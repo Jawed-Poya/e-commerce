@@ -9,6 +9,7 @@ import type {
 } from "../types/product-bulk-types";
 import { useCreateBulkProductsMutation } from "./use-product-mutation";
 import { ProductBulkFormSchema } from "../schemas/product-bulk-schema";
+import { useNavigate } from "react-router-dom";
 
 const MaxImageSize = 5 * 1024 * 1024;
 
@@ -93,6 +94,7 @@ function getErrorMessage(error: unknown) {
 
 export function useBulkProductForm() {
     const createMutation = useCreateBulkProductsMutation();
+    const navigate = useNavigate();
 
     const form = useForm<ProductBulkFormValues>({
         resolver: zodResolver(ProductBulkFormSchema),
@@ -226,11 +228,12 @@ export function useBulkProductForm() {
             try {
                 await createPromise;
                 resetProducts();
+                navigate("/products");
             } catch {
                 // The toast already displays the API error.
             }
         },
-        [createMutation, resetProducts],
+        [createMutation, navigate, resetProducts],
     );
 
     useEffect(() => {
