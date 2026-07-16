@@ -3,6 +3,7 @@
 using API.Entities.Types;
 using ECommerce.Data;
 using ECommerce.Dtos;
+using ECommerce.Entities.Common;
 using Microsoft.EntityFrameworkCore;
 
 public class GeneralTypesService : IGeneralTypeService
@@ -22,10 +23,10 @@ public class GeneralTypesService : IGeneralTypeService
             .AsNoTracking()
             .AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(group))
-        {
-            query = query.Where(x => x.Group == group);
-        }
+        //if (!string.IsNullOrWhiteSpace(group))
+        //{
+        //    query = query.Where(x => x.Group == group);
+        //}
 
         return await query
             .OrderBy(x => x.Group)
@@ -35,7 +36,7 @@ public class GeneralTypesService : IGeneralTypeService
             {
                 Id = x.Id,
                 Name = x.Name,
-                Group = x.Group,
+                Group = x.Group.ToString(),
                 ParentId = x.ParentId,
                 ParentName = x.Parent != null ? x.Parent.Name : null,
                 SortOrder = x.SortOrder ?? 0
@@ -58,7 +59,6 @@ public class GeneralTypesService : IGeneralTypeService
             .AnyAsync(x =>
                 x.Name == model.Name &&
                 x.Group == model.Group);
-
 
         if (exists)
         {

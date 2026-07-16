@@ -14,6 +14,7 @@ public static class DependencyInjection
     {
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IGeneralTypeService, GeneralTypesService>();
+        services.AddScoped<IProductImageStorage, LocalProductImageStorage>();
 
         return services;
     }

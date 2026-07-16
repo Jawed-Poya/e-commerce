@@ -1,5 +1,6 @@
 using ECommerce.Shared;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
@@ -45,6 +46,14 @@ builder.Services
                 ))
         };
     });
+
+builder.Services.Configure<FormOptions>(
+    options =>
+    {
+        options.MultipartBodyLengthLimit =
+            260L * 1024L * 1024L;
+    }
+);
 
 var app = builder.Build();
 
