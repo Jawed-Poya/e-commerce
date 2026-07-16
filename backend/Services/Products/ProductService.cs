@@ -69,6 +69,9 @@ public class ProductService : IProductService
         if (filter.IsFeatured.HasValue)
             query = query.Where(x => x.IsFeatured == filter.IsFeatured);
 
+        if (filter.IsActive.HasValue)
+            query = query.Where(x => x.IsActive == filter.IsActive);
+
         if (filter.MinPrice.HasValue)
             query = query.Where(x =>
                 x.Prices.Any(p =>

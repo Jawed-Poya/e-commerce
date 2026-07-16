@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ImagePlus, LoaderCircle, Pencil, Plus, Search } from "lucide-react";
+import { ImagePlus, LoaderCircle, Pencil, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -20,6 +20,8 @@ import { productKeys } from "@/keys/product-keys";
 import { useI18n } from "@/i18n/i18n-provider";
 import { PageHeader } from "@/components/page-header";
 import { ProductSectionNavigation } from "@/features/products/components/product-section-navigation";
+import { ProductFiltersDialog, type AppliedProductFilters } from "@/features/products/components/product-filters-dialog";
+import { ProductPagination } from "@/features/products/components/product-pagination";
 
 function getUpdateErrorMessage(error: unknown, messages: { connection: string; endpoint: string; failed: string }) {
     const apiError = error as {
@@ -45,14 +47,19 @@ export default function ProductsPage() {
     const queryClient = useQueryClient();
     const { t } = useI18n();
     const [search, setSearch] = useState("");
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
+    const [filters, setFilters] = useState<AppliedProductFilters>({});
+    const [filtersOpen, setFiltersOpen] = useState(false);
     const [selected, setSelected] = useState<number[]>([]);
     const [drafts, setDrafts] = useState<BulkUpdateProduct[]>([]);
     const [open, setOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     const [activeEditor, setActiveEditor] = useState(0);
-    const { data, isLoading, isError } = useProducts(search);
+    const { data, isLoading, isError, isFetching } = useProducts({ ...filters, search: search || undefined, page, pageSize });
     const { data: lookups } = useProductLookupsQuery();
     const products = data?.items ?? [];
+    const activeFilterCount = Object.values(filters).filter(value => value !== undefined && value !== "").length;
     const selectedProducts = useMemo(() => products.filter(x => selected.includes(x.id)), [products, selected]);
 
     useEffect(() => setSelected(ids => ids.filter(id => products.some(x => x.id === id))), [products]);
@@ -82,7 +89,11 @@ export default function ProductsPage() {
                 <Button onClick={() => navigate("/products/new")}><Plus className="me-2 size-4" />{t("products.bulkCreate")}</Button>
             </>} />
         <ProductSectionNavigation />
-        <div className="relative"><Search className="absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input value={search} onChange={e => setSearch(e.target.value)} placeholder={t("products.search")} className="ps-9" /></div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="relative flex-1"><Search className="absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder={t("products.search")} className="ps-9" />{search && <Button variant="ghost" size="icon-xs" className="absolute end-2 top-1" aria-label={t("filters.clearSearch")} onClick={() => { setSearch(""); setPage(1); }}><X /></Button>}</div>
+            <Button variant={activeFilterCount > 0 ? "secondary" : "outline"} onClick={() => setFiltersOpen(true)}><SlidersHorizontal className="me-2 size-4" />{t("filters.title")}{activeFilterCount > 0 && <span className="ms-1 border bg-background px-1.5 text-xs">{activeFilterCount}</span>}</Button>
+            {activeFilterCount > 0 && <Button variant="destructive" onClick={() => { setFilters({}); setPage(1); setSelected([]); }}><X className="me-2 size-4" />{t("filters.removeAll")}</Button>}
+        </div>
         <div className="rounded-md border"><Table>
             <TableHeader><TableRow>
                 <TableHead className="w-10"><Checkbox aria-label="Select all" checked={products.length > 0 && selected.length === products.length} onCheckedChange={() => setSelected(selected.length === products.length ? [] : products.map(x => x.id))} /></TableHead>
@@ -100,6 +111,9 @@ export default function ProductsPage() {
                 </TableRow>)}
             </TableBody>
         </Table></div>
+        {data && <ProductPagination page={data.page} pageSize={data.pageSize} totalCount={data.totalCount} totalPages={data.totalPages} onPageChange={setPage} onPageSizeChange={size => { setPageSize(size); setPage(1); }} />}
+        {isFetching && !isLoading && <div className="fixed bottom-4 end-4 z-40 flex items-center gap-2 border bg-background px-3 py-2 text-xs shadow-lg"><LoaderCircle className="size-4 animate-spin" />{t("products.refreshing")}</div>}
+        <ProductFiltersDialog open={filtersOpen} filters={filters} categories={lookups?.categories ?? []} brands={lookups?.brands ?? []} units={lookups?.units ?? []} onOpenChange={setFiltersOpen} onApply={next => { setFilters(next); setPage(1); setSelected([]); }} />
 
         {open && createPortal(<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm" onMouseDown={() => !saving && setOpen(false)}>
           <section role="dialog" aria-modal="true" aria-labelledby="product-editor-title" className="relative grid max-h-[94vh] w-full max-w-6xl grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-4 overflow-hidden rounded-xl border bg-background p-5 text-foreground shadow-2xl" onMouseDown={event => event.stopPropagation()}>

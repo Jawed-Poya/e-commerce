@@ -1,14 +1,16 @@
 import { productKeys } from "@/keys/product-keys";
 import { productService } from "@/services/product.service";
 import { useQuery } from "@tanstack/react-query";
+import type { ProductListFilters } from "@/services/product.service";
 
-export function useProducts(search = "") {
+export function useProducts(filters: ProductListFilters = {}) {
     return useQuery({
-        queryKey: [...productKeys.all, search],
+        queryKey: [...productKeys.all, filters],
         queryFn: async () => {
-            const { data } = await productService.getAll({ search: search || undefined, pageSize: 50 });
+            const { data } = await productService.getAll(filters);
             return data;
         },
+        placeholderData: previous => previous,
         staleTime: 1000 * 60 * 5,
     });
 }

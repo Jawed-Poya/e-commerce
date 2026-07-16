@@ -40,6 +40,21 @@ export interface PagedProducts {
     hasNextPage: boolean;
 }
 
+export interface ProductListFilters {
+    search?: string;
+    page?: number;
+    pageSize?: number;
+    categoryId?: number;
+    brandId?: number;
+    unitId?: number;
+    isFeatured?: boolean;
+    isActive?: boolean;
+    minPrice?: number;
+    maxPrice?: number;
+    sortBy?: "name" | "price" | "createdAt";
+    sortDescending?: boolean;
+}
+
 export type BulkUpdateProduct = Pick<ProductListItem,
     "id" | "name" | "barcode" | "categoryId" | "brandId" | "unitId" |
     "shortDescription" | "description" | "slug" | "minimumValue" |
@@ -50,7 +65,7 @@ function append(formData: FormData, key: string, value: string | number | boolea
 }
 
 export const productService = {
-    getAll(params?: { search?: string; page?: number; pageSize?: number }) {
+    getAll(params?: ProductListFilters) {
         return apiClient.get<PagedProducts>("/products", params);
     },
     bulkUpdate(products: BulkUpdateProduct[]) {

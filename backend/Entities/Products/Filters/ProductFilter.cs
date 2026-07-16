@@ -12,6 +12,8 @@ public class ProductFilter : PaginationFilter
 
     public bool? IsFeatured { get; set; }
 
+    public bool? IsActive { get; set; }
+
     public decimal? MinPrice { get; set; }
 
     public decimal? MaxPrice { get; set; }
