@@ -1,6 +1,6 @@
+import { productKeys } from "@/keys/product-keys";
 import { productService } from "@/services/product.service";
 import { useQuery } from "@tanstack/react-query";
-import { productKeys } from "../../../keys/product-keys";
 
 export function useProducts() {
     return useQuery({

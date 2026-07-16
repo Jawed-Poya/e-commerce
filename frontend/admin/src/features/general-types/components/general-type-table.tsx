@@ -16,8 +16,11 @@ import { DeleteButton } from "@/components/delete-button";
 import { useDeleteGeneralType } from "../hooks/use-delete-type";
 
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { generalTypeKeys } from "@/keys/type-keys";
 
 export function GeneralTypesTable() {
+    const queryClient = useQueryClient();
     const group = "All";
     const search = "";
 
@@ -33,11 +36,20 @@ export function GeneralTypesTable() {
 
     const handleDelete = async (id: number | string) => {
         try {
-            await toast.promise(deleteMutation.mutateAsync(id as number), {
-                loading: "Deleting item...",
-                success: "Item deleted successfully.",
-                error: "Failed to delete item.",
-            });
+            await toast.promise(
+                deleteMutation.mutateAsync(id as number, {
+                    onSuccess: () => {
+                        queryClient.invalidateQueries({
+                            queryKey: generalTypeKeys.all,
+                        });
+                    },
+                }),
+                {
+                    loading: "Deleting item...",
+                    success: "Item deleted successfully.",
+                    error: "Failed to delete item.",
+                },
+            );
         } finally {
         }
     };
