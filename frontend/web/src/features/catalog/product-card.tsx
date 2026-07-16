@@ -25,7 +25,7 @@ export function ProductCard({ product }: { product: Product }) {
     });
 
   return (
-    <article className="group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_4px_24px_rgba(15,23,42,.04)] transition-[transform,box-shadow,border-color] duration-300 ease-out hover:-translate-y-1.5 hover:border-primary/25 hover:shadow-[0_20px_50px_rgba(7,89,183,.13)]">
+    <article className="group relative grid h-full min-w-0 grid-rows-[auto_1fr] overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_4px_24px_rgba(15,23,42,.04)] transition-[transform,box-shadow,border-color] duration-300 ease-out hover:-translate-y-1.5 hover:border-primary/25 hover:shadow-[0_20px_50px_rgba(7,89,183,.13)]">
       <div className="relative aspect-[1/1.06] overflow-hidden bg-gradient-to-b from-muted/40 to-muted">
         <Link
           to={`/products/${product.id}`}
@@ -86,18 +86,18 @@ export function ProductCard({ product }: { product: Product }) {
         </Link>
       </div>
 
-      <div className="flex flex-1 flex-col p-4 sm:p-5">
-        <p className="mb-2 truncate text-[10px] font-bold uppercase tracking-[.16em] text-primary">
+      <div className="grid min-h-52 grid-rows-[auto_3rem_1fr_auto] p-4 sm:min-h-56 sm:p-5">
+        <p className="mb-2 h-4 truncate text-[10px] font-bold uppercase tracking-[.16em] text-primary">
           {product.categoryName}
         </p>
         <Link
-          className="line-clamp-2 min-h-12 text-[15px] font-bold leading-6 tracking-[-.01em] transition-colors hover:text-primary"
+          className="line-clamp-2 h-12 text-[15px] font-bold leading-6 tracking-[-.01em] transition-colors hover:text-primary"
           to={`/products/${product.id}`}
         >
           {product.name}
         </Link>
 
-        <div className="mt-auto pt-4">
+        <div className="row-start-4 pt-4">
           <div className="mb-4 flex items-end justify-between gap-3">
             <p className="text-2xl font-black tracking-tight text-foreground">
               ${(product.price ?? 0).toFixed(2)}

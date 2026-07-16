@@ -150,7 +150,7 @@ export function CatalogPage() {
             </Select>
           </div>
           {query.isLoading ? (
-            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid auto-rows-fr items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <Skeleton key={i} className="h-[420px]" />
               ))}
@@ -172,7 +172,7 @@ export function CatalogPage() {
                 <b className="text-foreground">{query.data.items.length}</b> of{" "}
                 {query.data.totalCount} products
               </div>
-                  <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  <div className="grid auto-rows-fr items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                 {query.data.items.map((x) => (
                   <ProductCard key={x.id} product={x} />
                 ))}

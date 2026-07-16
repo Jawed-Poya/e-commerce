@@ -209,7 +209,7 @@ export function HomePage() {
             The product catalog is temporarily unavailable.
           </div>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-5">
+          <div className="grid auto-rows-fr items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-5">
             {products.isLoading
               ? Array.from({ length: 8 }).map((_, i) => (
                   <Skeleton key={i} className="h-[420px]" />
