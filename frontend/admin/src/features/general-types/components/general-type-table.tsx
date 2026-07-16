@@ -47,8 +47,9 @@ export function GeneralTypesTable({ rows, allRows, isLoading, isError, onRetry }
                     error: t("types.deleteError"),
                 },
             );
-        } catch {
+        } catch (error) {
             // toast.promise presents the localized failure message.
+            throw error;
         }
     };
 

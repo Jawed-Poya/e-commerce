@@ -22,6 +22,7 @@ interface DeleteButtonProps {
     cancelLabel?: string;
     confirmLabel?: string;
     loadingLabel?: string;
+    triggerLabel?: string;
 }
 
 export function DeleteButton({
@@ -32,6 +33,7 @@ export function DeleteButton({
     cancelLabel = "Cancel",
     confirmLabel = "Delete",
     loadingLabel = "Deleting...",
+    triggerLabel,
 }: DeleteButtonProps) {
     const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
@@ -41,6 +43,8 @@ export function DeleteButton({
             setLoading(true);
             await onDelete(id);
             setOpen(false);
+        } catch {
+            // The caller owns the user-facing error message; keep the dialog open.
         } finally {
             setLoading(false);
         }
@@ -56,8 +60,9 @@ export function DeleteButton({
             }}
         >
             <AlertDialogTrigger>
-                <Button variant="destructive" size="icon" aria-label={confirmLabel}>
+                <Button variant="destructive" size={triggerLabel ? "default" : "icon"} aria-label={confirmLabel}>
                     <Trash2 className="size-4" />
+                    {triggerLabel}
                 </Button>
             </AlertDialogTrigger>
 

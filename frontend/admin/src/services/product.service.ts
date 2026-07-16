@@ -98,4 +98,7 @@ export const productService = {
         });
         return apiClient.put<{ updatedCount: number }>("/products/bulk", formData);
     },
+    deleteMany(ids: number[]) {
+        return Promise.all(ids.map(id => apiClient.delete<void>(`/products/${id}`)));
+    },
 };

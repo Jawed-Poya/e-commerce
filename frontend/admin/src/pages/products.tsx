@@ -22,6 +22,7 @@ import { PageHeader } from "@/components/page-header";
 import { ProductSectionNavigation } from "@/features/products/components/product-section-navigation";
 import { ProductFiltersDialog, type AppliedProductFilters } from "@/features/products/components/product-filters-dialog";
 import { ProductPagination } from "@/features/products/components/product-pagination";
+import { DeleteButton } from "@/components/delete-button";
 
 function getUpdateErrorMessage(error: unknown, messages: { connection: string; endpoint: string; failed: string }) {
     const apiError = error as {
@@ -83,9 +84,24 @@ export default function ProductsPage() {
         } finally { setSaving(false); }
     };
 
+    const deleteSelected = async () => {
+        try {
+            await productService.deleteMany(selected);
+            toast.success(t("products.deleteSuccess"));
+            setSelected([]);
+            setPage(1);
+            await queryClient.invalidateQueries({ queryKey: productKeys.all });
+        } catch (error) {
+            toast.error(t("products.deleteError"));
+            await queryClient.invalidateQueries({ queryKey: productKeys.all });
+            throw error;
+        }
+    };
+
     return <div className="space-y-6">
         <PageHeader title={t("products.title")} description={t("products.subtitle")} actions={<>
                 {selected.length > 0 && <Button variant="outline" onClick={() => editProducts(selectedProducts)}><Pencil className="me-2 size-4" />{t("products.updateSelected")} ({selected.length})</Button>}
+                {selected.length > 0 && <DeleteButton id="selected-products" onDelete={deleteSelected} triggerLabel={`${t("products.deleteSelected")} (${selected.length})`} title={t("products.deleteTitle")} description={t("products.deleteDescription")} cancelLabel={t("form.cancel")} confirmLabel={t("products.confirmDelete")} loadingLabel={t("products.deleting")} />}
                 <Button onClick={() => navigate("/products/new")}><Plus className="me-2 size-4" />{t("products.bulkCreate")}</Button>
             </>} />
         <ProductSectionNavigation />
