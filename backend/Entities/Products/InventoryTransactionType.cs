@@ -14,5 +14,9 @@ public enum InventoryTransactionType
 
     Expired = 6,
 
-    Transfer = 7
+    Transfer = 7,
+
+    Reservation = 8,
+
+    ReservationRelease = 9
 }

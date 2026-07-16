@@ -6,7 +6,7 @@ using ECommerce.Entities.Users;
 
 public class ActivityLog : BaseEntity
 {
-    public long? UserId { get; set; }
+    public string? UserId { get; set; }
 
     public User? User { get; set; }
 

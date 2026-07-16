@@ -36,6 +36,6 @@ public sealed class ProductImageConfiguration
         {
             x.ProductId,
             x.IsPrimary
-        });
+        }).IsUnique().HasFilter("[IsPrimary] = 1");
     }
 }

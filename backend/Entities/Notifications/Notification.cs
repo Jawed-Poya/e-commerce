@@ -18,5 +18,5 @@ public class Notification : BaseEntity
 
     public DateTime? ReadAt { get; set; }
 
-    public long? UserId { get; set; }
+    public string? UserId { get; set; }
 }

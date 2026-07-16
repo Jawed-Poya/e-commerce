@@ -15,9 +15,11 @@ public class Customer : BaseEntity
 
     public string? Address { get; set; }
 
-    public Guid? CustomerTypeId { get; set; }
+    public long? CustomerTypeId { get; set; }
 
     public GeneralType? CustomerType { get; set; }
 
     public ICollection<Order> Orders { get; set; } = [];
+
+    public ICollection<CustomerAddress> Addresses { get; set; } = [];
 }

@@ -42,4 +42,6 @@ public class Product : BaseEntity
     public ICollection<ProductPrice> Prices { get; set; } = [];
 
     public ProductInventory Inventory { get; set; } = null!;
+
+    public ICollection<ECommerce.Entities.Products.ProductVariant> Variants { get; set; } = [];
 }

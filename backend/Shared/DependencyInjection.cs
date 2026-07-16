@@ -4,6 +4,7 @@ using ECommerce.Data;
 using ECommerce.Entities.Users;
 using ECommerce.Services.GeneralTypes;
 using ECommerce.Services.Products;
+using ECommerce.Services.Inventory;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IGeneralTypeService, GeneralTypesService>();
         services.AddScoped<IProductImageStorage, LocalProductImageStorage>();
+        services.AddScoped<IInventoryService, InventoryService>();
 
         return services;
     }

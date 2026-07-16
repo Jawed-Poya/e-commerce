@@ -16,5 +16,15 @@ public class OrderItem : ProductEntity
 
     public decimal Discount { get; set; }
 
-    public decimal Total => (Quantity * UnitPrice) - Discount;
+    public string ProductName { get; set; } = null!;
+
+    public string? ProductBarcode { get; set; }
+
+    public string? VariantDescription { get; set; }
+
+    public decimal Tax { get; set; }
+
+    public string Currency { get; set; } = "AFN";
+
+    public decimal Total => (Quantity * UnitPrice) - Discount + Tax;
 }

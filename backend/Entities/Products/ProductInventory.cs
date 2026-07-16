@@ -6,6 +6,7 @@ namespace API.Entities.Products;
 
 public class ProductInventory : ProductEntity
 {
+    public byte[] RowVersion { get; set; } = [];
     public decimal Quantity { get; set; }
 
     public decimal ReservedQuantity { get; set; }
@@ -16,5 +17,5 @@ public class ProductInventory : ProductEntity
 
     [NotMapped]
     public decimal AvailableQuantity =>
-    Math.Max(0, Quantity - ReservedQuantity);
+    Quantity - ReservedQuantity;
 }
