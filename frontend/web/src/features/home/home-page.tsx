@@ -1,0 +1,16 @@
+import { Link } from "react-router-dom";
+import heroImage from "../../assets/marketplace-hero.png";
+import { Icon } from "../../shared/components/icon";
+import { ProductCard } from "../catalog/product-card";
+import { useLookups, useProducts } from "../catalog/use-catalog";
+
+export function HomePage() {
+  const products = useProducts({ page: 1, pageSize: 4, isActive: true, sortBy: "createdAt", sortDescending: true });
+  const lookups = useLookups();
+  return <>
+    <section className="hero"><div className="hero-copy"><p className="kicker">A better everyday marketplace</p><h1>Everything you need, <em>chosen with care.</em></h1><p>Discover quality products from trusted brands, with live stock visibility and a smooth shopping experience.</p><div className="hero-buttons"><Link className="primary-button" to="/products">Explore products <Icon name="arrow" /></Link><a className="text-link" href="#categories">Browse categories</a></div><div className="hero-stats"><span><strong>Secure</strong> checkout</span><span><strong>Fast</strong> delivery</span><span><strong>Easy</strong> returns</span></div></div><div className="hero-visual"><img src={heroImage} alt="A curated collection of products available at EasyCart" /></div></section>
+    <section className="section" id="categories"><div className="section-heading"><div><p className="eyebrow">Find your department</p><h2>Shop by category</h2></div><Link to="/products">View all <Icon name="arrow" /></Link></div><div className="category-grid">{lookups.isLoading ? <p>Loading categories…</p> : lookups.data?.categories.slice(0, 6).map((category, index) => <Link className={`category-card tone-${index % 4}`} key={category.id} to={`/products?categoryId=${category.id}`}><span className="category-number">0{index + 1}</span><h3>{category.name}</h3><span>Explore collection <Icon name="arrow" /></span></Link>)}</div></section>
+    <section className="section products-section"><div className="section-heading"><div><p className="eyebrow">Fresh from our catalog</p><h2>New arrivals</h2></div><Link to="/products?sort=newest">Shop all <Icon name="arrow" /></Link></div>{products.isError ? <div className="state-card">We couldn't load the catalog. Make sure the store API is running.</div> : <div className="product-grid">{products.isLoading ? Array.from({length:4}).map((_, i) => <div className="product-skeleton" key={i} />) : products.data?.items.map((product) => <ProductCard key={product.id} product={product} />)}</div>}</section>
+    <section className="feature-band"><div><p className="eyebrow">Shopping made straightforward</p><h2>Real stock. Clear prices. No surprises.</h2><p>Our storefront is connected directly to product, pricing, inventory, and image data—so what you see reflects what is actually available.</p><Link className="light-button" to="/products">Start shopping <Icon name="arrow" /></Link></div><div className="feature-list"><span><strong>01</strong><b>Curated catalog</b><small>Structured categories and trusted brands</small></span><span><strong>02</strong><b>Live availability</b><small>Inventory-aware product purchasing</small></span><span><strong>03</strong><b>Persistent cart</b><small>Your choices remain between visits</small></span></div></section>
+  </>;
+}

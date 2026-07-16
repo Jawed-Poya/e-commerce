@@ -1,0 +1,12 @@
+import { Link } from "react-router-dom";
+import { imageUrl } from "../../shared/api/api-client";
+import { Icon } from "../../shared/components/icon";
+import { useCart } from "./cart-context";
+
+export function CartPage() {
+  const cart = useCart();
+  const subtotal = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const shipping = subtotal >= 75 || subtotal === 0 ? 0 : 7.5;
+  if (!cart.items.length) return <section className="page-section"><div className="empty-cart"><span><Icon name="cart" /></span><p className="eyebrow">Your cart is ready</p><h1>Start adding something great.</h1><p>Products you add will stay here, even when you return later.</p><Link className="primary-button" to="/products">Browse products <Icon name="arrow" /></Link></div></section>;
+  return <section className="page-section"><div className="page-title compact"><p className="eyebrow">Review your order</p><h1>Shopping cart</h1></div><div className="cart-layout"><div className="cart-list">{cart.items.map((item) => <article className="cart-row" key={item.id}><Link to={`/products/${item.id}`}><img src={imageUrl(item.image) || "/placeholder-product.svg"} alt={item.name} /></Link><div className="cart-product"><Link to={`/products/${item.id}`}>{item.name}</Link><small>${item.price.toFixed(2)} each</small><div className="quantity"><button onClick={() => cart.updateQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1}><Icon name="minus" /></button><span>{item.quantity}</span><button onClick={() => cart.updateQuantity(item.id, item.quantity + 1)} disabled={item.quantity >= item.stock}><Icon name="plus" /></button></div></div><strong>${(item.price * item.quantity).toFixed(2)}</strong><button className="remove-button" onClick={() => cart.removeItem(item.id)} aria-label="Remove item"><Icon name="trash" /></button></article>)}</div><aside className="order-summary"><p className="eyebrow">Order summary</p><h2>${(subtotal + shipping).toFixed(2)}</h2><div><span>Subtotal</span><strong>${subtotal.toFixed(2)}</strong></div><div><span>Shipping</span><strong>{shipping ? `$${shipping.toFixed(2)}` : "Free"}</strong></div><div className="summary-total"><span>Total</span><strong>${(subtotal + shipping).toFixed(2)}</strong></div><button className="primary-button full">Continue to checkout</button><p className="summary-note">Secure checkout integration is the next step.</p></aside></div></section>;
+}
