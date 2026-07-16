@@ -1,1 +1,96 @@
-:root{--blue:#0759b7;--orange:#f47b20;--ink:#0b1b2e;--muted:#68778a;--line:#dfe6ee;--pale:#eff6fd;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:#fff;font-synthesis:none;text-rendering:optimizeLegibility}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;min-width:320px}button,input{font:inherit}svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}::selection{background:var(--orange);color:#fff}
+@import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
+:root {
+  --background: #fff;
+  --foreground: #0b1728;
+  --card: #fff;
+  --card-foreground: #0b1728;
+  --popover: #fff;
+  --popover-foreground: #0b1728;
+  --primary: #0759b7;
+  --primary-foreground: #fff;
+  --secondary: #eef5fd;
+  --secondary-foreground: #064b9a;
+  --muted: #f4f7fa;
+  --muted-foreground: #627086;
+  --accent: #fff3e9;
+  --accent-foreground: #c95608;
+  --destructive: #d92d20;
+  --border: #dce4ed;
+  --input: #dce4ed;
+  --ring: #2675cf;
+  --brand-orange: #f47b20;
+  --radius: 0.5rem;
+}
+.dark {
+  --background: #07111f;
+  --foreground: #eef5ff;
+  --card: #0c1a2c;
+  --card-foreground: #eef5ff;
+  --popover: #0c1a2c;
+  --popover-foreground: #eef5ff;
+  --primary: #3b8bea;
+  --primary-foreground: #04101e;
+  --secondary: #102844;
+  --secondary-foreground: #dcecff;
+  --muted: #101f31;
+  --muted-foreground: #9eafc4;
+  --accent: #3a2317;
+  --accent-foreground: #ffad6f;
+  --destructive: #f97066;
+  --border: #23364c;
+  --input: #2a3d54;
+  --ring: #4e9aff;
+  --brand-orange: #ff8b3d;
+}
+:root {
+  --blue: var(--primary);
+  --orange: var(--brand-orange);
+  --ink: var(--foreground);
+  --line: var(--border);
+  --pale: var(--secondary);
+}
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand-orange: var(--brand-orange);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: "Inter", "Segoe UI", sans-serif;
+}
+* {
+  @apply border-border;
+}
+html {
+  @apply scroll-smooth;
+}
+body {
+  @apply m-0 min-w-80 bg-background text-foreground antialiased;
+}
+button,
+a,
+input,
+select {
+  @apply outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+}
+::selection {
+  @apply bg-brand-orange text-white;
+}

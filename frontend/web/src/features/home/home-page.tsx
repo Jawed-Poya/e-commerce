@@ -1,16 +1,271 @@
+import {
+  ArrowRight,
+  ChevronRight,
+  PackageCheck,
+  RotateCcw,
+  ShieldCheck,
+  ShoppingBag,
+  Star,
+  Truck,
+} from "lucide-react";
 import { Link } from "react-router-dom";
-import heroImage from "../../assets/marketplace-hero.png";
-import { Icon } from "../../shared/components/icon";
+import heroImage from "../../assets/storefront-hero.png";
+import { imageUrl } from "../../shared/api/api-client";
+import { Button } from "../../shared/components/ui/button";
+import { Skeleton } from "../../shared/components/ui/skeleton";
 import { ProductCard } from "../catalog/product-card";
 import { useLookups, useProducts } from "../catalog/use-catalog";
-
 export function HomePage() {
-  const products = useProducts({ page: 1, pageSize: 4, isActive: true, sortBy: "createdAt", sortDescending: true });
+  const products = useProducts({
+    page: 1,
+    pageSize: 8,
+    isActive: true,
+    sortBy: "createdAt",
+    sortDescending: true,
+  });
   const lookups = useLookups();
-  return <>
-    <section className="hero"><div className="hero-copy"><p className="kicker">A better everyday marketplace</p><h1>Everything you need, <em>chosen with care.</em></h1><p>Discover quality products from trusted brands, with live stock visibility and a smooth shopping experience.</p><div className="hero-buttons"><Link className="primary-button" to="/products">Explore products <Icon name="arrow" /></Link><a className="text-link" href="#categories">Browse categories</a></div><div className="hero-stats"><span><strong>Secure</strong> checkout</span><span><strong>Fast</strong> delivery</span><span><strong>Easy</strong> returns</span></div></div><div className="hero-visual"><img src={heroImage} alt="A curated collection of products available at EasyCart" /></div></section>
-    <section className="section" id="categories"><div className="section-heading"><div><p className="eyebrow">Find your department</p><h2>Shop by category</h2></div><Link to="/products">View all <Icon name="arrow" /></Link></div><div className="category-grid">{lookups.isLoading ? <p>Loading categories…</p> : lookups.data?.categories.slice(0, 6).map((category, index) => <Link className={`category-card tone-${index % 4}`} key={category.id} to={`/products?categoryId=${category.id}`}><span className="category-number">0{index + 1}</span><h3>{category.name}</h3><span>Explore collection <Icon name="arrow" /></span></Link>)}</div></section>
-    <section className="section products-section"><div className="section-heading"><div><p className="eyebrow">Fresh from our catalog</p><h2>New arrivals</h2></div><Link to="/products?sort=newest">Shop all <Icon name="arrow" /></Link></div>{products.isError ? <div className="state-card">We couldn't load the catalog. Make sure the store API is running.</div> : <div className="product-grid">{products.isLoading ? Array.from({length:4}).map((_, i) => <div className="product-skeleton" key={i} />) : products.data?.items.map((product) => <ProductCard key={product.id} product={product} />)}</div>}</section>
-    <section className="feature-band"><div><p className="eyebrow">Shopping made straightforward</p><h2>Real stock. Clear prices. No surprises.</h2><p>Our storefront is connected directly to product, pricing, inventory, and image data—so what you see reflects what is actually available.</p><Link className="light-button" to="/products">Start shopping <Icon name="arrow" /></Link></div><div className="feature-list"><span><strong>01</strong><b>Curated catalog</b><small>Structured categories and trusted brands</small></span><span><strong>02</strong><b>Live availability</b><small>Inventory-aware product purchasing</small></span><span><strong>03</strong><b>Persistent cart</b><small>Your choices remain between visits</small></span></div></section>
-  </>;
+  const items = products.data?.items ?? [];
+  const deal = items.find((x) => x.price && x.stock > 0) ?? items[0];
+  return (
+    <div className="mx-auto max-w-[1500px] px-4 sm:px-6 lg:px-8">
+      <section className="grid gap-6 py-6 lg:grid-cols-[230px_1fr]">
+        <aside className="hidden rounded-2xl border bg-card p-3 shadow-sm lg:block">
+          <div className="flex items-center justify-between rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground">
+            <span className="flex items-center gap-2">
+              <ShoppingBag className="size-4" />
+              All categories
+            </span>
+            <ChevronRight className="size-4" />
+          </div>
+          <nav className="mt-3 grid">
+            {lookups.isLoading
+              ? Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="m-1 h-10" />
+                ))
+              : lookups.data?.categories.slice(0, 8).map((x) => (
+                  <Link
+                    key={x.id}
+                    className="flex items-center justify-between rounded-lg px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-primary"
+                    to={`/products?categoryId=${x.id}`}
+                  >
+                    {x.name}
+                    <ChevronRight className="size-3.5" />
+                  </Link>
+                ))}
+          </nav>
+          <div className="mt-4 rounded-xl bg-gradient-to-br from-secondary to-accent p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-primary">
+              Marketplace offer
+            </p>
+            <h3 className="mt-2 text-lg font-black">
+              Explore this week's collection
+            </h3>
+            <Button asChild size="sm" className="mt-4">
+              <Link to="/products">Shop now</Link>
+            </Button>
+          </div>
+        </aside>
+        <div className="relative min-h-[560px] overflow-hidden rounded-2xl border bg-[#edf5ff] shadow-sm dark:bg-[#0b1d33]">
+          <img
+            className="absolute inset-0 size-full object-cover object-center"
+            src={heroImage}
+            alt="EasyCart product collection"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-transparent dark:from-[#071526] dark:via-[#071526]/90" />
+          <div className="relative flex min-h-[560px] max-w-2xl flex-col justify-center px-7 py-14 sm:px-12 lg:px-16">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.18em] text-primary">
+              <PackageCheck className="size-4" />
+              New collection
+            </p>
+            <h1 className="mt-5 text-5xl font-black leading-[1.02] tracking-[-.05em] sm:text-6xl">
+              Experience a <span className="text-primary">better way</span> to{" "}
+              <span className="text-brand-orange">shop.</span>
+            </h1>
+            <p className="mt-6 max-w-lg text-base leading-8 text-muted-foreground">
+              Discover real products from your local catalog, check live
+              availability and shop with confidence.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Button asChild size="lg">
+                <Link to="/products">
+                  Shop now
+                  <ArrowRight />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <a href="#products">View products</a>
+              </Button>
+            </div>
+            <div className="mt-12 grid max-w-lg grid-cols-3 gap-3">
+              {[
+                [Truck, "Fast delivery"],
+                [RotateCcw, "Easy returns"],
+                [ShieldCheck, "Secure shopping"],
+              ].map(([I, t]) => {
+                const C = I as typeof Truck;
+                return (
+                  <div
+                    key={String(t)}
+                    className="flex items-center gap-2 text-xs font-semibold"
+                  >
+                    <span className="grid size-8 place-items-center rounded-lg bg-background shadow-sm">
+                      <C className="size-4 text-primary" />
+                    </span>
+                    {String(t)}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="absolute right-7 top-7 hidden items-center gap-2 rounded-xl border bg-background/90 p-3 shadow-lg backdrop-blur sm:flex">
+            <Star className="size-5 fill-brand-orange text-brand-orange" />
+            <span>
+              <b className="block text-sm">Trusted catalog</b>
+              <small className="text-muted-foreground">Live product data</small>
+            </span>
+          </div>
+        </div>
+      </section>
+      <section id="categories" className="py-14">
+        <Heading
+          eyebrow="Browse categories"
+          title="Shop by categories"
+          to="/products"
+        />
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+          {lookups.isLoading
+            ? Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-48" />
+              ))
+            : lookups.data?.categories.slice(0, 6).map((x, i) => (
+                <Link
+                  key={x.id}
+                  to={`/products?categoryId=${x.id}`}
+                  className={`group flex min-h-48 flex-col justify-end rounded-2xl border p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${["bg-blue-100/70 dark:bg-blue-950/40", "bg-orange-100/70 dark:bg-orange-950/40", "bg-emerald-100/70 dark:bg-emerald-950/40"][i % 3]}`}
+                >
+                  <span className="mb-auto grid size-11 place-items-center rounded-xl bg-background/80 text-primary shadow-sm">
+                    <ShoppingBag />
+                  </span>
+                  <h3 className="font-bold">{x.name}</h3>
+                  <span className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                    Explore products
+                    <ArrowRight className="size-4 transition group-hover:translate-x-1" />
+                  </span>
+                </Link>
+              ))}
+        </div>
+      </section>
+      <section
+        id="deals"
+        className="grid gap-5 py-6 lg:grid-cols-[1.35fr_.65fr]"
+      >
+        {" "}
+        <div className="relative min-h-80 overflow-hidden rounded-2xl bg-gradient-to-br from-[#061426] to-[#123d77] p-8 text-white sm:p-10">
+          <p className="text-xs font-bold uppercase tracking-widest text-orange-300">
+            Featured from the catalog
+          </p>
+          <h2 className="mt-5 max-w-md text-3xl font-black sm:text-4xl">
+            Don't miss products selected for you.
+          </h2>
+          <p className="mt-4 max-w-sm text-sm leading-7 text-blue-100">
+            Real product information, gallery images, pricing and
+            availability—all in one place.
+          </p>
+          <Button asChild variant="orange" className="mt-7">
+            <Link to={deal ? `/products/${deal.id}` : "/products"}>
+              View product
+              <ArrowRight />
+            </Link>
+          </Button>
+          {deal && (
+            <img
+              className="absolute bottom-0 right-0 hidden h-[90%] w-[45%] object-contain sm:block"
+              src={imageUrl(deal.primaryImageUrl) || "/placeholder-product.svg"}
+              alt={deal.name}
+            />
+          )}
+        </div>
+        <div className="grid gap-5">
+          <Promo
+            color="bg-orange-100 dark:bg-orange-950/40"
+            label="New arrivals"
+            title="Fresh products added regularly"
+          />
+          <Promo
+            color="bg-blue-100 dark:bg-blue-950/40"
+            label="Free delivery"
+            title="On qualifying orders over $75"
+          />
+        </div>
+      </section>
+      <section id="products" className="py-16">
+        <Heading
+          eyebrow="Featured products"
+          title="Best products for you"
+          to="/products"
+        />
+        {products.isError ? (
+          <div className="rounded-2xl border border-dashed p-14 text-center text-muted-foreground">
+            The product catalog is temporarily unavailable.
+          </div>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-5">
+            {products.isLoading
+              ? Array.from({ length: 8 }).map((_, i) => (
+                  <Skeleton key={i} className="h-[420px]" />
+                ))
+              : items.map((x) => <ProductCard key={x.id} product={x} />)}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+function Heading({
+  eyebrow,
+  title,
+  to,
+}: {
+  eyebrow: string;
+  title: string;
+  to: string;
+}) {
+  return (
+    <div className="mb-8 flex items-end justify-between gap-4">
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-[.2em] text-muted-foreground">
+          {eyebrow}
+        </p>
+        <h2 className="mt-2 text-3xl font-black tracking-tight">{title}</h2>
+      </div>
+      <Button asChild variant="outline">
+        <Link to={to}>
+          View all
+          <ArrowRight />
+        </Link>
+      </Button>
+    </div>
+  );
+}
+function Promo({
+  color,
+  label,
+  title,
+}: {
+  color: string;
+  label: string;
+  title: string;
+}) {
+  return (
+    <Link
+      to="/products"
+      className={`${color} group flex min-h-36 flex-col justify-center rounded-2xl border p-6`}
+    >
+      <p className="text-[10px] font-bold uppercase tracking-widest text-primary">
+        {label}
+      </p>
+      <h3 className="mt-2 max-w-xs text-xl font-black">{title}</h3>
+      <ArrowRight className="mt-4 size-4 transition group-hover:translate-x-1" />
+    </Link>
+  );
 }
