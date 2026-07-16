@@ -352,7 +352,19 @@ export function ProductDraftCard({
                             control={control}
                             name={`products.${index}.isActive`}
                             render={({ field }) => (
-                                <div className="flex items-center justify-between rounded-lg border p-4">
+                                <div
+                                    role="switch"
+                                    aria-checked={field.value}
+                                    tabIndex={disabled ? -1 : 0}
+                                    onClick={() => !disabled && field.onChange(!field.value)}
+                                    onKeyDown={(event) => {
+                                        if (!disabled && (event.key === " " || event.key === "Enter")) {
+                                            event.preventDefault();
+                                            field.onChange(!field.value);
+                                        }
+                                    }}
+                                    className={`flex items-center justify-between rounded-lg border p-4 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${field.value ? "border-primary/50 bg-primary/5" : "hover:bg-muted/50"}`}
+                                >
                                     <div>
                                         <Label>Active product</Label>
                                         <p className="text-xs text-muted-foreground">
@@ -363,7 +375,9 @@ export function ProductDraftCard({
                                     <Switch
                                         disabled={disabled}
                                         checked={field.value}
-                                        onCheckedChange={field.onChange}
+                                        tabIndex={-1}
+                                        aria-hidden
+                                        className="pointer-events-none"
                                     />
                                 </div>
                             )}
@@ -373,7 +387,19 @@ export function ProductDraftCard({
                             control={control}
                             name={`products.${index}.isFeatured`}
                             render={({ field }) => (
-                                <div className="flex items-center justify-between rounded-lg border p-4">
+                                <div
+                                    role="switch"
+                                    aria-checked={field.value}
+                                    tabIndex={disabled ? -1 : 0}
+                                    onClick={() => !disabled && field.onChange(!field.value)}
+                                    onKeyDown={(event) => {
+                                        if (!disabled && (event.key === " " || event.key === "Enter")) {
+                                            event.preventDefault();
+                                            field.onChange(!field.value);
+                                        }
+                                    }}
+                                    className={`flex items-center justify-between rounded-lg border p-4 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${field.value ? "border-primary/50 bg-primary/5" : "hover:bg-muted/50"}`}
+                                >
                                     <div>
                                         <Label>Featured product</Label>
                                         <p className="text-xs text-muted-foreground">
@@ -384,7 +410,9 @@ export function ProductDraftCard({
                                     <Switch
                                         disabled={disabled}
                                         checked={field.value}
-                                        onCheckedChange={field.onChange}
+                                        tabIndex={-1}
+                                        aria-hidden
+                                        className="pointer-events-none"
                                     />
                                 </div>
                             )}

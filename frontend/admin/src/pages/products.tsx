@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useProducts } from "@/features/products/hooks/use-products";
 import { useProductLookupsQuery } from "@/features/products/hooks/use-product-mutation";
 import { productService, resolveProductImageUrl, type BulkUpdateProduct, type ProductListItem } from "@/services/product.service";
@@ -120,7 +121,10 @@ export default function ProductsPage() {
                         <div className="space-y-2"><Label>Slug</Label><Input value={item.slug ?? ""} onChange={e => change(item.id, { slug: e.target.value || null })} /></div>
                         <div className="space-y-2"><Label>Short description</Label><Textarea rows={2} value={item.shortDescription ?? ""} onChange={e => change(item.id, { shortDescription: e.target.value || null })} /></div>
                         <div className="space-y-2"><Label>Description</Label><Textarea rows={5} value={item.description ?? ""} onChange={e => change(item.id, { description: e.target.value || null })} /></div>
-                        <div className="flex flex-wrap gap-6"><label className="flex items-center gap-2 text-sm"><Checkbox checked={item.isActive} onCheckedChange={v => change(item.id, { isActive: v === true })} />Active</label><label className="flex items-center gap-2 text-sm"><Checkbox checked={item.isFeatured} onCheckedChange={v => change(item.id, { isFeatured: v === true })} />Featured</label></div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <ToggleCard title="Active product" description="Product is available for use in the store." checked={item.isActive} onChange={isActive => change(item.id, { isActive })} />
+                            <ToggleCard title="Featured product" description="Highlight this product in featured sections." checked={item.isFeatured} onChange={isFeatured => change(item.id, { isFeatured })} />
+                        </div>
                     </div>
                 </div>;
             })}</div>
@@ -139,4 +143,12 @@ function LookupSelect({ label, value, options, onChange, required = false }: { l
         <ComboboxInput className="w-full" placeholder={`Search ${label.replace(" *", "").toLowerCase()}...`} showClear={!required} />
         <ComboboxContent><ComboboxEmpty>No matching option.</ComboboxEmpty><ComboboxList>{options.map(option => <ComboboxItem key={option.id} value={option}>{option.name}</ComboboxItem>)}</ComboboxList></ComboboxContent>
     </Combobox></div>;
+}
+
+function ToggleCard({ title, description, checked, onChange }: { title: string; description: string; checked: boolean; onChange: (checked: boolean) => void }) {
+    const toggle = () => onChange(!checked);
+    return <div role="switch" aria-checked={checked} tabIndex={0} onClick={toggle} onKeyDown={event => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); toggle(); } }} className={`flex cursor-pointer items-center justify-between rounded-lg border p-4 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${checked ? "border-primary/50 bg-primary/5" : "hover:bg-muted/50"}`}>
+        <div className="pr-4"><p className="font-medium">{title}</p><p className="mt-1 text-xs text-muted-foreground">{description}</p></div>
+        <Switch checked={checked} tabIndex={-1} aria-hidden className="pointer-events-none" />
+    </div>;
 }
