@@ -6,12 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+    Combobox,
+    ComboboxContent,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+} from "@/components/ui/combobox";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type {
@@ -41,6 +42,50 @@ function FieldError({ message }: FieldErrorProps) {
     }
 
     return <p className="mt-1 text-xs text-destructive">{message}</p>;
+}
+
+function LookupCombobox({
+    options,
+    value,
+    placeholder,
+    disabled,
+    required = false,
+    onChange,
+}: {
+    options: ProductLookupOption[];
+    value: number | null;
+    placeholder: string;
+    disabled?: boolean;
+    required?: boolean;
+    onChange: (value: number | null) => void;
+}) {
+    const selected = options.find((option) => option.id === value) ?? null;
+
+    return (
+        <Combobox
+            items={options}
+            value={selected}
+            disabled={disabled}
+            onValueChange={(option) => onChange(option?.id ?? null)}
+            itemToStringLabel={(option) => option.name}
+        >
+            <ComboboxInput
+                className="w-full"
+                placeholder={placeholder}
+                showClear={!required}
+            />
+            <ComboboxContent>
+                <ComboboxEmpty>No matching option.</ComboboxEmpty>
+                <ComboboxList>
+                    {options.map((option) => (
+                        <ComboboxItem key={option.id} value={option}>
+                            {option.name}
+                        </ComboboxItem>
+                    ))}
+                </ComboboxList>
+            </ComboboxContent>
+        </Combobox>
+    );
 }
 
 export function ProductDraftCard({
@@ -143,32 +188,14 @@ export function ProductDraftCard({
                                 control={control}
                                 name={`products.${index}.categoryId`}
                                 render={({ field }) => (
-                                    <Select
+                                    <LookupCombobox
+                                        options={categories}
+                                        value={field.value || null}
+                                        placeholder="Search category..."
                                         disabled={disabled}
-                                        value={
-                                            field.value > 0
-                                                ? String(field.value)
-                                                : ""
-                                        }
-                                        onValueChange={(value) =>
-                                            field.onChange(Number(value))
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select category" />
-                                        </SelectTrigger>
-
-                                        <SelectContent>
-                                            {categories.map((category) => (
-                                                <SelectItem
-                                                    key={category.id}
-                                                    value={String(category.id)}
-                                                >
-                                                    {category.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                        required
+                                        onChange={field.onChange}
+                                    />
                                 )}
                             />
 
@@ -184,40 +211,13 @@ export function ProductDraftCard({
                                 control={control}
                                 name={`products.${index}.brandId`}
                                 render={({ field }) => (
-                                    <Select
+                                    <LookupCombobox
+                                        options={brands}
+                                        value={field.value}
+                                        placeholder="Search brand..."
                                         disabled={disabled}
-                                        value={
-                                            field.value
-                                                ? String(field.value)
-                                                : "none"
-                                        }
-                                        onValueChange={(value) =>
-                                            field.onChange(
-                                                value === "none"
-                                                    ? null
-                                                    : Number(value),
-                                            )
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select brand" />
-                                        </SelectTrigger>
-
-                                        <SelectContent>
-                                            <SelectItem value="none">
-                                                No brand
-                                            </SelectItem>
-
-                                            {brands.map((brand) => (
-                                                <SelectItem
-                                                    key={brand.id}
-                                                    value={String(brand.id)}
-                                                >
-                                                    {brand.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                        onChange={field.onChange}
+                                    />
                                 )}
                             />
                         </div>
@@ -229,40 +229,13 @@ export function ProductDraftCard({
                                 control={control}
                                 name={`products.${index}.unitId`}
                                 render={({ field }) => (
-                                    <Select
+                                    <LookupCombobox
+                                        options={units}
+                                        value={field.value}
+                                        placeholder="Search unit..."
                                         disabled={disabled}
-                                        value={
-                                            field.value
-                                                ? String(field.value)
-                                                : "none"
-                                        }
-                                        onValueChange={(value) =>
-                                            field.onChange(
-                                                value === "none"
-                                                    ? null
-                                                    : Number(value),
-                                            )
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select unit" />
-                                        </SelectTrigger>
-
-                                        <SelectContent>
-                                            <SelectItem value="none">
-                                                No unit
-                                            </SelectItem>
-
-                                            {units.map((unit) => (
-                                                <SelectItem
-                                                    key={unit.id}
-                                                    value={String(unit.id)}
-                                                >
-                                                    {unit.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                        onChange={field.onChange}
+                                    />
                                 )}
                             />
                         </div>
