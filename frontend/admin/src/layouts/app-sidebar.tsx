@@ -32,12 +32,6 @@ const data = {
             title: "Products",
             url: "/products",
             icon: <PackageIcon />,
-            items: [
-                {
-                    title: "All Products",
-                    url: "/products",
-                },
-            ],
         },
 
         {

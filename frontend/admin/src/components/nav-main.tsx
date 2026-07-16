@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/sidebar";
 
 import { CaretRightIcon } from "@phosphor-icons/react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useI18n } from "@/i18n/i18n-provider";
 
 const navKeys = { Dashboard: "nav.dashboard", Products: "nav.products", "All Products": "nav.allProducts", Categories: "nav.categories", Brands: "nav.brands", Units: "nav.units", Inventory: "nav.inventory", "Stock Overview": "nav.stockOverview", "Stock Transactions": "nav.stockTransactions", "Low Stock": "nav.lowStock", Orders: "nav.orders", "All Orders": "nav.allOrders", "Pending Orders": "nav.pendingOrders", "Completed Orders": "nav.completedOrders", "Cancelled Orders": "nav.cancelledOrders", Customers: "nav.customers", "All Customers": "nav.allCustomers", "Customer Types": "nav.customerTypes", System: "nav.system", "General Types": "nav.generalTypes", Users: "nav.users", "Roles & Permissions": "nav.roles" } as const;
@@ -36,7 +36,9 @@ export function NavMain({
     }[];
 }) {
     const { t, language } = useI18n();
+    const { pathname } = useLocation();
     const translate = (title: string) => t(navKeys[title as keyof typeof navKeys] ?? "nav.platform");
+    const matchesRoute = (url: string) => pathname === url || pathname.startsWith(`${url}/`) || (url === "/dashboard" && pathname === "/");
     return (
         <SidebarGroup>
             <SidebarGroupLabel>{t("nav.platform")}</SidebarGroupLabel>
@@ -44,11 +46,12 @@ export function NavMain({
             <SidebarMenu>
                 {items.map((item) => {
                     const hasChildren = item.items && item.items.length > 0;
+                    const itemIsActive = matchesRoute(item.url) || item.items?.some(subItem => matchesRoute(subItem.url)) === true;
 
                     if (!hasChildren) {
                         return (
                             <SidebarMenuItem key={item.title}>
-                                <SidebarMenuButton tooltip={translate(item.title)}>
+                                <SidebarMenuButton tooltip={translate(item.title)} isActive={itemIsActive}>
                                     <Link
                                         to={item.url}
                                         className="flex gap-2 items-center w-full py-3"
@@ -64,12 +67,12 @@ export function NavMain({
                     return (
                         <Collapsible
                             key={item.title}
-                            defaultOpen={item.isActive}
+                            defaultOpen={itemIsActive || item.isActive}
                             className="group/collapsible"
                         >
                             <SidebarMenuItem>
                                 <CollapsibleTrigger className={"w-full"}>
-                                    <SidebarMenuButton tooltip={translate(item.title)}>
+                                    <SidebarMenuButton tooltip={translate(item.title)} isActive={itemIsActive}>
                                         {item.icon}
 
                                         <span>{translate(item.title)}</span>
@@ -77,10 +80,12 @@ export function NavMain({
                                         <CaretRightIcon
                                             className={`
                                                 ms-auto
+                                                rotate-0
                                                 transition-transform
                                                 duration-200
-                                                group-data-[state=open]/collapsible:rotate-90
-                                                ${language === "en" ? "" : "rotate-180"}
+                                                ease-out
+                                                group-data-open/collapsible:rotate-90
+                                                ${language === "en" ? "" : "rotate-180 group-data-open/collapsible:rotate-90"}
                                             `}
                                         />
                                     </SidebarMenuButton>
@@ -92,7 +97,7 @@ export function NavMain({
                                             <SidebarMenuSubItem
                                                 key={subItem.title}
                                             >
-                                                <SidebarMenuSubButton>
+                                                <SidebarMenuSubButton isActive={matchesRoute(subItem.url)}>
                                                     <Link
                                                         to={subItem.url}
                                                         className=" w-full py-3"
