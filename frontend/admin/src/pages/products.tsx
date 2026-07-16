@@ -10,8 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
 import {
     Table,
     TableBody,
@@ -29,41 +27,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { Badge } from "@/components/ui/badge";
-
-const products = [
-    {
-        id: 1,
-        name: "iPhone 16 Pro",
-        sku: "IPH-16-PRO",
-        category: "Mobile",
-        price: "$999",
-        stock: 25,
-        status: true,
-    },
-    {
-        id: 2,
-        name: "MacBook Pro M4",
-        sku: "MB-M4",
-        category: "Laptop",
-        price: "$1999",
-        stock: 8,
-        status: true,
-    },
-    {
-        id: 3,
-        name: "AirPods Pro",
-        sku: "APP-2",
-        category: "Accessories",
-        price: "$249",
-        stock: 0,
-        status: false,
-    },
-];
+import { useProducts } from "@/features/products/hooks/use-products";
+import { useNavigate } from "react-router-dom";
 
 export default function ProductsPage() {
+    const navigate = useNavigate();
+    const { data } = useProducts();
+
     return (
         <div className="space-y-6">
-            {/* Header */}
             <div
                 className="
                 flex
@@ -91,7 +63,10 @@ export default function ProductsPage() {
                     </p>
                 </div>
 
-                <Button>
+                <Button
+                    className={"cursor-pointer"}
+                    onClick={() => navigate("/products/new")}
+                >
                     <Plus className="mr-2 h-4 w-4" />
                     Add Product
                 </Button>
@@ -167,7 +142,7 @@ export default function ProductsPage() {
                     </TableHeader>
 
                     <TableBody>
-                        {products.map((product) => (
+                        {data?.data?.map((product) => (
                             <TableRow key={product.id}>
                                 <TableCell
                                     className="

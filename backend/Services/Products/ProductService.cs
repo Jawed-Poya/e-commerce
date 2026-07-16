@@ -31,7 +31,6 @@ public class ProductService : IProductService
         {
             query = query.Where(x =>
                 x.Name.Contains(filter.Search) ||
-                x.SKU.Contains(filter.Search) ||
                 (x.Barcode != null && x.Barcode.Contains(filter.Search)));
         }
 
@@ -141,7 +140,6 @@ public class ProductService : IProductService
             throw new KeyNotFoundException("Product not found.");
 
         entity.Name = model.Name;
-        entity.SKU = model.SKU;
         entity.Barcode = model.Barcode;
         entity.Slug = model.Slug;
         entity.ShortDescription = model.ShortDescription;

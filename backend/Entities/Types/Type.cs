@@ -3,13 +3,13 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace API.Entities.Types;
 
-
-[Table("Type", Schema = "Common")]
 public class GeneralType : BaseEntity
 {
     public string Name { get; set; } = null!;
     
     public string Group { get; set; } = null!;
+
+    public int? SortOrder { get; set; }
 
     public long? ParentId { get; set; }
 

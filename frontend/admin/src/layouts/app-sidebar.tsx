@@ -1,7 +1,4 @@
-"use client";
-
 import * as React from "react";
-
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
 
@@ -14,9 +11,7 @@ import {
 } from "@/components/ui/sidebar";
 
 import {
-    ChartBarIcon,
     LayoutDashboard,
-    MegaphoneIcon,
     PackageIcon,
     SettingsIcon,
     ShoppingCartIcon,
@@ -50,19 +45,15 @@ const data = {
                 },
                 {
                     title: "Categories",
-                    url: "/categories",
+                    url: "/products/categories",
                 },
                 {
                     title: "Brands",
-                    url: "/brands",
+                    url: "/products/brands",
                 },
                 {
                     title: "Units",
-                    url: "/units",
-                },
-                {
-                    title: "Product Reviews",
-                    url: "/reviews",
+                    url: "/products/units",
                 },
             ],
         },
@@ -128,46 +119,14 @@ const data = {
         },
 
         {
-            title: "Marketing",
-            url: "/marketing",
-            icon: <MegaphoneIcon />,
-            items: [
-                {
-                    title: "Featured Products",
-                    url: "/marketing/featured",
-                },
-                {
-                    title: "Discounts",
-                    url: "/marketing/discounts",
-                },
-            ],
-        },
-
-        {
-            title: "Reports",
-            url: "/reports",
-            icon: <ChartBarIcon />,
-            items: [
-                {
-                    title: "Sales Reports",
-                    url: "/reports/sales",
-                },
-                {
-                    title: "Inventory Reports",
-                    url: "/reports/inventory",
-                },
-                {
-                    title: "Customer Reports",
-                    url: "/reports/customers",
-                },
-            ],
-        },
-
-        {
             title: "System",
             url: "/system",
             icon: <SettingsIcon />,
             items: [
+                {
+                    title: "General Types",
+                    url: "/system/general-types",
+                },
                 {
                     title: "Users",
                     url: "/system/users",
@@ -175,18 +134,6 @@ const data = {
                 {
                     title: "Roles & Permissions",
                     url: "/system/roles",
-                },
-                {
-                    title: "Notifications",
-                    url: "/system/notifications",
-                },
-                {
-                    title: "Activity Logs",
-                    url: "/system/activity-logs",
-                },
-                {
-                    title: "Settings",
-                    url: "/system/settings",
                 },
             ],
         },

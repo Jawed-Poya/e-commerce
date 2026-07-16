@@ -2,6 +2,7 @@
 
 using ECommerce.Data;
 using ECommerce.Entities.Users;
+using ECommerce.Services.GeneralTypes;
 using ECommerce.Services.Products;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,7 @@ public static class DependencyInjection
     public static IServiceCollection AddCatalog(this IServiceCollection services)
     {
         services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<IGeneralTypeService, GeneralTypesService>();
 
         return services;
     }

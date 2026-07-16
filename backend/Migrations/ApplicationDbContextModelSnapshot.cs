@@ -204,10 +204,6 @@ namespace ECommerce.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("SKU")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("ShortDescription")
                         .HasColumnType("nvarchar(max)");
 
@@ -391,17 +387,20 @@ namespace ECommerce.Migrations
 
                     b.Property<string>("Group")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<long?>("ParentId")
                         .HasColumnType("bigint");
+
+                    b.Property<int?>("SortOrder")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -410,7 +409,10 @@ namespace ECommerce.Migrations
 
                     b.HasIndex("ParentId");
 
-                    b.ToTable("Type", "Common");
+                    b.HasIndex("Group", "Name")
+                        .IsUnique();
+
+                    b.ToTable("Types");
                 });
 
             modelBuilder.Entity("ECommerce.Entities.ActivityLog", b =>

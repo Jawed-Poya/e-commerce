@@ -2,6 +2,8 @@ import { createBrowserRouter } from "react-router-dom";
 import AppLayout from "@/layouts/app-layout";
 import Dashboard from "@/pages/dashboard";
 import ProductsPage from "@/pages/products";
+import CreateProductPage from "@/features/products/pages/create-product";
+import GeneralTypesPage from "@/pages/general-types";
 
 export const router = createBrowserRouter([
     {
@@ -28,8 +30,8 @@ export const router = createBrowserRouter([
                     },
 
                     {
-                        path: "create",
-                        element: "Create Product",
+                        path: "new",
+                        element: <CreateProductPage />,
                     },
 
                     {
@@ -47,6 +49,11 @@ export const router = createBrowserRouter([
             {
                 path: "customers",
                 element: "Customers page",
+            },
+
+            {
+                path: "system/general-types",
+                element: <GeneralTypesPage />,
             },
 
             {

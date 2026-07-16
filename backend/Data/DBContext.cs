@@ -68,8 +68,17 @@ public class ApplicationDbContext
     {
         base.OnModelCreating(builder);
 
+
         builder.ApplyConfigurationsFromAssembly(
             typeof(ApplicationDbContext).Assembly
         );
+
+        builder.Entity<GeneralType>()
+            .HasIndex(x => new
+            {
+                x.Group,
+                x.Name
+            })
+            .IsUnique();
     }
 }

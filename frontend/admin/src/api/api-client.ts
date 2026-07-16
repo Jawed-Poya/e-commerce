@@ -7,36 +7,36 @@ export interface ApiResponse<T> {
 }
 
 class ApiClient {
-    async get<T>(url: string, params?: object): Promise<T> {
+    async get<T>(url: string, params?: object): Promise<ApiResponse<T>> {
         const response = await axiosInstance.get<ApiResponse<T>>(url, {
             params,
         });
 
-        return response.data.data;
+        return response.data;
     }
 
-    async post<T>(url: string, body?: unknown): Promise<T> {
+    async post<T>(url: string, body?: unknown): Promise<ApiResponse<T>> {
         const response = await axiosInstance.post<ApiResponse<T>>(url, body);
 
-        return response.data.data;
+        return response.data;
     }
 
-    async put<T>(url: string, body?: unknown): Promise<T> {
+    async put<T>(url: string, body?: unknown): Promise<ApiResponse<T>> {
         const response = await axiosInstance.put<ApiResponse<T>>(url, body);
 
-        return response.data.data;
+        return response.data;
     }
 
-    async patch<T>(url: string, body?: unknown): Promise<T> {
+    async patch<T>(url: string, body?: unknown): Promise<ApiResponse<T>> {
         const response = await axiosInstance.patch<ApiResponse<T>>(url, body);
 
-        return response.data.data;
+        return response.data;
     }
 
-    async delete<T>(url: string): Promise<T> {
+    async delete<T>(url: string): Promise<ApiResponse<T>> {
         const response = await axiosInstance.delete<ApiResponse<T>>(url);
 
-        return response.data.data;
+        return response.data;
     }
 }
 

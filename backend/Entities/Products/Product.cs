@@ -7,8 +7,6 @@ public class Product : BaseEntity
 {
     public string Name { get; set; } = null!;
 
-    public string SKU { get; set; } = null!;
-
     public string? Barcode { get; set; }
 
     public string? ShortDescription { get; set; }
