@@ -35,7 +35,9 @@ public class ProductsController : ControllerBase
     [HttpGet("{id:long}")]
     public async Task<IActionResult> GetById(long id)
     {
-        return Ok(await _service.GetByIdAsync(id));
+        var product = await _service.GetByIdAsync(id);
+        if (product is null) return NotFound(ApiResponse<object>.Fail("Product not found."));
+        return Ok(ApiResponse<ECommerce.Dtos.ProductDetailsDto>.Ok(product));
     }
 
     [HttpPost]

@@ -14,3 +14,12 @@ export function useProducts(filters: ProductListFilters = {}) {
         staleTime: 1000 * 60 * 5,
     });
 }
+
+export function useProduct(id: number) {
+    return useQuery({
+        queryKey: productKeys.detail(id),
+        queryFn: async () => (await productService.getById(id)).data,
+        enabled: Number.isInteger(id) && id > 0,
+        staleTime: 1000 * 60 * 5,
+    });
+}

@@ -318,12 +318,33 @@ public class ProductService : IProductService
                 Name = x.Name,
                 Barcode = x.Barcode,
                 Description = x.Description,
+                ShortDescription = x.ShortDescription,
+                Slug = x.Slug,
+                MinimumValue = x.MinimumValue,
+                MaximumValue = x.MaximumValue,
                 CategoryId = x.CategoryId,
+                CategoryName = x.Category.Name,
                 BrandId = x.BrandId,
+                BrandName = x.Brand == null ? null : x.Brand.Name,
                 UnitId = x.UnitId,
+                UnitName = x.Unit == null ? null : x.Unit.Name,
                 IsActive = x.IsActive,
                 IsFeatured = x.IsFeatured,
-                ViewCount = x.ViewCount
+                ViewCount = x.ViewCount,
+                CreatedAt = x.CreatedAt,
+                UpdatedAt = x.UpdatedAt,
+                Inventory = x.Inventory == null ? null : new ProductInventoryDetailsDto(
+                    x.Inventory.Quantity,
+                    x.Inventory.ReservedQuantity,
+                    Math.Max(0, x.Inventory.Quantity - x.Inventory.ReservedQuantity),
+                    x.Inventory.MinimumQuantity,
+                    x.Inventory.ExpireDate),
+                Images = x.Images.OrderBy(i => i.SortOrder).Select(i => new ProductImageDetailsDto(
+                    i.Id, "/" + i.ImagePath.Replace("\\", "/"), i.OriginalFileName,
+                    i.ContentType, i.Size, i.IsPrimary, i.SortOrder)).ToList(),
+                Prices = x.Prices.Select(p => new ProductPriceDetailsDto(
+                    p.Id, p.CustomerType.Name, p.RegularPrice, p.SalePrice,
+                    p.StartDate, p.EndDate)).ToList()
             })
             .FirstOrDefaultAsync();
     }

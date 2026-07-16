@@ -37,6 +37,17 @@ export interface ProductListImage {
     sortOrder: number;
 }
 
+export interface ProductDetails extends Omit<ProductListItem, "stock" | "price" | "primaryImageUrl" | "images"> {
+    brandName: string | null;
+    unitName: string | null;
+    viewCount: number;
+    createdAt: string;
+    updatedAt: string | null;
+    inventory: { quantity: number; reservedQuantity: number; availableQuantity: number; minimumQuantity: number; expireDate: string | null } | null;
+    prices: { id: number; customerTypeName: string; regularPrice: number; salePrice: number | null; startDate: string | null; endDate: string | null }[];
+    images: (ProductListImage & { originalFileName: string | null; contentType: string; size: number })[];
+}
+
 export interface PagedProducts {
     items: ProductListItem[];
     page: number;
@@ -97,6 +108,9 @@ export const productService = {
             product.removedImageIds?.forEach(id => formData.append(`${prefix}.RemovedImageIds`, String(id)));
         });
         return apiClient.put<{ updatedCount: number }>("/products/bulk", formData);
+    },
+    getById(id: number) {
+        return apiClient.get<ProductDetails>(`/products/${id}`);
     },
     deleteMany(ids: number[]) {
         return Promise.all(ids.map(id => apiClient.delete<void>(`/products/${id}`)));

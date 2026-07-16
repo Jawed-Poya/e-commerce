@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ImagePlus, LoaderCircle, Pencil, Plus, Search, SlidersHorizontal, X } from "lucide-react";
+import { Eye, ImagePlus, LoaderCircle, Pencil, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -119,11 +119,11 @@ export default function ProductsPage() {
                 {isLoading && <TableRow><TableCell colSpan={7} className="h-28 text-center"><LoaderCircle className="mx-auto animate-spin" /></TableCell></TableRow>}
                 {isError && <TableRow><TableCell colSpan={7} className="h-28 text-center text-destructive">{t("products.loadError")}</TableCell></TableRow>}
                 {!isLoading && !isError && products.length === 0 && <TableRow><TableCell colSpan={7} className="h-28 text-center text-muted-foreground">{t("products.empty")}</TableCell></TableRow>}
-                {products.map(product => <TableRow key={product.id} data-state={selected.includes(product.id) ? "selected" : undefined}>
-                    <TableCell><Checkbox aria-label={`Select ${product.name}`} checked={selected.includes(product.id)} onCheckedChange={() => toggle(product.id)} /></TableCell>
+                {products.map(product => <TableRow key={product.id} className="group cursor-pointer" data-state={selected.includes(product.id) ? "selected" : undefined} onDoubleClick={() => navigate(`/products/${product.id}`)}>
+                    <TableCell onDoubleClick={event => event.stopPropagation()}><Checkbox aria-label={`Select ${product.name}`} checked={selected.includes(product.id)} onCheckedChange={() => toggle(product.id)} /></TableCell>
                     <TableCell><div className="flex items-center gap-3">{resolveProductImageUrl(product.primaryImageUrl) ? <img src={resolveProductImageUrl(product.primaryImageUrl)!} alt="" className="size-10 shrink-0 rounded-md border bg-muted object-cover" /> : <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted"><ImagePlus className="size-4 text-muted-foreground" /></div>}<span className="font-medium">{product.name}</span></div></TableCell><TableCell>{product.barcode || "—"}</TableCell><TableCell>{product.categoryName}</TableCell>
                     <TableCell>{product.price == null ? "—" : product.price.toLocaleString()}</TableCell><TableCell>{product.stock.toLocaleString()}</TableCell>
-                    <TableCell><Badge variant={product.isActive ? "outline" : "secondary"}>{product.isActive ? t("products.active") : t("products.inactive")}</Badge></TableCell>
+                    <TableCell className="relative"><Badge variant={product.isActive ? "outline" : "secondary"}>{product.isActive ? t("products.active") : t("products.inactive")}</Badge><Button type="button" variant="outline" size="icon-sm" className="absolute end-2 top-1/2 -translate-y-1/2 bg-background/95 text-primary opacity-0 shadow-sm backdrop-blur-sm transition-[opacity,transform,background-color] hover:bg-primary hover:text-primary-foreground group-hover:opacity-100 focus-visible:opacity-100" aria-label={t("details.open")} onClick={() => navigate(`/products/${product.id}`)}><Eye className="size-4" /></Button></TableCell>
                 </TableRow>)}
             </TableBody>
         </Table></div>

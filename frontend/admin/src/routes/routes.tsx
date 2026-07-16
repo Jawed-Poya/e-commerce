@@ -4,6 +4,7 @@ import Dashboard from "@/pages/dashboard";
 import ProductsPage from "@/pages/products";
 import GeneralTypesPage from "@/pages/general-types";
 import { ProductBulkCreatePage } from "@/features/products/components/product-bulk-create-page";
+import ProductDetailsPage from "@/pages/product-details";
 
 export const router = createBrowserRouter([
     {
@@ -32,6 +33,11 @@ export const router = createBrowserRouter([
                     {
                         path: "new",
                         element: <ProductBulkCreatePage />,
+                    },
+
+                    {
+                        path: ":id",
+                        element: <ProductDetailsPage />,
                     },
 
                     {
