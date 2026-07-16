@@ -1,5 +1,4 @@
 import apiClient from "@/api/api-client";
-import type { Product } from "@/schemas/product-schema";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "https://localhost:7060/api";
 const apiOrigin = new URL(apiBaseUrl, window.location.origin).origin;
@@ -88,17 +87,5 @@ export const productService = {
             if (product.image) formData.append(`${prefix}.Image`, product.image, product.image.name);
         });
         return apiClient.put<{ updatedCount: number }>("/products/bulk", formData);
-    },
-    getById(id: number) {
-        return apiClient.get<Product>(`/products/${id}`);
-    },
-    create(data: Product) {
-        return apiClient.post<number>("/products", data);
-    },
-    update(id: number, data: Product) {
-        return apiClient.put<void>(`/products/${id}`, data);
-    },
-    delete(id: number) {
-        return apiClient.delete<void>(`/products/${id}`);
     },
 };
