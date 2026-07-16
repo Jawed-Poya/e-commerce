@@ -19,6 +19,7 @@ import { productService, resolveProductImageUrl, type BulkUpdateProduct, type Pr
 import { productKeys } from "@/keys/product-keys";
 import { useI18n } from "@/i18n/i18n-provider";
 import { PageHeader } from "@/components/page-header";
+import { ProductSectionNavigation } from "@/features/products/components/product-section-navigation";
 
 function getUpdateErrorMessage(error: unknown, messages: { connection: string; endpoint: string; failed: string }) {
     const apiError = error as {
@@ -80,6 +81,7 @@ export default function ProductsPage() {
                 {selected.length > 0 && <Button variant="outline" onClick={() => editProducts(selectedProducts)}><Pencil className="me-2 size-4" />{t("products.updateSelected")} ({selected.length})</Button>}
                 <Button onClick={() => navigate("/products/new")}><Plus className="me-2 size-4" />{t("products.bulkCreate")}</Button>
             </>} />
+        <ProductSectionNavigation />
         <div className="relative"><Search className="absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input value={search} onChange={e => setSearch(e.target.value)} placeholder={t("products.search")} className="ps-9" /></div>
         <div className="rounded-md border"><Table>
             <TableHeader><TableRow>

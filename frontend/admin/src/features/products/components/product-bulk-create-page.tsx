@@ -10,6 +10,7 @@ import { ProductBulkUploader } from "./product-bulk-uploader";
 import { ProductDraftCard } from "./product-draft";
 import { useI18n } from "@/i18n/i18n-provider";
 import { PageHeader } from "@/components/page-header";
+import { ProductSectionNavigation } from "./product-section-navigation";
 
 export function ProductBulkCreatePage() {
     const { t } = useI18n();
@@ -28,7 +29,7 @@ export function ProductBulkCreatePage() {
 
     if (isLoading) {
         return (
-            <div className="space-y-5 p-6">
+            <div className="space-y-5">
                 <Skeleton className="h-10 w-72" />
                 <Skeleton className="h-48 w-full" />
                 <Skeleton className="h-96 w-full" />
@@ -38,7 +39,7 @@ export function ProductBulkCreatePage() {
 
     if (isError || !data) {
         return (
-            <div className="p-6">
+            <div>
                 <Alert variant="destructive">
                     <AlertTitle>Unable to load product form</AlertTitle>
                     <AlertDescription>
@@ -57,7 +58,7 @@ export function ProductBulkCreatePage() {
         <FormProvider {...form}>
             <form
                 onSubmit={submit}
-                className="mx-auto max-w-7xl space-y-6 p-4 md:p-6"
+                className="space-y-6"
             >
                 <PageHeader title={t("bulk.title")} description={t("bulk.subtitle")} actions={productCount > 0 ? (
                         <div className="flex items-center gap-2">
@@ -77,6 +78,8 @@ export function ProductBulkCreatePage() {
                             </Button>
                         </div>
                     ) : undefined} />
+
+                <ProductSectionNavigation />
 
                 <ProductBulkUploader
                     disabled={isSubmitting}
@@ -137,12 +140,12 @@ export function ProductBulkCreatePage() {
                         <Button type="submit" size="lg" disabled={isSubmitting}>
                             {isSubmitting ? (
                                 <>
-                                    <LoaderCircle className="mr-2 size-4 animate-spin" />
+                                    <LoaderCircle className="me-2 size-4 animate-spin" />
                                     {t("bulk.creating")}
                                 </>
                             ) : (
                                 <>
-                                    <PackagePlus className="mr-2 size-4" />
+                                    <PackagePlus className="me-2 size-4" />
                                     {t("bulk.create")} {productCount} product
                                     {productCount !== 1 ? "s" : ""}
                                 </>

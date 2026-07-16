@@ -26,7 +26,7 @@ export default function CreateProductPage() {
     }
 
     return (
-        <div className="mx-auto max-w-7xl space-y-6">
+        <div className="space-y-6">
             <PageHeader title={t("create.title")} description={t("create.subtitle")} actions={
                 <Button variant="outline" onClick={() => navigate("/products")}>
                     {t("create.back")}
