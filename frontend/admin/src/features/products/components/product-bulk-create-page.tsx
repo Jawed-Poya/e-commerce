@@ -8,8 +8,10 @@ import { useProductLookupsQuery } from "../hooks/use-product-mutation";
 import { useBulkProductForm } from "../hooks/use-bulk-product-form";
 import { ProductBulkUploader } from "./product-bulk-uploader";
 import { ProductDraftCard } from "./product-draft";
+import { useI18n } from "@/i18n/i18n-provider";
 
 export function ProductBulkCreatePage() {
+    const { t } = useI18n();
     const { data, isError, isLoading } = useProductLookupsQuery();
 
     const {
@@ -59,12 +61,11 @@ export function ProductBulkCreatePage() {
                 <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">
-                            Bulk product creation
+                            {t("bulk.title")}
                         </h1>
 
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Select multiple images and enter the information for
-                            each product.
+                            {t("bulk.subtitle")}
                         </p>
                     </div>
 
@@ -82,7 +83,7 @@ export function ProductBulkCreatePage() {
                                 onClick={resetProducts}
                             >
                                 <Trash2 className="mr-2 size-4" />
-                                Clear all
+                                {t("bulk.clear")}
                             </Button>
                         </div>
                     )}
@@ -107,11 +108,11 @@ export function ProductBulkCreatePage() {
                         <PackagePlus className="mx-auto size-10 text-muted-foreground" />
 
                         <h2 className="mt-4 font-semibold">
-                            No products selected
+                            {t("bulk.noProducts")}
                         </h2>
 
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Select product images to generate the forms.
+                            {t("bulk.selectImages")}
                         </p>
                     </div>
                 ) : (
@@ -136,11 +137,11 @@ export function ProductBulkCreatePage() {
                         <div>
                             <p className="font-medium">
                                 {productCount} product
-                                {productCount !== 1 ? "s" : ""} ready
+                                {productCount !== 1 ? "s" : ""} {t("bulk.ready")}
                             </p>
 
                             <p className="text-xs text-muted-foreground">
-                                All products will be submitted together.
+                                {t("bulk.submitTogether")}
                             </p>
                         </div>
 
@@ -148,12 +149,12 @@ export function ProductBulkCreatePage() {
                             {isSubmitting ? (
                                 <>
                                     <LoaderCircle className="mr-2 size-4 animate-spin" />
-                                    Creating products...
+                                    {t("bulk.creating")}
                                 </>
                             ) : (
                                 <>
                                     <PackagePlus className="mr-2 size-4" />
-                                    Create {productCount} product
+                                    {t("bulk.create")} {productCount} product
                                     {productCount !== 1 ? "s" : ""}
                                 </>
                             )}

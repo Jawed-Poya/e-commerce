@@ -14,12 +14,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { generalTypeKeys } from "@/keys/type-keys";
 import type { GeneralType } from "@/schemas/type.schema";
 import { useUpdateGeneralType } from "../hooks/use-update-types";
+import { useI18n } from "@/i18n/i18n-provider";
 
 interface GeneralTypeDialogProps {
     defaultGroup?: string;
 }
 
 export function GeneralTypeDialog({ defaultGroup }: GeneralTypeDialogProps) {
+    const { t } = useI18n();
     const queryClient = useQueryClient();
 
     const {
@@ -50,11 +52,10 @@ export function GeneralTypeDialog({ defaultGroup }: GeneralTypeDialogProps) {
         >
             <DialogContent className="min-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Create General Type</DialogTitle>
+                    <DialogTitle>{isEdit ? t("types.edit") : t("types.create")}</DialogTitle>
 
                     <DialogDescription>
-                        Create categories, brands, units and other reusable
-                        types.
+                        {t("types.subtitle")}
                     </DialogDescription>
                 </DialogHeader>
 

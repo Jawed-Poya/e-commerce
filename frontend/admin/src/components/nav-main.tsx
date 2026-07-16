@@ -17,6 +17,9 @@ import {
 
 import { CaretRightIcon } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
+import { useI18n } from "@/i18n/i18n-provider";
+
+const navKeys = { Dashboard: "nav.dashboard", Products: "nav.products", "All Products": "nav.allProducts", Categories: "nav.categories", Brands: "nav.brands", Units: "nav.units", Inventory: "nav.inventory", "Stock Overview": "nav.stockOverview", "Stock Transactions": "nav.stockTransactions", "Low Stock": "nav.lowStock", Orders: "nav.orders", "All Orders": "nav.allOrders", "Pending Orders": "nav.pendingOrders", "Completed Orders": "nav.completedOrders", "Cancelled Orders": "nav.cancelledOrders", Customers: "nav.customers", "All Customers": "nav.allCustomers", "Customer Types": "nav.customerTypes", System: "nav.system", "General Types": "nav.generalTypes", Users: "nav.users", "Roles & Permissions": "nav.roles" } as const;
 
 export function NavMain({
     items,
@@ -32,9 +35,11 @@ export function NavMain({
         }[];
     }[];
 }) {
+    const { t, language } = useI18n();
+    const translate = (title: string) => t(navKeys[title as keyof typeof navKeys] ?? "nav.platform");
     return (
         <SidebarGroup>
-            <SidebarGroupLabel>Platform</SidebarGroupLabel>
+            <SidebarGroupLabel>{t("nav.platform")}</SidebarGroupLabel>
 
             <SidebarMenu>
                 {items.map((item) => {
@@ -43,13 +48,13 @@ export function NavMain({
                     if (!hasChildren) {
                         return (
                             <SidebarMenuItem key={item.title}>
-                                <SidebarMenuButton tooltip={item.title}>
+                                <SidebarMenuButton tooltip={translate(item.title)}>
                                     <Link
                                         to={item.url}
                                         className="flex gap-2 items-center w-full py-3"
                                     >
                                         {item.icon}
-                                        <span>{item.title}</span>
+                                        <span>{translate(item.title)}</span>
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
@@ -64,18 +69,19 @@ export function NavMain({
                         >
                             <SidebarMenuItem>
                                 <CollapsibleTrigger className={"w-full"}>
-                                    <SidebarMenuButton tooltip={item.title}>
+                                    <SidebarMenuButton tooltip={translate(item.title)}>
                                         {item.icon}
 
-                                        <span>{item.title}</span>
+                                        <span>{translate(item.title)}</span>
 
                                         <CaretRightIcon
-                                            className="
-                                                ml-auto
+                                            className={`
+                                                ms-auto
                                                 transition-transform
                                                 duration-200
                                                 group-data-[state=open]/collapsible:rotate-90
-                                            "
+                                                ${language === "en" ? "" : "rotate-180"}
+                                            `}
                                         />
                                     </SidebarMenuButton>
                                 </CollapsibleTrigger>
@@ -92,7 +98,7 @@ export function NavMain({
                                                         className=" w-full py-3"
                                                     >
                                                         <span>
-                                                            {subItem.title}
+                                                            {translate(subItem.title)}
                                                         </span>
                                                     </Link>
                                                 </SidebarMenuSubButton>

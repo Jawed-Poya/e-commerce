@@ -18,8 +18,10 @@ import { useDeleteGeneralType } from "../hooks/use-delete-type";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { generalTypeKeys } from "@/keys/type-keys";
+import { useI18n } from "@/i18n/i18n-provider";
 
 export function GeneralTypesTable() {
+    const { t } = useI18n();
     const queryClient = useQueryClient();
     const group = "All";
     const search = "";
@@ -58,13 +60,13 @@ export function GeneralTypesTable() {
         <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead>Name</TableHead>
+                    <TableHead>{t("form.name")}</TableHead>
 
-                    <TableHead>Group</TableHead>
+                    <TableHead>{t("types.group")}</TableHead>
 
-                    <TableHead>Parent</TableHead>
+                    <TableHead>{t("form.parent")}</TableHead>
 
-                    <TableHead className="w-30">Actions</TableHead>
+                    <TableHead className="w-30">{t("types.actions")}</TableHead>
                 </TableRow>
             </TableHeader>
 

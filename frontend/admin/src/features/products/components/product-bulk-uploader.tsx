@@ -10,6 +10,7 @@ import { ImagePlus, Images, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/i18n-provider";
 
 const SupportedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 
@@ -42,6 +43,7 @@ export function ProductBulkUploader({
     disabled = false,
     onImagesSelected,
 }: ProductBulkUploaderProps) {
+    const { t } = useI18n();
     const inputRef = useRef<HTMLInputElement>(null);
     const dropZoneRef = useRef<HTMLDivElement>(null);
 
@@ -201,16 +203,15 @@ export function ProductBulkUploader({
             </div>
 
             <h2 className="mt-4 text-lg font-semibold">
-                {isDragging ? "Drop images here" : "Upload product images"}
+                {isDragging ? t("uploader.drop") : t("uploader.title")}
             </h2>
 
             <p className="mt-1 text-sm text-muted-foreground">
-                Drag and drop images here, choose them from your device, or
-                paste copied images.
+                {t("uploader.instructions")}
             </p>
 
             <p className="mt-2 text-xs text-muted-foreground">
-                Click this area, then press{" "}
+                {t("uploader.pasteBefore")}{" "}
                 <kbd className="rounded border bg-background px-1.5 py-0.5 font-mono text-[11px]">
                     Ctrl
                 </kbd>
@@ -218,11 +219,11 @@ export function ProductBulkUploader({
                 <kbd className="rounded border bg-background px-1.5 py-0.5 font-mono text-[11px]">
                     V
                 </kbd>{" "}
-                to paste.
+                {t("uploader.pasteAfter")}
             </p>
 
             <p className="mt-1 text-xs text-muted-foreground">
-                JPG, PNG or WEBP. Maximum 5 MB per image.
+                {t("uploader.formats")}
             </p>
 
             <Button
@@ -235,7 +236,7 @@ export function ProductBulkUploader({
                 }}
             >
                 <ImagePlus className="mr-2 size-4" />
-                Choose images
+                {t("uploader.choose")}
             </Button>
         </div>
     );

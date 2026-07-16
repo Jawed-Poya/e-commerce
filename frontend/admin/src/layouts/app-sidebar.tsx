@@ -1,6 +1,6 @@
 import * as React from "react";
 import { NavMain } from "@/components/nav-main";
-import { NavUser } from "@/components/nav-user";
+import { adminUser, NavUser } from "@/components/nav-user";
 
 import {
     Sidebar,
@@ -18,13 +18,10 @@ import {
     UsersIcon,
     WarehouseIcon,
 } from "lucide-react";
+import { useI18n } from "@/i18n/i18n-provider";
 
 const data = {
-    user: {
-        name: "Admin",
-        email: "admin@example.com",
-        avatar: "/avatars/admin.jpg",
-    },
+    user: adminUser,
 
     navMain: [
         {
@@ -141,8 +138,9 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+    const { language } = useI18n();
     return (
-        <Sidebar collapsible="icon" {...props}>
+        <Sidebar side={language === "en" ? "left" : "right"} dir={language === "en" ? "ltr" : "rtl"} collapsible="icon" {...props}>
             <SidebarHeader>
                 <div className="flex items-center gap-2">
                     <div className="flex h-8 w-8 px-4 items-center justify-center rounded-lg bg-primary text-primary-foreground">

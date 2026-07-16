@@ -4,8 +4,10 @@ import { GeneralTypeDialog } from "@/features/general-types/components/general-t
 import { GeneralTypesTable } from "@/features/general-types/components/general-type-table";
 import { useModal } from "@/hooks/use-modal";
 import { Plus } from "lucide-react";
+import { useI18n } from "@/i18n/i18n-provider";
 
 export default function GeneralTypesPage() {
+    const { t } = useI18n();
     const { open } = useModal(Entities.GeneralType, "create");
 
     return (
@@ -25,7 +27,7 @@ export default function GeneralTypesPage() {
                         font-bold
                     "
                     >
-                        General Types
+                        {t("types.title")}
                     </h1>
 
                     <p
@@ -34,13 +36,13 @@ export default function GeneralTypesPage() {
                         text-muted-foreground
                     "
                     >
-                        Manage your store General Types
+                        {t("types.subtitle")}
                     </p>
                 </div>
 
                 <Button onClick={open}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Add Type
+                    {t("types.add")}
                 </Button>
                 <GeneralTypeDialog />
             </div>

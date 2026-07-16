@@ -19,6 +19,7 @@ import type {
     ProductBulkFormValues,
     ProductLookupOption,
 } from "../types/product-bulk-types";
+import { useI18n } from "@/i18n/i18n-provider";
 
 interface ProductDraftCardProps {
     index: number;
@@ -97,6 +98,7 @@ export function ProductDraftCard({
     disabled,
     onRemove,
 }: ProductDraftCardProps) {
+    const { t } = useI18n();
     const {
         register,
         control,
@@ -143,7 +145,7 @@ export function ProductDraftCard({
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-1.5">
                             <Label htmlFor={`products-${index}-name`}>
-                                Product name
+                                {t("bulk.productName")}
                                 <span className="text-destructive"> *</span>
                             </Label>
 
@@ -161,7 +163,7 @@ export function ProductDraftCard({
 
                         <div className="space-y-1.5">
                             <Label htmlFor={`products-${index}-barcode`}>
-                                Barcode
+                                {t("products.barcode")}
                             </Label>
 
                             <Input
@@ -180,7 +182,7 @@ export function ProductDraftCard({
                     <div className="grid gap-4 md:grid-cols-3">
                         <div className="space-y-1.5">
                             <Label>
-                                Category
+                                {t("products.category")}
                                 <span className="text-destructive"> *</span>
                             </Label>
 
@@ -205,7 +207,7 @@ export function ProductDraftCard({
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label>Brand</Label>
+                            <Label>{t("form.brand")}</Label>
 
                             <Controller
                                 control={control}
@@ -223,7 +225,7 @@ export function ProductDraftCard({
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label>Unit</Label>
+                            <Label>{t("form.unit")}</Label>
 
                             <Controller
                                 control={control}
@@ -243,7 +245,7 @@ export function ProductDraftCard({
 
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-1.5">
-                            <Label>Minimum value</Label>
+                            <Label>{t("form.minimum")}</Label>
 
                             <Controller
                                 control={control}
@@ -274,7 +276,7 @@ export function ProductDraftCard({
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label>Maximum value</Label>
+                            <Label>{t("form.maximum")}</Label>
 
                             <Controller
                                 control={control}
@@ -306,7 +308,7 @@ export function ProductDraftCard({
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label>Slug</Label>
+                        <Label>{t("form.slug")}</Label>
 
                         <Input
                             disabled={disabled}
@@ -318,7 +320,7 @@ export function ProductDraftCard({
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label>Short description</Label>
+                        <Label>{t("form.shortDescription")}</Label>
 
                         <Textarea
                             disabled={disabled}
@@ -333,7 +335,7 @@ export function ProductDraftCard({
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label>Description</Label>
+                        <Label>{t("form.description")}</Label>
 
                         <Textarea
                             disabled={disabled}
@@ -366,9 +368,9 @@ export function ProductDraftCard({
                                     className={`flex items-center justify-between rounded-lg border p-4 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${field.value ? "border-primary/50 bg-primary/5" : "hover:bg-muted/50"}`}
                                 >
                                     <div>
-                                        <Label>Active product</Label>
+                                        <Label>{t("bulk.activeProduct")}</Label>
                                         <p className="text-xs text-muted-foreground">
-                                            Product can be used in the system.
+                                            {t("bulk.activeHelp")}
                                         </p>
                                     </div>
 
@@ -401,9 +403,9 @@ export function ProductDraftCard({
                                     className={`flex items-center justify-between rounded-lg border p-4 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${field.value ? "border-primary/50 bg-primary/5" : "hover:bg-muted/50"}`}
                                 >
                                     <div>
-                                        <Label>Featured product</Label>
+                                        <Label>{t("bulk.featuredProduct")}</Label>
                                         <p className="text-xs text-muted-foreground">
-                                            Display this product as featured.
+                                            {t("bulk.featuredHelp")}
                                         </p>
                                     </div>
 

@@ -17,6 +17,7 @@ import {
     ComboboxList,
 } from "@/components/ui/combobox";
 import { useMemo } from "react";
+import { useI18n } from "@/i18n/i18n-provider";
 import { buildTree } from "@/lib/utils";
 
 interface GeneralTypeFormProps {
@@ -51,6 +52,7 @@ export function GeneralTypeForm({
     onSubmit,
     isLoading,
 }: GeneralTypeFormProps) {
+    const { t } = useI18n();
     const {
         register,
         handleSubmit,
@@ -92,7 +94,7 @@ export function GeneralTypeForm({
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-6">
                 <div className="space-y-2">
-                    <Label>Type Group</Label>
+                    <Label>{t("types.group")}</Label>
 
                     <ToggleGroup
                         variant="outline"
@@ -124,9 +126,9 @@ export function GeneralTypeForm({
                 </div>
 
                 <div className="space-y-2">
-                    <Label>Name</Label>
+                    <Label>{t("form.name")}</Label>
 
-                    <Input placeholder="Enter name" {...register("name")} />
+                    <Input placeholder={t("form.name")} {...register("name")} />
 
                     {errors.name && (
                         <p className="text-sm text-destructive">
@@ -136,7 +138,7 @@ export function GeneralTypeForm({
                 </div>
 
                 <div className="space-y-2">
-                    <Label>Parent</Label>
+                    <Label>{t("form.parent")}</Label>
 
                     <Combobox
                         items={parents}
@@ -148,10 +150,10 @@ export function GeneralTypeForm({
                         }}
                         itemToStringLabel={(item) => item.name}
                     >
-                        <ComboboxInput placeholder="Select parent" />
+                        <ComboboxInput placeholder={t("form.parent")} />
 
                         <ComboboxContent>
-                            <ComboboxEmpty>No parent found.</ComboboxEmpty>
+                            <ComboboxEmpty>{t("form.noMatch")}</ComboboxEmpty>
 
                             <ComboboxList>
                                 {treeParents.map((item: any) => (
@@ -165,7 +167,7 @@ export function GeneralTypeForm({
 
             <div className="flex justify-end">
                 <Button disabled={isLoading} type="submit">
-                    Save Type
+                    {t("form.save")}
                 </Button>
             </div>
         </form>
