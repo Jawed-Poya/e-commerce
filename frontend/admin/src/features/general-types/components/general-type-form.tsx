@@ -19,6 +19,7 @@ import {
 import { useMemo } from "react";
 import { useI18n } from "@/i18n/i18n-provider";
 import { buildTree } from "@/lib/utils";
+import { GENERAL_TYPE_GROUPS } from "../type-groups";
 
 interface GeneralTypeFormProps {
     defaultValues?: Partial<GeneralType>;
@@ -27,25 +28,6 @@ interface GeneralTypeFormProps {
 
     isLoading?: boolean;
 }
-
-const typeGroups = [
-    {
-        label: "Category",
-        value: "ProductCategory",
-    },
-    {
-        label: "Brand",
-        value: "ProductBrand",
-    },
-    {
-        label: "Unit",
-        value: "ProductUnit",
-    },
-    {
-        label: "Customer Type",
-        value: "CustomerType",
-    },
-];
 
 export function GeneralTypeForm({
     defaultValues,
@@ -75,9 +57,16 @@ export function GeneralTypeForm({
 
     const { data } = useGeneralTypes(selectedGroup);
 
-    const parents = data?.data;
-
-    // const anchor = useComboboxAnchor();
+    const allParents = useMemo(() => data?.data ?? [], [data]);
+    const excludedIds = useMemo(() => {
+        const result = new Set<number>();
+        if (!defaultValues?.id) return result;
+        result.add(defaultValues.id);
+        const addChildren = (id: number) => allParents.filter(item => item.parentId === id).forEach(item => { if (item.id && !result.has(item.id)) { result.add(item.id); addChildren(item.id); } });
+        addChildren(defaultValues.id);
+        return result;
+    }, [allParents, defaultValues?.id]);
+    const parents = allParents.filter(item => !item.id || !excludedIds.has(item.id));
 
     const parentId = useWatch({
         control,
@@ -88,7 +77,7 @@ export function GeneralTypeForm({
         return parents?.find((x) => x.id === parentId) ?? null;
     }, [parents, parentId]);
 
-    const treeParents = buildTree(parents!);
+    const treeParents = buildTree(parents);
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -100,20 +89,21 @@ export function GeneralTypeForm({
                         variant="outline"
                         value={[selectedGroup]}
                         onValueChange={(value) => {
-                            if (value) {
+                            if (value[0]) {
                                 setValue("group", value[0], {
                                     shouldValidate: true,
                                 });
+                                setValue("parentId", null, { shouldValidate: true });
                             }
                         }}
                         className="flex flex-wrap"
                     >
-                        {typeGroups.map((item) => (
+                        {GENERAL_TYPE_GROUPS.map((item) => (
                             <ToggleGroupItem
                                 key={item.value}
                                 value={item.value}
                             >
-                                {item.label}
+                                {t(item.labelKey)}
                             </ToggleGroupItem>
                         ))}
                     </ToggleGroup>
@@ -126,7 +116,7 @@ export function GeneralTypeForm({
                 </div>
 
                 <div className="space-y-2">
-                    <Label>{t("form.name")}</Label>
+                    <Label>{t("form.name")} *</Label>
 
                     <Input placeholder={t("form.name")} {...register("name")} />
 
@@ -150,7 +140,7 @@ export function GeneralTypeForm({
                         }}
                         itemToStringLabel={(item) => item.name}
                     >
-                        <ComboboxInput placeholder={t("form.parent")} />
+                        <ComboboxInput className="w-full" placeholder={t("types.noParent")} showClear />
 
                         <ComboboxContent>
                             <ComboboxEmpty>{t("form.noMatch")}</ComboboxEmpty>
@@ -165,9 +155,9 @@ export function GeneralTypeForm({
                 </div>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-end border-t pt-4">
                 <Button disabled={isLoading} type="submit">
-                    {t("form.save")}
+                    {isLoading ? t("types.saving") : t("form.save")}
                 </Button>
             </div>
         </form>
@@ -188,10 +178,10 @@ function TypeItem({
             <ComboboxItem value={item} className="flex">
                 <span
                     style={{
-                        paddingLeft: level * 16,
+                        paddingInlineStart: level * 16,
                     }}
                 >
-                    {level > 0 && "└ "}
+                    {level > 0 && "↳ "}
                     {item.name}
                 </span>
             </ComboboxItem>

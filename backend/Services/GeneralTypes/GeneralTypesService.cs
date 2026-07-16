@@ -23,10 +23,11 @@ public class GeneralTypesService : IGeneralTypeService
             .AsNoTracking()
             .AsQueryable();
 
-        //if (!string.IsNullOrWhiteSpace(group))
-        //{
-        //    query = query.Where(x => x.Group == group);
-        //}
+        if (!string.IsNullOrWhiteSpace(group) &&
+            Enum.TryParse<GeneralTypeEnum>(group, true, out var parsedGroup))
+        {
+            query = query.Where(x => x.Group == parsedGroup);
+        }
 
         return await query
             .OrderBy(x => x.Group)
@@ -55,6 +56,8 @@ public class GeneralTypesService : IGeneralTypeService
     public async Task<long> CreateAsync(
         GeneralType model)
     {
+        model.Name = model.Name.Trim();
+        await ValidateParentAsync(model.ParentId, model.Group);
         var exists = await _context.Types
             .AnyAsync(x =>
                 x.Name == model.Name &&
@@ -79,6 +82,7 @@ public class GeneralTypesService : IGeneralTypeService
         long id,
         GeneralType model)
     {
+        model.Name = model.Name.Trim();
         var entity = await _context.Types
             .FirstOrDefaultAsync(x => x.Id == id);
 
@@ -88,6 +92,14 @@ public class GeneralTypesService : IGeneralTypeService
             throw new KeyNotFoundException(
                 "Type not found.");
         }
+
+        if (model.ParentId == id)
+            throw new InvalidOperationException("A type cannot be its own parent.");
+
+        await ValidateParentAsync(model.ParentId, model.Group);
+
+        if (model.ParentId.HasValue && await IsDescendantAsync(id, model.ParentId.Value))
+            throw new InvalidOperationException("A child type cannot be selected as the parent.");
 
 
         var exists = await _context.Types
@@ -110,6 +122,25 @@ public class GeneralTypesService : IGeneralTypeService
         entity.ParentId = model.ParentId;
 
         await _context.SaveChangesAsync();
+    }
+
+    private async Task ValidateParentAsync(long? parentId, GeneralTypeEnum group)
+    {
+        if (!parentId.HasValue) return;
+        var valid = await _context.Types.AnyAsync(x => x.Id == parentId.Value && x.Group == group);
+        if (!valid) throw new InvalidOperationException("The selected parent must belong to the same group.");
+    }
+
+    private async Task<bool> IsDescendantAsync(long id, long candidateParentId)
+    {
+        var currentId = (long?)candidateParentId;
+        var visited = new HashSet<long>();
+        while (currentId.HasValue && visited.Add(currentId.Value))
+        {
+            if (currentId.Value == id) return true;
+            currentId = await _context.Types.Where(x => x.Id == currentId.Value).Select(x => x.ParentId).FirstOrDefaultAsync();
+        }
+        return false;
     }
 
     public async Task DeleteAsync(

@@ -5,7 +5,7 @@ namespace ECommerce.Services.GeneralTypes;
 
 public interface IGeneralTypeService
 {
-    Task<List<GeneralTypeDto>> GetAsync(string group);
+    Task<List<GeneralTypeDto>> GetAsync(string? group);
 
     Task<GeneralType?> GetByIdAsync(long id);
 

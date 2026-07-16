@@ -19,6 +19,9 @@ interface DeleteButtonProps {
     onDelete: (id: number | string) => Promise<unknown>;
     title?: string;
     description?: string;
+    cancelLabel?: string;
+    confirmLabel?: string;
+    loadingLabel?: string;
 }
 
 export function DeleteButton({
@@ -26,6 +29,9 @@ export function DeleteButton({
     onDelete,
     title = "Delete this item?",
     description = "This action cannot be undone. The selected item will be permanently deleted.",
+    cancelLabel = "Cancel",
+    confirmLabel = "Delete",
+    loadingLabel = "Deleting...",
 }: DeleteButtonProps) {
     const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
@@ -50,7 +56,7 @@ export function DeleteButton({
             }}
         >
             <AlertDialogTrigger>
-                <Button variant="destructive" size="icon">
+                <Button variant="destructive" size="icon" aria-label={confirmLabel}>
                     <Trash2 className="size-4" />
                 </Button>
             </AlertDialogTrigger>
@@ -66,7 +72,7 @@ export function DeleteButton({
 
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={loading}>
-                        Cancel
+                        {cancelLabel}
                     </AlertDialogCancel>
 
                     <AlertDialogAction
@@ -76,7 +82,7 @@ export function DeleteButton({
                             await handleDelete();
                         }}
                     >
-                        {loading ? "Deleting..." : "Delete"}
+                        {loading ? loadingLabel : confirmLabel}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

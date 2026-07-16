@@ -2,7 +2,7 @@ import apiClient from "@/api/api-client";
 import type { GeneralType } from "@/schemas/type.schema";
 
 export const generalTypeService = {
-    get(group: string) {
+    get(group?: string) {
         return apiClient.get<GeneralType[]>("/types", {
             group,
         });

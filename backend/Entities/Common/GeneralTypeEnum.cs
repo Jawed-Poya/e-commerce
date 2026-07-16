@@ -8,5 +8,7 @@ public enum GeneralTypeEnum
 
     ProductBrand = 2,
 
-    ProductUnit = 3
+    ProductUnit = 3,
+
+    CustomerType = 4
 }

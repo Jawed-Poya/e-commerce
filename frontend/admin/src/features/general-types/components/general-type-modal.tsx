@@ -15,6 +15,7 @@ import { generalTypeKeys } from "@/keys/type-keys";
 import type { GeneralType } from "@/schemas/type.schema";
 import { useUpdateGeneralType } from "../hooks/use-update-types";
 import { useI18n } from "@/i18n/i18n-provider";
+import { toast } from "sonner";
 
 interface GeneralTypeDialogProps {
     defaultGroup?: string;
@@ -46,11 +47,14 @@ export function GeneralTypeDialog({ defaultGroup }: GeneralTypeDialogProps) {
     return (
         <Dialog
             open={isOpen}
-            onOpenChange={() => {
-                isEdit ? close() : closeCreate();
+            onOpenChange={(open) => {
+                if (!open) {
+                    if (isEdit) close();
+                    else closeCreate();
+                }
             }}
         >
-            <DialogContent className="min-w-2xl">
+            <DialogContent className="w-full sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>{isEdit ? t("types.edit") : t("types.create")}</DialogTitle>
 
@@ -60,6 +64,7 @@ export function GeneralTypeDialog({ defaultGroup }: GeneralTypeDialogProps) {
                 </DialogHeader>
 
                 <GeneralTypeForm
+                    key={data?.id ?? `create-${defaultGroup ?? "default"}`}
                     defaultValues={{
                         group: defaultGroup,
                         ...data,
@@ -78,7 +83,9 @@ export function GeneralTypeDialog({ defaultGroup }: GeneralTypeDialogProps) {
                                             queryKey: generalTypeKeys.all,
                                         });
                                         close();
+                                        toast.success(t("types.updated"));
                                     },
+                                    onError: () => toast.error(t("types.saveError")),
                                 },
                             );
                             return;
@@ -89,7 +96,9 @@ export function GeneralTypeDialog({ defaultGroup }: GeneralTypeDialogProps) {
                                     queryKey: generalTypeKeys.all,
                                 });
                                 closeCreate();
+                                toast.success(t("types.created"));
                             },
+                            onError: () => toast.error(t("types.saveError")),
                         });
                     }}
                 />
