@@ -22,6 +22,11 @@ public sealed class BulkUpdateProductItemRequest
 
     public IFormFile? Image { get; set; }
 
+    [MaxLength(10, ErrorMessage = "A maximum of 10 gallery images can be added at once.")]
+    public List<IFormFile> GalleryImages { get; set; } = [];
+
+    public List<long> RemovedImageIds { get; set; } = [];
+
     [StringLength(500)]
     public string? ShortDescription { get; set; }
 

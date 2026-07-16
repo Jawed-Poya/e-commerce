@@ -17,5 +17,13 @@ public sealed record ProductListItemResponse(
     bool IsActive,
     decimal Stock,
     decimal? Price,
-    string? PrimaryImageUrl
+    string? PrimaryImageUrl,
+    IReadOnlyList<ProductListImageResponse> Images
+);
+
+public sealed record ProductListImageResponse(
+    long Id,
+    string Url,
+    bool IsPrimary,
+    int SortOrder
 );

@@ -65,8 +65,8 @@ export default function ProductsPage() {
     useEffect(() => setSelected(ids => ids.filter(id => products.some(x => x.id === id))), [products]);
     const toggle = (id: number) => setSelected(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]);
     const editProducts = (items: ProductListItem[]) => {
-        setDrafts(items.map(({ id, name, barcode, shortDescription, description, slug, categoryId, brandId, unitId, minimumValue, maximumValue, isFeatured, isActive, primaryImageUrl }) =>
-            ({ id, name, barcode, shortDescription, description, slug, categoryId, brandId, unitId, minimumValue, maximumValue, isFeatured, isActive, primaryImageUrl })));
+        setDrafts(items.map(({ id, name, barcode, shortDescription, description, slug, categoryId, brandId, unitId, minimumValue, maximumValue, isFeatured, isActive, primaryImageUrl, images }) =>
+            ({ id, name, barcode, shortDescription, description, slug, categoryId, brandId, unitId, minimumValue, maximumValue, isFeatured, isActive, primaryImageUrl, images: images ?? [] })));
         setActiveEditor(0);
         setOpen(true);
     };
@@ -125,7 +125,9 @@ export default function ProductsPage() {
                 return <div key={item.id} className="grid gap-5 rounded-xl border p-5 lg:grid-cols-[180px_1fr]">
                     <div><div className="aspect-square overflow-hidden rounded-lg border bg-muted">{preview ? <img src={preview} alt={item.name} className="size-full object-cover" /> : <ImagePlus className="m-auto mt-16 text-muted-foreground" />}</div>
                         <Label className="mt-3 flex cursor-pointer items-center justify-center border px-3 py-2 text-sm"><ImagePlus className="me-2 size-4" />{t("update.replaceImage")}<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={e => change(item.id, { image: e.target.files?.[0] })} /></Label>
-                        <p className="mt-2 text-xs text-muted-foreground">{t("update.keepImage")}</p></div>
+                        <p className="mt-2 text-xs text-muted-foreground">{t("update.keepImage")}</p>
+                        <GalleryImagePicker existingImages={item.images.filter(image => !image.isPrimary && !(item.removedImageIds ?? []).includes(image.id))} files={item.galleryImages ?? []} onChange={galleryImages => change(item.id, { galleryImages })} onRemoveExisting={imageId => change(item.id, { removedImageIds: [...(item.removedImageIds ?? []), imageId] })} />
+                    </div>
                     <div className="space-y-4"><h3 className="font-semibold">{t("update.productNumber")} #{index + 1}</h3>
                         <div className="grid gap-4 md:grid-cols-2"><div className="space-y-2"><Label>{t("form.name")} *</Label><Input value={item.name} onChange={e => change(item.id, { name: e.target.value })} /></div><div className="space-y-2"><Label>{t("update.barcode")}</Label><Input value={item.barcode ?? ""} onChange={e => change(item.id, { barcode: e.target.value || null })} /></div></div>
                         <div className="grid gap-4 md:grid-cols-3">
@@ -166,5 +168,30 @@ function ToggleCard({ title, description, checked, onChange }: { title: string; 
     return <div role="switch" aria-checked={checked} tabIndex={0} onClick={toggle} onKeyDown={event => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); toggle(); } }} className={`flex cursor-pointer items-center justify-between rounded-lg border p-4 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${checked ? "border-primary/50 bg-primary/5" : "hover:bg-muted/50"}`}>
         <div className="me-4 text-start"><p className="font-medium">{title}</p><p className="mt-1 text-xs text-muted-foreground">{description}</p></div>
         <Switch checked={checked} tabIndex={-1} aria-hidden className="pointer-events-none" />
+    </div>;
+}
+
+function GalleryImagePicker({ existingImages, files, onChange, onRemoveExisting }: { existingImages: { id: number; url: string }[]; files: File[]; onChange: (files: File[]) => void; onRemoveExisting: (id: number) => void }) {
+    const { t } = useI18n();
+    const previews = useMemo(() => files.map(file => ({ file, url: URL.createObjectURL(file) })), [files]);
+    useEffect(() => () => previews.forEach(preview => URL.revokeObjectURL(preview.url)), [previews]);
+
+    const addFiles = (selected: FileList | null) => {
+        if (!selected) return;
+        const supported = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+        const signatures = new Set(files.map(file => `${file.name}-${file.size}-${file.lastModified}`));
+        const additions = Array.from(selected).filter(file => supported.has(file.type) && file.size <= 5 * 1024 * 1024 && !signatures.has(`${file.name}-${file.size}-${file.lastModified}`));
+        const availableSlots = Math.max(0, 10 - existingImages.length - 1);
+        if (files.length + additions.length > availableSlots) toast.error(t("update.galleryLimit"));
+        onChange([...files, ...additions].slice(0, availableSlots));
+    };
+
+    return <div className="mt-5 space-y-2 border-t pt-4">
+        <div><p className="text-sm font-medium">{t("update.galleryImages")}</p><p className="text-xs text-muted-foreground">{t("update.galleryHelp")}</p></div>
+        {(existingImages.length > 0 || previews.length > 0) && <div className="grid grid-cols-3 gap-2">
+            {existingImages.map(image => <div key={image.id} className="relative aspect-square overflow-hidden border bg-muted"><img src={resolveProductImageUrl(image.url)!} alt="" className="size-full object-cover" /><Button type="button" variant="destructive" size="icon-xs" className="absolute end-1 top-1" aria-label={t("update.removeGalleryImage")} onClick={() => onRemoveExisting(image.id)}><X className="size-3" /></Button><span className="absolute bottom-0 inset-x-0 bg-black/65 px-1 py-0.5 text-center text-[10px] text-white">{t("update.savedImage")}</span></div>)}
+            {previews.map((preview, index) => <div key={`${preview.file.name}-${preview.file.lastModified}`} className="relative aspect-square overflow-hidden border bg-muted"><img src={preview.url} alt="" className="size-full object-cover" /><Button type="button" variant="destructive" size="icon-xs" className="absolute end-1 top-1" aria-label={t("update.removeGalleryImage")} onClick={() => onChange(files.filter((_, fileIndex) => fileIndex !== index))}><X className="size-3" /></Button><span className="absolute bottom-0 inset-x-0 bg-primary/85 px-1 py-0.5 text-center text-[10px] text-primary-foreground">{t("update.newImage")}</span></div>)}
+        </div>}
+        <Label className="flex cursor-pointer items-center justify-center border px-3 py-2 text-xs"><ImagePlus className="me-2 size-4" />{t("update.addGalleryImages")}<input className="sr-only" type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={event => { addFiles(event.target.files); event.target.value = ""; }} /></Label>
     </div>;
 }

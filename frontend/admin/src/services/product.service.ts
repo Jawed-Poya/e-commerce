@@ -27,6 +27,14 @@ export interface ProductListItem {
     stock: number;
     price: number | null;
     primaryImageUrl: string | null;
+    images: ProductListImage[];
+}
+
+export interface ProductListImage {
+    id: number;
+    url: string;
+    isPrimary: boolean;
+    sortOrder: number;
 }
 
 export interface PagedProducts {
@@ -57,7 +65,7 @@ export interface ProductListFilters {
 export type BulkUpdateProduct = Pick<ProductListItem,
     "id" | "name" | "barcode" | "categoryId" | "brandId" | "unitId" |
     "shortDescription" | "description" | "slug" | "minimumValue" |
-    "maximumValue" | "isFeatured" | "isActive" | "primaryImageUrl"> & { image?: File };
+    "maximumValue" | "isFeatured" | "isActive" | "primaryImageUrl" | "images"> & { image?: File; galleryImages?: File[]; removedImageIds?: number[] };
 
 function append(formData: FormData, key: string, value: string | number | boolean | null | undefined) {
     if (value !== null && value !== undefined) formData.append(key, String(value));
@@ -85,6 +93,8 @@ export const productService = {
             append(formData, `${prefix}.IsFeatured`, product.isFeatured);
             append(formData, `${prefix}.IsActive`, product.isActive);
             if (product.image) formData.append(`${prefix}.Image`, product.image, product.image.name);
+            product.galleryImages?.forEach(image => formData.append(`${prefix}.GalleryImages`, image, image.name));
+            product.removedImageIds?.forEach(id => formData.append(`${prefix}.RemovedImageIds`, String(id)));
         });
         return apiClient.put<{ updatedCount: number }>("/products/bulk", formData);
     },

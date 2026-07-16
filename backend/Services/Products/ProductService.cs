@@ -47,7 +47,7 @@ public class ProductService : IProductService
             .Include(x => x.Brand)
             .Include(x => x.Unit)
             .Include(x => x.Inventory)
-            .Include(x => x.Images.Where(i => i.IsPrimary))
+            .Include(x => x.Images)
             .Where(x => !x.IsDeleted);
 
         if (!string.IsNullOrWhiteSpace(filter.Search))
@@ -121,7 +121,10 @@ public class ProductService : IProductService
                 x.IsActive,
                 x.Inventory == null ? 0 : x.Inventory.Quantity,
                 x.Prices.Select(p => (decimal?)(p.SalePrice ?? p.RegularPrice)).Min(),
-                x.Images.Where(i => i.IsPrimary).Select(i => "/" + i.ImagePath.Replace("\\", "/")).FirstOrDefault()
+                x.Images.Where(i => i.IsPrimary).Select(i => "/" + i.ImagePath.Replace("\\", "/")).FirstOrDefault(),
+                x.Images.OrderByDescending(i => i.IsPrimary).ThenBy(i => i.SortOrder)
+                    .Select(i => new ProductListImageResponse(i.Id, "/" + i.ImagePath.Replace("\\", "/"), i.IsPrimary, i.SortOrder))
+                    .ToList()
             ))
             .ToListAsync();
 
@@ -219,14 +222,29 @@ public class ProductService : IProductService
                 product.IsActive = item.IsActive;
                 product.UpdatedAt = DateTime.UtcNow;
 
+                if (item.RemovedImageIds.Count > 0)
+                {
+                    var removableImages = product.Images
+                        .Where(image => item.RemovedImageIds.Contains(image.Id) && !image.IsPrimary)
+                        .ToList();
+                    if (removableImages.Count != item.RemovedImageIds.Distinct().Count())
+                        throw new ProductValidationException(new Dictionary<string, string[]> { ["Products"] = [$"One or more gallery images do not belong to product '{product.Name}' or are primary images."] });
+
+                    foreach (var removedImage in removableImages)
+                    {
+                        oldImagePaths.Add(removedImage.ImagePath);
+                        product.Images.Remove(removedImage);
+                    }
+                }
+
                 if (item.Image is not null)
                 {
                     var stored = await _imageStorage.SaveAsync(item.Image, cancellationToken);
                     storedImages.Add(stored);
-                    foreach (var oldImage in product.Images.Where(x => x.IsPrimary))
+                    foreach (var oldImage in product.Images.Where(x => x.IsPrimary).ToList())
                     {
-                        oldImage.IsPrimary = false;
                         oldImagePaths.Add(oldImage.ImagePath);
+                        product.Images.Remove(oldImage);
                     }
                     product.Images.Add(new ProductImage
                     {
@@ -238,6 +256,30 @@ public class ProductService : IProductService
                         IsPrimary = true,
                         SortOrder = 0
                     });
+                }
+
+                if (item.GalleryImages.Count > 0)
+                {
+                    var currentImageCount = product.Images.Count;
+                    if (currentImageCount + item.GalleryImages.Count > 10)
+                        throw new ProductValidationException(new Dictionary<string, string[]> { ["Products"] = [$"Product '{product.Name}' cannot have more than 10 images."] });
+
+                    var nextSortOrder = product.Images.Where(x => !x.IsPrimary).Select(x => x.SortOrder).DefaultIfEmpty(0).Max() + 1;
+                    foreach (var galleryImage in item.GalleryImages)
+                    {
+                        var stored = await _imageStorage.SaveAsync(galleryImage, cancellationToken);
+                        storedImages.Add(stored);
+                        product.Images.Add(new ProductImage
+                        {
+                            ImagePath = stored.RelativePath,
+                            FileName = stored.FileName,
+                            OriginalFileName = Path.GetFileName(galleryImage.FileName),
+                            ContentType = stored.ContentType,
+                            Size = stored.Size,
+                            IsPrimary = false,
+                            SortOrder = nextSortOrder++
+                        });
+                    }
                 }
             }
 
