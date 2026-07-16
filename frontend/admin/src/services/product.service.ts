@@ -1,6 +1,15 @@
 import apiClient from "@/api/api-client";
 import type { Product } from "@/schemas/product-schema";
 
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "https://localhost:7060/api";
+const apiOrigin = new URL(apiBaseUrl, window.location.origin).origin;
+
+export function resolveProductImageUrl(path: string | null | undefined) {
+    if (!path) return null;
+    if (/^https?:\/\//i.test(path) || path.startsWith("blob:")) return path;
+    return new URL(path.startsWith("/") ? path : `/${path}`, apiOrigin).toString();
+}
+
 export interface ProductListItem {
     id: number;
     name: string;

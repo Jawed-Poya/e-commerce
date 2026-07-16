@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useProducts } from "@/features/products/hooks/use-products";
 import { useProductLookupsQuery } from "@/features/products/hooks/use-product-mutation";
-import { productService, type BulkUpdateProduct, type ProductListItem } from "@/services/product.service";
+import { productService, resolveProductImageUrl, type BulkUpdateProduct, type ProductListItem } from "@/services/product.service";
 import { productKeys } from "@/keys/product-keys";
 
 function getUpdateErrorMessage(error: unknown) {
@@ -91,7 +91,7 @@ export default function ProductsPage() {
                 {!isLoading && !isError && products.length === 0 && <TableRow><TableCell colSpan={7} className="h-28 text-center text-muted-foreground">No products found.</TableCell></TableRow>}
                 {products.map(product => <TableRow key={product.id} data-state={selected.includes(product.id) ? "selected" : undefined}>
                     <TableCell><Checkbox aria-label={`Select ${product.name}`} checked={selected.includes(product.id)} onCheckedChange={() => toggle(product.id)} /></TableCell>
-                    <TableCell className="font-medium">{product.name}</TableCell><TableCell>{product.barcode || "—"}</TableCell><TableCell>{product.categoryName}</TableCell>
+                    <TableCell><div className="flex items-center gap-3">{resolveProductImageUrl(product.primaryImageUrl) ? <img src={resolveProductImageUrl(product.primaryImageUrl)!} alt="" className="size-10 shrink-0 rounded-md border bg-muted object-cover" /> : <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted"><ImagePlus className="size-4 text-muted-foreground" /></div>}<span className="font-medium">{product.name}</span></div></TableCell><TableCell>{product.barcode || "—"}</TableCell><TableCell>{product.categoryName}</TableCell>
                     <TableCell>{product.price == null ? "—" : product.price.toLocaleString()}</TableCell><TableCell>{product.stock.toLocaleString()}</TableCell>
                     <TableCell><Badge variant={product.isActive ? "outline" : "secondary"}>{product.isActive ? "Active" : "Inactive"}</Badge></TableCell>
                 </TableRow>)}
@@ -104,7 +104,7 @@ export default function ProductsPage() {
             <div className={drafts.length > 1 ? "flex gap-2 overflow-x-auto border-b pb-3" : "hidden"}>{drafts.map((item, index) => <Button key={item.id} type="button" size="sm" variant={activeEditor === index ? "default" : "outline"} onClick={() => setActiveEditor(index)}>{index + 1}. {item.name || "Untitled"}</Button>)}</div>
             <div className="min-h-0 overflow-y-auto pr-1">{drafts[activeEditor] && [drafts[activeEditor]].map((item) => {
                 const index = activeEditor;
-                const preview = item.image ? URL.createObjectURL(item.image) : item.primaryImageUrl;
+                const preview = item.image ? URL.createObjectURL(item.image) : resolveProductImageUrl(item.primaryImageUrl);
                 return <div key={item.id} className="grid gap-5 rounded-xl border p-5 lg:grid-cols-[180px_1fr]">
                     <div><div className="aspect-square overflow-hidden rounded-lg border bg-muted">{preview ? <img src={preview} alt={item.name} className="size-full object-cover" /> : <ImagePlus className="m-auto mt-16 text-muted-foreground" />}</div>
                         <Label className="mt-3 flex cursor-pointer items-center justify-center rounded-md border px-3 py-2 text-sm"><ImagePlus className="mr-2 size-4" />Replace image<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={e => change(item.id, { image: e.target.files?.[0] })} /></Label>
