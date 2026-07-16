@@ -1,13 +1,15 @@
 ﻿using API.Entities.Products;
 using ECommerce.Dtos;
 using ECommerce.Entities.Common;
+using ECommerce.Entities.Products.Contracts;
 using ECommerce.Entities.Products.Filters;
+using ECommerce.Entities.Products.Requests;
 
 namespace ECommerce.Services.Products;
 
 public interface IProductService
 {
-    Task<PagedResult<Product>> GetAsync(ProductFilter filter);
+    Task<PagedResult<ProductListItemResponse>> GetAsync(ProductFilter filter);
 
     Task<ProductDetailsDto?> GetByIdAsync(long id);
 
@@ -18,4 +20,18 @@ public interface IProductService
     Task DeleteAsync(long id);
 
     Task ToggleStatusAsync(long id);
+
+    Task<CreateBulkProductsResponse> CreateBulkAsync(
+    CreateBulkProductsRequest request,
+    CancellationToken cancellationToken = default
+    );
+
+    Task<BulkUpdateProductsResponse> UpdateBulkAsync(
+        BulkUpdateProductsRequest request,
+        CancellationToken cancellationToken = default
+    );
+
+    Task<ProductLookupsResponse> GetLookupsAsync(
+        CancellationToken cancellationToken = default
+    );
 }
