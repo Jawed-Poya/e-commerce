@@ -6,10 +6,13 @@ import { Button } from "@/components/ui/button";
 import { ProductForm } from "../components/product-form";
 import { useCreateProduct } from "../hooks/use-create-product";
 import type { Product } from "../../../schemas/product-schema";
+import { PageHeader } from "@/components/page-header";
+import { useI18n } from "@/i18n/i18n-provider";
 
 export default function CreateProductPage() {
     const { mutate, isPending } = useCreateProduct();
     const navigate = useNavigate();
+    const { t } = useI18n();
 
     function handleSubmit(model: Product) {
         mutate(model, {
@@ -24,22 +27,12 @@ export default function CreateProductPage() {
 
     return (
         <div className="mx-auto max-w-7xl space-y-6">
-            <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                    <h1 className="text-2xl font-bold tracking-tight">
-                        Create Product
-                    </h1>
-
-                    <p className="text-muted-foreground">
-                        Add a new product to your catalog.
-                    </p>
-                </div>
-
+            <PageHeader title={t("create.title")} description={t("create.subtitle")} actions={
                 <Button variant="outline" onClick={() => navigate("/products")}>
-                    Back
-                    <ArrowRight className="h-4 w-4" />
+                    {t("create.back")}
+                    <ArrowRight className="size-4 rtl:rotate-180" />
                 </Button>
-            </div>
+            } />
 
             <ProductForm onSubmit={handleSubmit} isLoading={isPending} />
         </div>

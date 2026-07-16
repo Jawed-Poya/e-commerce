@@ -9,6 +9,7 @@ import { useBulkProductForm } from "../hooks/use-bulk-product-form";
 import { ProductBulkUploader } from "./product-bulk-uploader";
 import { ProductDraftCard } from "./product-draft";
 import { useI18n } from "@/i18n/i18n-provider";
+import { PageHeader } from "@/components/page-header";
 
 export function ProductBulkCreatePage() {
     const { t } = useI18n();
@@ -58,18 +59,7 @@ export function ProductBulkCreatePage() {
                 onSubmit={submit}
                 className="mx-auto max-w-7xl space-y-6 p-4 md:p-6"
             >
-                <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">
-                            {t("bulk.title")}
-                        </h1>
-
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            {t("bulk.subtitle")}
-                        </p>
-                    </div>
-
-                    {productCount > 0 && (
+                <PageHeader title={t("bulk.title")} description={t("bulk.subtitle")} actions={productCount > 0 ? (
                         <div className="flex items-center gap-2">
                             <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
                                 {productCount} product
@@ -82,12 +72,11 @@ export function ProductBulkCreatePage() {
                                 disabled={isSubmitting}
                                 onClick={resetProducts}
                             >
-                                <Trash2 className="mr-2 size-4" />
+                                <Trash2 className="me-2 size-4" />
                                 {t("bulk.clear")}
                             </Button>
                         </div>
-                    )}
-                </header>
+                    ) : undefined} />
 
                 <ProductBulkUploader
                     disabled={isSubmitting}

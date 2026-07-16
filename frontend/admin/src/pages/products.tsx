@@ -18,6 +18,7 @@ import { useProductLookupsQuery } from "@/features/products/hooks/use-product-mu
 import { productService, resolveProductImageUrl, type BulkUpdateProduct, type ProductListItem } from "@/services/product.service";
 import { productKeys } from "@/keys/product-keys";
 import { useI18n } from "@/i18n/i18n-provider";
+import { PageHeader } from "@/components/page-header";
 
 function getUpdateErrorMessage(error: unknown, messages: { connection: string; endpoint: string; failed: string }) {
     const apiError = error as {
@@ -75,13 +76,10 @@ export default function ProductsPage() {
     };
 
     return <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><h1 className="text-2xl font-bold">{t("products.title")}</h1><p className="text-sm text-muted-foreground">{t("products.subtitle")}</p></div>
-            <div className="flex gap-2">
+        <PageHeader title={t("products.title")} description={t("products.subtitle")} actions={<>
                 {selected.length > 0 && <Button variant="outline" onClick={() => editProducts(selectedProducts)}><Pencil className="me-2 size-4" />{t("products.updateSelected")} ({selected.length})</Button>}
                 <Button onClick={() => navigate("/products/new")}><Plus className="me-2 size-4" />{t("products.bulkCreate")}</Button>
-            </div>
-        </div>
+            </>} />
         <div className="relative"><Search className="absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input value={search} onChange={e => setSearch(e.target.value)} placeholder={t("products.search")} className="ps-9" /></div>
         <div className="rounded-md border"><Table>
             <TableHeader><TableRow>
@@ -103,7 +101,7 @@ export default function ProductsPage() {
 
         {open && createPortal(<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm" onMouseDown={() => !saving && setOpen(false)}>
           <section role="dialog" aria-modal="true" aria-labelledby="product-editor-title" className="relative grid max-h-[94vh] w-full max-w-6xl grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-4 overflow-hidden rounded-xl border bg-background p-5 text-foreground shadow-2xl" onMouseDown={event => event.stopPropagation()}>
-            <header className="pe-10"><h2 id="product-editor-title" className="text-xl font-semibold">{drafts.length === 1 ? t("update.title") : t("update.bulkTitle")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("update.subtitle")}</p><Button type="button" variant="ghost" size="icon" className="absolute end-6 top-6" aria-label={t("update.close")} onClick={() => setOpen(false)}>×</Button></header>
+            <header className="pe-12"><h2 id="product-editor-title" className="text-xl font-semibold">{drafts.length === 1 ? t("update.title") : t("update.bulkTitle")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("update.subtitle")}</p><Button type="button" variant="ghost" size="icon" className="absolute end-5 top-5 text-2xl font-light" aria-label={t("update.close")} onClick={() => setOpen(false)}>×</Button></header>
             <div className={drafts.length > 1 ? "flex gap-2 overflow-x-auto border-b pb-3" : "hidden"}>{drafts.map((item, index) => <Button key={item.id} type="button" size="sm" variant={activeEditor === index ? "default" : "outline"} onClick={() => setActiveEditor(index)}>{index + 1}. {item.name || t("update.untitled")}</Button>)}</div>
             <div className="min-h-0 overflow-y-auto pe-1">{drafts[activeEditor] && [drafts[activeEditor]].map((item) => {
                 const index = activeEditor;

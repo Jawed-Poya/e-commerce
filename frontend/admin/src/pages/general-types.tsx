@@ -5,6 +5,7 @@ import { GeneralTypesTable } from "@/features/general-types/components/general-t
 import { useModal } from "@/hooks/use-modal";
 import { Plus } from "lucide-react";
 import { useI18n } from "@/i18n/i18n-provider";
+import { PageHeader } from "@/components/page-header";
 
 export default function GeneralTypesPage() {
     const { t } = useI18n();
@@ -12,40 +13,13 @@ export default function GeneralTypesPage() {
 
     return (
         <>
-            <div
-                className="
-                flex
-                items-center
-                justify-between
-                mb-4
-            "
-            >
-                <div>
-                    <h1
-                        className="
-                        text-2xl
-                        font-bold
-                    "
-                    >
-                        {t("types.title")}
-                    </h1>
-
-                    <p
-                        className="
-                        text-sm
-                        text-muted-foreground
-                    "
-                    >
-                        {t("types.subtitle")}
-                    </p>
-                </div>
-
+            <PageHeader className="mb-4" title={t("types.title")} description={t("types.subtitle")} actions={<>
                 <Button onClick={open}>
-                    <Plus className="mr-2 h-4 w-4" />
+                    <Plus className="me-2 size-4" />
                     {t("types.add")}
                 </Button>
                 <GeneralTypeDialog />
-            </div>
+            </>} />
 
             <GeneralTypesTable />
         </>
