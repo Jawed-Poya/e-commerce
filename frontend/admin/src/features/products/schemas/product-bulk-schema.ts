@@ -26,6 +26,14 @@ export const ProductBulkItemSchema = z
 
         previewUrl: z.string().min(1),
 
+        galleryImages: z
+            .array(
+                z.instanceof(File)
+                    .refine((file) => SupportedImageTypes.includes(file.type), "Only JPG, PNG and WEBP images are supported.")
+                    .refine((file) => file.size <= MaxImageSize, "Image must be smaller than 5 MB."),
+            )
+            .max(9, "A product can have a maximum of 10 images."),
+
         name: z
             .string()
             .trim()

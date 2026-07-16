@@ -465,6 +465,7 @@ public class ProductService : IProductService
         }
 
         var storedImages = new List<StoredProductImage>();
+        var primaryStoredImages = new List<StoredProductImage>();
         var products = new List<Product>();
 
         try
@@ -480,6 +481,7 @@ public class ProductService : IProductService
                     );
 
                 storedImages.Add(storedImage);
+                primaryStoredImages.Add(storedImage);
 
                 var product = new Product
                 {
@@ -541,6 +543,23 @@ public class ProductService : IProductService
                     }
                 );
 
+                for (var imageIndex = 0; imageIndex < item.Request.GalleryImages.Count; imageIndex++)
+                {
+                    var galleryFile = item.Request.GalleryImages[imageIndex];
+                    var galleryImage = await _imageStorage.SaveAsync(galleryFile, cancellationToken);
+                    storedImages.Add(galleryImage);
+                    product.Images.Add(new ProductImage
+                    {
+                        ImagePath = galleryImage.RelativePath,
+                        FileName = galleryImage.FileName,
+                        OriginalFileName = Path.GetFileName(galleryFile.FileName),
+                        ContentType = galleryImage.ContentType,
+                        Size = galleryImage.Size,
+                        IsPrimary = false,
+                        SortOrder = imageIndex + 1
+                    });
+                }
+
                 products.Add(product);
             }
 
@@ -583,7 +602,7 @@ public class ProductService : IProductService
                         Barcode: product.Barcode,
                         Slug: product.Slug!,
                         PrimaryImageUrl:
-                            storedImages[index].PublicUrl
+                            primaryStoredImages[index].PublicUrl
                     )
                 )
                 .ToList();
@@ -736,6 +755,15 @@ public class ProductService : IProductService
                     errors,
                     $"Products[{index}].Image",
                     "Product image is required."
+                );
+            }
+
+            if (product.GalleryImages.Count > 9)
+            {
+                AddError(
+                    errors,
+                    $"Products[{index}].GalleryImages",
+                    "A product can have a maximum of 10 images."
                 );
             }
 

@@ -1,5 +1,7 @@
+import { useEffect, useMemo } from "react";
 import { Controller, useFormContext } from "react-hook-form";
-import { Trash2 } from "lucide-react";
+import { ImagePlus, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,6 +45,40 @@ function FieldError({ message }: FieldErrorProps) {
     }
 
     return <p className="mt-1 text-xs text-destructive">{message}</p>;
+}
+
+function GalleryImagePicker({ files, disabled, onChange }: { files: File[]; disabled?: boolean; onChange: (files: File[]) => void }) {
+    const { t } = useI18n();
+    const previews = useMemo(() => files.map((file) => ({ file, url: URL.createObjectURL(file) })), [files]);
+
+    useEffect(() => () => previews.forEach(({ url }) => URL.revokeObjectURL(url)), [previews]);
+
+    const addFiles = (selected: FileList | null) => {
+        if (!selected) return;
+        const supported = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+        const signatures = new Set(files.map((file) => `${file.name}-${file.size}-${file.lastModified}`));
+        const additions = Array.from(selected).filter((file) => supported.has(file.type) && file.size <= 5 * 1024 * 1024 && !signatures.has(`${file.name}-${file.size}-${file.lastModified}`));
+        if (files.length + additions.length > 9) toast.error(t("update.galleryLimit"));
+        onChange([...files, ...additions].slice(0, 9));
+    };
+
+    return (
+        <div className="space-y-2 border-t pt-4">
+            <div><p className="text-sm font-medium">{t("update.galleryImages")}</p><p className="text-xs text-muted-foreground">{t("update.galleryHelp")}</p></div>
+            {previews.length > 0 && <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+                {previews.map((preview, imageIndex) => <div key={`${preview.file.name}-${preview.file.lastModified}`} className="relative aspect-square overflow-hidden border bg-muted">
+                    <img src={preview.url} alt="" className="size-full object-cover" />
+                    <Button type="button" variant="destructive" size="icon-xs" disabled={disabled} className="absolute end-1 top-1" aria-label={t("update.removeGalleryImage")} onClick={() => onChange(files.filter((_, index) => index !== imageIndex))}><X className="size-3" /></Button>
+                    <span className="absolute inset-x-0 bottom-0 bg-primary/85 px-1 py-0.5 text-center text-[10px] text-primary-foreground">{t("update.newImage")}</span>
+                </div>)}
+            </div>}
+            <Label className="flex cursor-pointer items-center justify-center border px-3 py-2 text-xs aria-disabled:pointer-events-none aria-disabled:opacity-50" aria-disabled={disabled}>
+                <ImagePlus className="me-2 size-4" />{t("update.addGalleryImages")}
+                <input className="sr-only" type="file" multiple disabled={disabled} accept="image/jpeg,image/png,image/webp" onChange={(event) => { addFiles(event.target.files); event.target.value = ""; }} />
+            </Label>
+            <FieldError message={files.length > 9 ? t("update.galleryLimit") : undefined} />
+        </div>
+    );
 }
 
 function LookupCombobox({
@@ -139,6 +175,12 @@ export function ProductDraftCard({
                         The image will be uploaded as this product&apos;s
                         primary image.
                     </p>
+
+                    <Controller
+                        control={control}
+                        name={`products.${index}.galleryImages`}
+                        render={({ field }) => <GalleryImagePicker files={field.value ?? []} disabled={disabled} onChange={field.onChange} />}
+                    />
                 </div>
 
                 <div className="space-y-5">

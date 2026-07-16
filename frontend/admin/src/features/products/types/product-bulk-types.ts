@@ -14,6 +14,7 @@ export interface ProductBulkItemFormValues {
 
     image: File;
     previewUrl: string;
+    galleryImages: File[];
 
     name: string;
     barcode: string;

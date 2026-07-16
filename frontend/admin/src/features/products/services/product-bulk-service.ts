@@ -44,6 +44,9 @@ function createProductsFormData(request: CreateBulkProductsRequest): FormData {
         }
 
         formData.append(`${prefix}.Image`, product.image, product.image.name);
+        product.galleryImages.forEach((image) =>
+            formData.append(`${prefix}.GalleryImages`, image, image.name),
+        );
 
         formData.append(`${prefix}.Name`, product.name.trim());
 

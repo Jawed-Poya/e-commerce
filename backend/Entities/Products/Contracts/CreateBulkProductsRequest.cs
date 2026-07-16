@@ -17,6 +17,8 @@ public sealed class CreateBulkProductItemRequest
     [Required]
     public IFormFile? Image { get; set; }
 
+    public List<IFormFile> GalleryImages { get; set; } = [];
+
     [Required]
     [StringLength(
         200,

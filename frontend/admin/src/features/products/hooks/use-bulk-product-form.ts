@@ -52,6 +52,7 @@ function createProductDraft(file: File): ProductBulkItemFormValues {
 
         image: file,
         previewUrl: URL.createObjectURL(file),
+        galleryImages: [],
 
         name: defaultName,
         barcode: "",
