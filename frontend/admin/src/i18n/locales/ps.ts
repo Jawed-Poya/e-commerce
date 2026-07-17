@@ -1,4 +1,5 @@
 import type { en } from "./en";
+import { inventoryPs } from "@/features/inventory/i18n/inventory-translations";
 export const ps: Record<keyof typeof en, string> = {
   "language.en": "انګلیسي", "language.ps": "پښتو", "language.dr": "دري",
   "common.profile": "پروفایل", "common.logout": "وتل", "common.notifications": "خبرتیاوې",
@@ -15,4 +16,5 @@ export const ps: Record<keyof typeof en, string> = {
   "update.savedImage": "خوندي شوی", "update.newImage": "نوی",
   "products.deleteSelected": "ټاکل شوي ړنګول", "products.deleteTitle": "ټاکل شوي محصولات ړنګ کړئ؟", "products.deleteDescription": "ټاکل شوي محصولات به له کتالوګ څخه لرې شي. دا کار د ادارې له برخې بېرته نه راګرځي.", "products.confirmDelete": "محصولات ړنګول", "products.deleting": "محصولات ړنګېږي...", "products.deleteSuccess": "محصولات په بریالیتوب ړنګ شول.", "products.deleteError": "ټاکل شوي محصولات ړنګ نه شول.",
   "details.subtitle": "د محصول بشپړ معلومات، انځورونه، زېرمه او بیې.", "details.back": "محصولاتو ته ستنېدل", "details.open": "د محصول جزئیات کتل", "details.notFound": "محصول ونه موندل شو", "details.notFoundHelp": "کېدای شي دا محصول ړنګ شوی یا د لاسرسي وړ نه وي.", "details.featured": "ځانګړی", "details.noDescription": "د دې محصول لپاره تشریح نه ده لیکل شوې.", "details.views": "کتنې", "details.created": "جوړ شوی", "details.updated": "وروستی نوی کول", "details.inventory": "زېرمه", "details.totalStock": "ټوله زېرمه", "details.availableStock": "شته زېرمه", "details.reservedStock": "ساتل شوې زېرمه", "details.minimumStock": "لږ تر لږه زېرمه", "details.expiry": "د پای نېټه", "details.pricing": "بیې", "details.noPrices": "د پېرودونکو لپاره بیې نه دي ټاکل شوې.",
+  ...inventoryPs,
 };

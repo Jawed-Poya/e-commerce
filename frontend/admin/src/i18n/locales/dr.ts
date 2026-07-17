@@ -1,4 +1,5 @@
 import type { en } from "./en";
+import { inventoryDr } from "@/features/inventory/i18n/inventory-translations";
 export const dr: Record<keyof typeof en, string> = {
   "language.en": "انگلیسی", "language.ps": "پشتو", "language.dr": "دری",
   "common.profile": "پروفایل", "common.logout": "خروج", "common.notifications": "اعلان‌ها",
@@ -15,4 +16,5 @@ export const dr: Record<keyof typeof en, string> = {
   "update.savedImage": "ذخیره‌شده", "update.newImage": "جدید",
   "products.deleteSelected": "حذف انتخاب‌شده‌ها", "products.deleteTitle": "محصولات انتخاب‌شده حذف شوند؟", "products.deleteDescription": "محصولات انتخاب‌شده از فهرست حذف می‌شوند. این عمل از پنل مدیریت قابل بازگشت نیست.", "products.confirmDelete": "حذف محصولات", "products.deleting": "در حال حذف محصولات...", "products.deleteSuccess": "محصولات با موفقیت حذف شدند.", "products.deleteError": "محصولات انتخاب‌شده حذف نشدند.",
   "details.subtitle": "اطلاعات کامل محصول، تصاویر، موجودی و قیمت‌ها.", "details.back": "بازگشت به محصولات", "details.open": "مشاهده جزئیات محصول", "details.notFound": "محصول یافت نشد", "details.notFoundHelp": "این محصول ممکن است حذف شده یا در دسترس نباشد.", "details.featured": "ویژه", "details.noDescription": "برای این محصول توضیحی ثبت نشده است.", "details.views": "بازدیدها", "details.created": "تاریخ ایجاد", "details.updated": "آخرین به‌روزرسانی", "details.inventory": "موجودی", "details.totalStock": "موجودی کل", "details.availableStock": "موجودی قابل دسترس", "details.reservedStock": "موجودی رزرو", "details.minimumStock": "حداقل موجودی", "details.expiry": "تاریخ انقضا", "details.pricing": "قیمت‌گذاری", "details.noPrices": "قیمتی برای مشتریان تنظیم نشده است.",
+  ...inventoryDr,
 };

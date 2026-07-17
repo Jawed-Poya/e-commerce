@@ -1,3 +1,5 @@
+import { inventoryEn } from "@/features/inventory/i18n/inventory-translations";
+
 export const en = {
   "language.en": "English", "language.ps": "Pashto", "language.dr": "Dari",
   "common.profile": "Profile", "common.logout": "Log out", "common.notifications": "Notifications",
@@ -14,4 +16,5 @@ export const en = {
   "update.savedImage": "Saved", "update.newImage": "New",
   "products.deleteSelected": "Delete selected", "products.deleteTitle": "Delete selected products?", "products.deleteDescription": "The selected products will be removed from the catalog. This action cannot be undone from the admin panel.", "products.confirmDelete": "Delete products", "products.deleting": "Deleting products...", "products.deleteSuccess": "Products deleted successfully.", "products.deleteError": "The selected products could not be deleted.",
   "details.subtitle": "Complete product information, media, inventory and pricing.", "details.back": "Back to products", "details.open": "View product details", "details.notFound": "Product not found", "details.notFoundHelp": "This product may have been removed or is unavailable.", "details.featured": "Featured", "details.noDescription": "No description has been added for this product.", "details.views": "Views", "details.created": "Created", "details.updated": "Last updated", "details.inventory": "Inventory", "details.totalStock": "Total stock", "details.availableStock": "Available stock", "details.reservedStock": "Reserved stock", "details.minimumStock": "Minimum stock", "details.expiry": "Expiry date", "details.pricing": "Pricing", "details.noPrices": "No customer pricing has been configured.",
+  ...inventoryEn,
 } as const;
