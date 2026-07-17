@@ -82,6 +82,13 @@ public class ProductService : IProductService
                 x.Prices.Any(p =>
                     (p.SalePrice ?? p.RegularPrice) <= filter.MaxPrice));
 
+        if (filter.InStock.HasValue)
+            query = filter.InStock.Value
+                ? query.Where(x => x.Inventory != null &&
+                    x.Inventory.Quantity - x.Inventory.ReservedQuantity > 0)
+                : query.Where(x => x.Inventory == null ||
+                    x.Inventory.Quantity - x.Inventory.ReservedQuantity <= 0);
+
         query = filter.SortBy?.ToLower() switch
         {
             "name" => filter.SortDescending
@@ -119,8 +126,13 @@ public class ProductService : IProductService
                 x.MaximumValue,
                 x.IsFeatured,
                 x.IsActive,
-                x.Inventory == null ? 0 : x.Inventory.Quantity,
+                x.Inventory == null ? 0 : x.Inventory.Quantity - x.Inventory.ReservedQuantity,
                 x.Prices.Select(p => (decimal?)(p.SalePrice ?? p.RegularPrice)).Min(),
+                x.Prices
+                    .Where(p => p.SalePrice.HasValue && p.SalePrice < p.RegularPrice)
+                    .OrderBy(p => p.SalePrice)
+                    .Select(p => (decimal?)p.RegularPrice)
+                    .FirstOrDefault(),
                 x.Images.Where(i => i.IsPrimary).Select(i => "/" + i.ImagePath.Replace("\\", "/")).FirstOrDefault(),
                 x.Images.OrderByDescending(i => i.IsPrimary).ThenBy(i => i.SortOrder)
                     .Select(i => new ProductListImageResponse(i.Id, "/" + i.ImagePath.Replace("\\", "/"), i.IsPrimary, i.SortOrder))
@@ -686,14 +698,44 @@ public class ProductService : IProductService
             })
             .ToListAsync(cancellationToken);
 
+        var categoryProducts = await _context
+            .Set<Product>()
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .Select(x => new
+            {
+                x.CategoryId,
+                ImagePath = x.Images
+                    .OrderByDescending(image => image.IsPrimary)
+                    .ThenBy(image => image.SortOrder)
+                    .Select(image => image.ImagePath)
+                    .FirstOrDefault()
+            })
+            .ToListAsync(cancellationToken);
+
+        var categoryStats = categoryProducts
+            .GroupBy(x => x.CategoryId)
+            .ToDictionary(
+                group => group.Key,
+                group => new
+                {
+                    Count = group.Count(),
+                    ImagePath = group.Select(x => x.ImagePath).FirstOrDefault(path => path != null)
+                }
+            );
+
         var categories = generalTypes
             .Where(x =>
                 x.Group == GeneralTypeEnum.ProductCategory
             )
             .Select(x =>
-                new ProductLookupItemResponse(
+                new ProductCategoryLookupItemResponse(
                     x.Id,
-                    x.Name
+                    x.Name,
+                    categoryStats.TryGetValue(x.Id, out var stats) ? stats.Count : 0,
+                    categoryStats.TryGetValue(x.Id, out stats) && stats.ImagePath != null
+                        ? "/" + stats.ImagePath.Replace("\\", "/")
+                        : null
                 )
             )
             .ToList();

@@ -1,6 +1,5 @@
 import {
   ArrowRight,
-  ChevronRight,
   PackageCheck,
   RotateCcw,
   ShieldCheck,
@@ -25,47 +24,14 @@ export function HomePage() {
   });
   const lookups = useLookups();
   const items = products.data?.items ?? [];
+  const saleItems = items.filter(
+    (item) => item.oldPrice && item.price && item.oldPrice > item.price,
+  );
   const deal = items.find((x) => x.price && x.stock > 0) ?? items[0];
   return (
     <div className="mx-auto max-w-[1500px] px-4 sm:px-6 lg:px-8">
-      <section className="grid gap-6 py-6 lg:grid-cols-[230px_1fr]">
-        <aside className="hidden rounded-2xl border bg-card p-3 shadow-sm lg:block">
-          <div className="flex items-center justify-between rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground">
-            <span className="flex items-center gap-2">
-              <ShoppingBag className="size-4" />
-              All categories
-            </span>
-            <ChevronRight className="size-4" />
-          </div>
-          <nav className="mt-3 grid">
-            {lookups.isLoading
-              ? Array.from({ length: 6 }).map((_, i) => (
-                  <Skeleton key={i} className="m-1 h-10" />
-                ))
-              : lookups.data?.categories.slice(0, 8).map((x) => (
-                  <Link
-                    key={x.id}
-                    className="flex items-center justify-between rounded-lg px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-primary"
-                    to={`/products?categoryId=${x.id}`}
-                  >
-                    {x.name}
-                    <ChevronRight className="size-3.5" />
-                  </Link>
-                ))}
-          </nav>
-          <div className="mt-4 rounded-xl bg-gradient-to-br from-secondary to-accent p-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-primary">
-              Marketplace offer
-            </p>
-            <h3 className="mt-2 text-lg font-black">
-              Explore this week's collection
-            </h3>
-            <Button asChild size="sm" className="mt-4">
-              <Link to="/products">Shop now</Link>
-            </Button>
-          </div>
-        </aside>
-        <div className="relative min-h-[560px] overflow-hidden rounded-2xl border bg-[#edf5ff] shadow-sm dark:bg-[#0b1d33]">
+      <section className="py-6">
+        <div className="relative min-h-[530px] overflow-hidden rounded-lg border bg-secondary">
           <img
             className="absolute inset-0 size-full object-cover object-center"
             src={heroImage}
@@ -126,6 +92,20 @@ export function HomePage() {
           </div>
         </div>
       </section>
+      {saleItems.length > 0 && (
+        <section className="py-12">
+          <Heading
+            eyebrow="Limited offers"
+            title="Flash deals"
+            to="/products"
+          />
+          <div className="grid auto-rows-fr gap-5 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-5">
+            {saleItems.slice(0, 5).map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </section>
+      )}
       <section id="categories" className="py-14">
         <Heading
           eyebrow="Browse categories"
@@ -137,20 +117,33 @@ export function HomePage() {
             ? Array.from({ length: 6 }).map((_, i) => (
                 <Skeleton key={i} className="h-48" />
               ))
-            : lookups.data?.categories.slice(0, 6).map((x, i) => (
+            : lookups.data?.categories.slice(0, 6).map((x) => (
                 <Link
                   key={x.id}
                   to={`/products?categoryId=${x.id}`}
-                  className={`group flex min-h-48 flex-col justify-end rounded-2xl border p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${["bg-blue-100/70 dark:bg-blue-950/40", "bg-orange-100/70 dark:bg-orange-950/40", "bg-emerald-100/70 dark:bg-emerald-950/40"][i % 3]}`}
+                  className="group overflow-hidden rounded-lg border bg-card transition-colors hover:border-primary/50"
                 >
-                  <span className="mb-auto grid size-11 place-items-center rounded-xl bg-background/80 text-primary shadow-sm">
-                    <ShoppingBag />
-                  </span>
-                  <h3 className="font-bold">{x.name}</h3>
-                  <span className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                    Explore products
-                    <ArrowRight className="size-4 transition group-hover:translate-x-1" />
-                  </span>
+                  <div className="aspect-[1.05/1] overflow-hidden border-b bg-muted">
+                    {x.imageUrl ? (
+                      <img
+                        src={imageUrl(x.imageUrl) ?? ""}
+                        alt=""
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      <span className="grid size-full place-items-center text-muted-foreground">
+                        <ShoppingBag className="size-10" />
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <h3 className="truncate font-bold">{x.name}</h3>
+                    <span className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                      {x.productCount}{" "}
+                      {x.productCount === 1 ? "product" : "products"}
+                      <ArrowRight className="size-4 text-foreground" />
+                    </span>
+                  </div>
                 </Link>
               ))}
         </div>
@@ -160,14 +153,14 @@ export function HomePage() {
         className="grid gap-5 py-6 lg:grid-cols-[1.35fr_.65fr]"
       >
         {" "}
-        <div className="relative min-h-80 overflow-hidden rounded-2xl bg-gradient-to-br from-[#061426] to-[#123d77] p-8 text-white sm:p-10">
+        <div className="relative min-h-80 overflow-hidden rounded-lg bg-primary p-8 text-primary-foreground sm:p-10">
           <p className="text-xs font-bold uppercase tracking-widest text-orange-300">
             Featured from the catalog
           </p>
           <h2 className="mt-5 max-w-md text-3xl font-black sm:text-4xl">
             Don't miss products selected for you.
           </h2>
-          <p className="mt-4 max-w-sm text-sm leading-7 text-blue-100">
+          <p className="mt-4 max-w-sm text-sm leading-7 text-primary-foreground/75">
             Real product information, gallery images, pricing and
             availability—all in one place.
           </p>
@@ -201,7 +194,7 @@ export function HomePage() {
       <section id="products" className="py-16">
         <Heading
           eyebrow="Featured products"
-          title="Best products for you"
+          title="Just for you"
           to="/products"
         />
         {products.isError ? (

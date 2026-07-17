@@ -17,6 +17,7 @@ public sealed record ProductListItemResponse(
     bool IsActive,
     decimal Stock,
     decimal? Price,
+    decimal? OldPrice,
     string? PrimaryImageUrl,
     IReadOnlyList<ProductListImageResponse> Images
 );

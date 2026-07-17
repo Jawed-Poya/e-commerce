@@ -14,6 +14,13 @@ export function ProductCard({ product }: { product: Product }) {
   const alternate = product.images.find(
     (image) => image.url !== product.primaryImageUrl,
   );
+  const hasDiscount =
+    product.oldPrice != null &&
+    product.price != null &&
+    product.oldPrice > product.price;
+  const discount = hasDiscount
+    ? Math.round(((product.oldPrice! - product.price!) / product.oldPrice!) * 100)
+    : 0;
 
   const addToCart = () =>
     cart.addItem({
@@ -54,6 +61,11 @@ export function ProductCard({ product }: { product: Product }) {
           {product.isFeatured && (
             <Badge className="border border-white/20 bg-primary/95 text-primary-foreground shadow-sm backdrop-blur">
               Featured
+            </Badge>
+          )}
+          {hasDiscount && (
+            <Badge className="bg-brand-orange text-white shadow-sm">
+              -{discount}%
             </Badge>
           )}
           {product.stock < 1 && (
@@ -99,9 +111,16 @@ export function ProductCard({ product }: { product: Product }) {
 
         <div className="row-start-4 pt-4">
           <div className="mb-4 flex items-end justify-between gap-3">
-            <p className="text-2xl font-black tracking-tight text-foreground">
-              ${(product.price ?? 0).toFixed(2)}
-            </p>
+            <div>
+              <p className="text-2xl font-black tracking-tight text-foreground">
+                ${(product.price ?? 0).toFixed(2)}
+              </p>
+              {hasDiscount && (
+                <p className="mt-0.5 text-xs font-medium text-muted-foreground line-through decoration-destructive/70">
+                  ${product.oldPrice!.toFixed(2)}
+                </p>
+              )}
+            </div>
             <p
               className={cn(
                 "flex shrink-0 items-center gap-1 text-[11px] font-semibold",

@@ -86,10 +86,12 @@ body {
   @apply m-0 min-w-80 bg-background text-foreground antialiased;
 }
 button,
-a,
+a {
+  @apply outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+}
 input,
 select {
-  @apply outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  @apply outline-none;
 }
 ::selection {
   @apply bg-brand-orange text-white;

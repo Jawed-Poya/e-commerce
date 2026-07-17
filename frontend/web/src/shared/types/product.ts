@@ -24,6 +24,7 @@ export type Product = {
   isActive: boolean;
   stock: number;
   price: number | null;
+  oldPrice: number | null;
   primaryImageUrl: string | null;
   images: ProductImage[];
 };
@@ -62,7 +63,12 @@ export type PagedProducts = {
   hasNextPage: boolean;
 };
 export type Lookups = {
-  categories: { id: number; name: string }[];
+  categories: {
+    id: number;
+    name: string;
+    productCount: number;
+    imageUrl: string | null;
+  }[];
   brands: { id: number; name: string }[];
   units: { id: number; name: string }[];
 };

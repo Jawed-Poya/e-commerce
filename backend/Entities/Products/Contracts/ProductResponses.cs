@@ -18,8 +18,15 @@ public sealed record ProductLookupItemResponse(
     string Name
 );
 
+public sealed record ProductCategoryLookupItemResponse(
+    long Id,
+    string Name,
+    int ProductCount,
+    string? ImageUrl
+);
+
 public sealed record ProductLookupsResponse(
-    IReadOnlyCollection<ProductLookupItemResponse> Categories,
+    IReadOnlyCollection<ProductCategoryLookupItemResponse> Categories,
     IReadOnlyCollection<ProductLookupItemResponse> Brands,
     IReadOnlyCollection<ProductLookupItemResponse> Units
 );

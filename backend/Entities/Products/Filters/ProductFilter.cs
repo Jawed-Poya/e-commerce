@@ -17,4 +17,6 @@ public class ProductFilter : PaginationFilter
     public decimal? MinPrice { get; set; }
 
     public decimal? MaxPrice { get; set; }
+
+    public bool? InStock { get; set; }
 }
