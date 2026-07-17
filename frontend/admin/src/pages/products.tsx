@@ -60,7 +60,7 @@ export default function ProductsPage() {
     const { data, isLoading, isError, isFetching } = useProducts({ ...filters, search: search || undefined, page, pageSize });
     const { data: lookups } = useProductLookupsQuery();
     const products = data?.items ?? [];
-    const activeFilterCount = Object.values(filters).filter(value => value !== undefined && value !== "").length;
+    const activeFilterCount = Object.values(filters).filter(value => value !== undefined).length;
     const selectedProducts = useMemo(() => products.filter(x => selected.includes(x.id)), [products, selected]);
 
     useEffect(() => setSelected(ids => ids.filter(id => products.some(x => x.id === id))), [products]);

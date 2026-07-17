@@ -164,13 +164,13 @@ export function GeneralTypeForm({
     );
 }
 
+type GeneralTypeTree = GeneralType & { children: GeneralTypeTree[] };
+
 function TypeItem({
     item,
     level = 0,
 }: {
-    item: GeneralType & {
-        children: GeneralType[];
-    };
+    item: GeneralTypeTree;
     level?: number;
 }) {
     return (
