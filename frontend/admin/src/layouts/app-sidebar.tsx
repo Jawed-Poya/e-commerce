@@ -14,6 +14,7 @@ import {
     LayoutDashboard,
     PackageIcon,
     SettingsIcon,
+    Warehouse,
 } from "lucide-react";
 import { useI18n } from "@/i18n/i18n-provider";
 
@@ -32,6 +33,12 @@ const data = {
             title: "Products",
             url: "/products",
             icon: <PackageIcon />,
+        },
+
+        {
+            title: "Inventory",
+            url: "/inventory",
+            icon: <Warehouse />,
         },
 
         {

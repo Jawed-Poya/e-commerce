@@ -18,16 +18,40 @@ public sealed class InventoryController(IInventoryService inventory) : Controlle
     }
 
     [HttpPost("adjust")]
-    public async Task<IActionResult> Adjust(long productId, AdjustStockRequest request, CancellationToken ct) => Ok(ApiResponse<StockResult>.Ok(await inventory.AdjustAsync(productId, request, UserId, ct)));
+    public Task<IActionResult> Adjust(long productId, AdjustStockRequest request, CancellationToken ct) =>
+        Mutate(() => inventory.AdjustAsync(productId, request, UserId, ct));
 
     [HttpPost("reserve")]
-    public async Task<IActionResult> Reserve(long productId, ReserveStockRequest request, CancellationToken ct) => Ok(ApiResponse<StockResult>.Ok(await inventory.ReserveAsync(productId, request, UserId, ct)));
+    public Task<IActionResult> Reserve(long productId, ReserveStockRequest request, CancellationToken ct) =>
+        Mutate(() => inventory.ReserveAsync(productId, request, UserId, ct));
 
     [HttpPost("release")]
-    public async Task<IActionResult> Release(long productId, ReserveStockRequest request, CancellationToken ct) => Ok(ApiResponse<StockResult>.Ok(await inventory.ReleaseAsync(productId, request, UserId, ct)));
+    public Task<IActionResult> Release(long productId, ReserveStockRequest request, CancellationToken ct) =>
+        Mutate(() => inventory.ReleaseAsync(productId, request, UserId, ct));
 
     [HttpPost("commit-sale")]
-    public async Task<IActionResult> CommitSale(long productId, ReserveStockRequest request, CancellationToken ct) => Ok(ApiResponse<StockResult>.Ok(await inventory.CommitSaleAsync(productId, request, UserId, ct)));
+    public Task<IActionResult> CommitSale(long productId, ReserveStockRequest request, CancellationToken ct) =>
+        Mutate(() => inventory.CommitSaleAsync(productId, request, UserId, ct));
+
+    private async Task<IActionResult> Mutate(Func<Task<StockResult>> action)
+    {
+        try
+        {
+            return Ok(ApiResponse<StockResult>.Ok(await action()));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(ApiResponse<StockResult>.Fail(exception.Message));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(ApiResponse<StockResult>.Fail(exception.Message));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(ApiResponse<StockResult>.Fail(exception.Message));
+        }
+    }
 
     private string? UserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 }
