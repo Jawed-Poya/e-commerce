@@ -23,6 +23,11 @@ import { ProductSectionNavigation } from "@/features/products/components/product
 import { ProductFiltersDialog, type AppliedProductFilters } from "@/features/products/components/product-filters-dialog";
 import { ProductPagination } from "@/features/products/components/product-pagination";
 import { DeleteButton } from "@/components/delete-button";
+import {
+    IMAGE_FILE_ACCEPT,
+    isSupportedImageFile,
+    MAXIMUM_IMAGE_FILE_SIZE,
+} from "@/lib/image-files";
 
 function getUpdateErrorMessage(error: unknown, messages: { connection: string; endpoint: string; failed: string }) {
     const apiError = error as {
@@ -60,7 +65,7 @@ export default function ProductsPage() {
     const { data, isLoading, isError, isFetching } = useProducts({ ...filters, search: search || undefined, page, pageSize });
     const { data: lookups } = useProductLookupsQuery();
     const products = data?.items ?? [];
-    const activeFilterCount = Object.values(filters).filter(value => value !== undefined && value !== "").length;
+    const activeFilterCount = Object.values(filters).filter(value => value !== undefined).length;
     const selectedProducts = useMemo(() => products.filter(x => selected.includes(x.id)), [products, selected]);
 
     useEffect(() => setSelected(ids => ids.filter(id => products.some(x => x.id === id))), [products]);
@@ -140,7 +145,7 @@ export default function ProductsPage() {
                 const preview = item.image ? URL.createObjectURL(item.image) : resolveProductImageUrl(item.primaryImageUrl);
                 return <div key={item.id} className="grid gap-5 rounded-xl border p-5 lg:grid-cols-[180px_1fr]">
                     <div><div className="aspect-square overflow-hidden rounded-lg border bg-muted">{preview ? <img src={preview} alt={item.name} className="size-full object-cover" /> : <ImagePlus className="m-auto mt-16 text-muted-foreground" />}</div>
-                        <Label className="mt-3 flex cursor-pointer items-center justify-center border px-3 py-2 text-sm"><ImagePlus className="me-2 size-4" />{t("update.replaceImage")}<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={e => change(item.id, { image: e.target.files?.[0] })} /></Label>
+                        <Label className="mt-3 flex cursor-pointer items-center justify-center border px-3 py-2 text-sm"><ImagePlus className="me-2 size-4" />{t("update.replaceImage")}<input className="sr-only" type="file" accept={IMAGE_FILE_ACCEPT} onChange={e => change(item.id, { image: e.target.files?.[0] })} /></Label>
                         <p className="mt-2 text-xs text-muted-foreground">{t("update.keepImage")}</p>
                         <GalleryImagePicker existingImages={item.images.filter(image => !image.isPrimary && !(item.removedImageIds ?? []).includes(image.id))} files={item.galleryImages ?? []} onChange={galleryImages => change(item.id, { galleryImages })} onRemoveExisting={imageId => change(item.id, { removedImageIds: [...(item.removedImageIds ?? []), imageId] })} />
                     </div>
@@ -194,9 +199,8 @@ function GalleryImagePicker({ existingImages, files, onChange, onRemoveExisting 
 
     const addFiles = (selected: FileList | null) => {
         if (!selected) return;
-        const supported = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
         const signatures = new Set(files.map(file => `${file.name}-${file.size}-${file.lastModified}`));
-        const additions = Array.from(selected).filter(file => supported.has(file.type) && file.size <= 5 * 1024 * 1024 && !signatures.has(`${file.name}-${file.size}-${file.lastModified}`));
+        const additions = Array.from(selected).filter(file => isSupportedImageFile(file) && file.size <= MAXIMUM_IMAGE_FILE_SIZE && !signatures.has(`${file.name}-${file.size}-${file.lastModified}`));
         const availableSlots = Math.max(0, 10 - existingImages.length - 1);
         if (files.length + additions.length > availableSlots) toast.error(t("update.galleryLimit"));
         onChange([...files, ...additions].slice(0, availableSlots));
@@ -208,6 +212,6 @@ function GalleryImagePicker({ existingImages, files, onChange, onRemoveExisting 
             {existingImages.map(image => <div key={image.id} className="relative aspect-square overflow-hidden border bg-muted"><img src={resolveProductImageUrl(image.url)!} alt="" className="size-full object-cover" /><Button type="button" variant="destructive" size="icon-xs" className="absolute end-1 top-1" aria-label={t("update.removeGalleryImage")} onClick={() => onRemoveExisting(image.id)}><X className="size-3" /></Button><span className="absolute bottom-0 inset-x-0 bg-black/65 px-1 py-0.5 text-center text-[10px] text-white">{t("update.savedImage")}</span></div>)}
             {previews.map((preview, index) => <div key={`${preview.file.name}-${preview.file.lastModified}`} className="relative aspect-square overflow-hidden border bg-muted"><img src={preview.url} alt="" className="size-full object-cover" /><Button type="button" variant="destructive" size="icon-xs" className="absolute end-1 top-1" aria-label={t("update.removeGalleryImage")} onClick={() => onChange(files.filter((_, fileIndex) => fileIndex !== index))}><X className="size-3" /></Button><span className="absolute bottom-0 inset-x-0 bg-primary/85 px-1 py-0.5 text-center text-[10px] text-primary-foreground">{t("update.newImage")}</span></div>)}
         </div>}
-        <Label className="flex cursor-pointer items-center justify-center border px-3 py-2 text-xs"><ImagePlus className="me-2 size-4" />{t("update.addGalleryImages")}<input className="sr-only" type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={event => { addFiles(event.target.files); event.target.value = ""; }} /></Label>
+        <Label className="flex cursor-pointer items-center justify-center border px-3 py-2 text-xs"><ImagePlus className="me-2 size-4" />{t("update.addGalleryImages")}<input className="sr-only" type="file" multiple accept={IMAGE_FILE_ACCEPT} onChange={event => { addFiles(event.target.files); event.target.value = ""; }} /></Label>
     </div>;
 }

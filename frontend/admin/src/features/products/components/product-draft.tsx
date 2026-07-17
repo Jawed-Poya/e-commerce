@@ -22,6 +22,12 @@ import type {
     ProductLookupOption,
 } from "../types/product-bulk-types";
 import { useI18n } from "@/i18n/i18n-provider";
+import { flattenTree } from "@/lib/utils";
+import {
+    IMAGE_FILE_ACCEPT,
+    isSupportedImageFile,
+    MAXIMUM_IMAGE_FILE_SIZE,
+} from "@/lib/image-files";
 
 interface ProductDraftCardProps {
     index: number;
@@ -55,9 +61,8 @@ function GalleryImagePicker({ files, disabled, onChange }: { files: File[]; disa
 
     const addFiles = (selected: FileList | null) => {
         if (!selected) return;
-        const supported = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
         const signatures = new Set(files.map((file) => `${file.name}-${file.size}-${file.lastModified}`));
-        const additions = Array.from(selected).filter((file) => supported.has(file.type) && file.size <= 5 * 1024 * 1024 && !signatures.has(`${file.name}-${file.size}-${file.lastModified}`));
+        const additions = Array.from(selected).filter((file) => isSupportedImageFile(file) && file.size <= MAXIMUM_IMAGE_FILE_SIZE && !signatures.has(`${file.name}-${file.size}-${file.lastModified}`));
         if (files.length + additions.length > 9) toast.error(t("update.galleryLimit"));
         onChange([...files, ...additions].slice(0, 9));
     };
@@ -74,7 +79,7 @@ function GalleryImagePicker({ files, disabled, onChange }: { files: File[]; disa
             </div>}
             <Label className="flex cursor-pointer items-center justify-center border px-3 py-2 text-xs aria-disabled:pointer-events-none aria-disabled:opacity-50" aria-disabled={disabled}>
                 <ImagePlus className="me-2 size-4" />{t("update.addGalleryImages")}
-                <input className="sr-only" type="file" multiple disabled={disabled} accept="image/jpeg,image/png,image/webp" onChange={(event) => { addFiles(event.target.files); event.target.value = ""; }} />
+                <input className="sr-only" type="file" multiple disabled={disabled} accept={IMAGE_FILE_ACCEPT} onChange={(event) => { addFiles(event.target.files); event.target.value = ""; }} />
             </Label>
             <FieldError message={files.length > 9 ? t("update.galleryLimit") : undefined} />
         </div>
@@ -87,6 +92,7 @@ function LookupCombobox({
     placeholder,
     disabled,
     required = false,
+    hierarchical = false,
     onChange,
 }: {
     options: ProductLookupOption[];
@@ -94,9 +100,13 @@ function LookupCombobox({
     placeholder: string;
     disabled?: boolean;
     required?: boolean;
+    hierarchical?: boolean;
     onChange: (value: number | null) => void;
 }) {
     const selected = options.find((option) => option.id === value) ?? null;
+    const orderedOptions = hierarchical
+        ? flattenTree(options)
+        : options.map((item) => ({ item, depth: 0 }));
 
     return (
         <Combobox
@@ -114,9 +124,17 @@ function LookupCombobox({
             <ComboboxContent>
                 <ComboboxEmpty>No matching option.</ComboboxEmpty>
                 <ComboboxList>
-                    {options.map((option) => (
-                        <ComboboxItem key={option.id} value={option}>
-                            {option.name}
+                    {orderedOptions.map(({ item, depth }) => (
+                        <ComboboxItem key={item.id} value={item}>
+                            <span
+                                className={
+                                    depth === 0 ? "font-medium" : undefined
+                                }
+                                style={{ paddingInlineStart: depth * 16 }}
+                            >
+                                {depth > 0 && "↳ "}
+                                {item.name}
+                            </span>
                         </ComboboxItem>
                     ))}
                 </ComboboxList>
@@ -238,6 +256,7 @@ export function ProductDraftCard({
                                         placeholder="Search category..."
                                         disabled={disabled}
                                         required
+                                        hierarchical
                                         onChange={field.onChange}
                                     />
                                 )}

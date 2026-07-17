@@ -10,15 +10,10 @@ import type {
 import { useCreateBulkProductsMutation } from "./use-product-mutation";
 import { ProductBulkFormSchema } from "../schemas/product-bulk-schema";
 import { useNavigate } from "react-router-dom";
-
-const MaxImageSize = 5 * 1024 * 1024;
-
-const SupportedImageTypes = [
-    "image/jpeg",
-    "image/jpg",
-    "image/png",
-    "image/webp",
-];
+import {
+    isSupportedImageFile,
+    MAXIMUM_IMAGE_FILE_SIZE,
+} from "@/lib/image-files";
 
 function getFileSignature(file: File) {
     return `${file.name}-${file.size}-${file.lastModified}`;
@@ -146,8 +141,8 @@ export function useBulkProductForm() {
             let duplicateCount = 0;
 
             for (const file of files) {
-                const isSupported = SupportedImageTypes.includes(file.type);
-                const isValidSize = file.size <= MaxImageSize;
+                const isSupported = isSupportedImageFile(file);
+                const isValidSize = file.size <= MAXIMUM_IMAGE_FILE_SIZE;
                 const signature = getFileSignature(file);
 
                 if (!isSupported || !isValidSize) {
@@ -166,7 +161,7 @@ export function useBulkProductForm() {
 
             if (invalidCount > 0) {
                 toast.error(
-                    `${invalidCount} image(s) were skipped. Use JPG, PNG or WEBP files smaller than 5 MB.`,
+                    `${invalidCount} image(s) were skipped. Use JPG, PNG, WEBP or AVIF files smaller than 5 MB.`,
                 );
             }
 

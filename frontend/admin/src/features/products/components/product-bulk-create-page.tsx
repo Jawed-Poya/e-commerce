@@ -52,8 +52,6 @@ export function ProductBulkCreatePage() {
 
     const { categories, brands, units } = data;
 
-    console.log("Cat: ", categories);
-
     return (
         <FormProvider {...form}>
             <form

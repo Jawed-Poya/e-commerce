@@ -10,9 +10,11 @@ import { ImagePlus, Images, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+    IMAGE_FILE_ACCEPT,
+    isSupportedImageFile,
+} from "@/lib/image-files";
 import { useI18n } from "@/i18n/i18n-provider";
-
-const SupportedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 
 interface ProductBulkUploaderProps {
     disabled?: boolean;
@@ -20,7 +22,7 @@ interface ProductBulkUploaderProps {
 }
 
 function getAcceptedImages(files: File[]): File[] {
-    return files.filter((file) => SupportedImageTypes.includes(file.type));
+    return files.filter(isSupportedImageFile);
 }
 
 function getClipboardImages(clipboardData: DataTransfer): File[] {
@@ -31,12 +33,10 @@ function getClipboardImages(clipboardData: DataTransfer): File[] {
     }
 
     return Array.from(clipboardData.items)
-        .filter(
-            (item) =>
-                item.kind === "file" && SupportedImageTypes.includes(item.type),
-        )
+        .filter((item) => item.kind === "file")
         .map((item) => item.getAsFile())
-        .filter((file): file is File => file !== null);
+        .filter((file): file is File => file !== null)
+        .filter(isSupportedImageFile);
 }
 
 export function ProductBulkUploader({
@@ -181,7 +181,7 @@ export function ProductBulkUploader({
             <input
                 ref={inputRef}
                 type="file"
-                accept={SupportedImageTypes.join(",")}
+                accept={IMAGE_FILE_ACCEPT}
                 multiple
                 disabled={disabled}
                 className="hidden"

@@ -1,6 +1,6 @@
 import apiClient from "@/api/api-client";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "https://localhost:7060/api";
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5188/api";
 const apiOrigin = new URL(apiBaseUrl, window.location.origin).origin;
 
 export function resolveProductImageUrl(path: string | null | undefined) {

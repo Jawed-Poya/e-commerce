@@ -1,13 +1,8 @@
 import { z } from "zod";
-
-const MaxImageSize = 5 * 1024 * 1024;
-
-const SupportedImageTypes = [
-    "image/jpeg",
-    "image/jpg",
-    "image/png",
-    "image/webp",
-];
+import {
+    isSupportedImageFile,
+    MAXIMUM_IMAGE_FILE_SIZE,
+} from "@/lib/image-files";
 
 export const ProductBulkItemSchema = z
     .object({
@@ -16,11 +11,11 @@ export const ProductBulkItemSchema = z
         image: z
             .instanceof(File)
             .refine(
-                (file) => SupportedImageTypes.includes(file.type),
-                "Only JPG, PNG and WEBP images are supported.",
+                isSupportedImageFile,
+                "Only JPG, PNG, WEBP and AVIF images are supported.",
             )
             .refine(
-                (file) => file.size <= MaxImageSize,
+                (file) => file.size <= MAXIMUM_IMAGE_FILE_SIZE,
                 "Image must be smaller than 5 MB.",
             ),
 
@@ -29,8 +24,8 @@ export const ProductBulkItemSchema = z
         galleryImages: z
             .array(
                 z.instanceof(File)
-                    .refine((file) => SupportedImageTypes.includes(file.type), "Only JPG, PNG and WEBP images are supported.")
-                    .refine((file) => file.size <= MaxImageSize, "Image must be smaller than 5 MB."),
+                    .refine(isSupportedImageFile, "Only JPG, PNG, WEBP and AVIF images are supported.")
+                    .refine((file) => file.size <= MAXIMUM_IMAGE_FILE_SIZE, "Image must be smaller than 5 MB."),
             )
             .max(9, "A product can have a maximum of 10 images."),
 
