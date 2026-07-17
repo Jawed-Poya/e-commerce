@@ -27,5 +27,5 @@ public sealed class ProductDetailsDto
 }
 
 public sealed record ProductInventoryDetailsDto(decimal Quantity, decimal ReservedQuantity, decimal AvailableQuantity, decimal MinimumQuantity, DateOnly? ExpireDate);
-public sealed record ProductPriceDetailsDto(long Id, string CustomerTypeName, decimal RegularPrice, decimal? SalePrice, DateOnly? StartDate, DateOnly? EndDate);
+public sealed record ProductPriceDetailsDto(long Id, long CustomerTypeId, string CustomerTypeName, decimal RegularPrice, decimal? SalePrice, DateOnly? StartDate, DateOnly? EndDate);
 public sealed record ProductImageDetailsDto(long Id, string Url, string? OriginalFileName, string ContentType, long Size, bool IsPrimary, int SortOrder);

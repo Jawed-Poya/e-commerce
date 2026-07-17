@@ -3,15 +3,12 @@ import { ProductService } from "../services/product-bulk-service";
 import type { CreateBulkProductsRequest } from "../types/product-bulk-types";
 import { productKeys } from "@/keys/product-keys";
 
-export const ProductQueryKeys = {
-    lookups: ["products", "lookups", "hierarchy-v2"] as const,
-};
-
 export function useProductLookupsQuery() {
     return useQuery({
-        queryKey: ProductQueryKeys.lookups,
+        queryKey: productKeys.lookups,
         queryFn: ProductService.GetLookups,
         staleTime: 10 * 60 * 1000,
+        refetchOnMount: "always",
     });
 }
 

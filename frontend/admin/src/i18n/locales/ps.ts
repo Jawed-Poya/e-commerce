@@ -1,5 +1,6 @@
 import type { en } from "./en";
 import { inventoryPs } from "@/features/inventory/i18n/inventory-translations";
+import { pricingPs } from "@/features/products/i18n/pricing-translations";
 export const ps: Record<keyof typeof en, string> = {
   "language.en": "انګلیسي", "language.ps": "پښتو", "language.dr": "دري",
   "common.profile": "پروفایل", "common.logout": "وتل", "common.notifications": "خبرتیاوې",
@@ -18,4 +19,5 @@ export const ps: Record<keyof typeof en, string> = {
   "details.subtitle": "د محصول بشپړ معلومات، انځورونه، زېرمه او بیې.", "details.back": "محصولاتو ته ستنېدل", "details.open": "د محصول جزئیات کتل", "details.notFound": "محصول ونه موندل شو", "details.notFoundHelp": "کېدای شي دا محصول ړنګ شوی یا د لاسرسي وړ نه وي.", "details.featured": "ځانګړی", "details.noDescription": "د دې محصول لپاره تشریح نه ده لیکل شوې.", "details.views": "کتنې", "details.created": "جوړ شوی", "details.updated": "وروستی نوی کول", "details.inventory": "زېرمه", "details.totalStock": "ټوله زېرمه", "details.availableStock": "شته زېرمه", "details.reservedStock": "ساتل شوې زېرمه", "details.minimumStock": "لږ تر لږه زېرمه", "details.expiry": "د پای نېټه", "details.pricing": "بیې", "details.noPrices": "د پېرودونکو لپاره بیې نه دي ټاکل شوې.",
   "types.image": "انځور", "types.imageUrl": "د انځور پته", "types.imageUrlHelp": "د انځور لپاره عامه HTTP یا HTTPS پته ولیکئ.", "types.useImage": "انځور کارول", "types.useImageHelp": "اختیاري دی. یوازې هغه وخت یې فعال کړئ چې دا ډول انځور ته اړتیا ولري.", "types.imageSource": "د انځور سرچینه", "types.uploadImage": "انځور پورته کول", "types.onlineUrl": "انلاین پته", "types.chooseImage": "له وسیلې څخه انځور وټاکئ", "types.imageFileHelp": "JPG، PNG، WEBP یا AVIF، تر ۵ MB پورې.", "types.imagePreview": "د ډول انځور مخکتنه", "types.removeImage": "انځور لرې کول", "types.imageFormatError": "یو معتبر JPG، PNG، WEBP یا AVIF انځور وټاکئ.", "types.imageSizeError": "انځور باید له ۵ MB څخه لوی نه وي.", "types.imageUrlError": "یوه معتبره HTTP یا HTTPS پته ولیکئ.", "types.imageRequired": "له خوندي کولو مخکې انځور وټاکئ یا د انځور اختیار بند کړئ.",
   ...inventoryPs,
+  ...pricingPs,
 };

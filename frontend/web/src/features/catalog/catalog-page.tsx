@@ -1,727 +1,987 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import {
-  ChevronLeft,
-  ChevronRight,
-  PackageSearch,
-  Search,
-  SlidersHorizontal,
-  X,
+    ChevronLeft,
+    ChevronRight,
+    PackageSearch,
+    Search,
+    SlidersHorizontal,
+    X,
 } from "lucide-react";
-import {
-  useEffect,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Button } from "../../shared/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../shared/components/ui/select";
-import { Skeleton } from "../../shared/components/ui/skeleton";
+
+import { flattenCategoryTree } from "./category-tree";
 import { ProductCard } from "./product-card";
 import { useLookups, useProducts } from "./use-catalog";
-import { flattenCategoryTree } from "./category-tree";
+
+import { Button } from "../../shared/components/ui/button";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "../../shared/components/ui/select";
+import { Skeleton } from "../../shared/components/ui/skeleton";
 import type { CategoryLookup } from "../../shared/types/product";
 
 export function CatalogPage() {
-  const [params, setParams] = useSearchParams();
-  const [search, setSearch] = useState(params.get("search") ?? "");
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const page = Number(params.get("page") ?? 1);
-  const sort = params.get("sort") ?? "newest";
-  const sortMap: Record<string, [string, boolean]> = {
-    newest: ["createdAt", true],
-    name: ["name", false],
-    priceLow: ["price", false],
-    priceHigh: ["price", true],
-  };
-  const [sortBy, sortDescending] = sortMap[sort] ?? sortMap.newest;
-  const lookups = useLookups();
-  const priceMinimum = Math.floor(lookups.data?.minimumPrice ?? 0);
-  const priceMaximum = Math.max(
-    priceMinimum + 1,
-    Math.ceil(lookups.data?.maximumPrice ?? priceMinimum + 1),
-  );
-  const query = useProducts({
-    page,
-    pageSize: 12,
-    search: params.get("search") ?? undefined,
-    categoryId: params.get("categoryId")
-      ? Number(params.get("categoryId"))
-      : undefined,
-    brandId: params.get("brandId") ? Number(params.get("brandId")) : undefined,
-    unitId: params.get("unitId") ? Number(params.get("unitId")) : undefined,
-    minPrice: params.get("minPrice")
-      ? Number(params.get("minPrice"))
-      : undefined,
-    maxPrice: params.get("maxPrice")
-      ? Number(params.get("maxPrice"))
-      : undefined,
-    isFeatured: params.get("isFeatured") === "true" ? true : undefined,
-    inStock:
-      params.get("stock") === "in"
-        ? true
-        : params.get("stock") === "out"
-          ? false
-          : undefined,
-    isActive: true,
-    sortBy,
-    sortDescending,
-  });
+    const [params, setParams] = useSearchParams();
+    const [search, setSearch] = useState(params.get("search") ?? "");
+    const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const update = (key: string, value?: string) => {
-    const next = new URLSearchParams(params);
-    if (value && value !== "all") next.set(key, value);
-    else next.delete(key);
-    if (key !== "page") next.delete("page");
-    setParams(next);
-  };
-  const updatePriceRange = (minimum: number, maximum: number) => {
-    const next = new URLSearchParams(params);
+    const page = Number(params.get("page") ?? 1);
+    const sort = params.get("sort") ?? "newest";
 
-    if (minimum > priceMinimum) next.set("minPrice", String(minimum));
-    else next.delete("minPrice");
+    const sortMap: Record<string, [string, boolean]> = {
+        newest: ["createdAt", true],
+        name: ["name", false],
+        priceLow: ["price", false],
+        priceHigh: ["price", true],
+    };
 
-    if (maximum < priceMaximum) next.set("maxPrice", String(maximum));
-    else next.delete("maxPrice");
+    const [sortBy, sortDescending] = sortMap[sort] ?? sortMap.newest;
 
-    next.delete("page");
-    setParams(next);
-  };
-  const clearFilters = () => {
-    setSearch("");
-    setParams(sort === "newest" ? {} : { sort });
-  };
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    update("search", search.trim());
-  };
+    const lookups = useLookups();
 
-  const category = lookups.data?.categories.find(
-    (item) => String(item.id) === params.get("categoryId"),
-  );
-  const brand = lookups.data?.brands.find(
-    (item) => String(item.id) === params.get("brandId"),
-  );
-  const unit = lookups.data?.units.find(
-    (item) => String(item.id) === params.get("unitId"),
-  );
-  const activeFilters = [
-    params.get("search")
-      ? { key: "search", label: `Search: ${params.get("search")}` }
-      : null,
-    category ? { key: "categoryId", label: category.name } : null,
-    brand ? { key: "brandId", label: brand.name } : null,
-    unit ? { key: "unitId", label: unit.name } : null,
-    params.get("minPrice") || params.get("maxPrice")
-      ? {
-          key: "price",
-          label: `${formatCurrency(Number(params.get("minPrice") ?? priceMinimum))} – ${formatCurrency(Number(params.get("maxPrice") ?? priceMaximum))}`,
+    const priceMinimum = Math.floor(lookups.data?.minimumPrice ?? 0);
+
+    const priceMaximum = Math.max(
+        priceMinimum + 1,
+        Math.ceil(lookups.data?.maximumPrice ?? priceMinimum + 1),
+    );
+
+    const query = useProducts({
+        page,
+        pageSize: 12,
+        search: params.get("search") ?? undefined,
+        categoryId: params.get("categoryId")
+            ? Number(params.get("categoryId"))
+            : undefined,
+        brandId: params.get("brandId")
+            ? Number(params.get("brandId"))
+            : undefined,
+        unitId: params.get("unitId") ? Number(params.get("unitId")) : undefined,
+        minPrice: params.get("minPrice")
+            ? Number(params.get("minPrice"))
+            : undefined,
+        maxPrice: params.get("maxPrice")
+            ? Number(params.get("maxPrice"))
+            : undefined,
+        isFeatured: params.get("isFeatured") === "true" ? true : undefined,
+        inStock:
+            params.get("stock") === "in"
+                ? true
+                : params.get("stock") === "out"
+                  ? false
+                  : undefined,
+        isActive: true,
+        sortBy,
+        sortDescending,
+    });
+
+    const update = (key: string, value?: string) => {
+        const next = new URLSearchParams(params);
+
+        if (value && value !== "all") {
+            next.set(key, value);
+        } else {
+            next.delete(key);
         }
-      : null,
-    params.get("stock") === "in"
-      ? { key: "stock", label: "In stock" }
-      : params.get("stock") === "out"
-        ? { key: "stock", label: "Out of stock" }
-        : null,
-    params.get("isFeatured") === "true"
-      ? { key: "isFeatured", label: "Featured" }
-      : null,
-  ].filter(Boolean) as { key: string; label: string }[];
 
-  const filterPanel = (
-    <FilterPanel
-      categoryId={params.get("categoryId") ?? "all"}
-      brandId={params.get("brandId") ?? "all"}
-      unitId={params.get("unitId") ?? "all"}
-      stock={params.get("stock") ?? "all"}
-      featured={params.get("isFeatured") ?? "all"}
-      minPrice={params.get("minPrice") ?? ""}
-      maxPrice={params.get("maxPrice") ?? ""}
-      priceMinimum={priceMinimum}
-      priceMaximum={priceMaximum}
-      categories={lookups.data?.categories ?? []}
-      brands={lookups.data?.brands ?? []}
-      units={lookups.data?.units ?? []}
-      onChange={update}
-      onPriceChange={updatePriceRange}
-      onClear={clearFilters}
-      hasFilters={activeFilters.length > 0}
-    />
-  );
+        if (key !== "page") {
+            next.delete("page");
+        }
 
-  return (
-    <div className="mx-auto w-full max-w-[1500px] px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-      <nav className="mb-7 flex items-center gap-2 text-xs text-muted-foreground">
-        <Link to="/" className="hover:text-foreground">
-          Home
-        </Link>
-        <ChevronRight className="size-3" />
-        <span className="text-foreground">Shop</span>
-      </nav>
+        setParams(next);
+    };
 
-      <div className="mb-9 border-b pb-8">
-        <p className="text-xs font-bold uppercase tracking-[.18em] text-primary">
-          Curated marketplace
-        </p>
-        <div className="mt-3 flex flex-col justify-between gap-4 md:flex-row md:items-end">
-          <div>
-            <h1 className="text-4xl font-black tracking-tight sm:text-5xl">
-              Find products made for you.
-            </h1>
-            <p className="mt-3 max-w-2xl leading-7 text-muted-foreground">
-              Browse the complete catalog with clear prices, real availability,
-              and useful product details.
-            </p>
-          </div>
-          {!query.isLoading && query.data && (
-            <p className="shrink-0 text-sm text-muted-foreground">
-              <b className="text-foreground">{query.data.totalCount}</b>{" "}
-              products available
-            </p>
-          )}
-        </div>
-      </div>
+    const updatePriceRange = (minimum: number, maximum: number) => {
+        const next = new URLSearchParams(params);
 
-      <div className="grid items-start gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="sticky top-24 hidden rounded-lg border bg-card p-5 lg:block">
-          {filterPanel}
-        </aside>
+        if (minimum > priceMinimum) {
+            next.set("minPrice", String(minimum));
+        } else {
+            next.delete("minPrice");
+        }
 
-        <section className="min-w-0">
-          <div className="mb-5 flex flex-col gap-3 sm:flex-row">
-            <form
-              onSubmit={submit}
-              className="flex h-11 min-w-0 flex-1 items-center rounded-lg border bg-background transition focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/20"
-            >
-              <Search className="ml-3 size-4 shrink-0 text-muted-foreground" />
-              <input
-                className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search by product name or barcode"
-              />
-              <Button className="mr-1 h-9">Search</Button>
-            </form>
+        if (maximum < priceMaximum) {
+            next.set("maxPrice", String(maximum));
+        } else {
+            next.delete("maxPrice");
+        }
 
-            <Dialog.Root open={filtersOpen} onOpenChange={setFiltersOpen}>
-              <Dialog.Trigger asChild>
-                <Button variant="outline" className="lg:hidden">
-                  <SlidersHorizontal /> Filters
-                  {activeFilters.length > 0 && (
-                    <span className="grid size-5 place-items-center rounded-full bg-primary text-[10px] text-primary-foreground">
-                      {activeFilters.length}
-                    </span>
-                  )}
-                </Button>
-              </Dialog.Trigger>
-              <Dialog.Portal>
-                <Dialog.Overlay className="fixed inset-0 z-50 bg-black/45" />
-                <Dialog.Content className="fixed inset-y-0 right-0 z-50 w-[88%] max-w-sm overflow-y-auto border-l bg-background p-6">
-                  <div className="mb-7 flex items-center justify-between">
-                    <Dialog.Title className="text-lg font-bold">
-                      Filter products
-                    </Dialog.Title>
-                    <Dialog.Close asChild>
-                      <Button variant="ghost" size="icon">
-                        <X />
-                      </Button>
-                    </Dialog.Close>
-                  </div>
-                  {filterPanel}
-                  <Dialog.Close asChild>
-                    <Button className="mt-6 w-full">Show products</Button>
-                  </Dialog.Close>
-                </Dialog.Content>
-              </Dialog.Portal>
-            </Dialog.Root>
+        next.delete("page");
+        setParams(next);
+    };
 
-            <Select
-              value={sort}
-              onValueChange={(value) => update("sort", value)}
-            >
-              <SelectTrigger className="sm:w-52">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">Newest first</SelectItem>
-                <SelectItem value="name">Name A-Z</SelectItem>
-                <SelectItem value="priceLow">Price: low to high</SelectItem>
-                <SelectItem value="priceHigh">Price: high to low</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+    const clearFilters = () => {
+        setSearch("");
+        setParams(sort === "newest" ? {} : { sort });
+    };
 
-          {activeFilters.length > 0 && (
-            <div className="mb-6 flex flex-wrap items-center gap-2">
-              {activeFilters.map((filter) => (
-                <button
-                  key={filter.key}
-                  onClick={() => {
-                    if (filter.key === "search") setSearch("");
-                    if (filter.key === "price") {
-                      updatePriceRange(priceMinimum, priceMaximum);
-                    } else {
-                      update(filter.key);
-                    }
-                  }}
-                  className="inline-flex h-8 items-center gap-2 rounded-full border bg-background px-3 text-xs font-medium hover:border-primary"
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        update("search", search.trim());
+    };
+
+    const category = lookups.data?.categories.find(
+        (item) => String(item.id) === params.get("categoryId"),
+    );
+
+    const brand = lookups.data?.brands.find(
+        (item) => String(item.id) === params.get("brandId"),
+    );
+
+    const unit = lookups.data?.units.find(
+        (item) => String(item.id) === params.get("unitId"),
+    );
+
+    const activeFilters = [
+        params.get("search")
+            ? {
+                  key: "search",
+                  label: `Search: ${params.get("search")}`,
+              }
+            : null,
+        category
+            ? {
+                  key: "categoryId",
+                  label: category.name,
+              }
+            : null,
+        brand
+            ? {
+                  key: "brandId",
+                  label: brand.name,
+              }
+            : null,
+        unit
+            ? {
+                  key: "unitId",
+                  label: unit.name,
+              }
+            : null,
+        params.get("minPrice") || params.get("maxPrice")
+            ? {
+                  key: "price",
+                  label: `${formatCurrency(
+                      Number(params.get("minPrice") ?? priceMinimum),
+                  )} – ${formatCurrency(
+                      Number(params.get("maxPrice") ?? priceMaximum),
+                  )}`,
+              }
+            : null,
+        params.get("stock") === "in"
+            ? {
+                  key: "stock",
+                  label: "In stock",
+              }
+            : params.get("stock") === "out"
+              ? {
+                    key: "stock",
+                    label: "Out of stock",
+                }
+              : null,
+        params.get("isFeatured") === "true"
+            ? {
+                  key: "isFeatured",
+                  label: "Featured",
+              }
+            : null,
+    ].filter(Boolean) as {
+        key: string;
+        label: string;
+    }[];
+
+    const filterPanel = (
+        <FilterPanel
+            categoryId={params.get("categoryId") ?? "all"}
+            brandId={params.get("brandId") ?? "all"}
+            unitId={params.get("unitId") ?? "all"}
+            stock={params.get("stock") ?? "all"}
+            featured={params.get("isFeatured") ?? "all"}
+            minPrice={params.get("minPrice") ?? ""}
+            maxPrice={params.get("maxPrice") ?? ""}
+            priceMinimum={priceMinimum}
+            priceMaximum={priceMaximum}
+            categories={lookups.data?.categories ?? []}
+            brands={lookups.data?.brands ?? []}
+            units={lookups.data?.units ?? []}
+            onChange={update}
+            onPriceChange={updatePriceRange}
+            onClear={clearFilters}
+            hasFilters={activeFilters.length > 0}
+        />
+    );
+
+    return (
+        <div className="mx-auto w-full max-w-[1500px] px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+            <nav className="mb-6 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Link
+                    to="/"
+                    className="rounded-md px-1 py-1 transition-colors hover:text-primary"
                 >
-                  {filter.label} <X className="size-3" />
-                </button>
-              ))}
-              <button
-                onClick={clearFilters}
-                className="px-2 text-xs font-semibold text-destructive hover:underline"
-              >
-                Clear all
-              </button>
-            </div>
-          )}
+                    Home
+                </Link>
 
-          {query.isLoading ? (
-            <div className="grid auto-rows-fr gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, index) => (
-                <Skeleton key={index} className="h-[430px]" />
-              ))}
+                <ChevronRight className="size-3.5 opacity-50" />
+
+                <span className="text-foreground">Shop</span>
+            </nav>
+
+            <section className="relative mb-8 overflow-hidden rounded-[28px] border bg-gradient-to-br from-primary/10 via-background to-orange-500/5 px-6 py-9 sm:px-9 lg:px-12 lg:py-12">
+                <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-primary/10 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-28 left-1/3 size-64 rounded-full bg-orange-500/10 blur-3xl" />
+
+                <div className="relative flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+                    <div>
+                        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/70 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-primary shadow-sm backdrop-blur">
+                            <PackageSearch className="size-3.5" />
+                            Curated marketplace
+                        </div>
+
+                        <h1 className="mt-5 max-w-3xl text-4xl font-black tracking-[-0.045em] sm:text-5xl lg:text-6xl">
+                            Find products made for you.
+                        </h1>
+
+                        <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+                            Browse the complete catalog with clear prices, real
+                            availability, useful product details, and flexible
+                            filtering.
+                        </p>
+                    </div>
+
+                    {!query.isLoading && query.data && (
+                        <div className="w-fit rounded-2xl border bg-background/80 px-5 py-4 shadow-sm backdrop-blur">
+                            <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                                Available now
+                            </span>
+
+                            <span className="mt-1 block text-2xl font-black">
+                                {query.data.totalCount}
+                            </span>
+
+                            <span className="text-xs text-muted-foreground">
+                                products in the catalog
+                            </span>
+                        </div>
+                    )}
+                </div>
+            </section>
+
+            <div className="grid items-start gap-7 lg:grid-cols-[290px_minmax(0,1fr)]">
+                <aside className="sticky top-32 hidden overflow-hidden rounded-2xl border bg-card shadow-sm lg:block">
+                    <div className="p-5">{filterPanel}</div>
+                </aside>
+
+                <section className="min-w-0">
+                    <div className="mb-5 rounded-2xl border bg-card p-3 shadow-sm">
+                        <div className="flex flex-col gap-3 sm:flex-row">
+                            <form
+                                onSubmit={submit}
+                                className="group flex h-12 min-w-0 flex-1 items-center rounded-xl border bg-muted/30 p-1 transition-all focus-within:border-primary focus-within:bg-background focus-within:ring-4 focus-within:ring-primary/10"
+                            >
+                                <Search className="ml-3 size-4.5 shrink-0 text-muted-foreground transition-colors group-focus-within:text-primary" />
+
+                                <input
+                                    className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
+                                    value={search}
+                                    onChange={(event) =>
+                                        setSearch(event.target.value)
+                                    }
+                                    placeholder="Search by product name or barcode..."
+                                />
+
+                                <Button className="h-10 rounded-lg px-5 font-semibold">
+                                    Search
+                                </Button>
+                            </form>
+
+                            <Dialog.Root
+                                open={filtersOpen}
+                                onOpenChange={setFiltersOpen}
+                            >
+                                <Dialog.Trigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className="h-12 rounded-xl lg:hidden"
+                                    >
+                                        <SlidersHorizontal className="size-4" />
+                                        Filters
+                                        {activeFilters.length > 0 && (
+                                            <span className="grid size-5 place-items-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                                                {activeFilters.length}
+                                            </span>
+                                        )}
+                                    </Button>
+                                </Dialog.Trigger>
+
+                                <Dialog.Portal>
+                                    <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out data-[state=open]:fade-in" />
+
+                                    <Dialog.Content className="fixed inset-y-0 right-0 z-50 w-[90%] max-w-sm overflow-y-auto border-l bg-background shadow-2xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
+                                        <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-5 py-5 backdrop-blur">
+                                            <div>
+                                                <Dialog.Title className="text-lg font-black">
+                                                    Filter products
+                                                </Dialog.Title>
+
+                                                <Dialog.Description className="mt-1 text-xs text-muted-foreground">
+                                                    Refine the catalog using
+                                                    product details.
+                                                </Dialog.Description>
+                                            </div>
+
+                                            <Dialog.Close asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="rounded-xl"
+                                                >
+                                                    <X className="size-5" />
+                                                </Button>
+                                            </Dialog.Close>
+                                        </div>
+
+                                        <div className="p-5">{filterPanel}</div>
+
+                                        <div className="sticky bottom-0 border-t bg-background/95 p-5 backdrop-blur">
+                                            <Dialog.Close asChild>
+                                                <Button className="h-11 w-full rounded-xl">
+                                                    Show products
+                                                </Button>
+                                            </Dialog.Close>
+                                        </div>
+                                    </Dialog.Content>
+                                </Dialog.Portal>
+                            </Dialog.Root>
+
+                            <Select
+                                value={sort}
+                                onValueChange={(value) => update("sort", value)}
+                            >
+                                <SelectTrigger className="h-12 rounded-xl sm:w-56">
+                                    <SelectValue />
+                                </SelectTrigger>
+
+                                <SelectContent>
+                                    <SelectItem value="newest">
+                                        Newest first
+                                    </SelectItem>
+                                    <SelectItem value="name">
+                                        Name A-Z
+                                    </SelectItem>
+                                    <SelectItem value="priceLow">
+                                        Price: low to high
+                                    </SelectItem>
+                                    <SelectItem value="priceHigh">
+                                        Price: high to low
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    {activeFilters.length > 0 && (
+                        <div className="mb-6 flex flex-wrap items-center gap-2 rounded-2xl border border-dashed bg-muted/20 p-3">
+                            <span className="mr-1 text-xs font-semibold text-muted-foreground">
+                                Active filters:
+                            </span>
+
+                            {activeFilters.map((filter) => (
+                                <button
+                                    key={filter.key}
+                                    type="button"
+                                    onClick={() => {
+                                        if (filter.key === "search") {
+                                            setSearch("");
+                                        }
+
+                                        if (filter.key === "price") {
+                                            updatePriceRange(
+                                                priceMinimum,
+                                                priceMaximum,
+                                            );
+                                        } else {
+                                            update(filter.key);
+                                        }
+                                    }}
+                                    className="group inline-flex h-8 items-center gap-2 rounded-full border bg-background px-3 text-xs font-semibold shadow-sm transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                                >
+                                    <span className="max-w-48 truncate">
+                                        {filter.label}
+                                    </span>
+
+                                    <X className="size-3 opacity-50 transition-opacity group-hover:opacity-100" />
+                                </button>
+                            ))}
+
+                            <button
+                                type="button"
+                                onClick={clearFilters}
+                                className="rounded-full px-3 py-2 text-xs font-bold text-destructive transition-colors hover:bg-destructive/10"
+                            >
+                                Clear all
+                            </button>
+                        </div>
+                    )}
+
+                    {query.isLoading ? (
+                        <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                            {Array.from({ length: 8 }).map((_, index) => (
+                                <Skeleton
+                                    key={index}
+                                    className="h-[430px] rounded-2xl"
+                                />
+                            ))}
+                        </div>
+                    ) : query.isError ? (
+                        <EmptyState
+                            title="The catalog is unavailable"
+                            text="We couldn't load products right now. Please try again shortly."
+                        />
+                    ) : !query.data?.items.length ? (
+                        <EmptyState
+                            title="No matching products"
+                            text="Try a different search or remove one of the active filters."
+                            action={clearFilters}
+                        />
+                    ) : (
+                        <>
+                            <div className="mb-5 flex items-center justify-between gap-3">
+                                <p className="text-sm text-muted-foreground">
+                                    Showing{" "}
+                                    <span className="font-bold text-foreground">
+                                        {query.data.items.length}
+                                    </span>{" "}
+                                    products on this page
+                                </p>
+
+                                <span className="hidden text-xs text-muted-foreground sm:block">
+                                    Page {query.data.page} of{" "}
+                                    {query.data.totalPages}
+                                </span>
+                            </div>
+
+                            <div className="grid auto-rows-fr items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                                {query.data.items.map((product) => (
+                                    <ProductCard
+                                        key={product.id}
+                                        product={product}
+                                    />
+                                ))}
+                            </div>
+
+                            <Pagination
+                                page={query.data.page}
+                                totalPages={query.data.totalPages}
+                                previous={query.data.hasPreviousPage}
+                                next={query.data.hasNextPage}
+                                onPage={(value) =>
+                                    update("page", String(value))
+                                }
+                            />
+                        </>
+                    )}
+                </section>
             </div>
-          ) : query.isError ? (
-            <EmptyState
-              title="The catalog is unavailable"
-              text="We couldn't load products right now. Please try again shortly."
-            />
-          ) : !query.data?.items.length ? (
-            <EmptyState
-              title="No matching products"
-              text="Try a different search or remove one of the active filters."
-              action={clearFilters}
-            />
-          ) : (
-            <>
-              <div className="mb-4 text-sm text-muted-foreground">
-                Showing {query.data.items.length} products on this page
-              </div>
-              <div className="grid auto-rows-fr items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                {query.data.items.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
-              <Pagination
-                page={query.data.page}
-                totalPages={query.data.totalPages}
-                previous={query.data.hasPreviousPage}
-                next={query.data.hasNextPage}
-                onPage={(value) => update("page", String(value))}
-              />
-            </>
-          )}
-        </section>
-      </div>
-    </div>
-  );
+        </div>
+    );
 }
 
-type Lookup = { id: number; name: string };
-function FilterPanel({
-  categoryId,
-  brandId,
-  unitId,
-  stock,
-  featured,
-  minPrice,
-  maxPrice,
-  priceMinimum,
-  priceMaximum,
-  categories,
-  brands,
-  units,
-  onChange,
-  onPriceChange,
-  onClear,
-  hasFilters,
-}: {
-  categoryId: string;
-  brandId: string;
-  unitId: string;
-  stock: string;
-  featured: string;
-  minPrice: string;
-  maxPrice: string;
-  priceMinimum: number;
-  priceMaximum: number;
-  categories: CategoryLookup[];
-  brands: Lookup[];
-  units: Lookup[];
-  onChange: (key: string, value?: string) => void;
-  onPriceChange: (minimum: number, maximum: number) => void;
-  onClear: () => void;
-  hasFilters: boolean;
-}) {
-  const orderedCategories = flattenCategoryTree(categories);
+type Lookup = {
+    id: number;
+    name: string;
+};
 
-  return (
-    <div>
-      <div className="mb-6 flex items-start justify-between gap-3">
-        <span>
-          <span className="flex items-center gap-2 font-bold">
-            <SlidersHorizontal className="size-4 text-primary" /> Filters
-          </span>
-          <span className="mt-1 block text-xs leading-5 text-muted-foreground">
-            Refine products by the details that matter.
-          </span>
-        </span>
-        {hasFilters && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="shrink-0 text-xs font-semibold text-destructive hover:underline"
-          >
-            Reset
-          </button>
-        )}
-      </div>
-      <div>
-        <Filter label="Category">
-          <Select
-            value={categoryId}
-            onValueChange={(value) => onChange("categoryId", value)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All categories</SelectItem>
-              {orderedCategories.map(({ category, depth }) => (
-                <SelectItem key={category.id} value={String(category.id)}>
-                  <span style={{ paddingInlineStart: depth * 12 }}>
-                    {depth > 0 && "↳ "}
-                    {category.name}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Filter>
-        <Filter label="Brand">
-          <Select
-            value={brandId}
-            onValueChange={(value) => onChange("brandId", value)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All brands</SelectItem>
-              {brands.map((item) => (
-                <SelectItem key={item.id} value={String(item.id)}>
-                  {item.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Filter>
-        <Filter label="Price range">
-          <PriceRange
-            minimum={priceMinimum}
-            maximum={priceMaximum}
-            selectedMinimum={minPrice}
-            selectedMaximum={maxPrice}
-            onChange={onPriceChange}
-          />
-        </Filter>
-        <Filter label="Availability">
-          <ChoiceGroup
-            value={stock}
-            onChange={(value) => onChange("stock", value)}
-            options={[
-              { value: "all", label: "Any" },
-              { value: "in", label: "In stock" },
-              { value: "out", label: "Sold out" },
-            ]}
-          />
-        </Filter>
-        <Filter label="Collection">
-          <ChoiceGroup
-            value={featured}
-            onChange={(value) => onChange("isFeatured", value)}
-            options={[
-              { value: "all", label: "All products" },
-              { value: "true", label: "Featured" },
-            ]}
-          />
-        </Filter>
-        <Filter label="Unit">
-          <Select
-            value={unitId}
-            onValueChange={(value) => onChange("unitId", value)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All units</SelectItem>
-              {units.map((item) => (
-                <SelectItem key={item.id} value={String(item.id)}>
-                  {item.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Filter>
-      </div>
-    </div>
-  );
+function FilterPanel({
+    categoryId,
+    brandId,
+    unitId,
+    stock,
+    featured,
+    minPrice,
+    maxPrice,
+    priceMinimum,
+    priceMaximum,
+    categories,
+    brands,
+    units,
+    onChange,
+    onPriceChange,
+    onClear,
+    hasFilters,
+}: {
+    categoryId: string;
+    brandId: string;
+    unitId: string;
+    stock: string;
+    featured: string;
+    minPrice: string;
+    maxPrice: string;
+    priceMinimum: number;
+    priceMaximum: number;
+    categories: CategoryLookup[];
+    brands: Lookup[];
+    units: Lookup[];
+    onChange: (key: string, value?: string) => void;
+    onPriceChange: (minimum: number, maximum: number) => void;
+    onClear: () => void;
+    hasFilters: boolean;
+}) {
+    const orderedCategories = flattenCategoryTree(categories);
+
+    return (
+        <div>
+            <div className="mb-5 flex items-start justify-between gap-3">
+                <div>
+                    <span className="flex items-center gap-2 text-base font-black">
+                        <span className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary">
+                            <SlidersHorizontal className="size-4" />
+                        </span>
+                        Filters
+                    </span>
+
+                    <span className="mt-2 block text-xs leading-5 text-muted-foreground">
+                        Refine products by the details that matter to you.
+                    </span>
+                </div>
+
+                {hasFilters && (
+                    <button
+                        type="button"
+                        onClick={onClear}
+                        className="shrink-0 rounded-lg px-2 py-1.5 text-xs font-bold text-destructive transition-colors hover:bg-destructive/10"
+                    >
+                        Reset
+                    </button>
+                )}
+            </div>
+
+            <div className="grid gap-3">
+                <Filter label="Category">
+                    <Select
+                        value={categoryId}
+                        onValueChange={(value) => onChange("categoryId", value)}
+                    >
+                        <SelectTrigger className="h-11 rounded-xl">
+                            <SelectValue />
+                        </SelectTrigger>
+
+                        <SelectContent>
+                            <SelectItem value="all">All categories</SelectItem>
+
+                            {orderedCategories.map(({ category, depth }) => (
+                                <SelectItem
+                                    key={category.id}
+                                    value={String(category.id)}
+                                >
+                                    <span
+                                        style={{
+                                            paddingInlineStart: depth * 12,
+                                        }}
+                                    >
+                                        {depth > 0 && "↳ "}
+                                        {category.name}
+                                    </span>
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </Filter>
+
+                <Filter label="Brand">
+                    <Select
+                        value={brandId}
+                        onValueChange={(value) => onChange("brandId", value)}
+                    >
+                        <SelectTrigger className="h-11 rounded-xl">
+                            <SelectValue />
+                        </SelectTrigger>
+
+                        <SelectContent>
+                            <SelectItem value="all">All brands</SelectItem>
+
+                            {brands.map((item) => (
+                                <SelectItem
+                                    key={item.id}
+                                    value={String(item.id)}
+                                >
+                                    {item.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </Filter>
+
+                <Filter label="Price range">
+                    <PriceRange
+                        minimum={priceMinimum}
+                        maximum={priceMaximum}
+                        selectedMinimum={minPrice}
+                        selectedMaximum={maxPrice}
+                        onChange={onPriceChange}
+                    />
+                </Filter>
+
+                <Filter label="Availability">
+                    <ChoiceGroup
+                        value={stock}
+                        onChange={(value) => onChange("stock", value)}
+                        options={[
+                            {
+                                value: "all",
+                                label: "Any",
+                            },
+                            {
+                                value: "in",
+                                label: "In stock",
+                            },
+                            {
+                                value: "out",
+                                label: "Sold out",
+                            },
+                        ]}
+                    />
+                </Filter>
+
+                <Filter label="Collection">
+                    <ChoiceGroup
+                        value={featured}
+                        onChange={(value) => onChange("isFeatured", value)}
+                        options={[
+                            {
+                                value: "all",
+                                label: "All products",
+                            },
+                            {
+                                value: "true",
+                                label: "Featured",
+                            },
+                        ]}
+                    />
+                </Filter>
+
+                <Filter label="Unit">
+                    <Select
+                        value={unitId}
+                        onValueChange={(value) => onChange("unitId", value)}
+                    >
+                        <SelectTrigger className="h-11 rounded-xl">
+                            <SelectValue />
+                        </SelectTrigger>
+
+                        <SelectContent>
+                            <SelectItem value="all">All units</SelectItem>
+
+                            {units.map((item) => (
+                                <SelectItem
+                                    key={item.id}
+                                    value={String(item.id)}
+                                >
+                                    {item.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </Filter>
+            </div>
+        </div>
+    );
 }
 
 function Filter({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <fieldset className="border-b py-5 first:pt-0 last:border-0 last:pb-0">
-      <legend className="text-xs font-bold uppercase tracking-[.12em] text-foreground">
-        {label}
-      </legend>
-      <div className="mt-3">{children}</div>
-    </fieldset>
-  );
+    return (
+        <fieldset className="rounded-xl border bg-muted/15 p-4">
+            <legend className="px-1 text-[10px] font-bold uppercase tracking-[0.14em] text-foreground">
+                {label}
+            </legend>
+
+            <div className="mt-1">{children}</div>
+        </fieldset>
+    );
 }
 
 function ChoiceGroup({
-  value,
-  options,
-  onChange,
+    value,
+    options,
+    onChange,
 }: {
-  value: string;
-  options: { value: string; label: string }[];
-  onChange: (value: string) => void;
+    value: string;
+    options: {
+        value: string;
+        label: string;
+    }[];
+    onChange: (value: string) => void;
 }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          aria-pressed={value === option.value}
-          onClick={() => onChange(option.value)}
-          className={`rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
-            value === option.value
-              ? "border-primary bg-primary text-primary-foreground"
-              : "bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground"
-          }`}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
+    return (
+        <div className="flex flex-wrap gap-2">
+            {options.map((option) => (
+                <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={value === option.value}
+                    onClick={() => onChange(option.value)}
+                    className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                        value === option.value
+                            ? "border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                            : "bg-background text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+                    }`}
+                >
+                    {option.label}
+                </button>
+            ))}
+        </div>
+    );
 }
 
 function PriceRange({
-  minimum,
-  maximum,
-  selectedMinimum,
-  selectedMaximum,
-  onChange,
+    minimum,
+    maximum,
+    selectedMinimum,
+    selectedMaximum,
+    onChange,
 }: {
-  minimum: number;
-  maximum: number;
-  selectedMinimum: string;
-  selectedMaximum: string;
-  onChange: (minimum: number, maximum: number) => void;
+    minimum: number;
+    maximum: number;
+    selectedMinimum: string;
+    selectedMaximum: string;
+    onChange: (minimum: number, maximum: number) => void;
 }) {
-  const span = Math.max(1, maximum - minimum);
-  const step = span <= 100 ? 1 : span <= 500 ? 5 : span <= 2000 ? 10 : 50;
-  const getMinimum = () =>
-    Math.min(
-      maximum - step,
-      Math.max(minimum, Number(selectedMinimum || minimum)),
+    const span = Math.max(1, maximum - minimum);
+    const step = span <= 100 ? 1 : span <= 500 ? 5 : span <= 2000 ? 10 : 50;
+
+    const getMinimum = () =>
+        Math.min(
+            maximum - step,
+            Math.max(minimum, Number(selectedMinimum || minimum)),
+        );
+
+    const getMaximum = () =>
+        Math.max(
+            minimum + step,
+            Math.min(maximum, Number(selectedMaximum || maximum)),
+        );
+
+    const [draftMinimum, setDraftMinimum] = useState(getMinimum);
+    const [draftMaximum, setDraftMaximum] = useState(getMaximum);
+
+    useEffect(() => {
+        setDraftMinimum(getMinimum());
+        setDraftMaximum(getMaximum());
+    }, [minimum, maximum, selectedMinimum, selectedMaximum]);
+
+    const minimumPercent = ((draftMinimum - minimum) / span) * 100;
+
+    const maximumPercent = ((draftMaximum - minimum) / span) * 100;
+
+    const commit = () => onChange(draftMinimum, draftMaximum);
+
+    return (
+        <div>
+            <div className="grid grid-cols-2 gap-2">
+                <PriceValue label="Minimum" value={draftMinimum} />
+
+                <PriceValue label="Maximum" value={draftMaximum} align="end" />
+            </div>
+
+            <div className="relative mt-5 h-6">
+                <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-muted" />
+
+                <div
+                    className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-primary shadow-sm"
+                    style={{
+                        left: `${minimumPercent}%`,
+                        right: `${100 - maximumPercent}%`,
+                    }}
+                />
+
+                <input
+                    type="range"
+                    aria-label="Minimum price"
+                    min={minimum}
+                    max={maximum}
+                    step={step}
+                    value={draftMinimum}
+                    onChange={(event) =>
+                        setDraftMinimum(
+                            Math.min(
+                                Number(event.target.value),
+                                draftMaximum - step,
+                            ),
+                        )
+                    }
+                    onPointerUp={commit}
+                    onKeyUp={commit}
+                    onBlur={commit}
+                    className="price-range-input absolute inset-0 z-20 w-full"
+                />
+
+                <input
+                    type="range"
+                    aria-label="Maximum price"
+                    min={minimum}
+                    max={maximum}
+                    step={step}
+                    value={draftMaximum}
+                    onChange={(event) =>
+                        setDraftMaximum(
+                            Math.max(
+                                Number(event.target.value),
+                                draftMinimum + step,
+                            ),
+                        )
+                    }
+                    onPointerUp={commit}
+                    onKeyUp={commit}
+                    onBlur={commit}
+                    className="price-range-input absolute inset-0 z-30 w-full"
+                />
+            </div>
+
+            <div className="mt-1 flex justify-between text-[10px] font-medium text-muted-foreground">
+                <span>{formatCurrency(minimum)}</span>
+                <span>{formatCurrency(maximum)}</span>
+            </div>
+        </div>
     );
-  const getMaximum = () =>
-    Math.max(
-      minimum + step,
-      Math.min(maximum, Number(selectedMaximum || maximum)),
-    );
-  const [draftMinimum, setDraftMinimum] = useState(getMinimum);
-  const [draftMaximum, setDraftMaximum] = useState(getMaximum);
-
-  useEffect(() => {
-    setDraftMinimum(getMinimum());
-    setDraftMaximum(getMaximum());
-  }, [minimum, maximum, selectedMinimum, selectedMaximum]);
-
-  const minimumPercent = ((draftMinimum - minimum) / span) * 100;
-  const maximumPercent = ((draftMaximum - minimum) / span) * 100;
-  const commit = () => onChange(draftMinimum, draftMaximum);
-
-  return (
-    <div>
-      <div className="grid grid-cols-2 gap-2">
-        <PriceValue label="Minimum" value={draftMinimum} />
-        <PriceValue label="Maximum" value={draftMaximum} align="end" />
-      </div>
-
-      <div className="relative mt-5 h-6">
-        <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-muted" />
-        <div
-          className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-primary"
-          style={{
-            left: `${minimumPercent}%`,
-            right: `${100 - maximumPercent}%`,
-          }}
-        />
-        <input
-          type="range"
-          aria-label="Minimum price"
-          min={minimum}
-          max={maximum}
-          step={step}
-          value={draftMinimum}
-          onChange={(event) =>
-            setDraftMinimum(
-              Math.min(Number(event.target.value), draftMaximum - step),
-            )
-          }
-          onPointerUp={commit}
-          onKeyUp={commit}
-          onBlur={commit}
-          className="price-range-input absolute inset-0 z-20 w-full"
-        />
-        <input
-          type="range"
-          aria-label="Maximum price"
-          min={minimum}
-          max={maximum}
-          step={step}
-          value={draftMaximum}
-          onChange={(event) =>
-            setDraftMaximum(
-              Math.max(Number(event.target.value), draftMinimum + step),
-            )
-          }
-          onPointerUp={commit}
-          onKeyUp={commit}
-          onBlur={commit}
-          className="price-range-input absolute inset-0 z-30 w-full"
-        />
-      </div>
-
-      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
-        <span>{formatCurrency(minimum)}</span>
-        <span>{formatCurrency(maximum)}</span>
-      </div>
-    </div>
-  );
 }
 
 function PriceValue({
-  label,
-  value,
-  align = "start",
+    label,
+    value,
+    align = "start",
 }: {
-  label: string;
-  value: number;
-  align?: "start" | "end";
+    label: string;
+    value: number;
+    align?: "start" | "end";
 }) {
-  return (
-    <div
-      className={`rounded-md border bg-muted/30 px-3 py-2 ${align === "end" ? "text-right" : ""}`}
-    >
-      <small className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </small>
-      <b className="mt-0.5 block text-sm text-foreground">
-        {formatCurrency(value)}
-      </b>
-    </div>
-  );
+    return (
+        <div
+            className={`rounded-xl border bg-background px-3 py-2.5 shadow-sm ${
+                align === "end" ? "text-right" : ""
+            }`}
+        >
+            <small className="block text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                {label}
+            </small>
+
+            <b className="mt-1 block text-sm text-foreground">
+                {formatCurrency(value)}
+            </b>
+        </div>
+    );
 }
 
 function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(value);
+    return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 0,
+    }).format(value);
 }
 
 function Pagination({
-  page,
-  totalPages,
-  previous,
-  next,
-  onPage,
+    page,
+    totalPages,
+    previous,
+    next,
+    onPage,
 }: {
-  page: number;
-  totalPages: number;
-  previous: boolean;
-  next: boolean;
-  onPage: (page: number) => void;
+    page: number;
+    totalPages: number;
+    previous: boolean;
+    next: boolean;
+    onPage: (page: number) => void;
 }) {
-  const first = Math.max(1, Math.min(page - 2, totalPages - 4));
-  const pages = Array.from(
-    { length: Math.min(5, totalPages) },
-    (_, i) => first + i,
-  );
-  if (totalPages <= 1) return null;
-  return (
-    <nav
-      className="mt-12 flex items-center justify-center gap-1"
-      aria-label="Product pages"
-    >
-      <Button
-        variant="ghost"
-        size="icon"
-        disabled={!previous}
-        onClick={() => onPage(page - 1)}
-      >
-        <ChevronLeft />
-      </Button>
-      {pages.map((value) => (
-        <Button
-          key={value}
-          variant={value === page ? "default" : "ghost"}
-          size="icon"
-          onClick={() => onPage(value)}
+    const first = Math.max(1, Math.min(page - 2, totalPages - 4));
+
+    const pages = Array.from(
+        {
+            length: Math.min(5, totalPages),
+        },
+        (_, index) => first + index,
+    );
+
+    if (totalPages <= 1) {
+        return null;
+    }
+
+    return (
+        <nav
+            className="mt-12 flex items-center justify-center gap-1.5 rounded-2xl border bg-card p-2 shadow-sm"
+            aria-label="Product pages"
         >
-          {value}
-        </Button>
-      ))}
-      <Button
-        variant="ghost"
-        size="icon"
-        disabled={!next}
-        onClick={() => onPage(page + 1)}
-      >
-        <ChevronRight />
-      </Button>
-    </nav>
-  );
+            <Button
+                variant="ghost"
+                size="icon"
+                disabled={!previous}
+                onClick={() => onPage(page - 1)}
+                className="rounded-xl"
+            >
+                <ChevronLeft className="size-4" />
+            </Button>
+
+            {pages.map((value) => (
+                <Button
+                    key={value}
+                    variant={value === page ? "default" : "ghost"}
+                    size="icon"
+                    onClick={() => onPage(value)}
+                    className="rounded-xl"
+                >
+                    {value}
+                </Button>
+            ))}
+
+            <Button
+                variant="ghost"
+                size="icon"
+                disabled={!next}
+                onClick={() => onPage(page + 1)}
+                className="rounded-xl"
+            >
+                <ChevronRight className="size-4" />
+            </Button>
+        </nav>
+    );
 }
 
 function EmptyState({
-  title,
-  text,
-  action,
+    title,
+    text,
+    action,
 }: {
-  title: string;
-  text: string;
-  action?: () => void;
+    title: string;
+    text: string;
+    action?: () => void;
 }) {
-  return (
-    <div className="rounded-lg border border-dashed p-16 text-center">
-      <PackageSearch className="mx-auto size-9 text-muted-foreground" />
-      <h2 className="mt-5 text-xl font-bold">{title}</h2>
-      <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-        {text}
-      </p>
-      {action && (
-        <Button variant="outline" className="mt-6" onClick={action}>
-          Clear filters
-        </Button>
-      )}
-    </div>
-  );
+    return (
+        <div className="relative overflow-hidden rounded-[28px] border border-dashed bg-muted/15 px-6 py-20 text-center">
+            <div className="pointer-events-none absolute left-1/2 top-1/2 size-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-3xl" />
+
+            <div className="relative">
+                <span className="mx-auto grid size-16 place-items-center rounded-2xl border bg-background text-muted-foreground shadow-sm">
+                    <PackageSearch className="size-7" />
+                </span>
+
+                <h2 className="mt-6 text-xl font-black">{title}</h2>
+
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+                    {text}
+                </p>
+
+                {action && (
+                    <Button
+                        variant="outline"
+                        className="mt-6 rounded-xl"
+                        onClick={action}
+                    >
+                        Clear filters
+                    </Button>
+                )}
+            </div>
+        </div>
+    );
 }

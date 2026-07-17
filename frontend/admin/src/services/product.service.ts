@@ -42,9 +42,21 @@ export interface ProductDetails extends Omit<ProductListItem, "stock" | "price" 
     createdAt: string;
     updatedAt: string | null;
     inventory: { quantity: number; reservedQuantity: number; availableQuantity: number; minimumQuantity: number; expireDate: string | null } | null;
-    prices: { id: number; customerTypeName: string; regularPrice: number; salePrice: number | null; startDate: string | null; endDate: string | null }[];
+    prices: ProductPrice[];
     images: (ProductListImage & { originalFileName: string | null; contentType: string; size: number })[];
 }
+
+export interface ProductPrice {
+    id: number;
+    customerTypeId: number;
+    customerTypeName: string;
+    regularPrice: number;
+    salePrice: number | null;
+    startDate: string | null;
+    endDate: string | null;
+}
+
+export type ProductPriceInput = Omit<ProductPrice, "id" | "customerTypeName"> & { id?: number };
 
 export interface PagedProducts {
     items: ProductListItem[];
@@ -109,6 +121,9 @@ export const productService = {
     },
     getById(id: number) {
         return apiClient.get<ProductDetails>(`/products/${id}`);
+    },
+    replacePrices(productId: number, prices: ProductPriceInput[]) {
+        return apiClient.put<ProductPrice[]>(`/products/${productId}/prices`, { prices });
     },
     deleteMany(ids: number[]) {
         return Promise.all(ids.map(id => apiClient.delete<void>(`/products/${id}`)));

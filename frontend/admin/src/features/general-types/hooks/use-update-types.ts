@@ -1,4 +1,5 @@
 import type { GeneralType } from "@/schemas/type.schema";
+import { productKeys } from "@/keys/product-keys";
 import {
     generalTypeService,
     type GeneralTypeSubmission,
@@ -19,6 +20,9 @@ export function useUpdateGeneralType() {
         onSuccess: () => {
             queryClient.invalidateQueries({
                 queryKey: ["general-types"],
+            });
+            queryClient.invalidateQueries({
+                queryKey: productKeys.lookups,
             });
         },
     });

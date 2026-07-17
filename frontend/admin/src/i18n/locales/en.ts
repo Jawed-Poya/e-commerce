@@ -1,4 +1,5 @@
 import { inventoryEn } from "@/features/inventory/i18n/inventory-translations";
+import { pricingEn } from "@/features/products/i18n/pricing-translations";
 
 export const en = {
   "language.en": "English", "language.ps": "Pashto", "language.dr": "Dari",
@@ -18,4 +19,5 @@ export const en = {
   "details.subtitle": "Complete product information, media, inventory and pricing.", "details.back": "Back to products", "details.open": "View product details", "details.notFound": "Product not found", "details.notFoundHelp": "This product may have been removed or is unavailable.", "details.featured": "Featured", "details.noDescription": "No description has been added for this product.", "details.views": "Views", "details.created": "Created", "details.updated": "Last updated", "details.inventory": "Inventory", "details.totalStock": "Total stock", "details.availableStock": "Available stock", "details.reservedStock": "Reserved stock", "details.minimumStock": "Minimum stock", "details.expiry": "Expiry date", "details.pricing": "Pricing", "details.noPrices": "No customer pricing has been configured.",
   "types.image": "Image", "types.imageUrl": "Image URL", "types.imageUrlHelp": "Enter a public HTTP or HTTPS image URL.", "types.useImage": "Use an image", "types.useImageHelp": "Optional. Enable this only when the type needs a visual image.", "types.imageSource": "Image source", "types.uploadImage": "Upload image", "types.onlineUrl": "Online URL", "types.chooseImage": "Choose an image from your device", "types.imageFileHelp": "JPG, PNG, WEBP or AVIF, up to 5 MB.", "types.imagePreview": "Type image preview", "types.removeImage": "Remove image", "types.imageFormatError": "Choose a valid JPG, PNG, WEBP or AVIF image.", "types.imageSizeError": "The image must not exceed 5 MB.", "types.imageUrlError": "Enter a valid HTTP or HTTPS image URL.", "types.imageRequired": "Choose an image before saving, or turn off the image option.",
   ...inventoryEn,
+  ...pricingEn,
 } as const;

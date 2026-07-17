@@ -46,6 +46,7 @@ export type ProductDetails = Omit<
   } | null;
   prices: {
     id: number;
+    customerTypeId: number;
     customerTypeName: string;
     regularPrice: number;
     salePrice: number | null;
@@ -73,6 +74,7 @@ export type Lookups = {
   categories: CategoryLookup[];
   brands: { id: number; name: string }[];
   units: { id: number; name: string }[];
+  customerTypes: { id: number; name: string }[];
   minimumPrice: number;
   maximumPrice: number;
 };

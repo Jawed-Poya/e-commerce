@@ -1,5 +1,6 @@
 import type { en } from "./en";
 import { inventoryDr } from "@/features/inventory/i18n/inventory-translations";
+import { pricingDr } from "@/features/products/i18n/pricing-translations";
 export const dr: Record<keyof typeof en, string> = {
   "language.en": "انگلیسی", "language.ps": "پشتو", "language.dr": "دری",
   "common.profile": "پروفایل", "common.logout": "خروج", "common.notifications": "اعلان‌ها",
@@ -18,4 +19,5 @@ export const dr: Record<keyof typeof en, string> = {
   "details.subtitle": "اطلاعات کامل محصول، تصاویر، موجودی و قیمت‌ها.", "details.back": "بازگشت به محصولات", "details.open": "مشاهده جزئیات محصول", "details.notFound": "محصول یافت نشد", "details.notFoundHelp": "این محصول ممکن است حذف شده یا در دسترس نباشد.", "details.featured": "ویژه", "details.noDescription": "برای این محصول توضیحی ثبت نشده است.", "details.views": "بازدیدها", "details.created": "تاریخ ایجاد", "details.updated": "آخرین به‌روزرسانی", "details.inventory": "موجودی", "details.totalStock": "موجودی کل", "details.availableStock": "موجودی قابل دسترس", "details.reservedStock": "موجودی رزرو", "details.minimumStock": "حداقل موجودی", "details.expiry": "تاریخ انقضا", "details.pricing": "قیمت‌گذاری", "details.noPrices": "قیمتی برای مشتریان تنظیم نشده است.",
   "types.image": "تصویر", "types.imageUrl": "نشانی تصویر", "types.imageUrlHelp": "یک نشانی عمومی HTTP یا HTTPS برای تصویر وارد کنید.", "types.useImage": "استفاده از تصویر", "types.useImageHelp": "اختیاری است. فقط زمانی فعال کنید که این نوع به تصویر نیاز دارد.", "types.imageSource": "منبع تصویر", "types.uploadImage": "بارگذاری تصویر", "types.onlineUrl": "نشانی آنلاین", "types.chooseImage": "انتخاب تصویر از دستگاه", "types.imageFileHelp": "JPG، PNG، WEBP یا AVIF، حداکثر ۵ مگابایت.", "types.imagePreview": "پیش‌نمایش تصویر نوع", "types.removeImage": "حذف تصویر", "types.imageFormatError": "یک تصویر معتبر JPG، PNG، WEBP یا AVIF انتخاب کنید.", "types.imageSizeError": "اندازه تصویر نباید بیشتر از ۵ مگابایت باشد.", "types.imageUrlError": "یک نشانی معتبر HTTP یا HTTPS وارد کنید.", "types.imageRequired": "پیش از ذخیره تصویر انتخاب کنید یا گزینه تصویر را غیرفعال کنید.",
   ...inventoryDr,
+  ...pricingDr,
 };

@@ -41,6 +41,7 @@ public class ProductService : IProductService
 
     public async Task<PagedResult<ProductListItemResponse>> GetAsync(ProductFilter filter)
     {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         IQueryable<Product> query = _context.Products
             .AsNoTracking()
             .Include(x => x.Category)
@@ -81,12 +82,20 @@ public class ProductService : IProductService
         if (filter.MinPrice.HasValue)
             query = query.Where(x =>
                 x.Prices.Any(p =>
-                    (p.SalePrice ?? p.RegularPrice) >= filter.MinPrice));
+                    (p.SalePrice.HasValue &&
+                     (!p.StartDate.HasValue || p.StartDate.Value <= today) &&
+                     (!p.EndDate.HasValue || p.EndDate.Value >= today)
+                        ? p.SalePrice.Value
+                        : p.RegularPrice) >= filter.MinPrice));
 
         if (filter.MaxPrice.HasValue)
             query = query.Where(x =>
                 x.Prices.Any(p =>
-                    (p.SalePrice ?? p.RegularPrice) <= filter.MaxPrice));
+                    (p.SalePrice.HasValue &&
+                     (!p.StartDate.HasValue || p.StartDate.Value <= today) &&
+                     (!p.EndDate.HasValue || p.EndDate.Value >= today)
+                        ? p.SalePrice.Value
+                        : p.RegularPrice) <= filter.MaxPrice));
 
         if (filter.InStock.HasValue)
             query = filter.InStock.Value
@@ -102,8 +111,18 @@ public class ProductService : IProductService
                 : query.OrderBy(x => x.Name),
 
             "price" => filter.SortDescending
-                ? query.OrderByDescending(x => x.Prices.Min(p => p.SalePrice ?? p.RegularPrice))
-                : query.OrderBy(x => x.Prices.Min(p => p.SalePrice ?? p.RegularPrice)),
+                ? query.OrderByDescending(x => x.Prices.Min(p =>
+                    p.SalePrice.HasValue &&
+                    (!p.StartDate.HasValue || p.StartDate.Value <= today) &&
+                    (!p.EndDate.HasValue || p.EndDate.Value >= today)
+                        ? p.SalePrice.Value
+                        : p.RegularPrice))
+                : query.OrderBy(x => x.Prices.Min(p =>
+                    p.SalePrice.HasValue &&
+                    (!p.StartDate.HasValue || p.StartDate.Value <= today) &&
+                    (!p.EndDate.HasValue || p.EndDate.Value >= today)
+                        ? p.SalePrice.Value
+                        : p.RegularPrice)),
 
             "createdat" => filter.SortDescending
                 ? query.OrderByDescending(x => x.CreatedAt)
@@ -133,11 +152,25 @@ public class ProductService : IProductService
                 x.IsFeatured,
                 x.IsActive,
                 x.Inventory == null ? 0 : x.Inventory.Quantity - x.Inventory.ReservedQuantity,
-                x.Prices.Select(p => (decimal?)(p.SalePrice ?? p.RegularPrice)).Min(),
+                x.Prices.Select(p => (decimal?)(
+                    p.SalePrice.HasValue &&
+                    (!p.StartDate.HasValue || p.StartDate.Value <= today) &&
+                    (!p.EndDate.HasValue || p.EndDate.Value >= today)
+                        ? p.SalePrice.Value
+                        : p.RegularPrice)).Min(),
                 x.Prices
-                    .Where(p => p.SalePrice.HasValue && p.SalePrice < p.RegularPrice)
-                    .OrderBy(p => p.SalePrice)
-                    .Select(p => (decimal?)p.RegularPrice)
+                    .OrderBy(p =>
+                        p.SalePrice.HasValue &&
+                        (!p.StartDate.HasValue || p.StartDate.Value <= today) &&
+                        (!p.EndDate.HasValue || p.EndDate.Value >= today)
+                            ? p.SalePrice.Value
+                            : p.RegularPrice)
+                    .Select(p =>
+                        p.SalePrice.HasValue &&
+                        (!p.StartDate.HasValue || p.StartDate.Value <= today) &&
+                        (!p.EndDate.HasValue || p.EndDate.Value >= today)
+                            ? (decimal?)p.RegularPrice
+                            : null)
                     .FirstOrDefault(),
                 x.Images.Where(i => i.IsPrimary).Select(i => "/" + i.ImagePath.Replace("\\", "/")).FirstOrDefault(),
                 x.Images.OrderByDescending(i => i.IsPrimary).ThenBy(i => i.SortOrder)
@@ -360,9 +393,12 @@ public class ProductService : IProductService
                 Images = x.Images.OrderBy(i => i.SortOrder).Select(i => new ProductImageDetailsDto(
                     i.Id, "/" + i.ImagePath.Replace("\\", "/"), i.OriginalFileName,
                     i.ContentType, i.Size, i.IsPrimary, i.SortOrder)).ToList(),
-                Prices = x.Prices.Select(p => new ProductPriceDetailsDto(
-                    p.Id, p.CustomerType.Name, p.RegularPrice, p.SalePrice,
-                    p.StartDate, p.EndDate)).ToList()
+                Prices = x.Prices
+                    .OrderBy(p => p.CustomerType.SortOrder)
+                    .ThenBy(p => p.CustomerType.Name)
+                    .Select(p => new ProductPriceDetailsDto(
+                        p.Id, p.CustomerTypeId, p.CustomerType.Name, p.RegularPrice, p.SalePrice,
+                        p.StartDate, p.EndDate)).ToList()
             })
             .FirstOrDefaultAsync();
     }
@@ -677,6 +713,7 @@ public class ProductService : IProductService
         CancellationToken cancellationToken = default
     )
     {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         /*
          * Rename `Type` and these enum members to match
          * your existing GeneralType model.
@@ -691,9 +728,10 @@ public class ProductService : IProductService
             .Set<GeneralType>()
             .AsNoTracking()
             .Where(x =>
-                x.Group == GeneralTypeEnum.ProductCategory ||
-                x.Group == GeneralTypeEnum.ProductBrand ||
-                x.Group == GeneralTypeEnum.ProductUnit
+                 x.Group == GeneralTypeEnum.ProductCategory ||
+                 x.Group == GeneralTypeEnum.ProductBrand ||
+                 x.Group == GeneralTypeEnum.ProductUnit ||
+                 x.Group == GeneralTypeEnum.CustomerType
             )
             .OrderBy(x => x.Name)
             .Select(x => new
@@ -781,11 +819,21 @@ public class ProductService : IProductService
             )
             .ToList();
 
+        var customerTypes = generalTypes
+            .Where(x => x.Group == GeneralTypeEnum.CustomerType)
+            .Select(x => new ProductLookupItemResponse(x.Id, x.Name))
+            .ToList();
+
         var priceRange = await _context
             .Set<ProductPrice>()
             .AsNoTracking()
             .Where(x => x.Product.IsActive && !x.Product.IsDeleted)
-            .Select(x => x.SalePrice ?? x.RegularPrice)
+            .Select(x =>
+                x.SalePrice.HasValue &&
+                (!x.StartDate.HasValue || x.StartDate.Value <= today) &&
+                (!x.EndDate.HasValue || x.EndDate.Value >= today)
+                    ? x.SalePrice.Value
+                    : x.RegularPrice)
             .GroupBy(_ => 1)
             .Select(group => new
             {
@@ -801,6 +849,7 @@ public class ProductService : IProductService
             Categories: categories,
             Brands: brands,
             Units: units,
+            CustomerTypes: customerTypes,
             MinimumPrice: minimumPrice,
             MaximumPrice: maximumPrice
         );

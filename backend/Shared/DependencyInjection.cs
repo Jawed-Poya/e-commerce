@@ -14,6 +14,7 @@ public static class DependencyInjection
     public static IServiceCollection AddCatalog(this IServiceCollection services)
     {
         services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<IProductPricingService, ProductPricingService>();
         services.AddScoped<IGeneralTypeService, GeneralTypesService>();
         services.AddScoped<IProductImageStorage, LocalProductImageStorage>();
         services.AddScoped<IInventoryService, InventoryService>();

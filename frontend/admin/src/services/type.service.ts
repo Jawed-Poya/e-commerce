@@ -27,7 +27,12 @@ function toFormData({ data, image }: GeneralTypeSubmission) {
 
     formData.append("Name", data.name.trim());
     formData.append("Group", data.group);
-    formData.append("ImageUrl", data.imageUrl?.trim() ?? "");
+
+    const imageUrl = data.imageUrl?.trim();
+
+    if (imageUrl) {
+        formData.append("ImageUrl", imageUrl);
+    }
 
     if (data.parentId != null) {
         formData.append("ParentId", String(data.parentId));
@@ -52,10 +57,26 @@ export const generalTypeService = {
     },
 
     create(submission: GeneralTypeSubmission) {
+        if (!submission.image) {
+            return apiClient.post<number>("/types", {
+                ...submission.data,
+                name: submission.data.name.trim(),
+                imageUrl: submission.data.imageUrl?.trim() || null,
+            });
+        }
+
         return apiClient.post<number>("/types", toFormData(submission));
     },
 
     update(id: number, submission: GeneralTypeSubmission) {
+        if (!submission.image) {
+            return apiClient.put(`/types/${id}`, {
+                ...submission.data,
+                name: submission.data.name.trim(),
+                imageUrl: submission.data.imageUrl?.trim() || null,
+            });
+        }
+
         return apiClient.put(`/types/${id}`, toFormData(submission));
     },
 

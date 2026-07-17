@@ -20,16 +20,9 @@ builder.Services.AddCors(options =>
     options.AddPolicy("CorsPolicy", policy =>
     {
         policy
-            .WithOrigins(
-                "http://localhost:5173", // React Admin
-                "http://localhost:5174", // React Storefront
-                "http://localhost:4173", // Storefront preview
-                "http://127.0.0.1:4173", // Local preview
-                "http://localhost:3000"  // Optional
-            )
             .AllowAnyHeader()
             .AllowAnyMethod()
-            .AllowCredentials();
+            .AllowAnyOrigin();
     });
 });
 
