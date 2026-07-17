@@ -93,6 +93,49 @@ input,
 select {
   @apply outline-none;
 }
+.price-range-input {
+  appearance: none;
+  height: 1.5rem;
+  background: transparent;
+  pointer-events: none;
+}
+.price-range-input::-webkit-slider-runnable-track {
+  height: 0.25rem;
+  background: transparent;
+}
+.price-range-input::-webkit-slider-thumb {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: -0.4375rem;
+  appearance: none;
+  border: 2px solid var(--primary);
+  border-radius: 9999px;
+  background: var(--background);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 18%);
+  cursor: grab;
+  pointer-events: auto;
+}
+.price-range-input::-moz-range-track {
+  height: 0.25rem;
+  border: 0;
+  background: transparent;
+}
+.price-range-input::-moz-range-thumb {
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 2px solid var(--primary);
+  border-radius: 9999px;
+  background: var(--background);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 18%);
+  cursor: grab;
+  pointer-events: auto;
+}
+.price-range-input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ring) 25%, transparent);
+}
+.price-range-input:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ring) 25%, transparent);
+}
 ::selection {
   @apply bg-brand-orange text-white;
 }

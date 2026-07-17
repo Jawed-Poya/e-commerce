@@ -29,5 +29,7 @@ public sealed record ProductCategoryLookupItemResponse(
 public sealed record ProductLookupsResponse(
     IReadOnlyCollection<ProductCategoryLookupItemResponse> Categories,
     IReadOnlyCollection<ProductLookupItemResponse> Brands,
-    IReadOnlyCollection<ProductLookupItemResponse> Units
+    IReadOnlyCollection<ProductLookupItemResponse> Units,
+    decimal MinimumPrice,
+    decimal MaximumPrice
 );

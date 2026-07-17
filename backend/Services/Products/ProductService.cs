@@ -781,10 +781,28 @@ public class ProductService : IProductService
             )
             .ToList();
 
+        var priceRange = await _context
+            .Set<ProductPrice>()
+            .AsNoTracking()
+            .Where(x => x.Product.IsActive && !x.Product.IsDeleted)
+            .Select(x => x.SalePrice ?? x.RegularPrice)
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                Minimum = group.Min(),
+                Maximum = group.Max()
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var minimumPrice = priceRange?.Minimum ?? 0m;
+        var maximumPrice = priceRange?.Maximum ?? minimumPrice;
+
         return new ProductLookupsResponse(
             Categories: categories,
             Brands: brands,
-            Units: units
+            Units: units,
+            MinimumPrice: minimumPrice,
+            MaximumPrice: maximumPrice
         );
     }
 

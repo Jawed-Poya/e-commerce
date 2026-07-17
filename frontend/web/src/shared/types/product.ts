@@ -73,4 +73,6 @@ export type Lookups = {
   categories: CategoryLookup[];
   brands: { id: number; name: string }[];
   units: { id: number; name: string }[];
+  minimumPrice: number;
+  maximumPrice: number;
 };

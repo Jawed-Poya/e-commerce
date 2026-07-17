@@ -7,7 +7,12 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "../../shared/components/ui/button";
 import {
@@ -37,6 +42,11 @@ export function CatalogPage() {
   };
   const [sortBy, sortDescending] = sortMap[sort] ?? sortMap.newest;
   const lookups = useLookups();
+  const priceMinimum = Math.floor(lookups.data?.minimumPrice ?? 0);
+  const priceMaximum = Math.max(
+    priceMinimum + 1,
+    Math.ceil(lookups.data?.maximumPrice ?? priceMinimum + 1),
+  );
   const query = useProducts({
     page,
     pageSize: 12,
@@ -71,6 +81,18 @@ export function CatalogPage() {
     if (key !== "page") next.delete("page");
     setParams(next);
   };
+  const updatePriceRange = (minimum: number, maximum: number) => {
+    const next = new URLSearchParams(params);
+
+    if (minimum > priceMinimum) next.set("minPrice", String(minimum));
+    else next.delete("minPrice");
+
+    if (maximum < priceMaximum) next.set("maxPrice", String(maximum));
+    else next.delete("maxPrice");
+
+    next.delete("page");
+    setParams(next);
+  };
   const clearFilters = () => {
     setSearch("");
     setParams(sort === "newest" ? {} : { sort });
@@ -96,11 +118,11 @@ export function CatalogPage() {
     category ? { key: "categoryId", label: category.name } : null,
     brand ? { key: "brandId", label: brand.name } : null,
     unit ? { key: "unitId", label: unit.name } : null,
-    params.get("minPrice")
-      ? { key: "minPrice", label: `From $${params.get("minPrice")}` }
-      : null,
-    params.get("maxPrice")
-      ? { key: "maxPrice", label: `Up to $${params.get("maxPrice")}` }
+    params.get("minPrice") || params.get("maxPrice")
+      ? {
+          key: "price",
+          label: `${formatCurrency(Number(params.get("minPrice") ?? priceMinimum))} – ${formatCurrency(Number(params.get("maxPrice") ?? priceMaximum))}`,
+        }
       : null,
     params.get("stock") === "in"
       ? { key: "stock", label: "In stock" }
@@ -121,10 +143,13 @@ export function CatalogPage() {
       featured={params.get("isFeatured") ?? "all"}
       minPrice={params.get("minPrice") ?? ""}
       maxPrice={params.get("maxPrice") ?? ""}
+      priceMinimum={priceMinimum}
+      priceMaximum={priceMaximum}
       categories={lookups.data?.categories ?? []}
       brands={lookups.data?.brands ?? []}
       units={lookups.data?.units ?? []}
       onChange={update}
+      onPriceChange={updatePriceRange}
       onClear={clearFilters}
       hasFilters={activeFilters.length > 0}
     />
@@ -163,7 +188,7 @@ export function CatalogPage() {
         </div>
       </div>
 
-      <div className="grid items-start gap-8 lg:grid-cols-[230px_minmax(0,1fr)]">
+      <div className="grid items-start gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="sticky top-24 hidden rounded-lg border bg-card p-5 lg:block">
           {filterPanel}
         </aside>
@@ -239,7 +264,11 @@ export function CatalogPage() {
                   key={filter.key}
                   onClick={() => {
                     if (filter.key === "search") setSearch("");
-                    update(filter.key);
+                    if (filter.key === "price") {
+                      updatePriceRange(priceMinimum, priceMaximum);
+                    } else {
+                      update(filter.key);
+                    }
                   }}
                   className="inline-flex h-8 items-center gap-2 rounded-full border bg-background px-3 text-xs font-medium hover:border-primary"
                 >
@@ -306,10 +335,13 @@ function FilterPanel({
   featured,
   minPrice,
   maxPrice,
+  priceMinimum,
+  priceMaximum,
   categories,
   brands,
   units,
   onChange,
+  onPriceChange,
   onClear,
   hasFilters,
 }: {
@@ -320,10 +352,13 @@ function FilterPanel({
   featured: string;
   minPrice: string;
   maxPrice: string;
+  priceMinimum: number;
+  priceMaximum: number;
   categories: CategoryLookup[];
   brands: Lookup[];
   units: Lookup[];
   onChange: (key: string, value?: string) => void;
+  onPriceChange: (minimum: number, maximum: number) => void;
   onClear: () => void;
   hasFilters: boolean;
 }) {
@@ -331,20 +366,26 @@ function FilterPanel({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <span className="flex items-center gap-2 font-bold">
-          <SlidersHorizontal className="size-4" /> Filters
+      <div className="mb-6 flex items-start justify-between gap-3">
+        <span>
+          <span className="flex items-center gap-2 font-bold">
+            <SlidersHorizontal className="size-4 text-primary" /> Filters
+          </span>
+          <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+            Refine products by the details that matter.
+          </span>
         </span>
         {hasFilters && (
           <button
+            type="button"
             onClick={onClear}
-            className="text-xs font-semibold text-destructive hover:underline"
+            className="shrink-0 text-xs font-semibold text-destructive hover:underline"
           >
             Reset
           </button>
         )}
       </div>
-      <div className="grid gap-6">
+      <div>
         <Filter label="Category">
           <Select
             value={categoryId}
@@ -385,65 +426,34 @@ function FilterPanel({
           </Select>
         </Filter>
         <Filter label="Price range">
-          <div className="grid grid-cols-2 gap-2">
-            <label className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
-                $
-              </span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={minPrice}
-                onChange={(event) => onChange("minPrice", event.target.value)}
-                placeholder="Min"
-                className="h-10 w-full rounded-md border bg-background pl-7 pr-2 text-sm font-normal tracking-normal text-foreground transition focus:border-primary focus:ring-2 focus:ring-ring/20"
-              />
-            </label>
-            <label className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
-                $
-              </span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={maxPrice}
-                onChange={(event) => onChange("maxPrice", event.target.value)}
-                placeholder="Max"
-                className="h-10 w-full rounded-md border bg-background pl-7 pr-2 text-sm font-normal tracking-normal text-foreground transition focus:border-primary focus:ring-2 focus:ring-ring/20"
-              />
-            </label>
-          </div>
+          <PriceRange
+            minimum={priceMinimum}
+            maximum={priceMaximum}
+            selectedMinimum={minPrice}
+            selectedMaximum={maxPrice}
+            onChange={onPriceChange}
+          />
         </Filter>
         <Filter label="Availability">
-          <Select
+          <ChoiceGroup
             value={stock}
-            onValueChange={(value) => onChange("stock", value)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Any availability</SelectItem>
-              <SelectItem value="in">In stock</SelectItem>
-              <SelectItem value="out">Out of stock</SelectItem>
-            </SelectContent>
-          </Select>
+            onChange={(value) => onChange("stock", value)}
+            options={[
+              { value: "all", label: "Any" },
+              { value: "in", label: "In stock" },
+              { value: "out", label: "Sold out" },
+            ]}
+          />
         </Filter>
         <Filter label="Collection">
-          <Select
+          <ChoiceGroup
             value={featured}
-            onValueChange={(value) => onChange("isFeatured", value)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All products</SelectItem>
-              <SelectItem value="true">Featured products</SelectItem>
-            </SelectContent>
-          </Select>
+            onChange={(value) => onChange("isFeatured", value)}
+            options={[
+              { value: "all", label: "All products" },
+              { value: "true", label: "Featured" },
+            ]}
+          />
         </Filter>
         <Filter label="Unit">
           <Select
@@ -470,11 +480,171 @@ function FilterPanel({
 
 function Filter({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="grid gap-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-      {label}
-      {children}
-    </label>
+    <fieldset className="border-b py-5 first:pt-0 last:border-0 last:pb-0">
+      <legend className="text-xs font-bold uppercase tracking-[.12em] text-foreground">
+        {label}
+      </legend>
+      <div className="mt-3">{children}</div>
+    </fieldset>
   );
+}
+
+function ChoiceGroup({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={value === option.value}
+          onClick={() => onChange(option.value)}
+          className={`rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
+            value === option.value
+              ? "border-primary bg-primary text-primary-foreground"
+              : "bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground"
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PriceRange({
+  minimum,
+  maximum,
+  selectedMinimum,
+  selectedMaximum,
+  onChange,
+}: {
+  minimum: number;
+  maximum: number;
+  selectedMinimum: string;
+  selectedMaximum: string;
+  onChange: (minimum: number, maximum: number) => void;
+}) {
+  const span = Math.max(1, maximum - minimum);
+  const step = span <= 100 ? 1 : span <= 500 ? 5 : span <= 2000 ? 10 : 50;
+  const getMinimum = () =>
+    Math.min(
+      maximum - step,
+      Math.max(minimum, Number(selectedMinimum || minimum)),
+    );
+  const getMaximum = () =>
+    Math.max(
+      minimum + step,
+      Math.min(maximum, Number(selectedMaximum || maximum)),
+    );
+  const [draftMinimum, setDraftMinimum] = useState(getMinimum);
+  const [draftMaximum, setDraftMaximum] = useState(getMaximum);
+
+  useEffect(() => {
+    setDraftMinimum(getMinimum());
+    setDraftMaximum(getMaximum());
+  }, [minimum, maximum, selectedMinimum, selectedMaximum]);
+
+  const minimumPercent = ((draftMinimum - minimum) / span) * 100;
+  const maximumPercent = ((draftMaximum - minimum) / span) * 100;
+  const commit = () => onChange(draftMinimum, draftMaximum);
+
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-2">
+        <PriceValue label="Minimum" value={draftMinimum} />
+        <PriceValue label="Maximum" value={draftMaximum} align="end" />
+      </div>
+
+      <div className="relative mt-5 h-6">
+        <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-muted" />
+        <div
+          className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-primary"
+          style={{
+            left: `${minimumPercent}%`,
+            right: `${100 - maximumPercent}%`,
+          }}
+        />
+        <input
+          type="range"
+          aria-label="Minimum price"
+          min={minimum}
+          max={maximum}
+          step={step}
+          value={draftMinimum}
+          onChange={(event) =>
+            setDraftMinimum(
+              Math.min(Number(event.target.value), draftMaximum - step),
+            )
+          }
+          onPointerUp={commit}
+          onKeyUp={commit}
+          onBlur={commit}
+          className="price-range-input absolute inset-0 z-20 w-full"
+        />
+        <input
+          type="range"
+          aria-label="Maximum price"
+          min={minimum}
+          max={maximum}
+          step={step}
+          value={draftMaximum}
+          onChange={(event) =>
+            setDraftMaximum(
+              Math.max(Number(event.target.value), draftMinimum + step),
+            )
+          }
+          onPointerUp={commit}
+          onKeyUp={commit}
+          onBlur={commit}
+          className="price-range-input absolute inset-0 z-30 w-full"
+        />
+      </div>
+
+      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+        <span>{formatCurrency(minimum)}</span>
+        <span>{formatCurrency(maximum)}</span>
+      </div>
+    </div>
+  );
+}
+
+function PriceValue({
+  label,
+  value,
+  align = "start",
+}: {
+  label: string;
+  value: number;
+  align?: "start" | "end";
+}) {
+  return (
+    <div
+      className={`rounded-md border bg-muted/30 px-3 py-2 ${align === "end" ? "text-right" : ""}`}
+    >
+      <small className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </small>
+      <b className="mt-0.5 block text-sm text-foreground">
+        {formatCurrency(value)}
+      </b>
+    </div>
+  );
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 function Pagination({
