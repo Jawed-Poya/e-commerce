@@ -6,6 +6,8 @@ public class GeneralTypeDto
 
     public string Name { get; set; } = null!;
 
+    public string? ImageUrl { get; set; }
+
     public string Group { get; set; } = null!;
 
     public long? ParentId { get; set; }

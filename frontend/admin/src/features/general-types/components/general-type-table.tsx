@@ -19,6 +19,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { generalTypeKeys } from "@/keys/type-keys";
 import { useI18n } from "@/i18n/i18n-provider";
 import type { GeneralType } from "@/schemas/type.schema";
+import { resolveGeneralTypeImageUrl } from "@/services/type.service";
 import { getGroupLabelKey } from "../type-groups";
 
 export function GeneralTypesTable({ rows, allRows, isLoading, isError, onRetry }: { rows: GeneralType[]; allRows: GeneralType[]; isLoading: boolean; isError: boolean; onRetry: () => void }) {
@@ -59,6 +60,8 @@ export function GeneralTypesTable({ rows, allRows, isLoading, isError, onRetry }
                 <TableRow>
                     <TableHead>{t("form.name")}</TableHead>
 
+                    <TableHead className="w-20">{t("types.image")}</TableHead>
+
                     <TableHead>{t("types.group")}</TableHead>
 
                     <TableHead>{t("form.parent")}</TableHead>
@@ -68,12 +71,16 @@ export function GeneralTypesTable({ rows, allRows, isLoading, isError, onRetry }
             </TableHeader>
 
             <TableBody>
-                {isLoading && <TableRow><TableCell colSpan={4} className="h-40 text-center"><LoaderCircle className="mx-auto size-5 animate-spin" /><span className="mt-2 block text-muted-foreground">{t("types.loading")}</span></TableCell></TableRow>}
-                {isError && <TableRow><TableCell colSpan={4} className="h-40 text-center"><p className="mb-3 text-destructive">{t("types.loadError")}</p><Button variant="outline" onClick={onRetry}>{t("types.retry")}</Button></TableCell></TableRow>}
-                {!isLoading && !isError && rows.length === 0 && <TableRow><TableCell colSpan={4} className="h-40 text-center"><FolderTree className="mx-auto mb-3 size-8 text-muted-foreground" /><p className="font-medium">{t("types.empty")}</p><p className="mt-1 text-xs text-muted-foreground">{t("types.emptyHelp")}</p></TableCell></TableRow>}
+                {isLoading && <TableRow><TableCell colSpan={5} className="h-40 text-center"><LoaderCircle className="mx-auto size-5 animate-spin" /><span className="mt-2 block text-muted-foreground">{t("types.loading")}</span></TableCell></TableRow>}
+                {isError && <TableRow><TableCell colSpan={5} className="h-40 text-center"><p className="mb-3 text-destructive">{t("types.loadError")}</p><Button variant="outline" onClick={onRetry}>{t("types.retry")}</Button></TableCell></TableRow>}
+                {!isLoading && !isError && rows.length === 0 && <TableRow><TableCell colSpan={5} className="h-40 text-center"><FolderTree className="mx-auto mb-3 size-8 text-muted-foreground" /><p className="font-medium">{t("types.empty")}</p><p className="mt-1 text-xs text-muted-foreground">{t("types.emptyHelp")}</p></TableCell></TableRow>}
                 {!isLoading && !isError && rows.map((type) => (
                     <TableRow key={type.id}>
                         <TableCell><div className="flex items-center" style={{ paddingInlineStart: `${getDepth(type) * 20}px` }}>{getDepth(type) > 0 && <span className="me-2 text-muted-foreground">└</span>}<span className="font-medium">{type.name}</span></div></TableCell>
+
+                        <TableCell>
+                            {type.imageUrl ? <img src={resolveGeneralTypeImageUrl(type.imageUrl)!} alt="" className="size-10 object-cover" /> : <span className="text-muted-foreground">-</span>}
+                        </TableCell>
 
                         <TableCell>
                             <Badge variant="secondary">{t(getGroupLabelKey(type.group))}</Badge>

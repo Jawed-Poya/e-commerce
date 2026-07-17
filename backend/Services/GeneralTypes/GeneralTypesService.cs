@@ -37,6 +37,7 @@ public class GeneralTypesService : IGeneralTypeService
             {
                 Id = x.Id,
                 Name = x.Name,
+                ImageUrl = x.ImageUrl,
                 Group = x.Group.ToString(),
                 ParentId = x.ParentId,
                 ParentName = x.Parent != null ? x.Parent.Name : null,
@@ -57,6 +58,7 @@ public class GeneralTypesService : IGeneralTypeService
         GeneralType model)
     {
         model.Name = model.Name.Trim();
+        model.ImageUrl = NormalizeImageUrl(model.ImageUrl);
         await ValidateParentAsync(model.ParentId, model.Group);
         var exists = await _context.Types
             .AnyAsync(x =>
@@ -118,6 +120,7 @@ public class GeneralTypesService : IGeneralTypeService
 
 
         entity.Name = model.Name;
+        entity.ImageUrl = NormalizeImageUrl(model.ImageUrl);
         entity.Group = model.Group;
         entity.ParentId = model.ParentId;
 
@@ -141,6 +144,34 @@ public class GeneralTypesService : IGeneralTypeService
             currentId = await _context.Types.Where(x => x.Id == currentId.Value).Select(x => x.ParentId).FirstOrDefaultAsync();
         }
         return false;
+    }
+
+    private static string? NormalizeImageUrl(string? imageUrl)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrl))
+        {
+            return null;
+        }
+
+        var normalized = imageUrl.Trim();
+
+        if (normalized.StartsWith(
+                "/uploads/types/",
+                StringComparison.OrdinalIgnoreCase
+            ))
+        {
+            return normalized;
+        }
+
+        if (Uri.TryCreate(normalized, UriKind.Absolute, out var uri) &&
+            uri.Scheme is "http" or "https")
+        {
+            return normalized;
+        }
+
+        throw new InvalidOperationException(
+            "Enter a valid HTTP or HTTPS image URL."
+        );
     }
 
     public async Task DeleteAsync(

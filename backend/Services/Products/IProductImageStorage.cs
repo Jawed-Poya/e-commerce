@@ -9,6 +9,12 @@ public interface IProductImageStorage
         CancellationToken cancellationToken = default
     );
 
+    Task<StoredProductImage> SaveAsync(
+        IFormFile file,
+        string collection,
+        CancellationToken cancellationToken = default
+    );
+
     Task DeleteAsync(
         string relativePath,
         CancellationToken cancellationToken = default

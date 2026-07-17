@@ -8,6 +8,12 @@ export const GeneralTypeSchema = z.object({
         .min(2, "Name must be at least 2 characters.")
         .max(200, "Name cannot exceed 200 characters."),
 
+    imageUrl: z
+        .string()
+        .max(2048, "Image URL is too long.")
+        .nullable()
+        .optional(),
+
     group: z.string().min(1, "Group is required."),
 
     parentId: z.number().nullable().optional(),

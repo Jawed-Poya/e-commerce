@@ -8,9 +8,9 @@ export function useCreateGeneralType() {
     return useMutation({
         mutationFn: generalTypeService.create,
 
-        onSuccess(_, model) {
+        onSuccess(_, submission) {
             queryClient.invalidateQueries({
-                queryKey: generalTypeKeys.group(model.group),
+                queryKey: generalTypeKeys.group(submission.data.group),
             });
         },
     });

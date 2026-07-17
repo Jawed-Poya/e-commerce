@@ -16,11 +16,24 @@ public sealed class LocalProductImageStorage : IProductImageStorage
         _environment = environment;
     }
 
+    public Task<StoredProductImage> SaveAsync(
+        IFormFile file,
+        CancellationToken cancellationToken = default
+    ) => SaveAsync(file, "products", cancellationToken);
+
     public async Task<StoredProductImage> SaveAsync(
         IFormFile file,
+        string collection,
         CancellationToken cancellationToken = default
     )
     {
+        if (collection is not ("products" or "types"))
+        {
+            throw new InvalidOperationException(
+                "The image collection is not supported."
+            );
+        }
+
         if (file.Length <= 0)
         {
             throw new InvalidOperationException(
@@ -43,7 +56,7 @@ public sealed class LocalProductImageStorage : IProductImageStorage
         if (imageType is null)
         {
             throw new InvalidOperationException(
-                "Only valid JPG, PNG and WEBP images are supported."
+                "Only valid JPG, PNG, WEBP and AVIF images are supported."
             );
         }
 
@@ -54,7 +67,7 @@ public sealed class LocalProductImageStorage : IProductImageStorage
 
         var relativeDirectory = Path.Combine(
             "uploads",
-            "products",
+            collection,
             year,
             month
         );
@@ -189,7 +202,7 @@ public sealed class LocalProductImageStorage : IProductImageStorage
         CancellationToken cancellationToken
     )
     {
-        var header = new byte[12];
+        var header = new byte[64];
 
         await using var stream = file.OpenReadStream();
 
@@ -239,6 +252,30 @@ public sealed class LocalProductImageStorage : IProductImageStorage
                 ".webp",
                 "image/webp"
             );
+        }
+
+        if (bytesRead >= 12 &&
+            header[4] == 0x66 &&
+            header[5] == 0x74 &&
+            header[6] == 0x79 &&
+            header[7] == 0x70)
+        {
+            for (var offset = 8; offset + 3 < bytesRead; offset += 4)
+            {
+                var isAvifBrand =
+                    header[offset] == 0x61 &&
+                    header[offset + 1] == 0x76 &&
+                    header[offset + 2] == 0x69 &&
+                    header[offset + 3] is 0x66 or 0x73;
+
+                if (isAvifBrand)
+                {
+                    return new DetectedImageType(
+                        ".avif",
+                        "image/avif"
+                    );
+                }
+            }
         }
 
         return null;
