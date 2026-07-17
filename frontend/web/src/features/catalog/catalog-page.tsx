@@ -20,6 +20,8 @@ import {
 import { Skeleton } from "../../shared/components/ui/skeleton";
 import { ProductCard } from "./product-card";
 import { useLookups, useProducts } from "./use-catalog";
+import { flattenCategoryTree } from "./category-tree";
+import type { CategoryLookup } from "../../shared/types/product";
 
 export function CatalogPage() {
   const [params, setParams] = useSearchParams();
@@ -318,13 +320,15 @@ function FilterPanel({
   featured: string;
   minPrice: string;
   maxPrice: string;
-  categories: Lookup[];
+  categories: CategoryLookup[];
   brands: Lookup[];
   units: Lookup[];
   onChange: (key: string, value?: string) => void;
   onClear: () => void;
   hasFilters: boolean;
 }) {
+  const orderedCategories = flattenCategoryTree(categories);
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -351,9 +355,12 @@ function FilterPanel({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All categories</SelectItem>
-              {categories.map((item) => (
-                <SelectItem key={item.id} value={String(item.id)}>
-                  {item.name}
+              {orderedCategories.map(({ category, depth }) => (
+                <SelectItem key={category.id} value={String(category.id)}>
+                  <span style={{ paddingInlineStart: depth * 12 }}>
+                    {depth > 0 && "↳ "}
+                    {category.name}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>

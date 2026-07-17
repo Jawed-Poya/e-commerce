@@ -58,7 +58,13 @@ public class ProductService : IProductService
         }
 
         if (filter.CategoryId.HasValue)
-            query = query.Where(x => x.CategoryId == filter.CategoryId);
+        {
+            var categoryIds = await GetCategoryTreeIdsAsync(
+                filter.CategoryId.Value
+            );
+
+            query = query.Where(x => categoryIds.Contains(x.CategoryId));
+        }
 
         if (filter.BrandId.HasValue)
             query = query.Where(x => x.BrandId == filter.BrandId);
@@ -694,48 +700,59 @@ public class ProductService : IProductService
             {
                 x.Id,
                 x.Name,
-                x.Group
+                x.ImageUrl,
+                x.Group,
+                x.ParentId
             })
             .ToListAsync(cancellationToken);
 
         var categoryProducts = await _context
             .Set<Product>()
             .AsNoTracking()
-            .Where(x => x.IsActive)
-            .Select(x => new
-            {
-                x.CategoryId,
-                ImagePath = x.Images
-                    .OrderByDescending(image => image.IsPrimary)
-                    .ThenBy(image => image.SortOrder)
-                    .Select(image => image.ImagePath)
-                    .FirstOrDefault()
-            })
+            .Where(x => x.IsActive && !x.IsDeleted)
+            .Select(x => x.CategoryId)
             .ToListAsync(cancellationToken);
 
         var categoryStats = categoryProducts
-            .GroupBy(x => x.CategoryId)
+            .GroupBy(categoryId => categoryId)
             .ToDictionary(
                 group => group.Key,
-                group => new
-                {
-                    Count = group.Count(),
-                    ImagePath = group.Select(x => x.ImagePath).FirstOrDefault(path => path != null)
-                }
+                group => group.Count()
             );
 
-        var categories = generalTypes
-            .Where(x =>
-                x.Group == GeneralTypeEnum.ProductCategory
-            )
+        var categoryTypes = generalTypes
+            .Where(x => x.Group == GeneralTypeEnum.ProductCategory)
+            .ToList();
+        var categoryChildren = categoryTypes.ToLookup(x => x.ParentId);
+
+        int GetProductCount(long categoryId, HashSet<long> path)
+        {
+            if (!path.Add(categoryId))
+            {
+                return 0;
+            }
+
+            var count = categoryStats.TryGetValue(categoryId, out var directCount)
+                ? directCount
+                : 0;
+
+            foreach (var child in categoryChildren[categoryId])
+            {
+                count += GetProductCount(child.Id, path);
+            }
+
+            path.Remove(categoryId);
+            return count;
+        }
+
+        var categories = categoryTypes
             .Select(x =>
                 new ProductCategoryLookupItemResponse(
                     x.Id,
                     x.Name,
-                    categoryStats.TryGetValue(x.Id, out var stats) ? stats.Count : 0,
-                    categoryStats.TryGetValue(x.Id, out stats) && stats.ImagePath != null
-                        ? "/" + stats.ImagePath.Replace("\\", "/")
-                        : null
+                    x.ParentId,
+                    GetProductCount(x.Id, []),
+                    x.ImageUrl
                 )
             )
             .ToList();
@@ -1057,6 +1074,36 @@ public class ProductService : IProductService
         }
 
         return slug;
+    }
+
+    private async Task<List<long>> GetCategoryTreeIdsAsync(long categoryId)
+    {
+        var categories = await _context.Types
+            .AsNoTracking()
+            .Where(x => x.Group == GeneralTypeEnum.ProductCategory)
+            .Select(x => new { x.Id, x.ParentId })
+            .ToListAsync();
+
+        var result = new HashSet<long> { categoryId };
+        var pending = new Queue<long>();
+        pending.Enqueue(categoryId);
+
+        while (pending.Count > 0)
+        {
+            var parentId = pending.Dequeue();
+
+            foreach (var childId in categories
+                .Where(x => x.ParentId == parentId)
+                .Select(x => x.Id))
+            {
+                if (result.Add(childId))
+                {
+                    pending.Enqueue(childId);
+                }
+            }
+        }
+
+        return result.ToList();
     }
 
     private async Task DeleteStoredImagesAsync(

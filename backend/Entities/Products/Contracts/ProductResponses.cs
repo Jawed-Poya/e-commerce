@@ -21,6 +21,7 @@ public sealed record ProductLookupItemResponse(
 public sealed record ProductCategoryLookupItemResponse(
     long Id,
     string Name,
+    long? ParentId,
     int ProductCount,
     string? ImageUrl
 );

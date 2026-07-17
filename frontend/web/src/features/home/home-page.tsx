@@ -14,6 +14,7 @@ import { Button } from "../../shared/components/ui/button";
 import { Skeleton } from "../../shared/components/ui/skeleton";
 import { ProductCard } from "../catalog/product-card";
 import { useLookups, useProducts } from "../catalog/use-catalog";
+import { buildCategoryTree } from "../catalog/category-tree";
 export function HomePage() {
   const products = useProducts({
     page: 1,
@@ -28,6 +29,7 @@ export function HomePage() {
     (item) => item.oldPrice && item.price && item.oldPrice > item.price,
   );
   const deal = items.find((x) => x.price && x.stock > 0) ?? items[0];
+  const categoryTree = buildCategoryTree(lookups.data?.categories ?? []);
   return (
     <div className="mx-auto max-w-[1500px] px-4 sm:px-6 lg:px-8">
       <section className="py-6">
@@ -112,36 +114,43 @@ export function HomePage() {
           title="Shop by categories"
           to="/products"
         />
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        <div className="grid auto-rows-[220px] gap-4 md:grid-cols-2 lg:grid-cols-3">
           {lookups.isLoading
             ? Array.from({ length: 6 }).map((_, i) => (
                 <Skeleton key={i} className="h-48" />
               ))
-            : lookups.data?.categories.slice(0, 6).map((x) => (
+            : categoryTree.slice(0, 5).map((x, index) => (
                 <Link
                   key={x.id}
                   to={`/products?categoryId=${x.id}`}
-                  className="group overflow-hidden rounded-lg border bg-card transition-colors hover:border-primary/50"
+                  className={`group relative overflow-hidden rounded-lg border bg-muted ${index === 4 ? "lg:col-start-3 lg:row-span-2 lg:row-start-1" : ""}`}
                 >
-                  <div className="aspect-[1.05/1] overflow-hidden border-b bg-muted">
-                    {x.imageUrl ? (
-                      <img
-                        src={imageUrl(x.imageUrl) ?? ""}
-                        alt=""
-                        className="size-full object-cover"
-                      />
-                    ) : (
-                      <span className="grid size-full place-items-center text-muted-foreground">
-                        <ShoppingBag className="size-10" />
-                      </span>
-                    )}
-                  </div>
-                  <div className="p-4">
-                    <h3 className="truncate font-bold">{x.name}</h3>
-                    <span className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                      {x.productCount}{" "}
-                      {x.productCount === 1 ? "product" : "products"}
-                      <ArrowRight className="size-4 text-foreground" />
+                  {x.imageUrl ? (
+                    <img
+                      src={imageUrl(x.imageUrl) ?? ""}
+                      alt=""
+                      className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                    />
+                  ) : (
+                    <span className="grid size-full place-items-center text-muted-foreground">
+                      <ShoppingBag className="size-10" />
+                    </span>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-5 text-white">
+                    <span>
+                      <h3 className="text-lg font-bold">{x.name}</h3>
+                      <small className="text-white/75">
+                        {x.children.length > 0
+                          ? x.children
+                              .slice(0, 3)
+                              .map((child) => child.name)
+                              .join(" · ")
+                          : `${x.productCount} ${x.productCount === 1 ? "product" : "products"}`}
+                      </small>
+                    </span>
+                    <span className="grid size-8 shrink-0 place-items-center rounded-md bg-white text-foreground">
+                      <ArrowRight className="size-4" />
                     </span>
                   </div>
                 </Link>

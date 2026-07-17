@@ -62,13 +62,15 @@ export type PagedProducts = {
   hasPreviousPage: boolean;
   hasNextPage: boolean;
 };
+export type CategoryLookup = {
+  id: number;
+  name: string;
+  parentId: number | null;
+  productCount: number;
+  imageUrl: string | null;
+};
 export type Lookups = {
-  categories: {
-    id: number;
-    name: string;
-    productCount: number;
-    imageUrl: string | null;
-  }[];
+  categories: CategoryLookup[];
   brands: { id: number; name: string }[];
   units: { id: number; name: string }[];
 };

@@ -1,6 +1,7 @@
 export interface ProductLookupOption {
     id: number;
     name: string;
+    parentId?: number | null;
 }
 
 export interface ProductLookups {

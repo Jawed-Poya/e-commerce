@@ -4,7 +4,7 @@ import type { CreateBulkProductsRequest } from "../types/product-bulk-types";
 import { productKeys } from "@/keys/product-keys";
 
 export const ProductQueryKeys = {
-    lookups: ["products", "lookups"] as const,
+    lookups: ["products", "lookups", "hierarchy-v2"] as const,
 };
 
 export function useProductLookupsQuery() {

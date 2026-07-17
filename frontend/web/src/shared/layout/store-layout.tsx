@@ -1,6 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import {
-  ChevronDown,
   CircleHelp,
   Heart,
   Menu,
@@ -15,6 +14,10 @@ import { useCart } from "../../features/cart/cart-context";
 import { ThemeToggle } from "../components/theme-toggle";
 import { Button } from "../components/ui/button";
 import { cn } from "../lib/utils";
+import {
+  CategoryMegaMenu,
+  MobileCategoryLinks,
+} from "../../features/catalog/category-menu";
 const nav = [
   { to: "/", label: "Home" },
   { to: "/products", label: "Shop" },
@@ -139,6 +142,7 @@ export function StoreLayout() {
                         </NavLink>
                       ))}
                     </nav>
+                    <MobileCategoryLinks onNavigate={() => setOpen(false)} />
                   </Dialog.Content>
                 </Dialog.Portal>
               </Dialog.Root>
@@ -147,18 +151,7 @@ export function StoreLayout() {
         </div>
         <div className="hidden border-b lg:block">
           <div className="mx-auto flex h-12 w-full max-w-[1500px] items-center px-8">
-            <Button
-              asChild
-              variant="secondary"
-              className="mr-8 min-w-48 justify-between rounded-md"
-            >
-              <Link to="/products">
-                <span className="flex items-center gap-2">
-                  <Menu /> Browse categories
-                </span>
-                <ChevronDown />
-              </Link>
-            </Button>
+            <CategoryMegaMenu />
             <nav className="flex items-center gap-1">
               {nav.map((x) => (
                 <NavLink
