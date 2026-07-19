@@ -2,6 +2,7 @@ using ECommerce.Data;
 using ECommerce.Entities.Notifications;
 using ECommerce.Entities.Notifications.Contracts;
 using ECommerce.Services.Customers;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace ECommerce.Services.Notifications;
@@ -9,19 +10,21 @@ namespace ECommerce.Services.Notifications;
 public sealed class StoreNotificationService(
     ApplicationDbContext context,
     ICurrentCustomerAccessor currentCustomer,
-    IDefaultCustomerTypeResolver defaultCustomerType) : IStoreNotificationService
+    IDefaultCustomerTypeResolver defaultCustomerType,
+    IHubContext<StoreNotificationHub> hub,
+    ILogger<StoreNotificationService> logger) : IStoreNotificationService
 {
     private const string StockEntityType = "StoreProductStock";
     private const string PriceEntityTypePrefix = "StoreProductPrice:";
 
-    public async Task CreatePriceChangedAsync(
+    public async Task<PendingStoreNotification?> CreatePriceChangedAsync(
         long productId,
         long customerTypeId,
         decimal? previousPrice,
         decimal newPrice,
         CancellationToken cancellationToken = default)
     {
-        if (previousPrice.HasValue && previousPrice.Value == newPrice) return;
+        if (previousPrice.HasValue && previousPrice.Value == newPrice) return null;
 
         var data = await context.Products
             .AsNoTracking()
@@ -36,7 +39,7 @@ public sealed class StoreNotificationService(
             })
             .SingleOrDefaultAsync(cancellationToken);
 
-        if (data is null) return;
+        if (data is null) return null;
 
         var audience = string.IsNullOrWhiteSpace(data.CustomerTypeName)
             ? "customers"
@@ -45,7 +48,7 @@ public sealed class StoreNotificationService(
             ? $"{data.Name} changed from {previousPrice.Value:0.##} to {newPrice:0.##} for {audience}."
             : $"{data.Name} now has a price of {newPrice:0.##} for {audience}.";
 
-        context.Notifications.Add(new Notification
+        var entity = new Notification
         {
             Title = $"Price updated: {data.Name}",
             Message = message,
@@ -53,16 +56,22 @@ public sealed class StoreNotificationService(
             EntityType = PriceEntityTypePrefix + customerTypeId,
             EntityId = productId,
             UserId = null
-        });
+        };
+        context.Notifications.Add(entity);
+
+        return new PendingStoreNotification(
+            entity,
+            data.Name,
+            StoreNotificationGroups.Price(productId, customerTypeId));
     }
 
-    public async Task CreateStockIncreasedAsync(
+    public async Task<PendingStoreNotification?> CreateStockIncreasedAsync(
         long productId,
         decimal previousAvailable,
         decimal newAvailable,
         CancellationToken cancellationToken = default)
     {
-        if (newAvailable <= previousAvailable) return;
+        if (newAvailable <= previousAvailable) return null;
 
         var productName = await context.Products
             .AsNoTracking()
@@ -70,9 +79,9 @@ public sealed class StoreNotificationService(
             .Select(product => product.Name)
             .SingleOrDefaultAsync(cancellationToken);
 
-        if (productName is null) return;
+        if (productName is null) return null;
 
-        context.Notifications.Add(new Notification
+        var entity = new Notification
         {
             Title = $"Back in stock: {productName}",
             Message = previousAvailable <= 0
@@ -82,7 +91,43 @@ public sealed class StoreNotificationService(
             EntityType = StockEntityType,
             EntityId = productId,
             UserId = null
-        });
+        };
+        context.Notifications.Add(entity);
+
+        return new PendingStoreNotification(
+            entity,
+            productName,
+            StoreNotificationGroups.Stock(productId));
+    }
+
+    public async Task PublishAsync(
+        IEnumerable<PendingStoreNotification?> notifications,
+        CancellationToken cancellationToken = default)
+    {
+        foreach (var pending in notifications.OfType<PendingStoreNotification>())
+        {
+            if (pending.Entity.Id <= 0) continue;
+
+            var item = Map(
+                pending.Entity,
+                pending.ProductName);
+            try
+            {
+                await hub.Clients
+                    .Group(pending.Group)
+                    .SendAsync("storeNotification", item, cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                // The database event is already committed. Polling will deliver it later,
+                // so a temporary realtime failure must not fail the business operation.
+                logger.LogWarning(
+                    exception,
+                    "Could not publish store notification {NotificationId} to {Group}.",
+                    pending.Entity.Id,
+                    pending.Group);
+            }
+        }
     }
 
     public async Task<StoreNotificationsResponse> GetStoreNotificationsAsync(
@@ -146,4 +191,15 @@ public sealed class StoreNotificationService(
                 $"/products/{row.ProductId}",
                 row.CreatedAt)).ToList());
     }
+
+    private static StoreNotificationResponse Map(Notification entity, string productName) =>
+        new(
+            entity.Id,
+            entity.Title,
+            entity.Message,
+            entity.Type == NotificationType.Inventory ? "Stock" : "Price",
+            entity.EntityId!.Value,
+            productName,
+            $"/products/{entity.EntityId.Value}",
+            entity.CreatedAt);
 }

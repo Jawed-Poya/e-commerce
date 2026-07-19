@@ -16,6 +16,7 @@ public sealed record AuthUserResponse(
     string? Email,
     string? Phone,
     IReadOnlyCollection<string> Roles,
+    IReadOnlyCollection<string> Permissions,
     long? CustomerId,
     long? CustomerTypeId,
     string? CustomerTypeName,

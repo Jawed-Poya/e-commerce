@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAdminAuth } from "./auth-context";
+import { getDefaultAdminRoute } from "./permissions";
 
 export default function AdminLoginPage() {
     const auth = useAdminAuth();
@@ -18,7 +19,7 @@ export default function AdminLoginPage() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    if (!auth.loading && auth.isAuthenticated) return <Navigate to="/dashboard" replace />;
+    if (!auth.loading && auth.isAuthenticated) return <Navigate to={getDefaultAdminRoute(auth.user?.permissions ?? [])} replace />;
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
@@ -26,8 +27,9 @@ export default function AdminLoginPage() {
         setError(null);
         try {
             await auth.login({ identifier: identifier.trim(), password });
+            const storedUser = JSON.parse(localStorage.getItem("easycart-admin-session") ?? "null") as { permissions?: string[] } | null;
             const from = (location.state as { from?: string } | null)?.from;
-            navigate(from || "/dashboard", { replace: true });
+            navigate(from || getDefaultAdminRoute(storedUser?.permissions ?? []), { replace: true });
         } catch (requestError) {
             const apiMessage = (requestError as AxiosError<{ message?: string }>).response?.data?.message;
             setError(apiMessage || (requestError instanceof Error ? requestError.message : "Login failed."));
@@ -45,7 +47,7 @@ export default function AdminLoginPage() {
                 <div className="relative z-10 my-auto max-w-xl">
                     <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-bold"><ShieldCheck className="size-4" />Protected administration</span>
                     <h1 className="mt-7 text-6xl font-black leading-[1.02] tracking-[-0.06em]">Run products, customers, orders, and payments securely.</h1>
-                    <p className="mt-6 text-base leading-8 text-slate-300">Only users assigned to the Admin role can enter this panel. API endpoints are protected by the same server-side role check.</p>
+                    <p className="mt-6 text-base leading-8 text-slate-300">Access is controlled by server-side roles and permission claims. Staff only see and use the sections assigned to them.</p>
                 </div>
                 <p className="relative z-10 text-xs text-slate-400">Use environment-based credentials before production deployment.</p>
             </section>

@@ -133,6 +133,7 @@ public sealed class ProductPricingService(
             .Select(price => price.CustomerTypeId)
             .Distinct()
             .ToArray();
+        var pendingNotifications = new List<PendingStoreNotification?>();
         var removedCustomerTypeIds = previousCustomerTypeIds
             .Except(requestedCustomerTypeIds)
             .Where(customerTypeId => customerTypeId != defaultTypeId)
@@ -143,12 +144,12 @@ public sealed class ProductPricingService(
             if (previousByCustomerType.TryGetValue(removedCustomerTypeId, out var previousPrice) &&
                 previousPrice != defaultEffectivePrice)
             {
-                await notifications.CreatePriceChangedAsync(
+                pendingNotifications.Add(await notifications.CreatePriceChangedAsync(
                     productId,
                     removedCustomerTypeId,
                     previousPrice,
                     defaultEffectivePrice,
-                    cancellationToken);
+                    cancellationToken));
             }
         }
 
@@ -162,16 +163,17 @@ public sealed class ProductPricingService(
             previousByCustomerType.TryGetValue(item.CustomerTypeId, out var previousPrice);
             if (!previousByCustomerType.ContainsKey(item.CustomerTypeId) || previousPrice != newPrice)
             {
-                await notifications.CreatePriceChangedAsync(
+                pendingNotifications.Add(await notifications.CreatePriceChangedAsync(
                     productId,
                     item.CustomerTypeId,
                     previousByCustomerType.ContainsKey(item.CustomerTypeId) ? previousPrice : null,
                     newPrice,
-                    cancellationToken);
+                    cancellationToken));
             }
         }
 
         await context.SaveChangesAsync(cancellationToken);
+        await notifications.PublishAsync(pendingNotifications, cancellationToken);
         return await Query(productId, defaultTypeId).ToListAsync(cancellationToken);
     }
 

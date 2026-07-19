@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ECommerce.Controllers;
 
-[Authorize(Roles = AppRoles.Admin)]
+[Authorize(Policy = AppPermissions.ProductPricingManage)]
 [ApiController]
 [Route("api/products/{productId:long}/prices")]
 public sealed class ProductPricesController(IProductPricingService pricing) : ControllerBase

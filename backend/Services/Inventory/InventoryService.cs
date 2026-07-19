@@ -275,9 +275,10 @@ public sealed class InventoryService(
 
         var availableBefore = before.Quantity - before.ReservedQuantity;
         var availableAfter = after.Quantity - after.ReservedQuantity;
+        PendingStoreNotification? pendingNotification = null;
         if (availableAfter > availableBefore)
         {
-            await notifications.CreateStockIncreasedAsync(
+            pendingNotification = await notifications.CreateStockIncreasedAsync(
                 productId,
                 availableBefore,
                 availableAfter,
@@ -286,6 +287,7 @@ public sealed class InventoryService(
 
         await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        await notifications.PublishAsync([pendingNotification], ct);
         return new StockResult(productId, after.Quantity, after.ReservedQuantity, after.Quantity - after.ReservedQuantity);
     }
 

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using API.Entities.Types;
 using ECommerce.Data;
 using ECommerce.Entities.Common;
@@ -19,6 +20,7 @@ public static class DatabaseInitializer
 
         await context.Database.MigrateAsync();
         await EnsureRolesAsync(services);
+        await EnsureAdminPermissionsAsync(services);
         await EnsureDefaultCustomerTypeAsync(context);
         await EnsureAdminAsync(services);
     }
@@ -44,6 +46,32 @@ public static class DatabaseInitializer
                 throw new InvalidOperationException(
                     $"Could not create role '{roleName}': " +
                     string.Join(" ", roleResult.Errors.Select(error => error.Description)));
+            }
+        }
+    }
+
+    private static async Task EnsureAdminPermissionsAsync(IServiceProvider services)
+    {
+        var roleManager = services.GetRequiredService<RoleManager<Role>>();
+        var adminRole = await roleManager.FindByNameAsync(AppRoles.Admin)
+            ?? throw new InvalidOperationException("Admin role is missing.");
+
+        var existing = (await roleManager.GetClaimsAsync(adminRole))
+            .Where(claim => claim.Type == AuthClaims.Permission)
+            .Select(claim => claim.Value)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var permission in AppPermissions.All.Where(permission => !existing.Contains(permission)))
+        {
+            var result = await roleManager.AddClaimAsync(
+                adminRole,
+                new Claim(AuthClaims.Permission, permission));
+
+            if (!result.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    $"Could not assign permission '{permission}' to the Admin role: " +
+                    string.Join(" ", result.Errors.Select(error => error.Description)));
             }
         }
     }

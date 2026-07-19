@@ -5,11 +5,13 @@ using ECommerce.Entities.Users;
 using ECommerce.Options;
 using ECommerce.Services.Auth;
 using ECommerce.Services.Customers;
+using ECommerce.Services.Dashboard;
 using ECommerce.Services.GeneralTypes;
 using ECommerce.Services.Inventory;
 using ECommerce.Services.Notifications;
 using ECommerce.Services.Orders;
 using ECommerce.Services.Products;
+using ECommerce.Services.Users;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,6 +31,9 @@ public static class DependencyInjection
         services.AddScoped<IDefaultCustomerTypeResolver, DefaultCustomerTypeResolver>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IStoreNotificationService, StoreNotificationService>();
+        services.AddSingleton<StoreRealtimeMetrics>();
+        services.AddScoped<IAdminDashboardService, AdminDashboardService>();
+        services.AddScoped<IAdminUserService, AdminUserService>();
 
         return services;
     }

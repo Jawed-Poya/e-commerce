@@ -9,11 +9,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ECommerce.Controllers;
 
-[Authorize(Roles = AppRoles.Admin)]
 [ApiController]
 [Route("api/inventory")]
 public sealed class InventoryManagementController(IInventoryService inventory) : ControllerBase
 {
+    [Authorize(Policy = AppPermissions.InventoryView)]
     [HttpGet]
     public async Task<ActionResult<ApiResponse<InventoryOverviewResponse>>> GetOverview(
         [FromQuery] InventoryFilter filter,
@@ -23,6 +23,7 @@ public sealed class InventoryManagementController(IInventoryService inventory) :
         return Ok(ApiResponse<InventoryOverviewResponse>.Ok(result));
     }
 
+    [Authorize(Policy = AppPermissions.InventoryView)]
     [HttpGet("transactions")]
     public async Task<ActionResult<ApiResponse<PagedResult<InventoryTransactionResponse>>>> GetTransactions(
         [FromQuery] InventoryTransactionFilter filter,
@@ -32,6 +33,7 @@ public sealed class InventoryManagementController(IInventoryService inventory) :
         return Ok(ApiResponse<PagedResult<InventoryTransactionResponse>>.Ok(result));
     }
 
+    [Authorize(Policy = AppPermissions.InventoryManage)]
     [HttpPatch("{productId:long}/settings")]
     public async Task<IActionResult> UpdateSettings(
         long productId,

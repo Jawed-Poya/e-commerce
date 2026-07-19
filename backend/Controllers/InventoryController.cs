@@ -8,11 +8,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ECommerce.Controllers;
 
-[Authorize(Roles = AppRoles.Admin)]
 [ApiController]
 [Route("api/products/{productId:long}/inventory")]
 public sealed class InventoryController(IInventoryService inventory) : ControllerBase
 {
+    [Authorize(Policy = AppPermissions.InventoryView)]
     [HttpGet]
     public async Task<IActionResult> Get(long productId, CancellationToken ct)
     {
@@ -20,18 +20,22 @@ public sealed class InventoryController(IInventoryService inventory) : Controlle
         return result is null ? NotFound(ApiResponse<object>.Fail("Product inventory not found.")) : Ok(ApiResponse<StockResult>.Ok(result));
     }
 
+    [Authorize(Policy = AppPermissions.InventoryManage)]
     [HttpPost("adjust")]
     public Task<IActionResult> Adjust(long productId, AdjustStockRequest request, CancellationToken ct) =>
         Mutate(() => inventory.AdjustAsync(productId, request, UserId, ct));
 
+    [Authorize(Policy = AppPermissions.InventoryManage)]
     [HttpPost("reserve")]
     public Task<IActionResult> Reserve(long productId, ReserveStockRequest request, CancellationToken ct) =>
         Mutate(() => inventory.ReserveAsync(productId, request, UserId, ct));
 
+    [Authorize(Policy = AppPermissions.InventoryManage)]
     [HttpPost("release")]
     public Task<IActionResult> Release(long productId, ReserveStockRequest request, CancellationToken ct) =>
         Mutate(() => inventory.ReleaseAsync(productId, request, UserId, ct));
 
+    [Authorize(Policy = AppPermissions.InventoryManage)]
     [HttpPost("commit-sale")]
     public Task<IActionResult> CommitSale(long productId, ReserveStockRequest request, CancellationToken ct) =>
         Mutate(() => inventory.CommitSaleAsync(productId, request, UserId, ct));

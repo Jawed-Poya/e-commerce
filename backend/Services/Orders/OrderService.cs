@@ -339,17 +339,18 @@ public sealed class OrderService(
 
             EnsureValidStatusTransition(order, request.Status);
             var previousStatus = order.Status;
+            var pendingNotifications = new List<PendingStoreNotification?>();
 
             if (request.Status == OrderStatus.Cancelled)
             {
                 var restockedProducts = ReleaseReservedStock(order);
                 foreach (var restocked in restockedProducts)
                 {
-                    await notifications.CreateStockIncreasedAsync(
+                    pendingNotifications.Add(await notifications.CreateStockIncreasedAsync(
                         restocked.ProductId,
                         restocked.PreviousAvailable,
                         restocked.NewAvailable,
-                        cancellationToken);
+                        cancellationToken));
                 }
                 order.FulfillmentStatus = FulfillmentStatus.Cancelled;
 
@@ -399,6 +400,7 @@ public sealed class OrderService(
 
             await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            await notifications.PublishAsync(pendingNotifications, cancellationToken);
 
             return MapDetails(order);
         }

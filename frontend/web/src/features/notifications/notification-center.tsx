@@ -41,7 +41,13 @@ export function NotificationCenter() {
                 >
                     <div className="flex items-center justify-between border-b p-4">
                         <div>
-                            <p className="font-black">Product alerts</p>
+                            <div className="flex items-center gap-2">
+                                <p className="font-black">Product alerts</p>
+                                <span className={`size-2 rounded-full ${notifications.realtimeStatus === "live" ? "bg-emerald-500" : "bg-amber-500"}`} />
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                                    {notifications.realtimeStatus === "live" ? "Live" : "Fallback"}
+                                </span>
+                            </div>
                             <p className="mt-0.5 text-xs text-muted-foreground">
                                 Price changes and restocks for products you follow.
                             </p>

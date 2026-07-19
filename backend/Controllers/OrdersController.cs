@@ -10,11 +10,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ECommerce.Controllers;
 
-[Authorize(Roles = AppRoles.Admin)]
 [ApiController]
 [Route("api/orders")]
 public sealed class OrdersController(IOrderService orders) : ControllerBase
 {
+    [Authorize(Policy = AppPermissions.OrdersView)]
     [HttpGet]
     public async Task<ActionResult<ApiResponse<PagedResult<OrderListItemResponse>>>> Get(
         [FromQuery] OrderFilter filter,
@@ -24,6 +24,7 @@ public sealed class OrdersController(IOrderService orders) : ControllerBase
         return Ok(ApiResponse<PagedResult<OrderListItemResponse>>.Ok(result));
     }
 
+    [Authorize(Policy = AppPermissions.OrdersView)]
     [HttpGet("{id:long}")]
     public async Task<ActionResult<ApiResponse<OrderDetailsResponse>>> GetById(
         long id,
@@ -36,6 +37,7 @@ public sealed class OrdersController(IOrderService orders) : ControllerBase
         return Ok(ApiResponse<OrderDetailsResponse>.Ok(result));
     }
 
+    [Authorize(Policy = AppPermissions.OrdersManage)]
     [HttpPatch("{id:long}/status")]
     public async Task<ActionResult<ApiResponse<OrderDetailsResponse>>> UpdateStatus(
         long id,
@@ -64,6 +66,7 @@ public sealed class OrdersController(IOrderService orders) : ControllerBase
         }
     }
 
+    [Authorize(Policy = AppPermissions.PaymentsManage)]
     [HttpPatch("{id:long}/payment")]
     public async Task<ActionResult<ApiResponse<OrderDetailsResponse>>> UpdatePayment(
         long id,

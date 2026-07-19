@@ -56,7 +56,7 @@ public class ProductsController : ControllerBase
         }
     }
 
-    [Authorize(Roles = AppRoles.Admin)]
+    [Authorize(Policy = AppPermissions.ProductsManage)]
     [HttpPost]
     public async Task<IActionResult> Create(
         Product model)
@@ -66,7 +66,7 @@ public class ProductsController : ControllerBase
         return Ok(id);
     }
 
-    [Authorize(Roles = AppRoles.Admin)]
+    [Authorize(Policy = AppPermissions.ProductsManage)]
     [HttpPut("{id:long}")]
     public async Task<IActionResult> Update(
         long id,
@@ -77,7 +77,7 @@ public class ProductsController : ControllerBase
         return NoContent();
     }
 
-    [Authorize(Roles = AppRoles.Admin)]
+    [Authorize(Policy = AppPermissions.ProductsManage)]
     [HttpDelete("{id:long}")]
     public async Task<IActionResult> Delete(long id)
     {
@@ -86,7 +86,7 @@ public class ProductsController : ControllerBase
         return NoContent();
     }
 
-    [Authorize(Roles = AppRoles.Admin)]
+    [Authorize(Policy = AppPermissions.ProductsManage)]
     [HttpPatch("{id:long}/toggle-status")]
     public async Task<IActionResult> ToggleStatus(long id)
     {
@@ -120,7 +120,7 @@ public class ProductsController : ControllerBase
         );
     }
 
-    [Authorize(Roles = AppRoles.Admin)]
+    [Authorize(Policy = AppPermissions.ProductsManage)]
     [HttpPost("bulk")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(MaximumRequestSize)]
@@ -189,7 +189,7 @@ public class ProductsController : ControllerBase
         }
     }
 
-    [Authorize(Roles = AppRoles.Admin)]
+    [Authorize(Policy = AppPermissions.ProductsManage)]
     [HttpPut("bulk")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(MaximumRequestSize)]

@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using System.Security.Claims;
 using ECommerce.Options;
 using ECommerce.Shared;
+using ECommerce.Services.Notifications;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.IdentityModel.Tokens;
@@ -16,15 +17,22 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 
 builder.Services.AddCatalog();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddSignalR();
+
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>()
+    ?? ["http://localhost:5173", "http://localhost:5174", "http://localhost:4173", "http://localhost:4174"];
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("CorsPolicy", policy =>
     {
         policy
+            .WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
-            .AllowAnyOrigin();
+            .AllowCredentials();
     });
 });
 
@@ -51,9 +59,32 @@ builder.Services
             NameClaimType = ClaimTypes.Name,
             RoleClaimType = ClaimTypes.Role
         };
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrWhiteSpace(accessToken) &&
+                    context.HttpContext.Request.Path.StartsWithSegments("/hubs/store-notifications"))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            }
+        };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    foreach (var permission in AppPermissions.All)
+    {
+        options.AddPolicy(permission, policy =>
+            policy.RequireAssertion(context =>
+                context.User.IsInRole(AppRoles.Admin) ||
+                context.User.HasClaim(AuthClaims.Permission, permission)));
+    }
+});
 
 builder.Services.Configure<FormOptions>(options =>
 {
@@ -73,5 +104,6 @@ app.UseCors("CorsPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<StoreNotificationHub>("/hubs/store-notifications");
 
 app.Run();

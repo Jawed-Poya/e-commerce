@@ -9,11 +9,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ECommerce.Controllers;
 
-[Authorize(Roles = AppRoles.Admin)]
 [ApiController]
 [Route("api/customers")]
 public sealed class CustomersController(ICustomerService customers) : ControllerBase
 {
+    [Authorize(Policy = AppPermissions.CustomersView)]
     [HttpGet]
     public async Task<ActionResult<ApiResponse<PagedResult<CustomerListItemResponse>>>> Get(
         [FromQuery] CustomerFilter filter,
@@ -23,6 +23,7 @@ public sealed class CustomersController(ICustomerService customers) : Controller
         return Ok(ApiResponse<PagedResult<CustomerListItemResponse>>.Ok(result));
     }
 
+    [Authorize(Policy = AppPermissions.CustomersView)]
     [HttpGet("{id:long}")]
     public async Task<ActionResult<ApiResponse<CustomerDetailsResponse>>> GetById(
         long id,
@@ -35,6 +36,7 @@ public sealed class CustomersController(ICustomerService customers) : Controller
         return Ok(ApiResponse<CustomerDetailsResponse>.Ok(result));
     }
 
+    [Authorize(Policy = AppPermissions.CustomersManage)]
     [HttpPost]
     public async Task<ActionResult<ApiResponse<CustomerDetailsResponse>>> Create(
         UpsertCustomerRequest request,
@@ -59,6 +61,7 @@ public sealed class CustomersController(ICustomerService customers) : Controller
         }
     }
 
+    [Authorize(Policy = AppPermissions.CustomersManage)]
     [HttpPut("{id:long}")]
     public async Task<ActionResult<ApiResponse<CustomerDetailsResponse>>> Update(
         long id,
@@ -86,6 +89,7 @@ public sealed class CustomersController(ICustomerService customers) : Controller
         }
     }
 
+    [Authorize(Policy = AppPermissions.CustomersManage)]
     [HttpDelete("{id:long}")]
     public async Task<ActionResult<ApiResponse<object>>> Delete(
         long id,

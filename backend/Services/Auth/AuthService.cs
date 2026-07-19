@@ -17,6 +17,7 @@ namespace ECommerce.Services.Auth;
 
 public sealed class AuthService(
     UserManager<User> userManager,
+    RoleManager<Role> roleManager,
     ApplicationDbContext context,
     IDefaultCustomerTypeResolver defaultCustomerType,
     ICurrentCustomerAccessor currentCustomer,
@@ -54,7 +55,8 @@ public sealed class AuthService(
             throw new InvalidOperationException("Invalid credentials.");
 
         var roles = (await userManager.GetRolesAsync(user)).ToArray();
-        if (!roles.Contains(AppRoles.Admin, StringComparer.OrdinalIgnoreCase))
+        var permissions = await GetPermissionsAsync(user, roles);
+        if (!roles.Contains(AppRoles.Admin, StringComparer.OrdinalIgnoreCase) && permissions.Count == 0)
             throw new UnauthorizedAccessException("This account cannot access the admin panel.");
 
         user.LastLoginAt = DateTime.UtcNow;
@@ -204,6 +206,8 @@ public sealed class AuthService(
         if (!string.IsNullOrWhiteSpace(user.Email)) claims.Add(new Claim(ClaimTypes.Email, user.Email));
         if (!string.IsNullOrWhiteSpace(user.PhoneNumber)) claims.Add(new Claim(ClaimTypes.MobilePhone, user.PhoneNumber));
         foreach (var role in roles) claims.Add(new Claim(ClaimTypes.Role, role));
+        foreach (var permission in authUser.Permissions)
+            claims.Add(new Claim(AuthClaims.Permission, permission));
         if (authUser.CustomerId.HasValue) claims.Add(new Claim(AuthClaims.CustomerId, authUser.CustomerId.Value.ToString()));
         if (authUser.CustomerTypeId.HasValue) claims.Add(new Claim(AuthClaims.CustomerTypeId, authUser.CustomerTypeId.Value.ToString()));
 
@@ -224,6 +228,7 @@ public sealed class AuthService(
         CancellationToken cancellationToken)
     {
         var identityClaims = await userManager.GetClaimsAsync(user);
+        var permissions = await GetPermissionsAsync(user, roles);
         var linkedCustomerId = long.TryParse(
             identityClaims.FirstOrDefault(claim => claim.Type == AuthClaims.CustomerId)?.Value,
             out var parsedCustomerId)
@@ -249,10 +254,38 @@ public sealed class AuthService(
             user.Email,
             user.PhoneNumber,
             roles.ToArray(),
+            permissions,
             customer?.Id,
             customer?.CustomerTypeId,
             customer?.CustomerType?.Name,
-            roles.Contains(AppRoles.Admin, StringComparer.OrdinalIgnoreCase));
+            roles.Contains(AppRoles.Admin, StringComparer.OrdinalIgnoreCase) || permissions.Count > 0);
+    }
+
+    private async Task<IReadOnlyCollection<string>> GetPermissionsAsync(
+        User user,
+        IReadOnlyCollection<string> roles)
+    {
+        var permissions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var claim in await userManager.GetClaimsAsync(user))
+        {
+            if (claim.Type == AuthClaims.Permission && AppPermissions.All.Contains(claim.Value))
+                permissions.Add(claim.Value);
+        }
+
+        foreach (var roleName in roles)
+        {
+            var role = await roleManager.FindByNameAsync(roleName);
+            if (role is null) continue;
+
+            foreach (var claim in await roleManager.GetClaimsAsync(role))
+            {
+                if (claim.Type == AuthClaims.Permission && AppPermissions.All.Contains(claim.Value))
+                    permissions.Add(claim.Value);
+            }
+        }
+
+        return permissions.OrderBy(value => value).ToArray();
     }
 
     private static string NormalizePhone(string? value) =>

@@ -29,9 +29,11 @@ export function NavMain({
         url: string;
         icon?: React.ReactNode;
         isActive?: boolean;
+        permission?: string;
         items?: {
             title: string;
             url: string;
+            permission?: string;
         }[];
     }[];
 }) {
