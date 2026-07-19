@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/page-header";
+import { ConfirmActionDialog } from "@/components/confirm-action-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -164,17 +165,27 @@ export default function RolesPage() {
                                     <Pencil /> Edit
                                 </Button>
                                 {!role.isSystemRole && (
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        className="text-destructive"
-                                        onClick={() => {
-                                            if (window.confirm(`Delete role ${role.name}?`))
-                                                remove.mutate(role.id);
-                                        }}
-                                    >
-                                        <Trash2 />
-                                    </Button>
+                                    <ConfirmActionDialog
+                                        trigger={
+                                            <Button
+                                                variant="outline"
+                                                size="icon"
+                                                className="text-destructive"
+                                                aria-label={`Delete ${role.name}`}
+                                            >
+                                                <Trash2 />
+                                            </Button>
+                                        }
+                                        title={`Delete ${role.name}?`}
+                                        description="This permanently removes the role. It can only be deleted when no users are assigned to it."
+                                        confirmLabel="Delete role"
+                                        destructive
+                                        pending={
+                                            remove.isPending &&
+                                            remove.variables === role.id
+                                        }
+                                        onConfirm={() => remove.mutateAsync(role.id)}
+                                    />
                                 )}
                             </div>
                         </CardContent>

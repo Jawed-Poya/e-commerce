@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, Languages } from "lucide-react";
+import { ChevronDown, Languages } from "lucide-react";
 import { HeaderNavUser } from "@/components/nav-user";
 import { ThemeToggle } from "@/components/toggle-theme";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useI18n, type Language } from "@/i18n/i18n-provider";
+import { AdminNotificationCenter } from "@/features/notifications/admin-notification-center";
 
 const languages: Language[] = ["en", "ps", "dr"];
 
@@ -20,7 +21,7 @@ function AppHeader() {
                 <DropdownMenuContent className="w-44" align="end">{languages.map(item => <DropdownMenuItem key={item} onClick={() => setLanguage(item)}>{t(`language.${item}`)}</DropdownMenuItem>)}</DropdownMenuContent>
             </DropdownMenu>
             <ThemeToggle />
-            <Button variant="ghost" size="icon" className="relative"><Bell className="size-5" /><span data-slot="notification-indicator" className="absolute right-1 top-1 size-2 rounded-full bg-red-500" /><span className="sr-only">{t("common.notifications")}</span></Button>
+            <AdminNotificationCenter />
             <HeaderNavUser />
         </div>
     </header>;

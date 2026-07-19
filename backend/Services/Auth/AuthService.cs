@@ -173,6 +173,97 @@ public sealed class AuthService(
         return await BuildUserAsync(user, roles, cancellationToken);
     }
 
+    public async Task<UserProfileResponse?> GetProfileAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var user = await FindCurrentUserAsync();
+        if (user is null) return null;
+
+        var roles = (await userManager.GetRolesAsync(user)).ToArray();
+        var permissions = await GetPermissionsAsync(user, roles);
+        return new UserProfileResponse(
+            user.Id,
+            user.FullName,
+            user.Email,
+            user.PhoneNumber,
+            user.AvatarUrl,
+            user.IsActive,
+            roles,
+            permissions,
+            user.LastLoginAt,
+            user.CreatedAt);
+    }
+
+    public async Task<UserProfileResponse> UpdateProfileAsync(
+        UpdateUserProfileRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await FindCurrentUserAsync()
+            ?? throw new UnauthorizedAccessException("Authentication is required.");
+
+        var fullName = Clean(request.FullName);
+        var email = NormalizeEmail(request.Email);
+        var phone = NormalizePhone(request.Phone);
+        if (string.IsNullOrWhiteSpace(fullName))
+            throw new ArgumentException("Full name is required.");
+        if (string.IsNullOrWhiteSpace(email))
+            throw new ArgumentException("Email is required.");
+        if (phone.Length > 0 && phone.Length < 6)
+            throw new ArgumentException("Enter a valid phone number.");
+
+        if (await context.Users.AnyAsync(
+                item => item.Id != user.Id && item.Email == email,
+                cancellationToken))
+            throw new InvalidOperationException("This email address is already in use.");
+
+        if (phone.Length > 0 && await context.Users.AnyAsync(
+                item => item.Id != user.Id && item.PhoneNumber == phone,
+                cancellationToken))
+            throw new InvalidOperationException("This phone number is already in use.");
+
+        user.FullName = fullName;
+        user.Email = email;
+        user.UserName = email;
+        user.PhoneNumber = phone.Length == 0 ? null : phone;
+
+        var result = await userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+            throw new InvalidOperationException(string.Join(
+                " ",
+                result.Errors.Select(error => error.Description)));
+
+        return (await GetProfileAsync(cancellationToken))!;
+    }
+
+    public async Task ChangePasswordAsync(
+        ChangePasswordRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await FindCurrentUserAsync()
+            ?? throw new UnauthorizedAccessException("Authentication is required.");
+
+        if (string.IsNullOrWhiteSpace(request.CurrentPassword) ||
+            string.IsNullOrWhiteSpace(request.NewPassword))
+            throw new ArgumentException("Current and new passwords are required.");
+
+        var result = await userManager.ChangePasswordAsync(
+            user,
+            request.CurrentPassword,
+            request.NewPassword);
+        if (!result.Succeeded)
+            throw new InvalidOperationException(string.Join(
+                " ",
+                result.Errors.Select(error => error.Description)));
+    }
+
+    private async Task<User?> FindCurrentUserAsync()
+    {
+        if (!currentCustomer.IsAuthenticated || string.IsNullOrWhiteSpace(currentCustomer.UserId))
+            return null;
+
+        return await userManager.FindByIdAsync(currentCustomer.UserId);
+    }
+
     private async Task<User?> FindUserAsync(string identifier)
     {
         var value = identifier?.Trim();

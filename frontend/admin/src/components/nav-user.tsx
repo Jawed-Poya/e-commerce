@@ -18,10 +18,12 @@ import { CaretUpDownIcon, CheckCircleIcon, SignOutIcon } from "@phosphor-icons/r
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/i18n/i18n-provider";
 import { useAdminAuth } from "@/features/auth/auth-context";
+import { useNavigate } from "react-router-dom";
 
 function UserDropdownContent({ side = "bottom" }: { side?: "bottom" | "right" }) {
     const { t } = useI18n();
     const auth = useAdminAuth();
+    const navigate = useNavigate();
     const user = auth.user;
     if (!user) return null;
 
@@ -39,7 +41,7 @@ function UserDropdownContent({ side = "bottom" }: { side?: "bottom" | "right" })
                 </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuGroup><DropdownMenuItem><CheckCircleIcon />{t("common.profile")}</DropdownMenuItem></DropdownMenuGroup>
+            <DropdownMenuGroup><DropdownMenuItem onClick={() => navigate("/profile")}><CheckCircleIcon />{t("common.profile")}</DropdownMenuItem></DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={auth.logout}><SignOutIcon />{t("common.logout")}</DropdownMenuItem>
         </DropdownMenuContent>

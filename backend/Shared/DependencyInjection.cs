@@ -20,6 +20,7 @@ public static class DependencyInjection
     public static IServiceCollection AddCatalog(this IServiceCollection services)
     {
         services.AddHttpContextAccessor();
+        services.AddMemoryCache();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IProductPricingService, ProductPricingService>();
         services.AddScoped<IGeneralTypeService, GeneralTypesService>();
@@ -31,6 +32,8 @@ public static class DependencyInjection
         services.AddScoped<IDefaultCustomerTypeResolver, DefaultCustomerTypeResolver>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IStoreNotificationService, StoreNotificationService>();
+        services.AddScoped<IAdminNotificationService, AdminNotificationService>();
+        services.AddSingleton<AdminNotificationBroker>();
         services.AddSingleton<StoreRealtimeMetrics>();
         services.AddScoped<IAdminDashboardService, AdminDashboardService>();
         services.AddScoped<IAdminUserService, AdminUserService>();
@@ -48,7 +51,12 @@ public static class DependencyInjection
 
         services.AddDbContext<ApplicationDbContext>(options =>
         {
-            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
+            options.UseSqlServer(
+                configuration.GetConnectionString("DefaultConnection"),
+                sqlOptions =>
+                {
+                    sqlOptions.CommandTimeout(60);
+                });
         });
 
         services

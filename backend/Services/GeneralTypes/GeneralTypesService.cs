@@ -4,17 +4,20 @@ using API.Entities.Types;
 using ECommerce.Data;
 using ECommerce.Dtos;
 using ECommerce.Entities.Common;
+using ECommerce.Services.Customers;
 using Microsoft.EntityFrameworkCore;
 
 public class GeneralTypesService : IGeneralTypeService
 {
     private readonly ApplicationDbContext _context;
-
+    private readonly IDefaultCustomerTypeResolver _defaultCustomerType;
 
     public GeneralTypesService(
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        IDefaultCustomerTypeResolver defaultCustomerType)
     {
         _context = context;
+        _defaultCustomerType = defaultCustomerType;
     }
 
     public async Task<List<GeneralTypeDto>> GetAsync(string? group)
@@ -75,7 +78,8 @@ public class GeneralTypesService : IGeneralTypeService
         _context.Types.Add(model);
 
         await _context.SaveChangesAsync();
-
+        if (model.Group == GeneralTypeEnum.CustomerType)
+            _defaultCustomerType.Invalidate();
 
         return model.Id;
     }
@@ -94,6 +98,8 @@ public class GeneralTypesService : IGeneralTypeService
             throw new KeyNotFoundException(
                 "Type not found.");
         }
+
+        var originalGroup = entity.Group;
 
         if (model.ParentId == id)
             throw new InvalidOperationException("A type cannot be its own parent.");
@@ -125,6 +131,8 @@ public class GeneralTypesService : IGeneralTypeService
         entity.ParentId = model.ParentId;
 
         await _context.SaveChangesAsync();
+        if (originalGroup == GeneralTypeEnum.CustomerType || model.Group == GeneralTypeEnum.CustomerType)
+            _defaultCustomerType.Invalidate();
     }
 
     private async Task ValidateParentAsync(long? parentId, GeneralTypeEnum group)
@@ -202,7 +210,8 @@ public class GeneralTypesService : IGeneralTypeService
 
         _context.Types.Remove(entity);
 
-
         await _context.SaveChangesAsync();
+        if (entity.Group == GeneralTypeEnum.CustomerType)
+            _defaultCustomerType.Invalidate();
     }
 }

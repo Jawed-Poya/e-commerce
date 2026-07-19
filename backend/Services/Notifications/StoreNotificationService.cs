@@ -2,6 +2,7 @@ using ECommerce.Data;
 using ECommerce.Entities.Notifications;
 using ECommerce.Entities.Notifications.Contracts;
 using ECommerce.Services.Customers;
+using ECommerce.Shared;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
@@ -140,44 +141,59 @@ public sealed class StoreNotificationService(
         if (ids.Length == 0)
             return new StoreNotificationsResponse(serverTime, []);
 
-        var defaultTypeId = await defaultCustomerType.GetIdAsync(cancellationToken);
-        var currentTypeId = await currentCustomer.GetCustomerTypeIdAsync(cancellationToken);
-        var allowedPriceTypes = new[]
+        // Notification polling is best-effort and bounded. Do not cancel its short
+        // database reads when React replaces a product subscription or SignalR
+        // reconnects; those routine client transitions previously surfaced as
+        // TaskCanceledException while opening a product details page.
+        var readToken = CancellationToken.None;
+        var defaultTypeId = await defaultCustomerType.GetIdAsync(readToken);
+        var currentTypeId = await TransientSqlRetry.ExecuteAsync(
+            token => currentCustomer.GetCustomerTypeIdAsync(token),
+            readToken);
+        var allowedEntityTypes = new[]
         {
+            StockEntityType,
             PriceEntityTypePrefix + defaultTypeId,
             currentTypeId.HasValue ? PriceEntityTypePrefix + currentTypeId.Value : null
-        }.OfType<string>().Distinct().ToArray();
+        }.OfType<string>().Distinct(StringComparer.Ordinal).ToArray();
 
         var threshold = after?.ToUniversalTime() ?? serverTime.AddDays(-2);
         if (threshold < serverTime.AddDays(-30)) threshold = serverTime.AddDays(-30);
 
-        var rows = await context.Notifications
-            .AsNoTracking()
-            .Where(notification =>
-                !notification.IsDeleted &&
-                notification.UserId == null &&
-                notification.EntityId.HasValue &&
-                ids.Contains(notification.EntityId.Value) &&
-                notification.CreatedAt > threshold &&
-                (notification.EntityType == StockEntityType ||
-                 allowedPriceTypes.Contains(notification.EntityType!)))
-            .OrderBy(notification => notification.CreatedAt)
-            .Take(50)
-            .Select(notification => new
-            {
-                notification.Id,
-                notification.Title,
-                notification.Message,
-                notification.Type,
-                ProductId = notification.EntityId!.Value,
-                ProductName = context.Products
-                    .IgnoreQueryFilters()
-                    .Where(product => product.Id == notification.EntityId.Value)
-                    .Select(product => product.Name)
-                    .FirstOrDefault(),
-                notification.CreatedAt
-            })
-            .ToListAsync(cancellationToken);
+        var rows = await TransientSqlRetry.ExecuteAsync(
+            token => context.Notifications
+                .AsNoTracking()
+                .Where(notification =>
+                    !notification.IsDeleted &&
+                    notification.UserId == null &&
+                    notification.EntityId.HasValue &&
+                    ids.Contains(notification.EntityId.Value) &&
+                    notification.CreatedAt > threshold &&
+                    notification.EntityType != null &&
+                    allowedEntityTypes.Contains(notification.EntityType))
+                .OrderBy(notification => notification.CreatedAt)
+                .Take(50)
+                .Select(notification => new
+                {
+                    notification.Id,
+                    notification.Title,
+                    notification.Message,
+                    notification.Type,
+                    ProductId = notification.EntityId!.Value,
+                    notification.CreatedAt
+                })
+                .ToListAsync(token),
+            readToken);
+
+        var rowProductIds = rows.Select(row => row.ProductId).Distinct().ToArray();
+        var productNames = await TransientSqlRetry.ExecuteAsync(
+            token => context.Products
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(product => rowProductIds.Contains(product.Id))
+                .Select(product => new { product.Id, product.Name })
+                .ToDictionaryAsync(product => product.Id, product => product.Name, token),
+            readToken);
 
         return new StoreNotificationsResponse(
             serverTime,
@@ -187,7 +203,7 @@ public sealed class StoreNotificationService(
                 row.Message,
                 row.Type == NotificationType.Inventory ? "Stock" : "Price",
                 row.ProductId,
-                row.ProductName ?? "Product",
+                productNames.GetValueOrDefault(row.ProductId, "Product"),
                 $"/products/{row.ProductId}",
                 row.CreatedAt)).ToList());
     }

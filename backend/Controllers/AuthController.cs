@@ -78,4 +78,57 @@ public sealed class AuthController(IAuthService auth) : ControllerBase
             ? Unauthorized(ApiResponse<object>.Fail("Authentication is required."))
             : Ok(ApiResponse<AuthUserResponse>.Ok(user));
     }
+
+    [Authorize]
+    [HttpGet("profile")]
+    public async Task<ActionResult<ApiResponse<UserProfileResponse>>> Profile(
+        CancellationToken cancellationToken)
+    {
+        var profile = await auth.GetProfileAsync(cancellationToken);
+        return profile is null
+            ? Unauthorized(ApiResponse<object>.Fail("Authentication is required."))
+            : Ok(ApiResponse<UserProfileResponse>.Ok(profile));
+    }
+
+    [Authorize]
+    [HttpPut("profile")]
+    public async Task<ActionResult<ApiResponse<UserProfileResponse>>> UpdateProfile(
+        UpdateUserProfileRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var profile = await auth.UpdateProfileAsync(request, cancellationToken);
+            return Ok(ApiResponse<UserProfileResponse>.Ok(profile, "Profile updated successfully."));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Conflict(ApiResponse<object>.Fail(exception.Message));
+        }
+    }
+
+    [Authorize]
+    [HttpPost("change-password")]
+    public async Task<ActionResult<ApiResponse<object>>> ChangePassword(
+        ChangePasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await auth.ChangePasswordAsync(request, cancellationToken);
+            return Ok(ApiResponse<object>.Ok(new { }, "Password changed successfully."));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
+        }
+    }
 }

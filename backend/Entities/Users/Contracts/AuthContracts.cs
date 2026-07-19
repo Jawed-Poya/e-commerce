@@ -28,3 +28,24 @@ public sealed record AuthResponse(
     DateTime ExpiresAt,
     AuthUserResponse User
 );
+
+public sealed record UserProfileResponse(
+    string UserId,
+    string FullName,
+    string? Email,
+    string? Phone,
+    string? AvatarUrl,
+    bool IsActive,
+    IReadOnlyCollection<string> Roles,
+    IReadOnlyCollection<string> Permissions,
+    DateTime? LastLoginAt,
+    DateTime CreatedAt);
+
+public sealed record UpdateUserProfileRequest(
+    string FullName,
+    string Email,
+    string? Phone);
+
+public sealed record ChangePasswordRequest(
+    string CurrentPassword,
+    string NewPassword);

@@ -8,6 +8,7 @@ using ECommerce.Entities.Products.Exceptions;
 using ECommerce.Entities.Products.Filters;
 using ECommerce.Entities.Products.Requests;
 using ECommerce.Services.Customers;
+using ECommerce.Shared;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
@@ -371,7 +372,14 @@ public class ProductService : IProductService
         return new BulkUpdateProductsResponse(request.Products.Count);
     }
 
-    public async Task<ProductDetailsDto?> GetByIdAsync(long id)
+    public Task<ProductDetailsDto?> GetByIdAsync(long id) =>
+        TransientSqlRetry.ExecuteAsync(
+            cancellationToken => GetByIdCoreAsync(id, cancellationToken),
+            CancellationToken.None);
+
+    private async Task<ProductDetailsDto?> GetByIdCoreAsync(
+        long id,
+        CancellationToken cancellationToken)
     {
         var product = await _context.Products
             .AsNoTracking()
@@ -382,13 +390,15 @@ public class ProductService : IProductService
             .Include(entity => entity.Images)
             .Include(entity => entity.Prices)
                 .ThenInclude(price => price.CustomerType)
-            .FirstOrDefaultAsync(entity => entity.Id == id && !entity.IsDeleted);
+            .FirstOrDefaultAsync(
+                entity => entity.Id == id && !entity.IsDeleted,
+                cancellationToken);
 
         if (product is null) return null;
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var defaultType = await _defaultCustomerType.GetAsync();
-        var requestedTypeId = await _currentCustomer.GetCustomerTypeIdAsync();
+        var defaultType = await _defaultCustomerType.GetAsync(cancellationToken);
+        var requestedTypeId = await _currentCustomer.GetCustomerTypeIdAsync(cancellationToken);
         var effectiveTypeId = requestedTypeId ?? defaultType.Id;
         var resolved = ResolvePrice(product.Prices, effectiveTypeId, defaultType.Id, today);
 

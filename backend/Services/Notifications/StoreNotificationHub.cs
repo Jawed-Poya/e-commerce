@@ -44,8 +44,13 @@ public sealed class StoreNotificationHub(
                 await Groups.RemoveFromGroupAsync(Context.ConnectionId, group);
         }
 
-        var defaultTypeId = await defaultCustomerType.GetIdAsync(Context.ConnectionAborted);
+        // React can replace a subscription immediately after a product is tracked.
+        // Use bounded, non-cancelled lookup reads and then stop quietly if the
+        // connection disappeared instead of surfacing TaskCanceledException.
+        var defaultTypeId = await defaultCustomerType.GetIdAsync(CancellationToken.None);
         var currentTypeId = await ResolveCustomerTypeIdAsync(defaultTypeId);
+        if (Context.ConnectionAborted.IsCancellationRequested) return;
+
         var groups = ids
             .SelectMany(productId => new[]
             {
@@ -56,10 +61,17 @@ public sealed class StoreNotificationHub(
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
-        foreach (var group in groups)
-            await Groups.AddToGroupAsync(Context.ConnectionId, group);
+        try
+        {
+            foreach (var group in groups)
+                await Groups.AddToGroupAsync(Context.ConnectionId, group);
 
-        Context.Items[SubscriptionKey] = groups;
+            Context.Items[SubscriptionKey] = groups;
+        }
+        catch (OperationCanceledException) when (Context.ConnectionAborted.IsCancellationRequested)
+        {
+            // Normal disconnect/re-subscribe path.
+        }
     }
 
     private async Task<long> ResolveCustomerTypeIdAsync(long defaultTypeId)
@@ -71,7 +83,7 @@ public sealed class StoreNotificationHub(
             .AsNoTracking()
             .Where(customer => customer.Id == customerId)
             .Select(customer => customer.CustomerTypeId)
-            .SingleOrDefaultAsync(Context.ConnectionAborted)
+            .SingleOrDefaultAsync(CancellationToken.None)
             ?? defaultTypeId;
     }
 }

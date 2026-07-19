@@ -8,6 +8,7 @@ import { ThemeProvider } from "./components/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nProvider } from "@/i18n/i18n-provider";
 import { AdminAuthProvider } from "@/features/auth/auth-context";
+import { AdminNotificationProvider } from "@/features/notifications/admin-notification-context";
 
 const client = new QueryClient();
 
@@ -17,7 +18,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <I18nProvider>
             <QueryClientProvider client={client}>
                 <AdminAuthProvider>
-                    <RouterProvider router={router} />
+                    <AdminNotificationProvider>
+                        <RouterProvider router={router} />
+                    </AdminNotificationProvider>
                 </AdminAuthProvider>
             </QueryClientProvider>
           </I18nProvider>

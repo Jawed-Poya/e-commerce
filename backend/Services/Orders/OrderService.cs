@@ -23,7 +23,8 @@ public sealed class OrderService(
     IOptions<CommerceOptions> commerceOptions,
     ICurrentCustomerAccessor currentCustomer,
     IDefaultCustomerTypeResolver defaultCustomerType,
-    IStoreNotificationService notifications) : IOrderService
+    IStoreNotificationService notifications,
+    IAdminNotificationService adminNotifications) : IOrderService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -200,8 +201,17 @@ public sealed class OrderService(
                 });
             }
 
+            var adminNotification = await adminNotifications.CreateOrderCreatedAsync(
+                order.Id,
+                order.OrderNumber,
+                BuildName(customer.FirstName, customer.LastName),
+                order.Total,
+                order.Currency,
+                cancellationToken);
+
             await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            await adminNotifications.PublishAsync(adminNotification, CancellationToken.None);
 
             return new OrderConfirmationResponse(
                 order.Id,
@@ -398,9 +408,16 @@ public sealed class OrderService(
                 ChangedByUserId = CleanOptional(userId)
             });
 
+            var adminNotification = await adminNotifications.CreateOrderStatusChangedAsync(
+                order.Id,
+                order.OrderNumber,
+                request.Status.ToString(),
+                cancellationToken);
+
             await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            await notifications.PublishAsync(pendingNotifications, cancellationToken);
+            await notifications.PublishAsync(pendingNotifications, CancellationToken.None);
+            await adminNotifications.PublishAsync(adminNotification, CancellationToken.None);
 
             return MapDetails(order);
         }
@@ -451,7 +468,14 @@ public sealed class OrderService(
             ChangedByUserId = CleanOptional(userId)
         });
 
+        var adminNotification = await adminNotifications.CreatePaymentStatusChangedAsync(
+            order.Id,
+            order.OrderNumber,
+            request.Status.ToString(),
+            cancellationToken);
+
         await context.SaveChangesAsync(cancellationToken);
+        await adminNotifications.PublishAsync(adminNotification, CancellationToken.None);
         return MapDetails(order);
     }
 

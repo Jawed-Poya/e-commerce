@@ -6,4 +6,5 @@ public interface IDefaultCustomerTypeResolver
 {
     Task<GeneralType> GetAsync(CancellationToken cancellationToken = default);
     Task<long> GetIdAsync(CancellationToken cancellationToken = default);
+    void Invalidate();
 }

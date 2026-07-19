@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/page-header";
+import { ConfirmActionDialog } from "@/components/confirm-action-dialog";
 import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
 import { Badge } from "@/components/ui/badge";
@@ -343,22 +344,29 @@ export default function UsersPage() {
                                                         <KeyRound />
                                                     </Button>
                                                     {user.isActive && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            title="Deactivate"
-                                                            className="text-destructive"
-                                                            onClick={() => {
-                                                                if (
-                                                                    window.confirm(
-                                                                        `Deactivate ${user.fullName}?`,
-                                                                    )
-                                                                )
-                                                                    deactivate.mutate(user.id);
-                                                            }}
-                                                        >
-                                                            <UserRoundX />
-                                                        </Button>
+                                                        <ConfirmActionDialog
+                                                            trigger={
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    title="Deactivate"
+                                                                    className="text-destructive"
+                                                                >
+                                                                    <UserRoundX />
+                                                                </Button>
+                                                            }
+                                                            title={`Deactivate ${user.fullName}?`}
+                                                            description="The user will no longer be able to sign in. Their roles and permissions remain saved for later reactivation."
+                                                            confirmLabel="Deactivate user"
+                                                            destructive
+                                                            pending={
+                                                                deactivate.isPending &&
+                                                                deactivate.variables === user.id
+                                                            }
+                                                            onConfirm={() =>
+                                                                deactivate.mutateAsync(user.id)
+                                                            }
+                                                        />
                                                     )}
                                                 </>
                                             ) : (
