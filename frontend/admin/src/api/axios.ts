@@ -25,8 +25,18 @@ const axiosInstance = axios.create({
     timeout: 30000,
 });
 
+function normalizedRequestPath(config: InternalAxiosRequestConfig | undefined) {
+    return config?.url?.replace(/^\/+/, "") ?? "";
+}
+
 function isLoginRequest(config: InternalAxiosRequestConfig | undefined) {
-    return config?.url?.replace(/^\/+/, "") === "auth/admin/login";
+    return normalizedRequestPath(config) === "auth/admin/login";
+}
+
+function isSessionValidationRequest(
+    config: InternalAxiosRequestConfig | undefined,
+) {
+    return normalizedRequestPath(config) === "auth/me";
 }
 
 axiosInstance.interceptors.request.use(
@@ -66,6 +76,7 @@ axiosInstance.interceptors.response.use(
             error.response?.status === 401 &&
             failedToken &&
             !isLoginRequest(config) &&
+            !isSessionValidationRequest(config) &&
             getAdminToken() === failedToken
         ) {
             dispatchAdminUnauthorized(failedToken);

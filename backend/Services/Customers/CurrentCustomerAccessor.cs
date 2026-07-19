@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using ECommerce.Data;
 using ECommerce.Shared;
@@ -11,7 +12,10 @@ public sealed class CurrentCustomerAccessor(
 {
     private ClaimsPrincipal? User => httpContextAccessor.HttpContext?.User;
 
-    public string? UserId => User?.FindFirstValue(ClaimTypes.NameIdentifier);
+    public string? UserId =>
+        User?.FindFirstValue(ClaimTypes.NameIdentifier) ??
+        User?.FindFirstValue(JwtRegisteredClaimNames.Sub) ??
+        User?.FindFirstValue("sub");
 
     public long? CustomerId => long.TryParse(
         User?.FindFirstValue(AuthClaims.CustomerId), out var id) ? id : null;

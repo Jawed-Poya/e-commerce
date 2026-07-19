@@ -4,6 +4,7 @@ import {
     useContext,
     useEffect,
     useMemo,
+    useRef,
     useState,
     type PropsWithChildren,
 } from "react";
@@ -30,64 +31,119 @@ type AuthContextValue = {
     refresh: () => Promise<void>;
 };
 
+type ValidateSessionOptions = {
+    expectedToken?: string;
+    showLoader?: boolean;
+};
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function readStoredUser(): AuthUser | null {
     try {
-        return JSON.parse(localStorage.getItem(adminSessionKey) ?? "null") as AuthUser | null;
+        return JSON.parse(
+            localStorage.getItem(adminSessionKey) ?? "null",
+        ) as AuthUser | null;
     } catch {
         return null;
     }
+}
+
+function authenticationErrorMessage(error: unknown) {
+    if (!isAxiosError(error)) {
+        return error instanceof Error
+            ? error.message
+            : "Administrator login could not be verified.";
+    }
+
+    if (error.response?.status === 401) {
+        return "The server issued a token but did not accept it. Restart the API and verify the JWT issuer, audience, and signing key.";
+    }
+
+    if (error.response?.status === 403) {
+        return "This account is authenticated but is not allowed to use the admin panel.";
+    }
+
+    return (
+        (error.response?.data as { message?: string } | undefined)?.message ??
+        "Administrator login could not be verified."
+    );
 }
 
 export function AdminAuthProvider({ children }: PropsWithChildren) {
     const queryClient = useQueryClient();
     const [user, setUser] = useState<AuthUser | null>(readStoredUser);
     const [loading, setLoading] = useState(Boolean(getAdminToken()));
+    const backgroundValidationRef = useRef<Promise<void> | null>(null);
 
-    const resetSessionState = useCallback(() => {
-        clearAdminSession();
-        setUser(null);
-        setLoading(false);
-        queryClient.clear();
-    }, [queryClient]);
+    const clearSessionState = useCallback(
+        (expectedToken?: string) => {
+            if (!clearAdminSession(expectedToken)) return false;
+
+            setUser(null);
+            setLoading(false);
+            queryClient.clear();
+            return true;
+        },
+        [queryClient],
+    );
 
     const logout = useCallback(() => {
-        resetSessionState();
-    }, [resetSessionState]);
+        clearSessionState();
+    }, [clearSessionState]);
 
-    const refresh = useCallback(async () => {
-        const token = getAdminToken();
-        if (!token) {
-            resetSessionState();
-            return;
-        }
+    const validateSession = useCallback(
+        async ({
+            expectedToken,
+            showLoader = true,
+        }: ValidateSessionOptions = {}) => {
+            const token = getAdminToken();
 
-        setLoading(true);
-        try {
-            const current = await authService.me();
-            if (!current.isAdmin) {
-                clearAdminSession(token);
-                setUser(null);
-                queryClient.clear();
+            if (!token) {
+                if (!expectedToken) clearSessionState();
                 return;
             }
 
-            localStorage.setItem(adminSessionKey, JSON.stringify(current));
-            setUser(current);
-        } catch (error) {
-            const status = isAxiosError(error) ? error.response?.status : undefined;
+            // Ignore a validation request created for an older login session.
+            if (expectedToken && token !== expectedToken) return;
 
-            // Only a real authentication/authorization failure invalidates the
-            // token. Timeouts and temporary backend outages keep the session.
-            if ((status === 401 || status === 403) && clearAdminSession(token)) {
-                setUser(null);
-                queryClient.clear();
+            if (showLoader) setLoading(true);
+
+            try {
+                const current = await authService.me();
+
+                // A login may have changed while /auth/me was in flight.
+                if (getAdminToken() !== token) return;
+
+                if (!current.isAdmin) {
+                    clearSessionState(token);
+                    return;
+                }
+
+                localStorage.setItem(adminSessionKey, JSON.stringify(current));
+                setUser(current);
+            } catch (error) {
+                const status = isAxiosError(error)
+                    ? error.response?.status
+                    : undefined;
+
+                // Only the dedicated session-validation endpoint can invalidate
+                // the current login. A 401 from dashboard/inventory/etc. first
+                // comes through this method and cannot log the user out directly.
+                if (status === 401 || status === 403) {
+                    clearSessionState(token);
+                }
+            } finally {
+                if (showLoader && (getAdminToken() === token || !getAdminToken())) {
+                    setLoading(false);
+                }
             }
-        } finally {
-            setLoading(false);
-        }
-    }, [queryClient, resetSessionState]);
+        },
+        [clearSessionState],
+    );
+
+    const refresh = useCallback(async () => {
+        await validateSession({ showLoader: true });
+    }, [validateSession]);
 
     useEffect(() => {
         void refresh();
@@ -99,47 +155,89 @@ export function AdminAuthProvider({ children }: PropsWithChildren) {
                 event as CustomEvent<AdminUnauthorizedEventDetail>
             ).detail?.token;
 
-            if (!failedToken || getAdminToken() !== failedToken) {
-                return;
-            }
+            if (!failedToken || getAdminToken() !== failedToken) return;
 
-            resetSessionState();
+            // Several queries may fail together. Verify the session only once.
+            // The feature request that returned 401 never clears localStorage by
+            // itself; /auth/me is the source of truth for session validity.
+            if (!backgroundValidationRef.current) {
+                backgroundValidationRef.current = validateSession({
+                    expectedToken: failedToken,
+                    showLoader: false,
+                }).finally(() => {
+                    backgroundValidationRef.current = null;
+                });
+            }
         };
 
         window.addEventListener(adminUnauthorizedEvent, handleUnauthorized);
         return () =>
-            window.removeEventListener(adminUnauthorizedEvent, handleUnauthorized);
-    }, [resetSessionState]);
+            window.removeEventListener(
+                adminUnauthorizedEvent,
+                handleUnauthorized,
+            );
+    }, [validateSession]);
 
-    const login = useCallback(async (request: LoginRequest) => {
-        const response = await authService.login(request);
-        if (!response.user.isAdmin) {
-            throw new Error("Administrator access is required.");
-        }
+    const login = useCallback(
+        async (request: LoginRequest) => {
+            const response = await authService.login(request);
+            if (!response.user.isAdmin) {
+                throw new Error("Administrator access is required.");
+            }
 
-        // Drop data cached for a previous account without refetching protected
-        // queries during the token transition. invalidateQueries() here caused
-        // intermittent 401 responses that removed the newly saved token.
-        queryClient.clear();
-        saveAdminSession(response.token, response.user);
-        setUser(response.user);
-        setLoading(false);
-    }, [queryClient]);
+            queryClient.clear();
+            setLoading(true);
 
-    const value = useMemo<AuthContextValue>(() => ({
-        user,
-        loading,
-        isAuthenticated: Boolean(user && getAdminToken()),
-        login,
-        logout,
-        refresh,
-    }), [loading, login, logout, refresh, user]);
+            try {
+                // Store the token so the verification request can authenticate,
+                // but do not expose an authenticated UI until /auth/me confirms it.
+                saveAdminSession(response.token, response.user);
+                const confirmedUser = await authService.me();
 
-    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+                if (getAdminToken() !== response.token) {
+                    throw new Error("The administrator session changed during login.");
+                }
+
+                if (!confirmedUser.isAdmin) {
+                    throw new Error("Administrator access is required.");
+                }
+
+                localStorage.setItem(
+                    adminSessionKey,
+                    JSON.stringify(confirmedUser),
+                );
+                setUser(confirmedUser);
+            } catch (error) {
+                clearSessionState(response.token);
+                throw new Error(authenticationErrorMessage(error));
+            } finally {
+                setLoading(false);
+            }
+        },
+        [clearSessionState, queryClient],
+    );
+
+    const value = useMemo<AuthContextValue>(
+        () => ({
+            user,
+            loading,
+            isAuthenticated: Boolean(user && getAdminToken()),
+            login,
+            logout,
+            refresh,
+        }),
+        [loading, login, logout, refresh, user],
+    );
+
+    return (
+        <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+    );
 }
 
 export function useAdminAuth() {
     const value = useContext(AuthContext);
-    if (!value) throw new Error("useAdminAuth must be used inside AdminAuthProvider.");
+    if (!value) {
+        throw new Error("useAdminAuth must be used inside AdminAuthProvider.");
+    }
     return value;
 }
