@@ -83,6 +83,18 @@ export default function RolesPage() {
         setOpen(true);
     };
 
+    const duplicateProtectedRole = () => {
+        if (!editing) return;
+        setEditing(null);
+        setForm((current) => ({
+            ...current,
+            name: `${editing.name} Custom`,
+            description:
+                current.description ??
+                `Editable permission profile based on ${editing.name}.`,
+        }));
+    };
+
     return (
         <div className="space-y-5">
             <PageHeader
@@ -245,7 +257,7 @@ export default function RolesPage() {
                         <PermissionChecklist
                             groups={permissions.data ?? []}
                             selected={form.permissions}
-                            disabled={editing?.isSystemRole}
+                            disabled={Boolean(editing?.isSystemRole)}
                             onChange={(value) =>
                                 setForm((current) => ({
                                     ...current,
@@ -254,9 +266,19 @@ export default function RolesPage() {
                             }
                         />
                         {editing?.isSystemRole && (
-                            <p className="rounded-lg border bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">
-                                System-role permissions are protected: Admin always receives every permission and Customer receives none.
-                            </p>
+                            <div className="flex flex-col gap-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-5 text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                                <p>
+                                    Built-in roles are security boundaries and cannot have their permission claims changed directly. Create an editable copy to customize this access profile safely.
+                                </p>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="shrink-0"
+                                    onClick={duplicateProtectedRole}
+                                >
+                                    Create editable copy
+                                </Button>
+                            </div>
                         )}
                     </div>
                     <DialogFooter className="sticky bottom-0 border-t bg-popover pt-4">

@@ -57,11 +57,13 @@ function DropdownMenuLabel({
   className,
   inset,
   ...props
-}: MenuPrimitive.GroupLabel.Props & {
+}: React.ComponentProps<"div"> & {
   inset?: boolean
 }) {
+  // Base UI's GroupLabel requires Menu.Group context, while shadcn's public
+  // DropdownMenuLabel API is commonly used directly inside the popup.
   return (
-    <MenuPrimitive.GroupLabel
+    <div
       data-slot="dropdown-menu-label"
       data-inset={inset}
       className={cn(

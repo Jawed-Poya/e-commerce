@@ -14,6 +14,7 @@ import UsersPage from "@/pages/users";
 import RolesPage from "@/pages/roles";
 import AdminLoginPage from "@/features/auth/login-page";
 import ProfilePage from "@/pages/profile";
+import AdminNotFoundPage from "@/pages/not-found";
 import { ProtectedRoute } from "@/features/auth/protected-route";
 import { PermissionRoute } from "@/features/auth/permission-route";
 import { Permissions } from "@/features/auth/permissions";
@@ -139,8 +140,16 @@ export const router = createBrowserRouter([
                         path: "system/roles",
                         element: allowed(Permissions.RolesManage, <RolesPage />),
                     },
+                    {
+                        path: "*",
+                        element: <AdminNotFoundPage />,
+                    },
                 ],
             },
         ],
+    },
+    {
+        path: "*",
+        element: <AdminNotFoundPage />,
     },
 ]);
