@@ -908,36 +908,52 @@ public class ProductService : IProductService
         var requestedCustomerTypeId = await _currentCustomer.GetCustomerTypeIdAsync(cancellationToken);
         var effectiveCustomerTypeId = requestedCustomerTypeId ?? defaultCustomerTypeId;
 
-        var priceRange = await _context.Products
+        // Build the effective price set directly from ProductPrices. This avoids the
+        // deeply-correlated Products -> Prices projection that SQL Server could cancel
+        // while the catalog and product notification requests were running together.
+        var effectivePrices = _context.ProductPrices
             .AsNoTracking()
-            .Where(product => product.IsActive && !product.IsDeleted)
-            .Select(product => new
-            {
-                Price = product.Prices
-                    .Where(price => price.CustomerTypeId == effectiveCustomerTypeId)
-                    .Select(price => (decimal?)(price.SalePrice.HasValue &&
-                        (!price.StartDate.HasValue || price.StartDate.Value <= today) &&
-                        (!price.EndDate.HasValue || price.EndDate.Value >= today)
-                            ? price.SalePrice.Value
-                            : price.RegularPrice))
-                    .FirstOrDefault()
-                    ?? product.Prices
-                        .Where(price => price.CustomerTypeId == defaultCustomerTypeId)
-                        .Select(price => (decimal?)(price.SalePrice.HasValue &&
-                            (!price.StartDate.HasValue || price.StartDate.Value <= today) &&
-                            (!price.EndDate.HasValue || price.EndDate.Value >= today)
-                                ? price.SalePrice.Value
-                                : price.RegularPrice))
-                        .FirstOrDefault()
-            })
-            .Where(item => item.Price.HasValue)
-            .GroupBy(_ => 1)
-            .Select(group => new
-            {
-                Minimum = group.Min(item => item.Price!.Value),
-                Maximum = group.Max(item => item.Price!.Value)
-            })
-            .FirstOrDefaultAsync(cancellationToken);
+            .Where(price =>
+                price.CustomerTypeId == effectiveCustomerTypeId &&
+                price.Product.IsActive &&
+                !price.Product.IsDeleted)
+            .Select(price => price.SalePrice.HasValue &&
+                (!price.StartDate.HasValue || price.StartDate.Value <= today) &&
+                (!price.EndDate.HasValue || price.EndDate.Value >= today)
+                    ? price.SalePrice.Value
+                    : price.RegularPrice);
+
+        IQueryable<decimal> resolvedPrices = effectivePrices;
+        if (effectiveCustomerTypeId != defaultCustomerTypeId)
+        {
+            var fallbackPrices = _context.ProductPrices
+                .AsNoTracking()
+                .Where(price =>
+                    price.CustomerTypeId == defaultCustomerTypeId &&
+                    price.Product.IsActive &&
+                    !price.Product.IsDeleted &&
+                    !_context.ProductPrices.Any(candidate =>
+                        candidate.ProductId == price.ProductId &&
+                        candidate.CustomerTypeId == effectiveCustomerTypeId))
+                .Select(price => price.SalePrice.HasValue &&
+                    (!price.StartDate.HasValue || price.StartDate.Value <= today) &&
+                    (!price.EndDate.HasValue || price.EndDate.Value >= today)
+                        ? price.SalePrice.Value
+                        : price.RegularPrice);
+
+            resolvedPrices = resolvedPrices.Concat(fallbackPrices);
+        }
+
+        var priceRange = await TransientSqlRetry.ExecuteAsync(
+            token => resolvedPrices
+                .GroupBy(_ => 1)
+                .Select(group => new
+                {
+                    Minimum = group.Min(),
+                    Maximum = group.Max()
+                })
+                .FirstOrDefaultAsync(token),
+            cancellationToken);
 
         var minimumPrice = priceRange?.Minimum ?? 0m;
         var maximumPrice = priceRange?.Maximum ?? minimumPrice;

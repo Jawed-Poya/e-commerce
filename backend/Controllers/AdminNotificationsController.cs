@@ -26,46 +26,56 @@ public sealed class AdminNotificationsController(
     }
 
     [HttpGet("stream")]
-    public async Task Stream(CancellationToken cancellationToken)
+    public async Task Stream()
     {
+        var requestAborted = HttpContext.RequestAborted;
+
         Response.Headers["Cache-Control"] = "no-cache, no-store";
         Response.Headers["Connection"] = "keep-alive";
         Response.Headers["X-Accel-Buffering"] = "no";
         Response.ContentType = "text/event-stream";
 
-        using var subscription = broker.Subscribe();
-        await Response.WriteAsync(": connected\n\n", cancellationToken);
-        await Response.Body.FlushAsync(cancellationToken);
-
         try
         {
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                var availableTask = subscription.Reader
-                    .WaitToReadAsync(cancellationToken)
-                    .AsTask();
-                var heartbeatTask = Task.Delay(TimeSpan.FromSeconds(20), cancellationToken);
-                var completed = await Task.WhenAny(availableTask, heartbeatTask);
+            using var subscription = broker.Subscribe();
 
-                if (completed == availableTask && await availableTask)
+            await WriteEventAsync(": connected\n\n", requestAborted);
+
+            while (!requestAborted.IsCancellationRequested)
+            {
+                var notificationReady = subscription.Reader
+                    .WaitToReadAsync(requestAborted)
+                    .AsTask();
+                var heartbeatDue = Task.Delay(TimeSpan.FromSeconds(20), requestAborted);
+                var completed = await Task.WhenAny(notificationReady, heartbeatDue);
+
+                if (completed == notificationReady && await notificationReady)
                 {
                     while (subscription.Reader.TryRead(out var item))
                     {
                         var json = JsonSerializer.Serialize(item, JsonSerializerOptions.Web);
-                        await Response.WriteAsync($"data: {json}\n\n", cancellationToken);
+                        await WriteEventAsync($"data: {json}\n\n", requestAborted);
                     }
                 }
                 else
                 {
-                    await Response.WriteAsync(": heartbeat\n\n", cancellationToken);
+                    await WriteEventAsync(": heartbeat\n\n", requestAborted);
                 }
-
-                await Response.Body.FlushAsync(cancellationToken);
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (requestAborted.IsCancellationRequested)
         {
-            // Normal browser disconnect.
+            // Closing the browser, navigating away, or reconnecting normally aborts SSE.
         }
+        catch (IOException) when (requestAborted.IsCancellationRequested)
+        {
+            // Kestrel can surface a disconnected SSE client as an I/O exception.
+        }
+    }
+
+    private async Task WriteEventAsync(string payload, CancellationToken cancellationToken)
+    {
+        await Response.WriteAsync(payload, cancellationToken);
+        await Response.Body.FlushAsync(cancellationToken);
     }
 }
