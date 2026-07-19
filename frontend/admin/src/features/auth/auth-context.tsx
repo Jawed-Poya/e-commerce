@@ -8,9 +8,11 @@ import {
     type PropsWithChildren,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 
 import { authService } from "./auth-service";
 import {
+    type AdminUnauthorizedEventDetail,
     adminSessionKey,
     adminUnauthorizedEvent,
     clearAdminSession,
@@ -55,7 +57,8 @@ export function AdminAuthProvider({ children }: PropsWithChildren) {
     }, [resetSessionState]);
 
     const refresh = useCallback(async () => {
-        if (!getAdminToken()) {
+        const token = getAdminToken();
+        if (!token) {
             resetSessionState();
             return;
         }
@@ -64,26 +67,48 @@ export function AdminAuthProvider({ children }: PropsWithChildren) {
         try {
             const current = await authService.me();
             if (!current.isAdmin) {
-                throw new Error("Administrator access is required.");
+                clearAdminSession(token);
+                setUser(null);
+                queryClient.clear();
+                return;
             }
 
             localStorage.setItem(adminSessionKey, JSON.stringify(current));
             setUser(current);
-        } catch {
-            resetSessionState();
+        } catch (error) {
+            const status = isAxiosError(error) ? error.response?.status : undefined;
+
+            // Only a real authentication/authorization failure invalidates the
+            // token. Timeouts and temporary backend outages keep the session.
+            if ((status === 401 || status === 403) && clearAdminSession(token)) {
+                setUser(null);
+                queryClient.clear();
+            }
         } finally {
             setLoading(false);
         }
-    }, [resetSessionState]);
+    }, [queryClient, resetSessionState]);
 
     useEffect(() => {
         void refresh();
     }, [refresh]);
 
     useEffect(() => {
-        const handleUnauthorized = () => resetSessionState();
+        const handleUnauthorized = (event: Event) => {
+            const failedToken = (
+                event as CustomEvent<AdminUnauthorizedEventDetail>
+            ).detail?.token;
+
+            if (!failedToken || getAdminToken() !== failedToken) {
+                return;
+            }
+
+            resetSessionState();
+        };
+
         window.addEventListener(adminUnauthorizedEvent, handleUnauthorized);
-        return () => window.removeEventListener(adminUnauthorizedEvent, handleUnauthorized);
+        return () =>
+            window.removeEventListener(adminUnauthorizedEvent, handleUnauthorized);
     }, [resetSessionState]);
 
     const login = useCallback(async (request: LoginRequest) => {
@@ -92,16 +117,19 @@ export function AdminAuthProvider({ children }: PropsWithChildren) {
             throw new Error("Administrator access is required.");
         }
 
+        // Drop data cached for a previous account without refetching protected
+        // queries during the token transition. invalidateQueries() here caused
+        // intermittent 401 responses that removed the newly saved token.
+        queryClient.clear();
         saveAdminSession(response.token, response.user);
         setUser(response.user);
         setLoading(false);
-        await queryClient.invalidateQueries();
     }, [queryClient]);
 
     const value = useMemo<AuthContextValue>(() => ({
         user,
         loading,
-        isAuthenticated: Boolean(user),
+        isAuthenticated: Boolean(user && getAdminToken()),
         login,
         logout,
         refresh,

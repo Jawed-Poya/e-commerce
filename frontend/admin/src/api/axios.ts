@@ -1,8 +1,10 @@
-import axios from "axios";
+import axios, {
+    type AxiosError,
+    type InternalAxiosRequestConfig,
+} from "axios";
 
 import {
-    adminUnauthorizedEvent,
-    clearAdminSession,
+    dispatchAdminUnauthorized,
     getAdminToken,
 } from "@/features/auth/auth-storage";
 
@@ -10,6 +12,10 @@ export const apiBaseUrl = (
     import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5188/api"
 ).replace(/\/+$/, "");
 export const apiOrigin = new URL(apiBaseUrl, window.location.origin).origin;
+
+type AdminRequestConfig = InternalAxiosRequestConfig & {
+    adminAccessToken?: string;
+};
 
 const axiosInstance = axios.create({
     baseURL: apiBaseUrl,
@@ -19,12 +25,24 @@ const axiosInstance = axios.create({
     timeout: 30000,
 });
 
+function isLoginRequest(config: InternalAxiosRequestConfig | undefined) {
+    return config?.url?.replace(/^\/+/, "") === "auth/admin/login";
+}
+
 axiosInstance.interceptors.request.use(
     (config) => {
         const token = getAdminToken();
+        const adminConfig = config as AdminRequestConfig;
 
-        if (token) {
+        // Remember the exact token used by this request. A late 401 from an old
+        // request must not remove a newer token created by a successful login.
+        adminConfig.adminAccessToken = token ?? undefined;
+
+        // The login endpoint must never receive a stale Authorization header.
+        if (token && !isLoginRequest(config)) {
             config.headers.Authorization = `Bearer ${token}`;
+        } else {
+            delete config.headers.Authorization;
         }
 
         if (config.data instanceof FormData) {
@@ -40,10 +58,17 @@ axiosInstance.interceptors.request.use(
 
 axiosInstance.interceptors.response.use(
     (response) => response,
-    (error) => {
-        if (error.response?.status === 401 && getAdminToken()) {
-            clearAdminSession();
-            window.dispatchEvent(new Event(adminUnauthorizedEvent));
+    (error: AxiosError) => {
+        const config = error.config as AdminRequestConfig | undefined;
+        const failedToken = config?.adminAccessToken;
+
+        if (
+            error.response?.status === 401 &&
+            failedToken &&
+            !isLoginRequest(config) &&
+            getAdminToken() === failedToken
+        ) {
+            dispatchAdminUnauthorized(failedToken);
         }
 
         return Promise.reject(error);

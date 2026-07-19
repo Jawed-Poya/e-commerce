@@ -1,6 +1,11 @@
 import { useCallback, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useFieldArray, useForm, type SubmitHandler } from "react-hook-form";
+import {
+    useFieldArray,
+    useForm,
+    type Resolver,
+    type SubmitHandler,
+} from "react-hook-form";
 import { toast } from "sonner";
 import type {
     CreateBulkProductsRequest,
@@ -93,7 +98,7 @@ export function useBulkProductForm() {
     const navigate = useNavigate();
 
     const form = useForm<ProductBulkFormValues>({
-        resolver: zodResolver(ProductBulkFormSchema),
+        resolver: zodResolver(ProductBulkFormSchema) as Resolver<ProductBulkFormValues>,
         mode: "onBlur",
         defaultValues: {
             products: [],
