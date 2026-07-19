@@ -41,8 +41,20 @@ var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOption
 if (string.IsNullOrWhiteSpace(jwt.Key) || Encoding.UTF8.GetByteCount(jwt.Key) < 32)
     throw new InvalidOperationException("Jwt:Key must be at least 32 bytes long.");
 
+// AddIdentity registers its application cookie as the explicit default
+// authenticate/challenge scheme. Setting only DefaultScheme here is not
+// enough because AuthenticationOptions prefers DefaultAuthenticateScheme and
+// DefaultChallengeScheme when they are already populated by Identity.
+// Force API authorization to authenticate Bearer tokens for every [Authorize]
+// endpoint while leaving Identity available for user/role management.
 builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddAuthentication(options =>
+    {
+        options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
     .AddJwtBearer(options =>
     {
         options.MapInboundClaims = true;
