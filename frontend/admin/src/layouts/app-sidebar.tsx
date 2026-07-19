@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/i18n/i18n-provider";
 import { useAdminAuth } from "@/features/auth/auth-context";
-import { Permissions } from "@/features/auth/permissions";
+import { hasPermission, Permissions } from "@/features/auth/permissions";
 
 const data = {
     navMain: [
@@ -82,17 +82,18 @@ const data = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const { language } = useI18n();
     const { user } = useAdminAuth();
-    const permissions = new Set(user?.permissions ?? []);
     const navItems = data.navMain
         .map((item) => ({
             ...item,
             items: item.items?.filter(
-                (subItem) => !subItem.permission || permissions.has(subItem.permission),
+                (subItem) =>
+                    !subItem.permission ||
+                    hasPermission(user, subItem.permission),
             ),
         }))
         .filter(
             (item) =>
-                (!item.permission || permissions.has(item.permission)) &&
+                (!item.permission || hasPermission(user, item.permission)) &&
                 (!item.items || item.items.length > 0),
         );
 

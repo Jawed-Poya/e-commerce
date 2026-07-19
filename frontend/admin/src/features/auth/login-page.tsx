@@ -19,7 +19,16 @@ export default function AdminLoginPage() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    if (!auth.loading && auth.isAuthenticated) return <Navigate to={getDefaultAdminRoute(auth.user?.permissions ?? [])} replace />;
+    if (!auth.loading && auth.isAuthenticated)
+        return (
+            <Navigate
+                to={getDefaultAdminRoute(
+                    auth.user?.permissions ?? [],
+                    auth.user?.roles ?? [],
+                )}
+                replace
+            />
+        );
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
@@ -27,9 +36,18 @@ export default function AdminLoginPage() {
         setError(null);
         try {
             await auth.login({ identifier: identifier.trim(), password });
-            const storedUser = JSON.parse(localStorage.getItem("easycart-admin-session") ?? "null") as { permissions?: string[] } | null;
+            const storedUser = JSON.parse(
+                localStorage.getItem("easycart-admin-session") ?? "null",
+            ) as { permissions?: string[]; roles?: string[] } | null;
             const from = (location.state as { from?: string } | null)?.from;
-            navigate(from || getDefaultAdminRoute(storedUser?.permissions ?? []), { replace: true });
+            navigate(
+                from ||
+                    getDefaultAdminRoute(
+                        storedUser?.permissions ?? [],
+                        storedUser?.roles ?? [],
+                    ),
+                { replace: true },
+            );
         } catch (requestError) {
             const apiMessage = (requestError as AxiosError<{ message?: string }>).response?.data?.message;
             setError(apiMessage || (requestError instanceof Error ? requestError.message : "Login failed."));

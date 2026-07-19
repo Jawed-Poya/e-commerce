@@ -265,6 +265,13 @@ public sealed class AuthService(
         User user,
         IReadOnlyCollection<string> roles)
     {
+        // The built-in Admin role is the authority boundary. Do not make an
+        // administrator depend on AspNetRoleClaims being populated correctly in
+        // an older database. Returning the complete permission set also keeps the
+        // JWT and admin UI consistent with the server-side policy bypass.
+        if (roles.Contains(AppRoles.Admin, StringComparer.OrdinalIgnoreCase))
+            return AppPermissions.All.OrderBy(value => value).ToArray();
+
         var permissions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var claim in await userManager.GetClaimsAsync(user))

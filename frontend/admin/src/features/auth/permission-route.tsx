@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import { buttonVariants } from "@/components/ui/button";
 import { useAdminAuth } from "./auth-context";
-import { getDefaultAdminRoute } from "./permissions";
+import { getDefaultAdminRoute, hasPermission } from "./permissions";
 
 export function PermissionRoute({
     permission,
@@ -13,7 +13,7 @@ export function PermissionRoute({
     children: React.ReactNode;
 }) {
     const { user } = useAdminAuth();
-    if (user?.permissions.includes(permission)) return children;
+    if (hasPermission(user, permission)) return children;
 
     return (
         <div className="grid min-h-[65vh] place-items-center p-6 text-center">
@@ -28,7 +28,10 @@ export function PermissionRoute({
                     again.
                 </p>
                 <Link
-                    to={getDefaultAdminRoute(user?.permissions ?? [])}
+                    to={getDefaultAdminRoute(
+                        user?.permissions ?? [],
+                        user?.roles ?? [],
+                    )}
                     className={buttonVariants({ className: "mt-5" })}
                 >
                     Go to an allowed section

@@ -15,7 +15,7 @@ import { toast } from "sonner";
 
 import { PageHeader } from "@/components/page-header";
 import { useAdminAuth } from "@/features/auth/auth-context";
-import { Permissions } from "@/features/auth/permissions";
+import { hasPermission, Permissions } from "@/features/auth/permissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,7 +60,7 @@ const emptyForm: CreateUserRequest = {
 export default function UsersPage() {
     const queryClient = useQueryClient();
     const { user: currentUser } = useAdminAuth();
-    const canManage = currentUser?.permissions.includes(Permissions.UsersManage) ?? false;
+    const canManage = hasPermission(currentUser, Permissions.UsersManage);
     const [search, setSearch] = useState("");
     const [role, setRole] = useState("");
     const [status, setStatus] = useState<"" | "active" | "inactive">("");

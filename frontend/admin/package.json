@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "clean": "node ../../scripts/clean-node-modules.mjs",
+    "reinstall": "npm run clean && npm cache verify && npm ci"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

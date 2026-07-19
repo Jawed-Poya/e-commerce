@@ -1,3 +1,5 @@
+import type { AuthUser } from "./auth-types";
+
 export const Permissions = {
     DashboardView: "dashboard.view",
     ProductsView: "products.view",
@@ -16,7 +18,31 @@ export const Permissions = {
     SystemManage: "system.manage",
 } as const;
 
-export function getDefaultAdminRoute(permissions: string[]) {
+export function isSystemAdministrator(
+    user: Pick<AuthUser, "roles"> | null | undefined,
+) {
+    return (
+        user?.roles.some((role) => role.toLowerCase() === "admin") ?? false
+    );
+}
+
+export function hasPermission(
+    user: Pick<AuthUser, "roles" | "permissions"> | null | undefined,
+    permission: string,
+) {
+    return Boolean(
+        user &&
+            (isSystemAdministrator(user) ||
+                user.permissions.includes(permission)),
+    );
+}
+
+export function getDefaultAdminRoute(
+    permissions: string[],
+    roles: string[] = [],
+) {
+    if (roles.some((role) => role.toLowerCase() === "admin"))
+        return "/dashboard";
     const set = new Set(permissions);
     if (set.has(Permissions.DashboardView)) return "/dashboard";
     if (set.has(Permissions.ProductsView)) return "/products";
