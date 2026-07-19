@@ -34,6 +34,13 @@ export const router = createBrowserRouter([
         }),
       },
       {
+        path: "wishlist",
+        lazy: async () => ({
+          Component: (await import("../features/cart/wishlist-page"))
+            .WishlistPage,
+        }),
+      },
+      {
         path: "checkout",
         lazy: async () => ({
           Component: (await import("../features/checkout/checkout-page"))

@@ -1,5 +1,11 @@
 import axios from "axios";
 
+import {
+    adminUnauthorizedEvent,
+    clearAdminSession,
+    getAdminToken,
+} from "@/features/auth/auth-storage";
+
 export const apiBaseUrl = (
     import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5188/api"
 ).replace(/\/+$/, "");
@@ -15,10 +21,16 @@ const axiosInstance = axios.create({
 
 axiosInstance.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem("token");
+        const token = getAdminToken();
 
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
+        }
+
+        if (config.data instanceof FormData) {
+            delete config.headers["Content-Type"];
+        } else {
+            config.headers["Content-Type"] = "application/json";
         }
 
         return config;
@@ -29,24 +41,13 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
-            localStorage.removeItem("token");
-            localStorage.removeItem("easycart-admin-session");
-            window.location.href = "/login";
+        if (error.response?.status === 401 && getAdminToken()) {
+            clearAdminSession();
+            window.dispatchEvent(new Event(adminUnauthorizedEvent));
         }
 
         return Promise.reject(error);
     },
 );
-
-axiosInstance.interceptors.request.use((config) => {
-    if (config.data instanceof FormData) {
-        delete config.headers["Content-Type"];
-    } else {
-        config.headers["Content-Type"] = "application/json";
-    }
-
-    return config;
-});
 
 export default axiosInstance;

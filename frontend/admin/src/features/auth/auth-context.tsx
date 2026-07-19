@@ -9,7 +9,14 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { adminSessionKey, adminTokenKey, authService } from "./auth-service";
+import { authService } from "./auth-service";
+import {
+    adminSessionKey,
+    adminUnauthorizedEvent,
+    clearAdminSession,
+    getAdminToken,
+    saveAdminSession,
+} from "./auth-storage";
 import type { AuthUser, LoginRequest } from "./auth-types";
 
 type AuthContextValue = {
@@ -34,45 +41,60 @@ function readStoredUser(): AuthUser | null {
 export function AdminAuthProvider({ children }: PropsWithChildren) {
     const queryClient = useQueryClient();
     const [user, setUser] = useState<AuthUser | null>(readStoredUser);
-    const [loading, setLoading] = useState(Boolean(localStorage.getItem(adminTokenKey)));
+    const [loading, setLoading] = useState(Boolean(getAdminToken()));
 
-    const logout = useCallback(() => {
-        localStorage.removeItem(adminTokenKey);
-        localStorage.removeItem(adminSessionKey);
+    const resetSessionState = useCallback(() => {
+        clearAdminSession();
         setUser(null);
+        setLoading(false);
         queryClient.clear();
     }, [queryClient]);
 
+    const logout = useCallback(() => {
+        resetSessionState();
+    }, [resetSessionState]);
+
     const refresh = useCallback(async () => {
-        if (!localStorage.getItem(adminTokenKey)) {
-            localStorage.removeItem(adminSessionKey);
-            setLoading(false);
-            setUser(null);
+        if (!getAdminToken()) {
+            resetSessionState();
             return;
         }
 
+        setLoading(true);
         try {
             const current = await authService.me();
-            if (!current.isAdmin) throw new Error("Administrator access is required.");
+            if (!current.isAdmin) {
+                throw new Error("Administrator access is required.");
+            }
+
             localStorage.setItem(adminSessionKey, JSON.stringify(current));
             setUser(current);
         } catch {
-            logout();
+            resetSessionState();
         } finally {
             setLoading(false);
         }
-    }, [logout]);
+    }, [resetSessionState]);
 
     useEffect(() => {
         void refresh();
     }, [refresh]);
 
+    useEffect(() => {
+        const handleUnauthorized = () => resetSessionState();
+        window.addEventListener(adminUnauthorizedEvent, handleUnauthorized);
+        return () => window.removeEventListener(adminUnauthorizedEvent, handleUnauthorized);
+    }, [resetSessionState]);
+
     const login = useCallback(async (request: LoginRequest) => {
         const response = await authService.login(request);
-        if (!response.user.isAdmin) throw new Error("Administrator access is required.");
-        localStorage.setItem(adminTokenKey, response.token);
-        localStorage.setItem(adminSessionKey, JSON.stringify(response.user));
+        if (!response.user.isAdmin) {
+            throw new Error("Administrator access is required.");
+        }
+
+        saveAdminSession(response.token, response.user);
         setUser(response.user);
+        setLoading(false);
         await queryClient.invalidateQueries();
     }, [queryClient]);
 

@@ -3,7 +3,7 @@ import type { Lookups, PagedProducts } from "../../shared/types/product";
 
 export type CatalogParams = Record<
   string,
-  string | number | boolean | undefined
+  string | number | boolean | (string | number)[] | undefined
 >;
 export const getProducts = (params: CatalogParams) =>
   apiGet<PagedProducts>("/products", params);

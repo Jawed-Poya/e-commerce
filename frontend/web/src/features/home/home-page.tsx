@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 import {
     ArrowRight,
     BadgePercent,
@@ -9,7 +11,7 @@ import {
     Star,
     Truck,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import heroImage from "../../assets/storefront-hero.png";
 import { imageUrl } from "../../shared/api/api-client";
@@ -20,6 +22,22 @@ import { ProductCard } from "../catalog/product-card";
 import { useLookups, useProducts } from "../catalog/use-catalog";
 
 export function HomePage() {
+    const location = useLocation();
+
+    useEffect(() => {
+        if (!location.hash) return;
+
+        const elementId = location.hash.slice(1);
+        const frame = window.requestAnimationFrame(() => {
+            document.getElementById(elementId)?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+            });
+        });
+
+        return () => window.cancelAnimationFrame(frame);
+    }, [location.hash]);
+
     const products = useProducts({
         page: 1,
         pageSize: 8,

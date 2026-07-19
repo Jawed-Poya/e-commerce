@@ -4,6 +4,8 @@ namespace ECommerce.Entities.Products.Filters;
 
 public class ProductFilter : PaginationFilter
 {
+    public long[]? Ids { get; set; }
+
     public long? CategoryId { get; set; }
 
     public long? BrandId { get; set; }

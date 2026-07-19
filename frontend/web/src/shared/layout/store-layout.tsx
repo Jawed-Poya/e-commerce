@@ -9,7 +9,7 @@ import {
     X,
 } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../features/auth/auth-context";
 import { useCart } from "../../features/cart/cart-context";
@@ -23,13 +23,28 @@ import { ThemeToggle } from "../components/theme-toggle";
 import { Button } from "../components/ui/button";
 import { cn } from "../lib/utils";
 
-const nav = [
-    { to: "/", label: "Home" },
-    { to: "/products", label: "Shop" },
-    { to: "/?section=categories#categories", label: "Categories" },
-    { to: "/?section=deals#deals", label: "Deals" },
-    { to: "/track-order", label: "Track order" },
+type StoreNavItem = {
+    to: string;
+    label: string;
+    match: "home" | "products" | "section" | "exact";
+    section?: "categories" | "deals";
+};
+
+const nav: StoreNavItem[] = [
+    { to: "/", label: "Home", match: "home" },
+    { to: "/products", label: "Shop", match: "products" },
+    { to: "/?section=categories#categories", label: "Categories", match: "section", section: "categories" },
+    { to: "/?section=deals#deals", label: "Deals", match: "section", section: "deals" },
+    { to: "/track-order", label: "Track order", match: "exact" },
 ];
+
+function isStoreNavItemActive(item: StoreNavItem, pathname: string, search: string) {
+    const selectedSection = new URLSearchParams(search).get("section");
+    if (item.match === "home") return pathname === "/" && !selectedSection;
+    if (item.match === "products") return pathname === "/products" || pathname.startsWith("/products/");
+    if (item.match === "section") return pathname === "/" && selectedSection === item.section;
+    return pathname === item.to;
+}
 
 function Logo() {
     return (
@@ -57,6 +72,7 @@ export function StoreLayout() {
     const [open, setOpen] = useState(false);
 
     const navigate = useNavigate();
+    const location = useLocation();
     const cart = useCart();
     const auth = useAuth();
     const accountPath = auth.isAuthenticated ? "/account" : "/account/login";
@@ -140,14 +156,11 @@ export function StoreLayout() {
                                 </Link>
                             </Button>
 
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                aria-label="Wishlist"
-                                className="relative hidden rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary sm:inline-flex"
-                            >
-                                <Heart className="size-5" />
-                                <Count value={cart.wishlist.length} />
+                            <Button asChild variant="ghost" size="icon" className="relative hidden rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary sm:inline-flex">
+                                <Link to="/wishlist" aria-label="Wishlist">
+                                    <Heart className="size-5" />
+                                    <Count value={cart.wishlist.length} />
+                                </Link>
                             </Button>
 
                             <Button
@@ -231,11 +244,11 @@ export function StoreLayout() {
                                                 />
 
                                                 <MobileAction
-                                                    icon={
-                                                        <Heart className="size-5" />
-                                                    }
+                                                    icon={<Heart className="size-5" />}
                                                     label="Wishlist"
                                                     count={cart.wishlist.length}
+                                                    to="/wishlist"
+                                                    onNavigate={() => setOpen(false)}
                                                 />
 
                                                 <Link
@@ -261,30 +274,18 @@ export function StoreLayout() {
                                                 </p>
 
                                                 <nav className="grid gap-1">
-                                                    {nav.map((x) => (
-                                                        <NavLink
-                                                            onClick={() =>
-                                                                setOpen(false)
-                                                            }
-                                                            key={x.label}
-                                                            to={x.to}
-                                                            className={({
-                                                                isActive,
-                                                            }) =>
-                                                                cn(
-                                                                    "flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold text-muted-foreground transition-all hover:bg-background hover:text-foreground",
-                                                                    isActive &&
-                                                                        "bg-primary/10 text-primary shadow-sm hover:bg-primary/10 hover:text-primary",
-                                                                )
-                                                            }
-                                                        >
-                                                            {x.label}
-
-                                                            <span className="text-lg font-light opacity-40">
-                                                                ›
-                                                            </span>
-                                                        </NavLink>
-                                                    ))}
+                                                    {nav.map((x) => {
+                                                        const isActive = isStoreNavItemActive(x, location.pathname, location.search);
+                                                        return (
+                                                            <Link onClick={() => setOpen(false)} key={x.label} to={x.to} className={cn(
+                                                                "flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold text-muted-foreground transition-all hover:bg-background hover:text-foreground",
+                                                                isActive && "bg-primary/10 text-primary shadow-sm hover:bg-primary/10 hover:text-primary",
+                                                            )}>
+                                                                {x.label}
+                                                                <span className="text-lg font-light opacity-40">›</span>
+                                                            </Link>
+                                                        );
+                                                    })}
                                                 </nav>
                                             </div>
 
@@ -372,32 +373,21 @@ export function StoreLayout() {
                         <div className="mx-4 h-6 w-px bg-border" />
 
                         <nav className="flex h-full items-center gap-1">
-                            {nav.map((x) => (
-                                <NavLink
-                                    key={x.label}
-                                    end={x.to === "/"}
-                                    to={x.to}
-                                    className={({ isActive }) =>
-                                        cn(
-                                            "relative flex h-full items-center rounded-lg px-4 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted/40 hover:text-primary",
-                                            isActive && "text-primary",
-                                        )
-                                    }
-                                >
-                                    {({ isActive }) => (
-                                        <>
-                                            {x.label}
-
-                                            <span
-                                                className={cn(
-                                                    "absolute inset-x-4 bottom-0 h-0.5 origin-center scale-x-0 rounded-full bg-primary transition-transform duration-200",
-                                                    isActive && "scale-x-100",
-                                                )}
-                                            />
-                                        </>
-                                    )}
-                                </NavLink>
-                            ))}
+                            {nav.map((x) => {
+                                const isActive = isStoreNavItemActive(x, location.pathname, location.search);
+                                return (
+                                    <Link key={x.label} to={x.to} className={cn(
+                                        "relative flex h-full items-center rounded-lg px-4 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted/40 hover:text-primary",
+                                        isActive && "text-primary",
+                                    )}>
+                                        {x.label}
+                                        <span className={cn(
+                                            "absolute inset-x-4 bottom-0 h-0.5 origin-center scale-x-0 rounded-full bg-primary transition-transform duration-200",
+                                            isActive && "scale-x-100",
+                                        )} />
+                                    </Link>
+                                );
+                            })}
                         </nav>
 
                         <Link

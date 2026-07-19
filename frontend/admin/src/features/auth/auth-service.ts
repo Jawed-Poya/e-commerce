@@ -1,8 +1,10 @@
 import apiClient from "@/api/api-client";
 import type { AuthResponse, AuthUser, LoginRequest } from "./auth-types";
 
-export const adminTokenKey = "token";
-export const adminSessionKey = "easycart-admin-session";
+export {
+    adminSessionKey,
+    adminTokenKey,
+} from "./auth-storage";
 
 export const authService = {
     async login(request: LoginRequest) {

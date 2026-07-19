@@ -28,6 +28,7 @@ interface CartValue {
   removeItem: (id: number) => void;
   clear: () => void;
   toggleWishlist: (id: number) => void;
+  clearWishlist: () => void;
 }
 
 const CartContext = createContext<CartValue | null>(null);
@@ -95,6 +96,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             ? current.filter((value) => value !== id)
             : [...current, id],
         ),
+      clearWishlist: () => setWishlist([]),
     }),
     [items, wishlist],
   );

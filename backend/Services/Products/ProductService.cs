@@ -64,6 +64,12 @@ public class ProductService : IProductService
                 (product.Barcode != null && product.Barcode.Contains(search)));
         }
 
+        if (filter.Ids is { Length: > 0 })
+        {
+            var productIds = filter.Ids.Distinct().ToArray();
+            products = products.Where(product => productIds.Contains(product.Id));
+        }
+
         if (filter.CategoryId.HasValue)
         {
             var categoryIds = await GetCategoryTreeIdsAsync(filter.CategoryId.Value);
