@@ -9,6 +9,8 @@ using ECommerce.Entities.Orders.Contracts;
 using ECommerce.Entities.Orders.Filters;
 using ECommerce.Entities.Products;
 using ECommerce.Options;
+using ECommerce.Services.Customers;
+using ECommerce.Services.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OrderEntity = API.Entities.Orders.Order;
@@ -18,7 +20,10 @@ namespace ECommerce.Services.Orders;
 
 public sealed class OrderService(
     ApplicationDbContext context,
-    IOptions<CommerceOptions> commerceOptions) : IOrderService
+    IOptions<CommerceOptions> commerceOptions,
+    ICurrentCustomerAccessor currentCustomer,
+    IDefaultCustomerTypeResolver defaultCustomerType,
+    IStoreNotificationService notifications) : IOrderService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -88,6 +93,7 @@ public sealed class OrderService(
 
             var requestByProductId = groupedItems.ToDictionary(item => item.ProductId);
             var orderItems = new List<OrderItem>(products.Count);
+            var defaultCustomerTypeId = await defaultCustomerType.GetIdAsync(cancellationToken);
 
             foreach (var product in products)
             {
@@ -97,7 +103,11 @@ public sealed class OrderService(
                 if (product.Inventory is null || product.Inventory.AvailableQuantity < requested.Quantity)
                     throw new InvalidOperationException($"Insufficient stock for '{product.Name}'.");
 
-                var unitPrice = ResolveEffectivePrice(product, customer.CustomerTypeId, today)
+                var unitPrice = ResolveEffectivePrice(
+                    product,
+                    customer.CustomerTypeId,
+                    defaultCustomerTypeId,
+                    today)
                     ?? throw new InvalidOperationException($"No active price is configured for '{product.Name}'.");
 
                 orderItems.Add(new OrderItem
@@ -332,7 +342,15 @@ public sealed class OrderService(
 
             if (request.Status == OrderStatus.Cancelled)
             {
-                ReleaseReservedStock(order);
+                var restockedProducts = ReleaseReservedStock(order);
+                foreach (var restocked in restockedProducts)
+                {
+                    await notifications.CreateStockIncreasedAsync(
+                        restocked.ProductId,
+                        restocked.PreviousAvailable,
+                        restocked.NewAvailable,
+                        cancellationToken);
+                }
                 order.FulfillmentStatus = FulfillmentStatus.Cancelled;
 
                 var payment = order.Payments.OrderByDescending(item => item.Id).FirstOrDefault();
@@ -473,14 +491,82 @@ public sealed class OrderService(
                 .ToList());
     }
 
+    public async Task<IReadOnlyCollection<OrderListItemResponse>> GetMyOrdersAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (!currentCustomer.CustomerId.HasValue)
+            throw new UnauthorizedAccessException("A customer account is required.");
+
+        var rows = await context.Orders
+            .AsNoTracking()
+            .Where(order => order.CustomerId == currentCustomer.CustomerId.Value)
+            .OrderByDescending(order => order.CreatedAt)
+            .Take(100)
+            .Select(order => new
+            {
+                order.Id,
+                order.OrderNumber,
+                order.Customer.FirstName,
+                order.Customer.LastName,
+                order.Customer.Phone,
+                order.Status,
+                order.PaymentStatus,
+                Provider = order.Payments.OrderByDescending(payment => payment.Id)
+                    .Select(payment => payment.Provider).FirstOrDefault(),
+                order.Total,
+                order.Currency,
+                ItemCount = order.Items.Count,
+                order.CreatedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(row => new OrderListItemResponse(
+            row.Id,
+            row.OrderNumber,
+            BuildName(row.FirstName, row.LastName),
+            row.Phone,
+            row.Status,
+            row.PaymentStatus,
+            ParsePaymentMethod(row.Provider),
+            row.Total,
+            row.Currency,
+            row.ItemCount,
+            row.CreatedAt)).ToList();
+    }
+
+    public async Task<OrderDetailsResponse?> GetMyOrderAsync(
+        string orderNumber,
+        CancellationToken cancellationToken = default)
+    {
+        if (!currentCustomer.CustomerId.HasValue)
+            throw new UnauthorizedAccessException("A customer account is required.");
+
+        var order = await context.Orders
+            .AsNoTracking()
+            .Include(item => item.Customer)
+                .ThenInclude(customer => customer.CustomerType)
+            .Include(item => item.Items)
+            .Include(item => item.Payments)
+            .Include(item => item.StatusHistory)
+            .FirstOrDefaultAsync(item =>
+                item.CustomerId == currentCustomer.CustomerId.Value &&
+                item.OrderNumber == orderNumber.Trim(),
+                cancellationToken);
+
+        return order is null ? null : MapDetails(order);
+    }
+
     private async Task<Customer> UpsertCheckoutCustomerAsync(
         CheckoutCustomerRequest request,
         CancellationToken cancellationToken)
     {
         var phone = NormalizePhone(request.Phone);
         var email = NormalizeEmail(request.Email);
-        var customer = await context.Customers
-            .FirstOrDefaultAsync(item => item.Phone == phone, cancellationToken);
+        var customer = currentCustomer.CustomerId.HasValue
+            ? await context.Customers.FirstOrDefaultAsync(
+                item => item.Id == currentCustomer.CustomerId.Value, cancellationToken)
+            : await context.Customers.FirstOrDefaultAsync(
+                item => item.Phone == phone, cancellationToken);
 
         if (email is not null && await context.Customers.AnyAsync(
                 item => item.Email == email && (customer == null || item.Id != customer.Id),
@@ -495,7 +581,7 @@ public sealed class OrderService(
                 LastName = CleanOptional(request.LastName),
                 Phone = phone,
                 Email = email,
-                CustomerTypeId = await ResolveDefaultCustomerTypeIdAsync(cancellationToken)
+                CustomerTypeId = await defaultCustomerType.GetIdAsync(cancellationToken)
             };
             context.Customers.Add(customer);
         }
@@ -551,22 +637,6 @@ public sealed class OrderService(
         }.Where(value => !string.IsNullOrWhiteSpace(value)));
     }
 
-    private async Task<long?> ResolveDefaultCustomerTypeIdAsync(CancellationToken cancellationToken)
-    {
-        if (_options.DefaultCustomerTypeId.HasValue && await context.Types.AnyAsync(
-                item => item.Id == _options.DefaultCustomerTypeId.Value &&
-                        item.Group == GeneralTypeEnum.CustomerType,
-                cancellationToken))
-            return _options.DefaultCustomerTypeId;
-
-        return await context.Types
-            .Where(item => item.Group == GeneralTypeEnum.CustomerType)
-            .OrderBy(item => item.SortOrder ?? int.MaxValue)
-            .ThenBy(item => item.Id)
-            .Select(item => (long?)item.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-    }
-
     private async Task<string> GenerateOrderNumberAsync(CancellationToken cancellationToken)
     {
         for (var attempt = 0; attempt < 10; attempt++)
@@ -597,12 +667,13 @@ public sealed class OrderService(
         return await query.FirstOrDefaultAsync(order => order.Id == id, cancellationToken);
     }
 
-    private void ReleaseReservedStock(OrderEntity order)
+    private IReadOnlyCollection<RestockedProduct> ReleaseReservedStock(OrderEntity order)
     {
         var productIds = order.Items.Select(item => item.ProductId).Distinct().ToArray();
         var inventories = context.ProductInventories
             .Where(item => productIds.Contains(item.ProductId))
             .ToDictionary(item => item.ProductId);
+        var restockedProducts = new List<RestockedProduct>();
 
         foreach (var item in order.Items)
         {
@@ -611,7 +682,10 @@ public sealed class OrderService(
                 throw new InvalidOperationException($"Reserved stock is inconsistent for '{item.ProductName}'.");
 
             var reservedBefore = inventory.ReservedQuantity;
+            var previousAvailable = inventory.Quantity - reservedBefore;
             inventory.ReservedQuantity -= item.Quantity;
+            var newAvailable = inventory.Quantity - inventory.ReservedQuantity;
+            restockedProducts.Add(new RestockedProduct(item.ProductId, previousAvailable, newAvailable));
 
             context.InventoryTransactions.Add(new InventoryTransaction
             {
@@ -628,7 +702,14 @@ public sealed class OrderService(
                 Description = $"Reservation released for cancelled order {order.OrderNumber}."
             });
         }
+
+        return restockedProducts;
     }
+
+    private sealed record RestockedProduct(
+        long ProductId,
+        decimal PreviousAvailable,
+        decimal NewAvailable);
 
     private void CommitReservedStock(OrderEntity order)
     {
@@ -730,27 +811,26 @@ public sealed class OrderService(
                 $"The maximum order quantity for '{product.Name}' is {product.MaximumValue.Value}.");
     }
 
-    private static decimal? ResolveEffectivePrice(Product product, long? customerTypeId, DateOnly today)
+    private static decimal? ResolveEffectivePrice(
+        Product product,
+        long? customerTypeId,
+        long defaultCustomerTypeId,
+        DateOnly today)
     {
-        var activePrices = product.Prices
-            .Where(price =>
-                (!price.StartDate.HasValue || price.StartDate.Value <= today) &&
-                (!price.EndDate.HasValue || price.EndDate.Value >= today))
-            .ToList();
-
         var selected = customerTypeId.HasValue
-            ? activePrices.FirstOrDefault(price => price.CustomerTypeId == customerTypeId.Value)
+            ? product.Prices.FirstOrDefault(price => price.CustomerTypeId == customerTypeId.Value)
             : null;
 
-        selected ??= activePrices
-            .OrderBy(price => price.CustomerType.SortOrder ?? int.MaxValue)
-            .ThenBy(price => price.CustomerTypeId)
-            .FirstOrDefault();
+        selected ??= product.Prices.FirstOrDefault(
+            price => price.CustomerTypeId == defaultCustomerTypeId);
 
-        if (selected is null)
-            return null;
+        if (selected is null) return null;
 
-        return selected.SalePrice ?? selected.RegularPrice;
+        var saleIsActive = selected.SalePrice.HasValue &&
+            (!selected.StartDate.HasValue || selected.StartDate.Value <= today) &&
+            (!selected.EndDate.HasValue || selected.EndDate.Value >= today);
+
+        return saleIsActive ? selected.SalePrice!.Value : selected.RegularPrice;
     }
 
     private OrderDetailsResponse MapDetails(OrderEntity order)

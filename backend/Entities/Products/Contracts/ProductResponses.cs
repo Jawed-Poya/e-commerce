@@ -31,6 +31,7 @@ public sealed record ProductLookupsResponse(
     IReadOnlyCollection<ProductLookupItemResponse> Brands,
     IReadOnlyCollection<ProductLookupItemResponse> Units,
     IReadOnlyCollection<ProductLookupItemResponse> CustomerTypes,
+    long DefaultCustomerTypeId,
     decimal MinimumPrice,
     decimal MaximumPrice
 );

@@ -2,20 +2,22 @@
 
 using ECommerce.Data;
 using ECommerce.Entities.Users;
-using ECommerce.Services.GeneralTypes;
-using ECommerce.Services.Products;
-using ECommerce.Services.Inventory;
-using ECommerce.Services.Orders;
-using ECommerce.Services.Customers;
 using ECommerce.Options;
+using ECommerce.Services.Auth;
+using ECommerce.Services.Customers;
+using ECommerce.Services.GeneralTypes;
+using ECommerce.Services.Inventory;
+using ECommerce.Services.Notifications;
+using ECommerce.Services.Orders;
+using ECommerce.Services.Products;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 public static class DependencyInjection
 {
     public static IServiceCollection AddCatalog(this IServiceCollection services)
     {
+        services.AddHttpContextAccessor();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IProductPricingService, ProductPricingService>();
         services.AddScoped<IGeneralTypeService, GeneralTypesService>();
@@ -23,36 +25,34 @@ public static class DependencyInjection
         services.AddScoped<IInventoryService, InventoryService>();
         services.AddScoped<IOrderService, OrderService>();
         services.AddScoped<ICustomerService, CustomerService>();
+        services.AddScoped<ICurrentCustomerAccessor, CurrentCustomerAccessor>();
+        services.AddScoped<IDefaultCustomerTypeResolver, DefaultCustomerTypeResolver>();
+        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IStoreNotificationService, StoreNotificationService>();
 
         return services;
     }
-
 
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.Configure<CommerceOptions>(
-            configuration.GetSection(CommerceOptions.SectionName));
+        services.Configure<CommerceOptions>(configuration.GetSection(CommerceOptions.SectionName));
+        services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.Configure<SeedAdminOptions>(configuration.GetSection(SeedAdminOptions.SectionName));
+
         services.AddDbContext<ApplicationDbContext>(options =>
         {
-            options.UseSqlServer(
-                configuration.GetConnectionString("DefaultConnection"));
+            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
         });
 
-
         services
-            .AddIdentity<User, Role>(options =>
-            {
-                ConfigureIdentity(options);
-            })
+            .AddIdentity<User, Role>(ConfigureIdentity)
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddDefaultTokenProviders();
 
-
         return services;
     }
-
 
     private static void ConfigureIdentity(IdentityOptions options)
     {
@@ -63,7 +63,6 @@ public static class DependencyInjection
         options.Password.RequireNonAlphanumeric = false;
 
         options.User.RequireUniqueEmail = true;
-
         options.SignIn.RequireConfirmedEmail = false;
         options.SignIn.RequireConfirmedPhoneNumber = false;
 

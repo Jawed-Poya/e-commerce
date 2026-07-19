@@ -8,7 +8,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ECommerce.Services.Customers;
 
-public sealed class CustomerService(ApplicationDbContext context) : ICustomerService
+public sealed class CustomerService(
+    ApplicationDbContext context,
+    IDefaultCustomerTypeResolver defaultCustomerType) : ICustomerService
 {
     public async Task<PagedResult<CustomerListItemResponse>> GetAsync(
         CustomerFilter filter,
@@ -96,7 +98,9 @@ public sealed class CustomerService(ApplicationDbContext context) : ICustomerSer
         var phone = NormalizePhone(request.Phone);
         var email = NormalizeEmail(request.Email);
         await EnsureUniqueAsync(null, phone, email, cancellationToken);
-        await EnsureCustomerTypeExistsAsync(request.CustomerTypeId, cancellationToken);
+        var customerTypeId = request.CustomerTypeId ??
+            await defaultCustomerType.GetIdAsync(cancellationToken);
+        await EnsureCustomerTypeExistsAsync(customerTypeId, cancellationToken);
 
         var customer = new Customer
         {
@@ -105,7 +109,7 @@ public sealed class CustomerService(ApplicationDbContext context) : ICustomerSer
             Phone = phone,
             Email = email,
             Address = CleanOptional(request.Address),
-            CustomerTypeId = request.CustomerTypeId
+            CustomerTypeId = customerTypeId
         };
 
         context.Customers.Add(customer);
@@ -128,14 +132,16 @@ public sealed class CustomerService(ApplicationDbContext context) : ICustomerSer
         var phone = NormalizePhone(request.Phone);
         var email = NormalizeEmail(request.Email);
         await EnsureUniqueAsync(id, phone, email, cancellationToken);
-        await EnsureCustomerTypeExistsAsync(request.CustomerTypeId, cancellationToken);
+        var customerTypeId = request.CustomerTypeId ??
+            await defaultCustomerType.GetIdAsync(cancellationToken);
+        await EnsureCustomerTypeExistsAsync(customerTypeId, cancellationToken);
 
         customer.FirstName = request.FirstName.Trim();
         customer.LastName = CleanOptional(request.LastName);
         customer.Phone = phone;
         customer.Email = email;
         customer.Address = CleanOptional(request.Address);
-        customer.CustomerTypeId = request.CustomerTypeId;
+        customer.CustomerTypeId = customerTypeId;
 
         await context.SaveChangesAsync(cancellationToken);
 

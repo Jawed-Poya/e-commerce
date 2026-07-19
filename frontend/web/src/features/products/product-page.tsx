@@ -1,21 +1,24 @@
 import {
+    BellRing,
     ChevronLeft,
     ChevronRight,
+    Eye,
     Heart,
     PackageCheck,
     ShoppingBag,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { apiGet, imageUrl } from "../../shared/api/api-client";
+import { apiGet, apiPost, imageUrl } from "../../shared/api/api-client";
 import { Badge } from "../../shared/components/ui/badge";
 import { Button } from "../../shared/components/ui/button";
 import { Skeleton } from "../../shared/components/ui/skeleton";
 import { cn } from "../../shared/lib/utils";
 import type { ProductDetails } from "../../shared/types/product";
 import { useCart } from "../cart/cart-context";
+import { useStoreNotifications } from "../notifications/notification-context";
 
 export function ProductPage() {
     const { id } = useParams();
@@ -28,6 +31,21 @@ export function ProductPage() {
 
     const [selected, setSelected] = useState<number | null>(null);
     const cart = useCart();
+    const notifications = useStoreNotifications();
+    const productId = Number(id);
+
+    useEffect(() => {
+        if (!Number.isInteger(productId) || productId < 1 || !q.data) return;
+
+        notifications.trackProduct(productId);
+        const viewKey = `easycart-product-view-${productId}`;
+        if (sessionStorage.getItem(viewKey)) return;
+
+        sessionStorage.setItem(viewKey, "1");
+        void apiPost<void>(`/products/${productId}/views`).catch(() => {
+            sessionStorage.removeItem(viewKey);
+        });
+    }, [notifications, productId, q.data]);
 
     if (q.isLoading) {
         return (
@@ -89,10 +107,8 @@ export function ProductPage() {
 
     const p = q.data;
 
-    const price =
-        p.prices.find((x) => x.salePrice)?.salePrice ??
-        p.prices[0]?.regularPrice ??
-        0;
+    const price = p.price;
+    const hasPrice = price != null;
 
     const stock = p.inventory?.availableQuantity ?? 0;
 
@@ -108,7 +124,7 @@ export function ProductPage() {
             id: p.id,
             name: p.name,
             image: active?.url,
-            price,
+            price: price!,
             stock,
         });
 
@@ -264,8 +280,18 @@ export function ProductPage() {
                                 </p>
 
                                 <p className="mt-1 text-3xl font-black tracking-[-0.04em] text-primary sm:text-4xl">
-                                    ${price.toFixed(2)}
+                                    {hasPrice ? `$${price.toFixed(2)}` : "Price unavailable"}
                                 </p>
+                                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                    <span className="rounded-full bg-primary/10 px-2.5 py-1 font-bold text-primary">
+                                        {p.isDefaultPrice
+                                            ? `${p.priceCustomerTypeName ?? "General"} / default price`
+                                            : `${p.priceCustomerTypeName ?? "Customer"} price`}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1">
+                                        <Eye className="size-3.5" /> {p.viewCount} views
+                                    </span>
+                                </div>
                             </div>
 
                             <div className="text-right">
@@ -326,11 +352,23 @@ export function ProductPage() {
                             <Button
                                 size="lg"
                                 className="h-12 flex-1 rounded-xl font-bold shadow-md shadow-primary/15"
-                                disabled={stock < 1}
+                                disabled={stock < 1 || !hasPrice}
                                 onClick={addToCart}
                             >
                                 <ShoppingBag className="size-4.5" />
                                 Add to cart
+                            </Button>
+
+                            <Button
+                                size="lg"
+                                variant="outline"
+                                onClick={() =>
+                                    void notifications.enableBrowserNotifications()
+                                }
+                                className="h-12 rounded-xl px-5"
+                            >
+                                <BellRing className="size-4.5" />
+                                <span className="hidden md:inline">Notify me</span>
                             </Button>
 
                             <Button
@@ -414,7 +452,7 @@ export function ProductPage() {
                         </p>
 
                         <p className="text-xl font-black tracking-tight text-primary">
-                            ${price.toFixed(2)}
+                            {hasPrice ? `$${price.toFixed(2)}` : "No price"}
                         </p>
                     </div>
 
@@ -440,7 +478,7 @@ export function ProductPage() {
                     <Button
                         type="button"
                         className="h-11 min-w-36 rounded-xl px-5 font-bold shadow-md shadow-primary/15"
-                        disabled={stock < 1}
+                        disabled={stock < 1 || !hasPrice}
                         onClick={addToCart}
                     >
                         <ShoppingBag className="size-4" />

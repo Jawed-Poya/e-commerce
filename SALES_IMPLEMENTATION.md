@@ -115,11 +115,15 @@ dotnet build
 
 Then run the API and verify the full checkout lifecycle against a development database.
 
+## Customer accounts and authorization
+
+The follow-up implementation in `CUSTOMER_ACCOUNTS_PRICING_ALERTS.md` adds optional customer accounts, customer-type price resolution, admin login, API authorization, product views, and storefront product alerts.
+
 ## Recommended next production steps
 
-1. Protect `/api/orders` and `/api/customers` with admin authorization.
-2. Add an authentication/account flow for customers if order history should be available without phone-based tracking.
-3. Add a scheduled job to cancel expired pending reservations.
-4. Add bank receipt image upload if a reference number is not sufficient.
-5. Add integration tests for concurrent checkout, cancellation, delivery, and duplicate requests.
-6. Move shipping calculation into configurable delivery zones when different cities have different fees.
+1. Add a scheduled job to cancel expired pending reservations.
+2. Add bank receipt image upload if a reference number is not sufficient.
+3. Add integration tests for concurrent checkout, cancellation, delivery, authentication, and duplicate requests.
+4. Move shipping calculation into configurable delivery zones when different cities have different fees.
+5. Add service-worker/VAPID web push if alerts must work after the storefront is closed.
+6. Move all real JWT, admin, bank, and database secrets to deployment configuration.

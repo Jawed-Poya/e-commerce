@@ -8,6 +8,8 @@ using ECommerce.Entities.Products.Filters;
 using ECommerce.Entities.Products.Requests;
 using ECommerce.Services.Products;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using ECommerce.Shared;
 
 
 [ApiController]
@@ -40,6 +42,21 @@ public class ProductsController : ControllerBase
         return Ok(ApiResponse<ECommerce.Dtos.ProductDetailsDto>.Ok(product));
     }
 
+    [HttpPost("{id:long}/views")]
+    public async Task<IActionResult> RecordView(long id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var viewCount = await _service.IncrementViewCountAsync(id, cancellationToken);
+            return Ok(ApiResponse<object>.Ok(new { viewCount }));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(ApiResponse<object>.Fail(exception.Message));
+        }
+    }
+
+    [Authorize(Roles = AppRoles.Admin)]
     [HttpPost]
     public async Task<IActionResult> Create(
         Product model)
@@ -49,6 +66,7 @@ public class ProductsController : ControllerBase
         return Ok(id);
     }
 
+    [Authorize(Roles = AppRoles.Admin)]
     [HttpPut("{id:long}")]
     public async Task<IActionResult> Update(
         long id,
@@ -59,6 +77,7 @@ public class ProductsController : ControllerBase
         return NoContent();
     }
 
+    [Authorize(Roles = AppRoles.Admin)]
     [HttpDelete("{id:long}")]
     public async Task<IActionResult> Delete(long id)
     {
@@ -67,6 +86,7 @@ public class ProductsController : ControllerBase
         return NoContent();
     }
 
+    [Authorize(Roles = AppRoles.Admin)]
     [HttpPatch("{id:long}/toggle-status")]
     public async Task<IActionResult> ToggleStatus(long id)
     {
@@ -100,6 +120,7 @@ public class ProductsController : ControllerBase
         );
     }
 
+    [Authorize(Roles = AppRoles.Admin)]
     [HttpPost("bulk")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(MaximumRequestSize)]
@@ -168,6 +189,7 @@ public class ProductsController : ControllerBase
         }
     }
 
+    [Authorize(Roles = AppRoles.Admin)]
     [HttpPut("bulk")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(MaximumRequestSize)]

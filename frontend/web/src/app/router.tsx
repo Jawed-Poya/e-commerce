@@ -54,6 +54,19 @@ export const router = createBrowserRouter([
             .OrderTrackingPage,
         }),
       },
+      {
+        path: "account/login",
+        lazy: async () => ({
+          Component: (await import("../features/auth/auth-page")).AuthPage,
+        }),
+      },
+      {
+        path: "account",
+        lazy: async () => ({
+          Component: (await import("../features/account/account-page"))
+            .AccountPage,
+        }),
+      },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

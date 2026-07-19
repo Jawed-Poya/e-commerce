@@ -1,9 +1,10 @@
+using System.Text;
+using System.Text.Json.Serialization;
+using ECommerce.Options;
 using ECommerce.Shared;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
-using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +27,11 @@ builder.Services.AddCors(options =>
     });
 });
 
+var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
+    ?? throw new InvalidOperationException("JWT configuration is missing.");
+if (string.IsNullOrWhiteSpace(jwt.Key) || Encoding.UTF8.GetByteCount(jwt.Key) < 32)
+    throw new InvalidOperationException("Jwt:Key must be at least 32 bytes long.");
+
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -36,37 +42,29 @@ builder.Services
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(
-                    builder.Configuration["Jwt:Key"]!
-                ))
+            ClockSkew = TimeSpan.FromMinutes(1),
+            ValidIssuer = jwt.Issuer,
+            ValidAudience = jwt.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key))
         };
     });
 
-builder.Services.Configure<FormOptions>(
-    options =>
-    {
-        options.MultipartBodyLengthLimit =
-            260L * 1024L * 1024L;
-    }
-);
+builder.Services.AddAuthorization();
+
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 260L * 1024L * 1024L;
+});
 
 var app = builder.Build();
 
+await app.InitializeDatabaseAsync();
+
 app.UseHttpsRedirection();
-
 app.UseStaticFiles();
-
 app.UseCors("CorsPolicy");
-
 app.UseAuthentication();
-
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();

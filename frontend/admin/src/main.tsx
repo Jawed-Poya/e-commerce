@@ -7,6 +7,7 @@ import "@/index.css";
 import { ThemeProvider } from "./components/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nProvider } from "@/i18n/i18n-provider";
+import { AdminAuthProvider } from "@/features/auth/auth-context";
 
 const client = new QueryClient();
 
@@ -15,7 +16,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <ThemeProvider>
           <I18nProvider>
             <QueryClientProvider client={client}>
-                <RouterProvider router={router} />
+                <AdminAuthProvider>
+                    <RouterProvider router={router} />
+                </AdminAuthProvider>
             </QueryClientProvider>
           </I18nProvider>
         </ThemeProvider>

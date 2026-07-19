@@ -11,7 +11,9 @@ import {
 import { useState, type FormEvent } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 
+import { useAuth } from "../../features/auth/auth-context";
 import { useCart } from "../../features/cart/cart-context";
+import { NotificationCenter } from "../../features/notifications/notification-center";
 import {
     CategoryMegaMenu,
     MobileCategoryLinks,
@@ -56,6 +58,8 @@ export function StoreLayout() {
 
     const navigate = useNavigate();
     const cart = useCart();
+    const auth = useAuth();
+    const accountPath = auth.isAuthenticated ? "/account" : "/account/login";
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -123,6 +127,7 @@ export function StoreLayout() {
 
                         <div className="ml-auto flex items-center gap-0.5">
                             <ThemeToggle />
+                            <NotificationCenter />
 
                             <Button
                                 asChild
@@ -130,7 +135,7 @@ export function StoreLayout() {
                                 size="icon"
                                 className="hidden rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary sm:inline-flex"
                             >
-                                <Link to="/track-order" aria-label="Track order">
+                                <Link to={accountPath} aria-label={auth.isAuthenticated ? "Customer account" : "Customer login"}>
                                     <UserRound className="size-5" />
                                 </Link>
                             </Button>
@@ -219,10 +224,10 @@ export function StoreLayout() {
 
                                             <div className="grid grid-cols-3 gap-2 px-5 pb-5">
                                                 <MobileAction
-                                                    icon={
-                                                        <UserRound className="size-5" />
-                                                    }
-                                                    label="Account"
+                                                    icon={<UserRound className="size-5" />}
+                                                    label={auth.isAuthenticated ? auth.user?.customerTypeName ?? "Account" : "Sign in"}
+                                                    to={accountPath}
+                                                    onNavigate={() => setOpen(false)}
                                                 />
 
                                                 <MobileAction
@@ -517,23 +522,33 @@ function MobileAction({
     icon,
     label,
     count,
+    to,
+    onNavigate,
 }: {
     icon: React.ReactNode;
     label: string;
     count?: number;
+    to?: string;
+    onNavigate?: () => void;
 }) {
-    return (
-        <button
-            type="button"
-            className="relative flex flex-col items-center gap-2 rounded-2xl border bg-card px-2 py-4 text-xs font-semibold shadow-sm transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-        >
+    const content = (
+        <>
             <span className="relative">
                 {icon}
-
                 {typeof count === "number" && <Count value={count} />}
             </span>
+            <span className="max-w-full truncate">{label}</span>
+        </>
+    );
+    const className = "relative flex min-w-0 flex-col items-center gap-2 rounded-2xl border bg-card px-2 py-4 text-xs font-semibold shadow-sm transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary";
 
-            {label}
+    return to ? (
+        <Link to={to} onClick={onNavigate} className={className}>
+            {content}
+        </Link>
+    ) : (
+        <button type="button" className={className}>
+            {content}
         </button>
     );
 }

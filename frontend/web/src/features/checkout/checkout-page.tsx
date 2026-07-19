@@ -13,10 +13,12 @@ import {
     ShoppingBag,
     Truck,
 } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 
+import { useAuth } from "../auth/auth-context";
 import { useCart } from "../cart/cart-context";
+import { saveRecentOrder } from "../orders/recent-orders";
 import { imageUrl, ApiError } from "../../shared/api/api-client";
 import { Button } from "../../shared/components/ui/button";
 import { formatMoney } from "../../shared/lib/money";
@@ -63,10 +65,24 @@ const initialForm: CheckoutForm = {
 
 export function CheckoutPage() {
     const cart = useCart();
+    const auth = useAuth();
     const navigate = useNavigate();
     const [form, setForm] = useState(initialForm);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!auth.user) return;
+        const names = auth.user.fullName.trim().split(/\s+/);
+        setForm((current) => ({
+            ...current,
+            firstName: current.firstName || names[0] || "",
+            lastName: current.lastName || names.slice(1).join(" "),
+            recipientName: current.recipientName || auth.user!.fullName,
+            phone: current.phone || auth.user!.phone || "",
+            email: current.email || auth.user!.email || "",
+        }));
+    }, [auth.user]);
 
     const configQuery = useQuery({
         queryKey: ["checkout-configuration"],
@@ -158,6 +174,7 @@ export function CheckoutPage() {
         try {
             const confirmation = await createOrder(request);
             saveConfirmation(confirmation, form.phone);
+            saveRecentOrder(confirmation, form.phone);
             cart.clear();
             navigate(`/orders/${confirmation.orderNumber}/success`, {
                 replace: true,
@@ -188,6 +205,11 @@ export function CheckoutPage() {
                         Prices and stock are checked again by the server before
                         your order is created.
                     </p>
+                    {auth.user && (
+                        <p className="mt-3 inline-flex rounded-full bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary">
+                            Signed in as {auth.user.fullName} · {auth.user.customerTypeName ?? "General"} pricing
+                        </p>
+                    )}
                 </div>
 
                 <Button asChild variant="outline" className="hidden sm:flex">

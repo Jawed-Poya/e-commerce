@@ -1,11 +1,14 @@
+using ECommerce.Shared;
 using ECommerce.Entities;
 using ECommerce.Entities.Products.Contracts;
 using ECommerce.Entities.Products.Exceptions;
 using ECommerce.Services.Products;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ECommerce.Controllers;
 
+[Authorize(Roles = AppRoles.Admin)]
 [ApiController]
 [Route("api/products/{productId:long}/prices")]
 public sealed class ProductPricesController(IProductPricingService pricing) : ControllerBase

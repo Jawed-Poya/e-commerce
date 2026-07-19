@@ -13,9 +13,11 @@ import { ApiError } from "../../shared/api/api-client";
 import { Button } from "../../shared/components/ui/button";
 import { formatMoney } from "../../shared/lib/money";
 import { trackOrder } from "./order-api";
+import { readRecentOrders } from "./recent-orders";
 
 export function OrderTrackingPage() {
     const [searchParams, setSearchParams] = useSearchParams();
+    const [recentOrders] = useState(readRecentOrders);
     const [orderNumber, setOrderNumber] = useState(
         searchParams.get("orderNumber") ?? "",
     );
@@ -80,6 +82,35 @@ export function OrderTrackingPage() {
                     <Search /> Track
                 </Button>
             </form>
+
+            {recentOrders.length > 0 && (
+                <section className="mx-auto mt-5 max-w-3xl rounded-2xl border bg-card p-5">
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <p className="text-sm font-black">Recent orders on this browser</p>
+                            <p className="mt-1 text-xs text-muted-foreground">Tap one to fill and track it without remembering the number.</p>
+                        </div>
+                        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">{recentOrders.length}</span>
+                    </div>
+                    <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+                        {recentOrders.map((order) => (
+                            <button
+                                key={order.orderNumber}
+                                type="button"
+                                onClick={() => {
+                                    setOrderNumber(order.orderNumber);
+                                    setPhone(order.phone);
+                                    setSearchParams({ orderNumber: order.orderNumber, phone: order.phone });
+                                }}
+                                className="min-w-56 rounded-xl border bg-background p-3 text-left transition hover:border-primary/40 hover:bg-primary/5"
+                            >
+                                <span className="block truncate text-sm font-black text-primary">{order.orderNumber}</span>
+                                <span className="mt-1 block text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleDateString()} · {formatMoney(order.total, order.currency)}</span>
+                            </button>
+                        ))}
+                    </div>
+                </section>
+            )}
 
             {query.isFetching && (
                 <div className="mt-10 flex justify-center text-muted-foreground">

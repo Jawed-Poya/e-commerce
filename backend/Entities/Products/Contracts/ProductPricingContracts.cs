@@ -27,5 +27,6 @@ public sealed record ProductPriceResponse(
     decimal RegularPrice,
     decimal? SalePrice,
     DateOnly? StartDate,
-    DateOnly? EndDate
+    DateOnly? EndDate,
+    bool IsDefault
 );

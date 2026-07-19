@@ -36,4 +36,11 @@ public interface IOrderService
         string orderNumber,
         string phone,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<OrderListItemResponse>> GetMyOrdersAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<OrderDetailsResponse?> GetMyOrderAsync(
+        string orderNumber,
+        CancellationToken cancellationToken = default);
 }

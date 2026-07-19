@@ -24,6 +24,10 @@ export interface ProductListItem {
     isActive: boolean;
     stock: number;
     price: number | null;
+    oldPrice: number | null;
+    priceCustomerTypeName: string | null;
+    isDefaultPrice: boolean;
+    viewCount: number;
     primaryImageUrl: string | null;
     images: ProductListImage[];
 }
@@ -38,7 +42,7 @@ export interface ProductListImage {
 export interface ProductDetails extends Omit<ProductListItem, "stock" | "price" | "primaryImageUrl" | "images"> {
     brandName: string | null;
     unitName: string | null;
-    viewCount: number;
+    priceCustomerTypeId: number | null;
     createdAt: string;
     updatedAt: string | null;
     inventory: { quantity: number; reservedQuantity: number; availableQuantity: number; minimumQuantity: number; expireDate: string | null } | null;
@@ -54,9 +58,10 @@ export interface ProductPrice {
     salePrice: number | null;
     startDate: string | null;
     endDate: string | null;
+    isDefault: boolean;
 }
 
-export type ProductPriceInput = Omit<ProductPrice, "id" | "customerTypeName"> & { id?: number };
+export type ProductPriceInput = Omit<ProductPrice, "id" | "customerTypeName" | "isDefault"> & { id?: number };
 
 export interface PagedProducts {
     items: ProductListItem[];

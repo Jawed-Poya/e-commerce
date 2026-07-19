@@ -9,6 +9,7 @@ export interface ProductLookups {
     brands: ProductLookupOption[];
     units: ProductLookupOption[];
     customerTypes: ProductLookupOption[];
+    defaultCustomerTypeId: number;
 }
 
 export interface ProductBulkItemFormValues {

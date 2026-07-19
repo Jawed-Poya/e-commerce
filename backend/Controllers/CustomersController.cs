@@ -1,12 +1,15 @@
+using ECommerce.Shared;
 using ECommerce.Entities;
 using ECommerce.Entities.Common;
 using ECommerce.Entities.Customers.Contracts;
 using ECommerce.Entities.Customers.Filters;
 using ECommerce.Services.Customers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ECommerce.Controllers;
 
+[Authorize(Roles = AppRoles.Admin)]
 [ApiController]
 [Route("api/customers")]
 public sealed class CustomersController(ICustomerService customers) : ControllerBase

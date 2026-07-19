@@ -13,6 +13,8 @@ public interface IProductService
 
     Task<ProductDetailsDto?> GetByIdAsync(long id);
 
+    Task<long> IncrementViewCountAsync(long id, CancellationToken cancellationToken = default);
+
     Task<long> CreateAsync(Product model);
 
     Task UpdateAsync(long id, Product model);

@@ -31,14 +31,18 @@ export function ProductCard({ product }: { product: Product }) {
           )
         : 0;
 
-    const addToCart = () =>
+    const hasPrice = product.price != null;
+
+    const addToCart = () => {
+        if (product.price == null) return;
         cart.addItem({
             id: product.id,
             name: product.name,
             image: product.primaryImageUrl,
-            price: product.price ?? 0,
+            price: product.price,
             stock: product.stock,
         });
+    };
 
     return (
         <article className="group relative grid h-full min-w-0 grid-cols-[116px_minmax(0,1fr)] overflow-hidden rounded-[20px] border border-border/70 bg-card p-2 shadow-[0_5px_20px_rgba(15,23,42,0.05)] transition-all duration-300 active:scale-[0.99] dark:shadow-[0_8px_28px_rgba(0,0,0,0.22)] sm:flex sm:flex-col sm:p-0 sm:hover:-translate-y-1.5 sm:hover:border-primary/25 sm:hover:shadow-[0_24px_60px_rgba(15,23,42,0.12)] dark:sm:hover:shadow-[0_24px_60px_rgba(0,0,0,0.38)]">
@@ -172,8 +176,17 @@ export function ProductCard({ product }: { product: Product }) {
                     <div className="mb-3 flex items-end justify-between gap-2 sm:mb-4">
                         <div className="min-w-0">
                             <p className="text-lg font-black tracking-[-0.035em] text-foreground sm:text-2xl">
-                                ${(product.price ?? 0).toFixed(2)}
+                                {hasPrice
+                                    ? `$${product.price!.toFixed(2)}`
+                                    : "Price unavailable"}
                             </p>
+                            {hasPrice && (
+                                <p className="mt-1 truncate text-[9px] font-semibold text-muted-foreground sm:text-[10px]">
+                                    {product.isDefaultPrice
+                                        ? `${product.priceCustomerTypeName ?? "General"} default price`
+                                        : `${product.priceCustomerTypeName ?? "Customer"} price`}
+                                </p>
+                            )}
 
                             {hasDiscount && (
                                 <div className="mt-0.5 flex items-center gap-1.5">
@@ -205,19 +218,25 @@ export function ProductCard({ product }: { product: Product }) {
                         <Button
                             type="button"
                             className="h-9 flex-1 rounded-xl px-3 text-xs font-bold shadow-sm transition-all hover:shadow-md active:scale-[0.97] sm:h-11 sm:text-sm"
-                            disabled={product.stock < 1}
+                            disabled={product.stock < 1 || !hasPrice}
                             onClick={addToCart}
                         >
                             <ShoppingBag className="size-3.5 sm:size-4" />
 
                             <span className="sm:hidden">
-                                {product.stock > 0 ? "Add" : "Sold out"}
+                                {product.stock < 1
+                                    ? "Sold out"
+                                    : hasPrice
+                                      ? "Add"
+                                      : "No price"}
                             </span>
 
                             <span className="hidden sm:inline">
-                                {product.stock > 0
-                                    ? "Add to cart"
-                                    : "Out of stock"}
+                                {product.stock < 1
+                                    ? "Out of stock"
+                                    : hasPrice
+                                      ? "Add to cart"
+                                      : "Price unavailable"}
                             </span>
                         </Button>
 

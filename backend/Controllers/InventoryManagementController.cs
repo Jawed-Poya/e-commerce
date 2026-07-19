@@ -1,12 +1,15 @@
+using ECommerce.Shared;
 using ECommerce.Entities;
 using ECommerce.Entities.Common;
 using ECommerce.Entities.Products.Contracts;
 using ECommerce.Entities.Products.Filters;
 using ECommerce.Services.Inventory;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ECommerce.Controllers;
 
+[Authorize(Roles = AppRoles.Admin)]
 [ApiController]
 [Route("api/inventory")]
 public sealed class InventoryManagementController(IInventoryService inventory) : ControllerBase

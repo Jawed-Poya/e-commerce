@@ -1,6 +1,6 @@
 import * as React from "react";
 import { NavMain } from "@/components/nav-main";
-import { adminUser, NavUser } from "@/components/nav-user";
+import { NavUser } from "@/components/nav-user";
 
 import {
     Sidebar,
@@ -21,8 +21,6 @@ import {
 import { useI18n } from "@/i18n/i18n-provider";
 
 const data = {
-    user: adminUser,
-
     navMain: [
         {
             title: "Dashboard",
@@ -100,7 +98,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarContent>
 
             <SidebarFooter>
-                <NavUser user={data.user} />
+                <NavUser />
             </SidebarFooter>
 
             <SidebarRail />

@@ -3,15 +3,18 @@ import {
     Banknote,
     Building2,
     CheckCircle2,
+    Clipboard,
     ClipboardCheck,
     PackageCheck,
     Truck,
 } from "lucide-react";
+import { useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
 import type { OrderConfirmation } from "../checkout/checkout-types";
 import { Button } from "../../shared/components/ui/button";
 import { formatMoney } from "../../shared/lib/money";
+import { useAuth } from "../auth/auth-context";
 
 type ConfirmationState = {
     confirmation: OrderConfirmation;
@@ -20,6 +23,8 @@ type ConfirmationState = {
 
 export function OrderSuccessPage() {
     const location = useLocation();
+    const auth = useAuth();
+    const [copied, setCopied] = useState(false);
     const { orderNumber } = useParams();
     const stored = readStoredConfirmation();
     const state = (location.state as ConfirmationState | null) ?? stored;
@@ -69,12 +74,34 @@ export function OrderSuccessPage() {
                 <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_0.9fr] lg:p-10">
                     <div className="space-y-5">
                         <div className="rounded-2xl border bg-muted/25 p-5">
-                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                                Order number
-                            </p>
-                            <p className="mt-2 break-all text-2xl font-black text-primary">
-                                {confirmation.orderNumber}
-                            </p>
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="min-w-0">
+                                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                        Your order number
+                                    </p>
+                                    <p className="mt-2 break-all text-2xl font-black text-primary">
+                                        {confirmation.orderNumber}
+                                    </p>
+                                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                                        {auth.isAuthenticated
+                                            ? "This order is saved in your account order history."
+                                            : "This order is saved in this browser. You can also copy the number now."}
+                                    </p>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="shrink-0 rounded-xl"
+                                    onClick={async () => {
+                                        await navigator.clipboard.writeText(confirmation.orderNumber);
+                                        setCopied(true);
+                                        window.setTimeout(() => setCopied(false), 1800);
+                                    }}
+                                >
+                                    <Clipboard /> {copied ? "Copied" : "Copy"}
+                                </Button>
+                            </div>
                         </div>
 
                         <div className="grid gap-3 sm:grid-cols-2">
@@ -134,6 +161,11 @@ export function OrderSuccessPage() {
                             >
                                 <Link to="/products">Continue shopping</Link>
                             </Button>
+                            {auth.isAuthenticated && (
+                                <Button asChild size="lg" variant="outline" className="rounded-xl">
+                                    <Link to="/account">View my orders</Link>
+                                </Button>
+                            )}
                         </div>
                     </div>
 

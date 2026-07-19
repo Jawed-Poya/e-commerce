@@ -1,13 +1,16 @@
+using ECommerce.Shared;
 using System.Security.Claims;
 using ECommerce.Entities;
 using ECommerce.Entities.Common;
 using ECommerce.Entities.Orders.Contracts;
 using ECommerce.Entities.Orders.Filters;
 using ECommerce.Services.Orders;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ECommerce.Controllers;
 
+[Authorize(Roles = AppRoles.Admin)]
 [ApiController]
 [Route("api/orders")]
 public sealed class OrdersController(IOrderService orders) : ControllerBase

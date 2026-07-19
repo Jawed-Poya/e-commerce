@@ -31,8 +31,7 @@ axiosInstance.interceptors.response.use(
     (error) => {
         if (error.response?.status === 401) {
             localStorage.removeItem("token");
-
-            // optional redirect
+            localStorage.removeItem("easycart-admin-session");
             window.location.href = "/login";
         }
 

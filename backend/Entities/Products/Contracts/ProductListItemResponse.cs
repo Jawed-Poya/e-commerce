@@ -18,6 +18,9 @@ public sealed record ProductListItemResponse(
     decimal Stock,
     decimal? Price,
     decimal? OldPrice,
+    string? PriceCustomerTypeName,
+    bool IsDefaultPrice,
+    long ViewCount,
     string? PrimaryImageUrl,
     IReadOnlyList<ProductListImageResponse> Images
 );

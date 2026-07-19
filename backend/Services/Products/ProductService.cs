@@ -7,6 +7,7 @@ using ECommerce.Entities.Products.Contracts;
 using ECommerce.Entities.Products.Exceptions;
 using ECommerce.Entities.Products.Filters;
 using ECommerce.Entities.Products.Requests;
+using ECommerce.Services.Customers;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
@@ -27,164 +28,177 @@ public class ProductService : IProductService
     private readonly ApplicationDbContext _context;
     private readonly ILogger<ProductService> _logger;
     private readonly IProductImageStorage _imageStorage;
-
+    private readonly ICurrentCustomerAccessor _currentCustomer;
+    private readonly IDefaultCustomerTypeResolver _defaultCustomerType;
 
     public ProductService(
         ApplicationDbContext context,
         IProductImageStorage imageStorage,
-        ILogger<ProductService> logger)
+        ILogger<ProductService> logger,
+        ICurrentCustomerAccessor currentCustomer,
+        IDefaultCustomerTypeResolver defaultCustomerType)
     {
         _context = context;
         _imageStorage = imageStorage;
         _logger = logger;
+        _currentCustomer = currentCustomer;
+        _defaultCustomerType = defaultCustomerType;
     }
 
     public async Task<PagedResult<ProductListItemResponse>> GetAsync(ProductFilter filter)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        IQueryable<Product> query = _context.Products
+        var defaultType = await _defaultCustomerType.GetAsync();
+        var requestedTypeId = await _currentCustomer.GetCustomerTypeIdAsync();
+        var effectiveTypeId = requestedTypeId ?? defaultType.Id;
+
+        IQueryable<Product> products = _context.Products
             .AsNoTracking()
-            .Include(x => x.Category)
-            .Include(x => x.Brand)
-            .Include(x => x.Unit)
-            .Include(x => x.Inventory)
-            .Include(x => x.Images)
-            .Where(x => !x.IsDeleted);
+            .Where(product => !product.IsDeleted);
 
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
-            query = query.Where(x =>
-                x.Name.Contains(filter.Search) ||
-                (x.Barcode != null && x.Barcode.Contains(filter.Search)));
+            var search = filter.Search.Trim();
+            products = products.Where(product =>
+                product.Name.Contains(search) ||
+                (product.Barcode != null && product.Barcode.Contains(search)));
         }
 
         if (filter.CategoryId.HasValue)
         {
-            var categoryIds = await GetCategoryTreeIdsAsync(
-                filter.CategoryId.Value
-            );
-
-            query = query.Where(x => categoryIds.Contains(x.CategoryId));
+            var categoryIds = await GetCategoryTreeIdsAsync(filter.CategoryId.Value);
+            products = products.Where(product => categoryIds.Contains(product.CategoryId));
         }
 
-        if (filter.BrandId.HasValue)
-            query = query.Where(x => x.BrandId == filter.BrandId);
-
-        if (filter.UnitId.HasValue)
-            query = query.Where(x => x.UnitId == filter.UnitId);
-
-        if (filter.IsFeatured.HasValue)
-            query = query.Where(x => x.IsFeatured == filter.IsFeatured);
-
-        if (filter.IsActive.HasValue)
-            query = query.Where(x => x.IsActive == filter.IsActive);
-
-        if (filter.MinPrice.HasValue)
-            query = query.Where(x =>
-                x.Prices.Any(p =>
-                    (p.SalePrice.HasValue &&
-                     (!p.StartDate.HasValue || p.StartDate.Value <= today) &&
-                     (!p.EndDate.HasValue || p.EndDate.Value >= today)
-                        ? p.SalePrice.Value
-                        : p.RegularPrice) >= filter.MinPrice));
-
-        if (filter.MaxPrice.HasValue)
-            query = query.Where(x =>
-                x.Prices.Any(p =>
-                    (p.SalePrice.HasValue &&
-                     (!p.StartDate.HasValue || p.StartDate.Value <= today) &&
-                     (!p.EndDate.HasValue || p.EndDate.Value >= today)
-                        ? p.SalePrice.Value
-                        : p.RegularPrice) <= filter.MaxPrice));
-
+        if (filter.BrandId.HasValue) products = products.Where(product => product.BrandId == filter.BrandId);
+        if (filter.UnitId.HasValue) products = products.Where(product => product.UnitId == filter.UnitId);
+        if (filter.IsFeatured.HasValue) products = products.Where(product => product.IsFeatured == filter.IsFeatured);
+        if (filter.IsActive.HasValue) products = products.Where(product => product.IsActive == filter.IsActive);
         if (filter.InStock.HasValue)
-            query = filter.InStock.Value
-                ? query.Where(x => x.Inventory != null &&
-                    x.Inventory.Quantity - x.Inventory.ReservedQuantity > 0)
-                : query.Where(x => x.Inventory == null ||
-                    x.Inventory.Quantity - x.Inventory.ReservedQuantity <= 0);
-
-        query = filter.SortBy?.ToLower() switch
         {
-            "name" => filter.SortDescending
-                ? query.OrderByDescending(x => x.Name)
-                : query.OrderBy(x => x.Name),
+            products = filter.InStock.Value
+                ? products.Where(product => product.Inventory != null && product.Inventory.Quantity - product.Inventory.ReservedQuantity > 0)
+                : products.Where(product => product.Inventory == null || product.Inventory.Quantity - product.Inventory.ReservedQuantity <= 0);
+        }
 
-            "price" => filter.SortDescending
-                ? query.OrderByDescending(x => x.Prices.Min(p =>
-                    p.SalePrice.HasValue &&
-                    (!p.StartDate.HasValue || p.StartDate.Value <= today) &&
-                    (!p.EndDate.HasValue || p.EndDate.Value >= today)
-                        ? p.SalePrice.Value
-                        : p.RegularPrice))
-                : query.OrderBy(x => x.Prices.Min(p =>
-                    p.SalePrice.HasValue &&
-                    (!p.StartDate.HasValue || p.StartDate.Value <= today) &&
-                    (!p.EndDate.HasValue || p.EndDate.Value >= today)
-                        ? p.SalePrice.Value
-                        : p.RegularPrice)),
-
-            "createdat" => filter.SortDescending
-                ? query.OrderByDescending(x => x.CreatedAt)
-                : query.OrderBy(x => x.CreatedAt),
-
-            _ => query.OrderByDescending(x => x.Id)
-        };
-
-        var total = await query.CountAsync();
-
-        var items = await query
-            .Skip((filter.Page - 1) * filter.PageSize)
-            .Take(filter.PageSize)
-            .Select(x => new ProductListItemResponse(
-                x.Id,
-                x.Name,
-                x.Barcode,
-                x.ShortDescription,
-                x.Description,
-                x.Slug,
-                x.CategoryId,
-                x.Category.Name,
-                x.BrandId,
-                x.UnitId,
-                x.MinimumValue,
-                x.MaximumValue,
-                x.IsFeatured,
-                x.IsActive,
-                x.Inventory == null ? 0 : x.Inventory.Quantity - x.Inventory.ReservedQuantity,
-                x.Prices.Select(p => (decimal?)(
-                    p.SalePrice.HasValue &&
-                    (!p.StartDate.HasValue || p.StartDate.Value <= today) &&
-                    (!p.EndDate.HasValue || p.EndDate.Value >= today)
-                        ? p.SalePrice.Value
-                        : p.RegularPrice)).Min(),
-                x.Prices
-                    .OrderBy(p =>
-                        p.SalePrice.HasValue &&
-                        (!p.StartDate.HasValue || p.StartDate.Value <= today) &&
-                        (!p.EndDate.HasValue || p.EndDate.Value >= today)
-                            ? p.SalePrice.Value
-                            : p.RegularPrice)
-                    .Select(p =>
-                        p.SalePrice.HasValue &&
-                        (!p.StartDate.HasValue || p.StartDate.Value <= today) &&
-                        (!p.EndDate.HasValue || p.EndDate.Value >= today)
-                            ? (decimal?)p.RegularPrice
+        var query = products.Select(product => new ProductListProjection
+        {
+            Id = product.Id,
+            Name = product.Name,
+            Barcode = product.Barcode,
+            ShortDescription = product.ShortDescription,
+            Description = product.Description,
+            Slug = product.Slug,
+            CategoryId = product.CategoryId,
+            CategoryName = product.Category.Name,
+            BrandId = product.BrandId,
+            UnitId = product.UnitId,
+            MinimumValue = product.MinimumValue,
+            MaximumValue = product.MaximumValue,
+            IsFeatured = product.IsFeatured,
+            IsActive = product.IsActive,
+            Stock = product.Inventory == null ? 0 : product.Inventory.Quantity - product.Inventory.ReservedQuantity,
+            HasRequestedPrice = product.Prices.Any(price => price.CustomerTypeId == effectiveTypeId),
+            Price = product.Prices
+                .Where(price => price.CustomerTypeId == effectiveTypeId)
+                .Select(price => (decimal?)(price.SalePrice.HasValue &&
+                    (!price.StartDate.HasValue || price.StartDate.Value <= today) &&
+                    (!price.EndDate.HasValue || price.EndDate.Value >= today)
+                        ? price.SalePrice.Value
+                        : price.RegularPrice))
+                .FirstOrDefault()
+                ?? product.Prices
+                    .Where(price => price.CustomerTypeId == defaultType.Id)
+                    .Select(price => (decimal?)(price.SalePrice.HasValue &&
+                        (!price.StartDate.HasValue || price.StartDate.Value <= today) &&
+                        (!price.EndDate.HasValue || price.EndDate.Value >= today)
+                            ? price.SalePrice.Value
+                            : price.RegularPrice))
+                    .FirstOrDefault(),
+            OldPrice = product.Prices
+                .Where(price => price.CustomerTypeId == effectiveTypeId)
+                .Select(price => price.SalePrice.HasValue &&
+                    (!price.StartDate.HasValue || price.StartDate.Value <= today) &&
+                    (!price.EndDate.HasValue || price.EndDate.Value >= today)
+                        ? (decimal?)price.RegularPrice
+                        : null)
+                .FirstOrDefault()
+                ?? product.Prices
+                    .Where(price => price.CustomerTypeId == defaultType.Id)
+                    .Select(price => price.SalePrice.HasValue &&
+                        (!price.StartDate.HasValue || price.StartDate.Value <= today) &&
+                        (!price.EndDate.HasValue || price.EndDate.Value >= today)
+                            ? (decimal?)price.RegularPrice
                             : null)
                     .FirstOrDefault(),
-                x.Images.Where(i => i.IsPrimary).Select(i => "/" + i.ImagePath.Replace("\\", "/")).FirstOrDefault(),
-                x.Images.OrderByDescending(i => i.IsPrimary).ThenBy(i => i.SortOrder)
-                    .Select(i => new ProductListImageResponse(i.Id, "/" + i.ImagePath.Replace("\\", "/"), i.IsPrimary, i.SortOrder))
-                    .ToList()
-            ))
-            .ToListAsync();
+            PriceCustomerTypeName = product.Prices
+                .Where(price => price.CustomerTypeId == effectiveTypeId)
+                .Select(price => price.CustomerType.Name)
+                .FirstOrDefault()
+                ?? product.Prices
+                    .Where(price => price.CustomerTypeId == defaultType.Id)
+                    .Select(price => price.CustomerType.Name)
+                    .FirstOrDefault(),
+            ViewCount = product.ViewCount,
+            PrimaryImageUrl = product.Images
+                .Where(image => image.IsPrimary)
+                .Select(image => "/" + image.ImagePath.Replace("\\", "/"))
+                .FirstOrDefault(),
+            Images = product.Images
+                .OrderByDescending(image => image.IsPrimary)
+                .ThenBy(image => image.SortOrder)
+                .Select(image => new ProductListImageResponse(
+                    image.Id,
+                    "/" + image.ImagePath.Replace("\\", "/"),
+                    image.IsPrimary,
+                    image.SortOrder))
+                .ToList()
+        });
+
+        if (filter.MinPrice.HasValue) query = query.Where(product => product.Price >= filter.MinPrice.Value);
+        if (filter.MaxPrice.HasValue) query = query.Where(product => product.Price <= filter.MaxPrice.Value);
+
+        query = filter.SortBy?.ToLowerInvariant() switch
+        {
+            "name" => filter.SortDescending ? query.OrderByDescending(product => product.Name) : query.OrderBy(product => product.Name),
+            "price" => filter.SortDescending ? query.OrderByDescending(product => product.Price) : query.OrderBy(product => product.Price),
+            "createdat" => filter.SortDescending ? query.OrderByDescending(product => product.Id) : query.OrderBy(product => product.Id),
+            _ => query.OrderByDescending(product => product.Id)
+        };
+
+        var page = Math.Max(1, filter.Page);
+        var pageSize = Math.Clamp(filter.PageSize, 1, 100);
+        var total = await query.CountAsync();
+        var rows = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
         return new PagedResult<ProductListItemResponse>
         {
-            Items = items,
+            Items = rows.Select(product => new ProductListItemResponse(
+                product.Id,
+                product.Name,
+                product.Barcode,
+                product.ShortDescription,
+                product.Description,
+                product.Slug,
+                product.CategoryId,
+                product.CategoryName,
+                product.BrandId,
+                product.UnitId,
+                product.MinimumValue,
+                product.MaximumValue,
+                product.IsFeatured,
+                product.IsActive,
+                product.Stock,
+                product.Price,
+                product.OldPrice,
+                product.PriceCustomerTypeName,
+                effectiveTypeId == defaultType.Id || !product.HasRequestedPrice,
+                product.ViewCount,
+                product.PrimaryImageUrl,
+                product.Images)).ToList(),
             TotalCount = total,
-            Page = filter.Page,
-            PageSize = filter.PageSize
+            Page = page,
+            PageSize = pageSize
         };
     }
 
@@ -353,54 +367,104 @@ public class ProductService : IProductService
 
     public async Task<ProductDetailsDto?> GetByIdAsync(long id)
     {
+        var product = await _context.Products
+            .AsNoTracking()
+            .Include(entity => entity.Category)
+            .Include(entity => entity.Brand)
+            .Include(entity => entity.Unit)
+            .Include(entity => entity.Inventory)
+            .Include(entity => entity.Images)
+            .Include(entity => entity.Prices)
+                .ThenInclude(price => price.CustomerType)
+            .FirstOrDefaultAsync(entity => entity.Id == id && !entity.IsDeleted);
+
+        if (product is null) return null;
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var defaultType = await _defaultCustomerType.GetAsync();
+        var requestedTypeId = await _currentCustomer.GetCustomerTypeIdAsync();
+        var effectiveTypeId = requestedTypeId ?? defaultType.Id;
+        var resolved = ResolvePrice(product.Prices, effectiveTypeId, defaultType.Id, today);
+
+        return new ProductDetailsDto
+        {
+            Id = product.Id,
+            Name = product.Name,
+            Barcode = product.Barcode,
+            Description = product.Description,
+            ShortDescription = product.ShortDescription,
+            Slug = product.Slug,
+            MinimumValue = product.MinimumValue,
+            MaximumValue = product.MaximumValue,
+            CategoryId = product.CategoryId,
+            CategoryName = product.Category.Name,
+            BrandId = product.BrandId,
+            BrandName = product.Brand?.Name,
+            UnitId = product.UnitId,
+            UnitName = product.Unit?.Name,
+            IsActive = product.IsActive,
+            IsFeatured = product.IsFeatured,
+            ViewCount = product.ViewCount,
+            Price = resolved?.Price,
+            OldPrice = resolved?.OldPrice,
+            PriceCustomerTypeId = resolved?.CustomerTypeId,
+            PriceCustomerTypeName = resolved?.CustomerTypeName,
+            IsDefaultPrice = resolved is not null && resolved.CustomerTypeId == defaultType.Id,
+            CreatedAt = product.CreatedAt,
+            UpdatedAt = product.UpdatedAt,
+            Inventory = product.Inventory is null ? null : new ProductInventoryDetailsDto(
+                product.Inventory.Quantity,
+                product.Inventory.ReservedQuantity,
+                Math.Max(0, product.Inventory.Quantity - product.Inventory.ReservedQuantity),
+                product.Inventory.MinimumQuantity,
+                product.Inventory.ExpireDate),
+            Images = product.Images
+                .OrderBy(image => image.SortOrder)
+                .Select(image => new ProductImageDetailsDto(
+                    image.Id,
+                    "/" + image.ImagePath.Replace("\\", "/"),
+                    image.OriginalFileName,
+                    image.ContentType,
+                    image.Size,
+                    image.IsPrimary,
+                    image.SortOrder))
+                .ToList(),
+            Prices = _currentCustomer.IsAdmin
+                ? product.Prices
+                    .OrderBy(price => price.CustomerType.SortOrder)
+                    .ThenBy(price => price.CustomerType.Name)
+                    .Select(price => new ProductPriceDetailsDto(
+                        price.Id,
+                        price.CustomerTypeId,
+                        price.CustomerType.Name,
+                        price.RegularPrice,
+                        price.SalePrice,
+                        price.StartDate,
+                        price.EndDate,
+                        price.CustomerTypeId == defaultType.Id))
+                    .ToList()
+                : []
+        };
+    }
+
+    public async Task<long> IncrementViewCountAsync(
+        long id,
+        CancellationToken cancellationToken = default)
+    {
+        var affected = await _context.Products
+            .Where(product => product.Id == id && product.IsActive)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(product => product.ViewCount, product => product.ViewCount + 1),
+                cancellationToken);
+
+        if (affected == 0)
+            throw new KeyNotFoundException("Product not found.");
+
         return await _context.Products
             .AsNoTracking()
-            .Include(x => x.Category)
-            .Include(x => x.Brand)
-            .Include(x => x.Unit)
-            .Include(x => x.Inventory)
-            .Include(x => x.Images)
-            .Include(x => x.Prices)
-                .ThenInclude(x => x.CustomerType)
-            .Where(x => x.Id == id && !x.IsDeleted)
-            .Select(x => new ProductDetailsDto
-            {
-                Id = x.Id,
-                Name = x.Name,
-                Barcode = x.Barcode,
-                Description = x.Description,
-                ShortDescription = x.ShortDescription,
-                Slug = x.Slug,
-                MinimumValue = x.MinimumValue,
-                MaximumValue = x.MaximumValue,
-                CategoryId = x.CategoryId,
-                CategoryName = x.Category.Name,
-                BrandId = x.BrandId,
-                BrandName = x.Brand == null ? null : x.Brand.Name,
-                UnitId = x.UnitId,
-                UnitName = x.Unit == null ? null : x.Unit.Name,
-                IsActive = x.IsActive,
-                IsFeatured = x.IsFeatured,
-                ViewCount = x.ViewCount,
-                CreatedAt = x.CreatedAt,
-                UpdatedAt = x.UpdatedAt,
-                Inventory = x.Inventory == null ? null : new ProductInventoryDetailsDto(
-                    x.Inventory.Quantity,
-                    x.Inventory.ReservedQuantity,
-                    Math.Max(0, x.Inventory.Quantity - x.Inventory.ReservedQuantity),
-                    x.Inventory.MinimumQuantity,
-                    x.Inventory.ExpireDate),
-                Images = x.Images.OrderBy(i => i.SortOrder).Select(i => new ProductImageDetailsDto(
-                    i.Id, "/" + i.ImagePath.Replace("\\", "/"), i.OriginalFileName,
-                    i.ContentType, i.Size, i.IsPrimary, i.SortOrder)).ToList(),
-                Prices = x.Prices
-                    .OrderBy(p => p.CustomerType.SortOrder)
-                    .ThenBy(p => p.CustomerType.Name)
-                    .Select(p => new ProductPriceDetailsDto(
-                        p.Id, p.CustomerTypeId, p.CustomerType.Name, p.RegularPrice, p.SalePrice,
-                        p.StartDate, p.EndDate)).ToList()
-            })
-            .FirstOrDefaultAsync();
+            .Where(product => product.Id == id)
+            .Select(product => product.ViewCount)
+            .SingleAsync(cancellationToken);
     }
 
     public async Task<long> CreateAsync(Product model)
@@ -824,21 +888,38 @@ public class ProductService : IProductService
             .Select(x => new ProductLookupItemResponse(x.Id, x.Name))
             .ToList();
 
-        var priceRange = await _context
-            .Set<ProductPrice>()
+        var defaultCustomerTypeId = await _defaultCustomerType.GetIdAsync(cancellationToken);
+        var requestedCustomerTypeId = await _currentCustomer.GetCustomerTypeIdAsync(cancellationToken);
+        var effectiveCustomerTypeId = requestedCustomerTypeId ?? defaultCustomerTypeId;
+
+        var priceRange = await _context.Products
             .AsNoTracking()
-            .Where(x => x.Product.IsActive && !x.Product.IsDeleted)
-            .Select(x =>
-                x.SalePrice.HasValue &&
-                (!x.StartDate.HasValue || x.StartDate.Value <= today) &&
-                (!x.EndDate.HasValue || x.EndDate.Value >= today)
-                    ? x.SalePrice.Value
-                    : x.RegularPrice)
+            .Where(product => product.IsActive && !product.IsDeleted)
+            .Select(product => new
+            {
+                Price = product.Prices
+                    .Where(price => price.CustomerTypeId == effectiveCustomerTypeId)
+                    .Select(price => (decimal?)(price.SalePrice.HasValue &&
+                        (!price.StartDate.HasValue || price.StartDate.Value <= today) &&
+                        (!price.EndDate.HasValue || price.EndDate.Value >= today)
+                            ? price.SalePrice.Value
+                            : price.RegularPrice))
+                    .FirstOrDefault()
+                    ?? product.Prices
+                        .Where(price => price.CustomerTypeId == defaultCustomerTypeId)
+                        .Select(price => (decimal?)(price.SalePrice.HasValue &&
+                            (!price.StartDate.HasValue || price.StartDate.Value <= today) &&
+                            (!price.EndDate.HasValue || price.EndDate.Value >= today)
+                                ? price.SalePrice.Value
+                                : price.RegularPrice))
+                        .FirstOrDefault()
+            })
+            .Where(item => item.Price.HasValue)
             .GroupBy(_ => 1)
             .Select(group => new
             {
-                Minimum = group.Min(),
-                Maximum = group.Max()
+                Minimum = group.Min(item => item.Price!.Value),
+                Maximum = group.Max(item => item.Price!.Value)
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -850,9 +931,63 @@ public class ProductService : IProductService
             Brands: brands,
             Units: units,
             CustomerTypes: customerTypes,
+            DefaultCustomerTypeId: defaultCustomerTypeId,
             MinimumPrice: minimumPrice,
             MaximumPrice: maximumPrice
         );
+    }
+
+    private static ResolvedProductPrice? ResolvePrice(
+        IEnumerable<ProductPrice> prices,
+        long requestedTypeId,
+        long defaultTypeId,
+        DateOnly today)
+    {
+        var selected = prices.FirstOrDefault(price => price.CustomerTypeId == requestedTypeId)
+            ?? prices.FirstOrDefault(price => price.CustomerTypeId == defaultTypeId);
+        if (selected is null) return null;
+
+        var saleActive = selected.SalePrice.HasValue &&
+            (!selected.StartDate.HasValue || selected.StartDate.Value <= today) &&
+            (!selected.EndDate.HasValue || selected.EndDate.Value >= today);
+
+        return new ResolvedProductPrice(
+            selected.CustomerTypeId,
+            selected.CustomerType.Name,
+            saleActive ? selected.SalePrice!.Value : selected.RegularPrice,
+            saleActive ? selected.RegularPrice : null);
+    }
+
+    private sealed record ResolvedProductPrice(
+        long CustomerTypeId,
+        string CustomerTypeName,
+        decimal Price,
+        decimal? OldPrice);
+
+    private sealed class ProductListProjection
+    {
+        public long Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public string? Barcode { get; init; }
+        public string? ShortDescription { get; init; }
+        public string? Description { get; init; }
+        public string? Slug { get; init; }
+        public long CategoryId { get; init; }
+        public string CategoryName { get; init; } = string.Empty;
+        public long? BrandId { get; init; }
+        public long? UnitId { get; init; }
+        public int? MinimumValue { get; init; }
+        public int? MaximumValue { get; init; }
+        public bool IsFeatured { get; init; }
+        public bool IsActive { get; init; }
+        public decimal Stock { get; init; }
+        public bool HasRequestedPrice { get; init; }
+        public decimal? Price { get; init; }
+        public decimal? OldPrice { get; init; }
+        public string? PriceCustomerTypeName { get; init; }
+        public long ViewCount { get; init; }
+        public string? PrimaryImageUrl { get; init; }
+        public IReadOnlyList<ProductListImageResponse> Images { get; init; } = [];
     }
 
     private static void ValidateRequest(

@@ -3,6 +3,8 @@ using ECommerce.Dtos;
 using ECommerce.Services.GeneralTypes;
 using ECommerce.Services.Products;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using ECommerce.Shared;
 
 namespace ECommerce.Controllers;
 
@@ -38,6 +40,7 @@ public class GeneralTypesController : ControllerBase
         return Ok(await _service.GetByIdAsync(id));
     }
 
+    [Authorize(Roles = AppRoles.Admin)]
     [HttpPost]
     [Consumes("application/json")]
     public async Task<IActionResult> CreateJson(
@@ -46,6 +49,7 @@ public class GeneralTypesController : ControllerBase
         return Ok(await _service.CreateAsync(model));
     }
 
+    [Authorize(Roles = AppRoles.Admin)]
     [HttpPost]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> Create(
@@ -89,6 +93,7 @@ public class GeneralTypesController : ControllerBase
         }
     }
 
+    [Authorize(Roles = AppRoles.Admin)]
     [HttpPut("{id:long}")]
     [Consumes("application/json")]
     public async Task<IActionResult> UpdateJson(
@@ -117,6 +122,7 @@ public class GeneralTypesController : ControllerBase
         return NoContent();
     }
 
+    [Authorize(Roles = AppRoles.Admin)]
     [HttpPut("{id:long}")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> Update(
@@ -180,6 +186,7 @@ public class GeneralTypesController : ControllerBase
         }
     }
 
+    [Authorize(Roles = AppRoles.Admin)]
     [HttpDelete("{id:long}")]
     public async Task<IActionResult> Delete(long id)
     {

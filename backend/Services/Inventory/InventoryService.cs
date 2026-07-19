@@ -5,10 +5,13 @@ using ECommerce.Entities.Products;
 using ECommerce.Entities.Products.Contracts;
 using ECommerce.Entities.Products.Filters;
 using Microsoft.EntityFrameworkCore;
+using ECommerce.Services.Notifications;
 
 namespace ECommerce.Services.Inventory;
 
-public sealed class InventoryService(ApplicationDbContext context) : IInventoryService
+public sealed class InventoryService(
+    ApplicationDbContext context,
+    IStoreNotificationService notifications) : IInventoryService
 {
     public async Task<InventoryOverviewResponse> GetOverviewAsync(InventoryFilter filter, CancellationToken ct = default)
     {
@@ -269,6 +272,18 @@ public sealed class InventoryService(ApplicationDbContext context) : IInventoryS
             IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey.Trim(),
             PerformedByUserId = userId
         });
+
+        var availableBefore = before.Quantity - before.ReservedQuantity;
+        var availableAfter = after.Quantity - after.ReservedQuantity;
+        if (availableAfter > availableBefore)
+        {
+            await notifications.CreateStockIncreasedAsync(
+                productId,
+                availableBefore,
+                availableAfter,
+                ct);
+        }
+
         await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return new StockResult(productId, after.Quantity, after.ReservedQuantity, after.Quantity - after.ReservedQuantity);

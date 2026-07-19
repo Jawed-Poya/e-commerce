@@ -19,6 +19,11 @@ public sealed class ProductDetailsDto
     public bool IsFeatured { get; set; }
     public bool IsActive { get; set; }
     public long ViewCount { get; set; }
+    public decimal? Price { get; set; }
+    public decimal? OldPrice { get; set; }
+    public long? PriceCustomerTypeId { get; set; }
+    public string? PriceCustomerTypeName { get; set; }
+    public bool IsDefaultPrice { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public ProductInventoryDetailsDto? Inventory { get; set; }
@@ -27,5 +32,5 @@ public sealed class ProductDetailsDto
 }
 
 public sealed record ProductInventoryDetailsDto(decimal Quantity, decimal ReservedQuantity, decimal AvailableQuantity, decimal MinimumQuantity, DateOnly? ExpireDate);
-public sealed record ProductPriceDetailsDto(long Id, long CustomerTypeId, string CustomerTypeName, decimal RegularPrice, decimal? SalePrice, DateOnly? StartDate, DateOnly? EndDate);
+public sealed record ProductPriceDetailsDto(long Id, long CustomerTypeId, string CustomerTypeName, decimal RegularPrice, decimal? SalePrice, DateOnly? StartDate, DateOnly? EndDate, bool IsDefault);
 public sealed record ProductImageDetailsDto(long Id, string Url, string? OriginalFileName, string ContentType, long Size, bool IsPrimary, int SortOrder);
