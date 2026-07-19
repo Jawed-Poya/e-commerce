@@ -174,7 +174,7 @@ export default function RolesPage() {
                                     className="flex-1"
                                     onClick={() => startEdit(role)}
                                 >
-                                    <Pencil /> Edit
+                                    <Pencil /> {role.isSystemRole ? "View / copy" : "Edit"}
                                 </Button>
                                 {!role.isSystemRole && (
                                     <ConfirmActionDialog
@@ -209,7 +209,7 @@ export default function RolesPage() {
                 <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
                     <DialogHeader className="pe-10">
                         <DialogTitle className="text-base">
-                            {editing ? `Edit ${editing.name}` : "Create role"}
+                            {editing ? (editing.isSystemRole ? `View ${editing.name}` : `Edit ${editing.name}`) : "Create role"}
                         </DialogTitle>
                         <DialogDescription>
                             A role is a reusable collection of permission claims. Assign the role to users from the Users page.
@@ -285,13 +285,15 @@ export default function RolesPage() {
                         <Button variant="outline" onClick={() => setOpen(false)}>
                             Cancel
                         </Button>
-                        <Button
-                            disabled={!form.name.trim() || save.isPending}
-                            onClick={() => save.mutate()}
-                        >
-                            {save.isPending && <LoaderCircle className="animate-spin" />}
-                            Save role
-                        </Button>
+                        {!editing?.isSystemRole && (
+                            <Button
+                                disabled={!form.name.trim() || save.isPending}
+                                onClick={() => save.mutate()}
+                            >
+                                {save.isPending && <LoaderCircle className="animate-spin" />}
+                                Save role
+                            </Button>
+                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

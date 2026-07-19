@@ -11,9 +11,11 @@ import { Link } from "react-router-dom";
 import { imageUrl } from "../../shared/api/api-client";
 import { Button } from "../../shared/components/ui/button";
 import { useCart } from "./cart-context";
+import { useI18n } from "../../i18n/i18n-provider";
 
 export function CartPage() {
     const cart = useCart();
+    const { t } = useI18n();
 
     const subtotal = cart.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
@@ -34,16 +36,15 @@ export function CartPage() {
                     </span>
 
                     <p className="mt-7 text-xs font-bold uppercase tracking-[0.2em] text-primary">
-                        Your shopping cart
+                        {t("cart.title")}
                     </p>
 
                     <h1 className="mt-3 text-3xl font-black tracking-[-0.04em] sm:text-5xl">
-                        Your cart is waiting.
+                        {t("cart.emptyTitle")}
                     </h1>
 
                     <p className="mx-auto mt-4 max-w-md text-sm leading-7 text-muted-foreground sm:text-base">
-                        Browse products from the catalog and add your favorites.
-                        Your selections will stay here when you return.
+                        {t("cart.emptyDescription")}
                     </p>
 
                     <Button
@@ -52,8 +53,8 @@ export function CartPage() {
                         className="mt-7 h-12 rounded-xl px-7 font-bold"
                     >
                         <Link to="/products">
-                            Explore products
-                            <ArrowRight className="size-4" />
+                            {t("wishlist.explore")}
+                            <ArrowRight className="size-4 rtl:rotate-180" />
                         </Link>
                     </Button>
                 </div>
@@ -67,11 +68,11 @@ export function CartPage() {
                 <div className="flex flex-col justify-between gap-4 border-b pb-6 sm:flex-row sm:items-end">
                     <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary sm:text-xs">
-                            Review your order
+                            {t("checkout.orderSummary")}
                         </p>
 
                         <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-5xl">
-                            Shopping cart
+                            {t("cart.title")}
                         </h1>
 
                         <p className="mt-2 text-sm text-muted-foreground">
@@ -87,8 +88,8 @@ export function CartPage() {
                         className="hidden rounded-xl sm:flex"
                     >
                         <Link to="/products">
-                            Continue shopping
-                            <ArrowRight className="size-4" />
+                            {t("common.continueShopping")}
+                            <ArrowRight className="size-4 rtl:rotate-180" />
                         </Link>
                     </Button>
                 </div>
@@ -202,7 +203,7 @@ export function CartPage() {
                                     </div>
 
                                     <div className="hidden min-w-32 flex-col items-end justify-between py-1 sm:flex">
-                                        <div className="text-right">
+                                        <div className="text-end">
                                             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                                                 Item total
                                             </p>
@@ -225,7 +226,7 @@ export function CartPage() {
                                             }
                                         >
                                             <Trash2 className="size-4" />
-                                            Remove
+                                            {t("common.remove")}
                                         </Button>
                                     </div>
                                 </article>
@@ -271,7 +272,7 @@ export function CartPage() {
                     <aside className="sticky top-32 hidden h-max overflow-hidden rounded-2xl border bg-card shadow-[0_18px_45px_rgba(15,23,42,0.08)] lg:block">
                         <div className="border-b bg-muted/25 p-6">
                             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-                                Order summary
+                                {t("checkout.orderSummary")}
                             </p>
 
                             <h2 className="mt-2 text-3xl font-black tracking-[-0.04em]">
@@ -282,7 +283,7 @@ export function CartPage() {
                         <div className="p-6">
                             <div className="grid gap-4 text-sm">
                                 <div className="flex items-center justify-between text-muted-foreground">
-                                    <span>Subtotal</span>
+                                    <span>{t("common.subtotal")}</span>
 
                                     <span className="font-bold text-foreground">
                                         ${subtotal.toFixed(2)}
@@ -290,17 +291,17 @@ export function CartPage() {
                                 </div>
 
                                 <div className="flex items-center justify-between text-muted-foreground">
-                                    <span>Delivery</span>
+                                    <span>{t("common.delivery")}</span>
 
                                     <span className="font-bold text-foreground">
                                         {shipping
                                             ? `$${shipping.toFixed(2)}`
-                                            : "Free"}
+                                            : t("common.free")}
                                     </span>
                                 </div>
 
                                 <div className="flex items-center justify-between border-t pt-4 text-base font-bold">
-                                    <span>Total</span>
+                                    <span>{t("common.total")}</span>
                                     <span className="text-xl">
                                         ${total.toFixed(2)}
                                     </span>
@@ -313,8 +314,8 @@ export function CartPage() {
                                 size="lg"
                             >
                                 <Link to="/checkout">
-                                    Continue to checkout
-                                    <ArrowRight className="size-4" />
+                                    {t("cart.checkout")}
+                                    <ArrowRight className="size-4 rtl:rotate-180" />
                                 </Link>
                             </Button>
 
@@ -331,7 +332,7 @@ export function CartPage() {
                 <div className="mx-auto flex max-w-xl items-center gap-4">
                     <div className="min-w-0">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                            Total
+                            {t("common.total")}
                         </p>
 
                         <p className="truncate text-xl font-black tracking-tight">
@@ -341,14 +342,14 @@ export function CartPage() {
                         <p className="text-[10px] text-muted-foreground">
                             {shipping
                                 ? `Includes $${shipping.toFixed(2)} delivery`
-                                : "Free delivery"}
+                                : t("cart.freeDelivery")}
                         </p>
                     </div>
 
-                    <Button asChild className="ml-auto h-12 min-w-44 rounded-xl px-5 font-bold shadow-md shadow-primary/15">
+                    <Button asChild className="ms-auto h-12 min-w-44 rounded-xl px-5 font-bold shadow-md shadow-primary/15">
                         <Link to="/checkout">
-                            Checkout
-                            <ArrowRight className="size-4" />
+                            {t("checkout.title")}
+                            <ArrowRight className="size-4 rtl:rotate-180" />
                         </Link>
                     </Button>
                 </div>

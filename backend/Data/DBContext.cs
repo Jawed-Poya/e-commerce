@@ -7,6 +7,7 @@ using API.Entities.Types;
 using ECommerce.Entities;
 using ECommerce.Entities.Notifications;
 using ECommerce.Entities.Products;
+using ECommerce.Entities.Storefront;
 using ECommerce.Entities.Users;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -66,6 +67,7 @@ public class ApplicationDbContext
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
 
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<StorefrontContent> StorefrontContents => Set<StorefrontContent>();
 
     #endregion
 
@@ -87,10 +89,18 @@ public class ApplicationDbContext
             })
             .IsUnique();
 
+        builder.Entity<StorefrontContent>(entity =>
+        {
+            entity.Property(item => item.HeroImageUrl).HasMaxLength(2048);
+            entity.Property(item => item.PrimaryButtonUrl).HasMaxLength(500);
+            entity.Property(item => item.SecondaryButtonUrl).HasMaxLength(500);
+        });
+
         builder.Entity<Product>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<Customer>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<Order>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<GeneralType>().HasQueryFilter(x => !x.IsDeleted);
+        builder.Entity<StorefrontContent>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<ProductImage>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted);
         builder.Entity<ProductInventory>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted);
         builder.Entity<ProductPrice>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted && !x.CustomerType.IsDeleted);

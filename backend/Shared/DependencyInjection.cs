@@ -11,6 +11,8 @@ using ECommerce.Services.Inventory;
 using ECommerce.Services.Notifications;
 using ECommerce.Services.Orders;
 using ECommerce.Services.Products;
+using ECommerce.Services.Storefront;
+using ECommerce.Services.Reviews;
 using ECommerce.Services.Users;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -37,6 +39,8 @@ public static class DependencyInjection
         services.AddSingleton<StoreRealtimeMetrics>();
         services.AddScoped<IAdminDashboardService, AdminDashboardService>();
         services.AddScoped<IAdminUserService, AdminUserService>();
+        services.AddScoped<IStorefrontContentService, StorefrontContentService>();
+        services.AddScoped<IProductReviewService, ProductReviewService>();
 
         return services;
     }

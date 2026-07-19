@@ -15,6 +15,8 @@ import RolesPage from "@/pages/roles";
 import AdminLoginPage from "@/features/auth/login-page";
 import ProfilePage from "@/pages/profile";
 import AdminNotFoundPage from "@/pages/not-found";
+import StorefrontContentPage from "@/pages/storefront-content";
+import ReviewsPage from "@/pages/reviews";
 import { ProtectedRoute } from "@/features/auth/protected-route";
 import { PermissionRoute } from "@/features/auth/permission-route";
 import { Permissions } from "@/features/auth/permissions";
@@ -77,6 +79,13 @@ export const router = createBrowserRouter([
                         ],
                     },
                     {
+                        path: "reviews",
+                        element: allowed(
+                            Permissions.ProductsManage,
+                            <ReviewsPage />,
+                        ),
+                    },
+                    {
                         path: "inventory",
                         element: allowed(
                             Permissions.InventoryView,
@@ -130,6 +139,13 @@ export const router = createBrowserRouter([
                         element: allowed(
                             Permissions.SystemManage,
                             <GeneralTypesPage />,
+                        ),
+                    },
+                    {
+                        path: "system/storefront",
+                        element: allowed(
+                            Permissions.SystemManage,
+                            <StorefrontContentPage />,
                         ),
                     },
                     {

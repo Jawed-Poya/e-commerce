@@ -1,0 +1,16 @@
+{
+  "name": "EasyCart Marketplace",
+  "short_name": "EasyCart",
+  "description": "Browse products, track orders, receive price and stock alerts, and shop from any device.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#0759b7",
+  "categories": ["shopping", "business"],
+  "icons": [
+    { "src": "/pwa-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

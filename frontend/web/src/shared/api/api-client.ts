@@ -102,6 +102,35 @@ export async function apiPost<T>(path: string, body?: unknown) {
     );
 }
 
+export async function apiPut<T>(path: string, body?: unknown) {
+    return readResponse<T>(
+        await fetch(`${API_URL}${path}`, {
+            method: "PUT",
+            headers: requestHeaders(true),
+            body: body === undefined ? undefined : JSON.stringify(body),
+        }),
+    );
+}
+
+export async function apiPatch<T>(path: string, body?: unknown) {
+    return readResponse<T>(
+        await fetch(`${API_URL}${path}`, {
+            method: "PATCH",
+            headers: requestHeaders(true),
+            body: body === undefined ? undefined : JSON.stringify(body),
+        }),
+    );
+}
+
+export async function apiDelete<T>(path: string) {
+    return readResponse<T>(
+        await fetch(`${API_URL}${path}`, {
+            method: "DELETE",
+            headers: requestHeaders(),
+        }),
+    );
+}
+
 export function imageUrl(path?: string | null) {
     if (!path) return null;
     return /^https?:/.test(path)

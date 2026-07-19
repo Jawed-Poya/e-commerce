@@ -5,6 +5,7 @@ import {
     CircleDollarSign,
     Radio,
     ShoppingCart,
+    Star,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -64,7 +65,7 @@ export function AdminNotificationCenter() {
                             <div>
                                 <p className="font-black">Sales activity</p>
                                 <p className="text-xs text-muted-foreground">
-                                    Orders and payment events
+                                    Orders, payments, and review events
                                 </p>
                             </div>
                         </div>
@@ -103,11 +104,15 @@ export function AdminNotificationCenter() {
                                     "mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl",
                                     item.kind === "Payment"
                                         ? "bg-emerald-500/10 text-emerald-600"
-                                        : "bg-primary/10 text-primary",
+                                        : item.kind === "Review"
+                                          ? "bg-amber-500/10 text-amber-600"
+                                          : "bg-primary/10 text-primary",
                                 )}
                             >
                                 {item.kind === "Payment" ? (
                                     <CircleDollarSign className="size-5" />
+                                ) : item.kind === "Review" ? (
+                                    <Star className="size-5 fill-current" />
                                 ) : (
                                     <ShoppingCart className="size-5" />
                                 )}
@@ -135,7 +140,7 @@ export function AdminNotificationCenter() {
                                 No sales notifications yet
                             </p>
                             <p className="mx-auto mt-1 max-w-xs text-xs leading-5 text-muted-foreground">
-                                New orders, order status changes, and payment updates will appear here immediately.
+                                New orders, order status changes, payments, and product reviews will appear here immediately.
                             </p>
                         </div>
                     )}

@@ -15,9 +15,11 @@ import { ApiError } from "../../shared/api/api-client";
 import { Button } from "../../shared/components/ui/button";
 import { cn } from "../../shared/lib/utils";
 import { useAuth } from "./auth-context";
+import { useI18n } from "../../i18n/i18n-provider";
 
 export function AuthPage() {
     const auth = useAuth();
+    const { t } = useI18n();
     const navigate = useNavigate();
     const location = useLocation();
     const [mode, setMode] = useState<"login" | "register">("login");
@@ -101,21 +103,21 @@ export function AuthPage() {
             <section className="flex min-h-[680px] items-center justify-center rounded-[32px] border bg-card p-5 shadow-[0_24px_80px_rgba(15,23,42,0.08)] sm:p-10">
                 <div className="w-full max-w-xl">
                     <div className="grid grid-cols-2 rounded-2xl bg-muted p-1.5">
-                        <ModeButton active={mode === "login"} onClick={() => { setMode("login"); setError(null); }}>Sign in</ModeButton>
-                        <ModeButton active={mode === "register"} onClick={() => { setMode("register"); setError(null); }}>Create account</ModeButton>
+                        <ModeButton active={mode === "login"} onClick={() => { setMode("login"); setError(null); }}>{t("auth.signIn")}</ModeButton>
+                        <ModeButton active={mode === "register"} onClick={() => { setMode("register"); setError(null); }}>{t("auth.createAccount")}</ModeButton>
                     </div>
 
                     <div className="mt-9">
                         <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">
-                            {mode === "login" ? "Welcome back" : "Join EasyCart"}
+                            {mode === "login" ? t("auth.welcomeBack") : t("auth.join")}
                         </p>
                         <h2 className="mt-2 text-3xl font-black tracking-[-0.045em] sm:text-4xl">
-                            {mode === "login" ? "Sign in to your account" : "Create your customer account"}
+                            {mode === "login" ? t("auth.signInTitle") : t("auth.createTitle")}
                         </h2>
                         <p className="mt-3 text-sm leading-6 text-muted-foreground">
                             {mode === "login"
-                                ? "Use your email address or phone number."
-                                : "You will start with the General customer type. An admin can promote you to VIP or another type later."}
+                                ? t("auth.loginDescription")
+                                : t("auth.registerDescription")}
                         </p>
                     </div>
 
@@ -123,30 +125,30 @@ export function AuthPage() {
                         {mode === "register" ? (
                             <>
                                 <div className="grid gap-4 sm:grid-cols-2">
-                                    <AuthField label="First name" required value={form.firstName} onChange={(value) => update("firstName", value)} />
-                                    <AuthField label="Last name" value={form.lastName} onChange={(value) => update("lastName", value)} />
+                                    <AuthField label={t("common.firstName")} required value={form.firstName} onChange={(value) => update("firstName", value)} />
+                                    <AuthField label={t("common.lastName")} value={form.lastName} onChange={(value) => update("lastName", value)} />
                                 </div>
-                                <AuthField label="Phone number" required value={form.phone} onChange={(value) => update("phone", value)} placeholder="+93 ..." />
-                                <AuthField label="Email" type="email" value={form.email} onChange={(value) => update("email", value)} placeholder="Optional, but recommended" />
+                                <AuthField label={t("auth.phone")} required value={form.phone} onChange={(value) => update("phone", value)} placeholder="+93 ..." />
+                                <AuthField label={t("common.email")} type="email" value={form.email} onChange={(value) => update("email", value)} placeholder="Optional, but recommended" />
                             </>
                         ) : (
-                            <AuthField label="Email or phone" required value={form.identifier} onChange={(value) => update("identifier", value)} placeholder="you@example.com or +93 ..." />
+                            <AuthField label={t("auth.identifier")} required value={form.identifier} onChange={(value) => update("identifier", value)} placeholder="you@example.com or +93 ..." />
                         )}
 
                         <label className="grid gap-2">
-                            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Password *</span>
+                            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t("common.password")} *</span>
                             <span className="relative">
-                                <LockKeyhole className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                                <LockKeyhole className="absolute start-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                                 <input
                                     required
                                     minLength={6}
                                     type={showPassword ? "text" : "password"}
                                     value={form.password}
                                     onChange={(event) => update("password", event.target.value)}
-                                    className="h-13 w-full rounded-xl border bg-background pl-11 pr-12 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                                    className="h-13 w-full rounded-xl border bg-background ps-11 pe-12 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
                                     placeholder="At least 6 characters"
                                 />
-                                <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={showPassword ? "Hide password" : "Show password"}>
+                                <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute end-3 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}>
                                     {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                                 </button>
                             </span>
@@ -155,8 +157,8 @@ export function AuthPage() {
                         {error && <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>}
 
                         <Button type="submit" size="lg" className="mt-2 h-13 rounded-xl text-base" disabled={submitting}>
-                            {submitting ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"}
-                            {!submitting && <ArrowRight />}
+                            {submitting ? t("auth.wait") : mode === "login" ? t("auth.signIn") : t("auth.createAccount")}
+                            {!submitting && <ArrowRight className="rtl:rotate-180" />}
                         </Button>
                     </form>
 

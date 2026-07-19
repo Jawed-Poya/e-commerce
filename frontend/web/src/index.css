@@ -139,3 +139,16 @@ select {
 ::selection {
   @apply bg-brand-orange text-white;
 }
+
+html[dir="rtl"] body {
+  font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+}
+html[dir="rtl"] input,
+html[dir="rtl"] textarea {
+  text-align: right;
+}
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior-y: contain;
+  }
+}

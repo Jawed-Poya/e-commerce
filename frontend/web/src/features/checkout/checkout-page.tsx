@@ -23,6 +23,7 @@ import { imageUrl, ApiError } from "../../shared/api/api-client";
 import { Button } from "../../shared/components/ui/button";
 import { formatMoney } from "../../shared/lib/money";
 import { createOrder, getCheckoutConfiguration } from "./checkout-api";
+import { useI18n } from "../../i18n/i18n-provider";
 import type {
     CreateOrderRequest,
     OrderConfirmation,
@@ -65,6 +66,7 @@ const initialForm: CheckoutForm = {
 
 export function CheckoutPage() {
     const cart = useCart();
+    const { t } = useI18n();
     const auth = useAuth();
     const navigate = useNavigate();
     const [form, setForm] = useState(initialForm);
@@ -126,7 +128,7 @@ export function CheckoutPage() {
             !form.city.trim() ||
             !form.country.trim()
         ) {
-            setError("Complete all required contact and delivery fields.");
+            setError(t("checkout.completeRequired"));
             return;
         }
 
@@ -134,7 +136,7 @@ export function CheckoutPage() {
             form.paymentMethod === "BankTransfer" &&
             !form.bankTransferReference.trim()
         ) {
-            setError("Enter the bank transaction/reference number.");
+            setError(t("checkout.enterReference"));
             return;
         }
 
@@ -196,25 +198,27 @@ export function CheckoutPage() {
             <div className="mb-8 flex items-center justify-between gap-4">
                 <div>
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
-                        Secure checkout
+                        {t("checkout.secure")}
                     </p>
                     <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-5xl">
-                        Complete your order
+                        {t("checkout.completeOrder")}
                     </h1>
                     <p className="mt-2 text-sm text-muted-foreground">
-                        Prices and stock are checked again by the server before
-                        your order is created.
+                        {t("checkout.serverCheck")}
                     </p>
                     {auth.user && (
                         <p className="mt-3 inline-flex rounded-full bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary">
-                            Signed in as {auth.user.fullName} · {auth.user.customerTypeName ?? "General"} pricing
+                            {t("checkout.signedIn", {
+                                name: auth.user.fullName,
+                                type: auth.user.customerTypeName ?? t("common.general"),
+                            })}
                         </p>
                     )}
                 </div>
 
                 <Button asChild variant="outline" className="hidden sm:flex">
                     <Link to="/cart">
-                        <ArrowLeft /> Back to cart
+                        <ArrowLeft className="rtl:rotate-180" /> {t("checkout.backToCart")}
                     </Link>
                 </Button>
             </div>
@@ -226,23 +230,23 @@ export function CheckoutPage() {
                 <div className="grid gap-6">
                     <CheckoutSection
                         icon={<Phone />}
-                        title="Contact information"
-                        description="We use this information for order updates and delivery."
+                        title={t("checkout.contact")}
+                        description={t("checkout.contactDescription")}
                     >
                         <div className="grid gap-4 sm:grid-cols-2">
                             <Field
-                                label="First name"
+                                label={t("common.firstName")}
                                 required
                                 value={form.firstName}
                                 onChange={(value) => update("firstName", value)}
                             />
                             <Field
-                                label="Last name"
+                                label={t("common.lastName")}
                                 value={form.lastName}
                                 onChange={(value) => update("lastName", value)}
                             />
                             <Field
-                                label="Phone number"
+                                label={t("auth.phone")}
                                 required
                                 value={form.phone}
                                 onChange={(value) => {
@@ -256,7 +260,7 @@ export function CheckoutPage() {
                                 placeholder="+93 ..."
                             />
                             <Field
-                                label="Email"
+                                label={t("common.email")}
                                 type="email"
                                 value={form.email}
                                 onChange={(value) => update("email", value)}
@@ -267,12 +271,12 @@ export function CheckoutPage() {
 
                     <CheckoutSection
                         icon={<MapPin />}
-                        title="Delivery address"
-                        description="The order keeps a snapshot of this address for auditing."
+                        title={t("checkout.address")}
+                        description={t("checkout.addressDescription")}
                     >
                         <div className="grid gap-4 sm:grid-cols-2">
                             <Field
-                                label="Recipient name"
+                                label={t("checkout.recipient")}
                                 required
                                 value={form.recipientName}
                                 onChange={(value) =>
@@ -288,7 +292,7 @@ export function CheckoutPage() {
                                     update("addressLine1", value)
                                 }
                                 className="sm:col-span-2"
-                                placeholder="Street, area, building, house number"
+                                placeholder={t("checkout.addressLine1")}
                             />
                             <Field
                                 label="Address line 2"
@@ -297,27 +301,27 @@ export function CheckoutPage() {
                                     update("addressLine2", value)
                                 }
                                 className="sm:col-span-2"
-                                placeholder="Optional landmark or apartment"
+                                placeholder={t("checkout.addressLine2")}
                             />
                             <Field
-                                label="City"
+                                label={t("checkout.city")}
                                 required
                                 value={form.city}
                                 onChange={(value) => update("city", value)}
                             />
                             <Field
-                                label="State / province"
+                                label={t("checkout.state")}
                                 value={form.state}
                                 onChange={(value) => update("state", value)}
                             />
                             <Field
-                                label="Country"
+                                label={t("checkout.country")}
                                 required
                                 value={form.country}
                                 onChange={(value) => update("country", value)}
                             />
                             <Field
-                                label="Postal code"
+                                label={t("checkout.postalCode")}
                                 value={form.postalCode}
                                 onChange={(value) =>
                                     update("postalCode", value)
@@ -328,8 +332,8 @@ export function CheckoutPage() {
 
                     <CheckoutSection
                         icon={<CreditCard />}
-                        title="Payment method"
-                        description="Online payment is not enabled yet. Choose cash on delivery or a manual bank transfer."
+                        title={t("checkout.paymentMethod")}
+                        description={t("checkout.paymentDescription")}
                     >
                         <div className="grid gap-3 sm:grid-cols-2">
                             <PaymentCard
@@ -337,8 +341,8 @@ export function CheckoutPage() {
                                     form.paymentMethod === "CashOnDelivery"
                                 }
                                 icon={<Banknote />}
-                                title="Cash on delivery"
-                                description="Pay the delivery person when your order arrives."
+                                title={t("checkout.cash")}
+                                description={t("checkout.cashDescription")}
                                 onClick={() =>
                                     update(
                                         "paymentMethod",
@@ -349,8 +353,8 @@ export function CheckoutPage() {
                             <PaymentCard
                                 active={form.paymentMethod === "BankTransfer"}
                                 icon={<Building2 />}
-                                title="Bank transfer"
-                                description="Transfer manually and wait for admin verification."
+                                title={t("checkout.bank")}
+                                description={t("checkout.bankDescription")}
                                 onClick={() =>
                                     update("paymentMethod", "BankTransfer")
                                 }
@@ -406,7 +410,7 @@ export function CheckoutPage() {
                                         </p>
 
                                         <Field
-                                            label="Bank transaction/reference number"
+                                            label={t("checkout.bankReference")}
                                             required
                                             value={form.bankTransferReference}
                                             onChange={(value) =>
@@ -429,8 +433,8 @@ export function CheckoutPage() {
 
                     <CheckoutSection
                         icon={<PackageCheck />}
-                        title="Order notes"
-                        description="Optional delivery instructions for the admin or courier."
+                        title={t("checkout.notes")}
+                        description={t("checkout.notesDescription")}
                     >
                         <textarea
                             value={form.notes}
@@ -451,7 +455,7 @@ export function CheckoutPage() {
                                 <ShoppingBag />
                             </span>
                             <div>
-                                <p className="font-bold">Order summary</p>
+                                <p className="font-bold">{t("checkout.orderSummary")}</p>
                                 <p className="text-xs text-muted-foreground">
                                     {cart.count} item{cart.count === 1 ? "" : "s"}
                                 </p>
@@ -491,25 +495,25 @@ export function CheckoutPage() {
                     <div className="border-t p-6">
                         <div className="grid gap-3 text-sm">
                             <SummaryLine
-                                label="Subtotal"
+                                label={t("common.subtotal")}
                                 value={formatMoney(
                                     subtotal,
                                     config?.currency,
                                 )}
                             />
                             <SummaryLine
-                                label="Delivery"
+                                label={t("common.delivery")}
                                 value={
                                     shipping
                                         ? formatMoney(
                                               shipping,
                                               config?.currency,
                                           )
-                                        : "Free"
+                                        : t("common.free")
                                 }
                             />
                             <div className="flex items-center justify-between border-t pt-4 text-lg font-black">
-                                <span>Estimated total</span>
+                                <span>{t("checkout.estimatedTotal")}</span>
                                 <span>
                                     {formatMoney(
                                         estimatedTotal,
@@ -536,7 +540,7 @@ export function CheckoutPage() {
                             ) : (
                                 <LockKeyhole />
                             )}
-                            {submitting ? "Creating order..." : "Place order"}
+                            {submitting ? t("checkout.creating") : t("checkout.placeOrder")}
                         </Button>
 
                         <div className="mt-4 flex items-start gap-2 text-xs leading-5 text-muted-foreground">

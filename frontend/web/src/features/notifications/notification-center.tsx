@@ -5,9 +5,12 @@ import { Link } from "react-router-dom";
 import { Button } from "../../shared/components/ui/button";
 import { cn } from "../../shared/lib/utils";
 import { useStoreNotifications } from "./notification-context";
+import { useI18n } from "../../i18n/i18n-provider";
 
 export function NotificationCenter() {
     const notifications = useStoreNotifications();
+    const { language, t } = useI18n();
+    const locale = language === "en" ? "en-US" : "fa-AF";
 
     return (
         <DropdownMenu.Root onOpenChange={(open) => open && notifications.markAllRead()}>
@@ -16,7 +19,7 @@ export function NotificationCenter() {
                     variant="ghost"
                     size="icon"
                     className="relative rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                    aria-label="Product notifications"
+                    aria-label={t("notifications.title")}
                 >
                     {notifications.unreadCount ? (
                         <BellRing className="size-5" />
@@ -42,14 +45,14 @@ export function NotificationCenter() {
                     <div className="flex items-center justify-between border-b p-4">
                         <div>
                             <div className="flex items-center gap-2">
-                                <p className="font-black">Product alerts</p>
+                                <p className="font-black">{t("notifications.title")}</p>
                                 <span className={`size-2 rounded-full ${notifications.realtimeStatus === "live" ? "bg-emerald-500" : "bg-amber-500"}`} />
                                 <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                                    {notifications.realtimeStatus === "live" ? "Live" : "Fallback"}
+                                    {notifications.realtimeStatus === "live" ? t("notifications.live") : t("notifications.fallback")}
                                 </span>
                             </div>
                             <p className="mt-0.5 text-xs text-muted-foreground">
-                                Price changes and restocks for products you follow.
+                                {t("notifications.description")}
                             </p>
                         </div>
                         <CheckCheck className="size-4 text-primary" />
@@ -58,7 +61,7 @@ export function NotificationCenter() {
                     {notifications.permission !== "granted" && (
                         <div className="border-b bg-primary/5 p-4">
                             <p className="text-xs leading-5 text-muted-foreground">
-                                Enable browser alerts to see changes while this shop is open in another tab.
+                                {t("notifications.enableDescription")}
                             </p>
                             <Button
                                 size="sm"
@@ -67,7 +70,7 @@ export function NotificationCenter() {
                                     void notifications.enableBrowserNotifications()
                                 }
                             >
-                                <BellRing /> Enable alerts
+                                <BellRing /> {t("notifications.enable")}
                             </Button>
                         </div>
                     )}
@@ -101,7 +104,7 @@ export function NotificationCenter() {
                                             {item.message}
                                         </span>
                                         <span className="mt-1.5 block text-[10px] text-muted-foreground">
-                                            {new Date(item.createdAt).toLocaleString()}
+                                            {new Date(item.createdAt).toLocaleString(locale)}
                                         </span>
                                     </span>
                                 </Link>
@@ -111,9 +114,9 @@ export function NotificationCenter() {
                         {!notifications.items.length && (
                             <div className="px-5 py-10 text-center">
                                 <Bell className="mx-auto size-8 text-muted-foreground" />
-                                <p className="mt-3 text-sm font-bold">No alerts yet</p>
+                                <p className="mt-3 text-sm font-bold">{t("notifications.emptyTitle")}</p>
                                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                                    Open a product or save it to your wishlist. We will watch it for you.
+                                    {t("notifications.emptyDescription")}
                                 </p>
                             </div>
                         )}

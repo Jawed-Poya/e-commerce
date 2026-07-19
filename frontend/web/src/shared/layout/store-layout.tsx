@@ -20,6 +20,9 @@ import {
 } from "../../features/catalog/category-menu";
 
 import { ThemeToggle } from "../components/theme-toggle";
+import { LanguageSwitcher } from "../../i18n/language-switcher";
+import { useI18n } from "../../i18n/i18n-provider";
+import { PwaInstallButton } from "../../features/pwa/pwa-install-button";
 import { Button } from "../components/ui/button";
 import { cn } from "../lib/utils";
 
@@ -31,11 +34,11 @@ type StoreNavItem = {
 };
 
 const nav: StoreNavItem[] = [
-    { to: "/", label: "Home", match: "home" },
-    { to: "/products", label: "Shop", match: "products" },
-    { to: "/?section=categories#categories", label: "Categories", match: "section", section: "categories" },
-    { to: "/?section=deals#deals", label: "Deals", match: "section", section: "deals" },
-    { to: "/track-order", label: "Track order", match: "exact" },
+    { to: "/", label: "nav.home", match: "home" },
+    { to: "/products", label: "nav.shop", match: "products" },
+    { to: "/?section=categories#categories", label: "nav.categories", match: "section", section: "categories" },
+    { to: "/?section=deals#deals", label: "nav.deals", match: "section", section: "deals" },
+    { to: "/track-order", label: "nav.trackOrder", match: "exact" },
 ];
 
 function isStoreNavItemActive(item: StoreNavItem, pathname: string, search: string) {
@@ -75,6 +78,7 @@ export function StoreLayout() {
     const location = useLocation();
     const cart = useCart();
     const auth = useAuth();
+    const { language, direction, t } = useI18n();
     const accountPath = auth.isAuthenticated ? "/account" : "/account/login";
 
     const submit = (e: FormEvent) => {
@@ -98,7 +102,7 @@ export function StoreLayout() {
                             </span>
 
                             <span className="truncate font-medium">
-                                Welcome to EasyCart marketplace
+                                {t("header.welcome")}
                             </span>
                         </div>
 
@@ -108,11 +112,11 @@ export function StoreLayout() {
                                 className="flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-primary dark:text-slate-300 dark:hover:text-white"
                             >
                                 <CircleHelp className="size-3.5" />
-                                Help center
+                                {t("header.help")}
                             </a>
 
                             <span className="text-muted-foreground dark:text-slate-400">
-                                Secure and trusted shopping
+                                {t("header.secure")}
                             </span>
                         </div>
                     </div>
@@ -133,15 +137,17 @@ export function StoreLayout() {
                                 className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
-                                placeholder="Search products, brands and categories..."
+                                placeholder={t("header.searchPlaceholder")}
                             />
 
                             <Button className="h-10 rounded-xl px-6 font-semibold shadow-sm">
-                                Search
+                                {t("common.search")}
                             </Button>
                         </form>
 
-                        <div className="ml-auto flex items-center gap-0.5">
+                        <div className="ms-auto flex items-center gap-0.5">
+                            <LanguageSwitcher />
+                            <PwaInstallButton compact />
                             <ThemeToggle />
                             <NotificationCenter />
 
@@ -151,13 +157,13 @@ export function StoreLayout() {
                                 size="icon"
                                 className="hidden rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary sm:inline-flex"
                             >
-                                <Link to={accountPath} aria-label={auth.isAuthenticated ? "Customer account" : "Customer login"}>
+                                <Link to={accountPath} aria-label={auth.isAuthenticated ? t("common.account") : t("common.login")}>
                                     <UserRound className="size-5" />
                                 </Link>
                             </Button>
 
                             <Button asChild variant="ghost" size="icon" className="relative hidden rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary sm:inline-flex">
-                                <Link to="/wishlist" aria-label="Wishlist">
+                                <Link to="/wishlist" aria-label={t("common.wishlist")}>
                                     <Heart className="size-5" />
                                     <Count value={cart.wishlist.length} />
                                 </Link>
@@ -169,7 +175,7 @@ export function StoreLayout() {
                                 size="icon"
                                 className="relative rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                             >
-                                <Link to="/cart" aria-label="Cart">
+                                <Link to="/cart" aria-label={t("common.cart")}>
                                     <ShoppingBag className="size-5" />
                                     <Count value={cart.count} />
                                 </Link>
@@ -190,7 +196,15 @@ export function StoreLayout() {
                                 <Dialog.Portal>
                                     <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-sm data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out data-[state=open]:fade-in" />
 
-                                    <Dialog.Content className="fixed inset-y-0 right-0 z-50 w-[90%] max-w-sm overflow-y-auto border-l bg-background shadow-2xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
+                                    <Dialog.Content
+                                        dir={direction}
+                                        className={cn(
+                                            "fixed inset-y-0 z-50 w-[90%] max-w-sm overflow-y-auto bg-background shadow-2xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
+                                            language === "en"
+                                                ? "right-0 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right"
+                                                : "left-0 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left",
+                                        )}
+                                    >
                                         <div className="flex min-h-full flex-col">
                                             <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-5 py-4 backdrop-blur-xl">
                                                 <Logo />
@@ -212,7 +226,7 @@ export function StoreLayout() {
                                                     onSubmit={submit}
                                                     className="flex h-12 items-center rounded-2xl border bg-muted/40 px-1 transition-all focus-within:border-primary/60 focus-within:bg-background focus-within:ring-4 focus-within:ring-primary/10"
                                                 >
-                                                    <Search className="ml-3 size-4 text-muted-foreground" />
+                                                    <Search className="ms-3 size-4 text-muted-foreground" />
 
                                                     <input
                                                         className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm outline-none"
@@ -270,18 +284,18 @@ export function StoreLayout() {
 
                                             <div className="border-y bg-muted/15 px-5 py-5">
                                                 <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                                                    Main menu
+                                                    {t("mobile.mainMenu")}
                                                 </p>
 
                                                 <nav className="grid gap-1">
                                                     {nav.map((x) => {
                                                         const isActive = isStoreNavItemActive(x, location.pathname, location.search);
                                                         return (
-                                                            <Link onClick={() => setOpen(false)} key={x.label} to={x.to} className={cn(
+                                                            <Link onClick={() => setOpen(false)} key={t(x.label)} to={x.to} className={cn(
                                                                 "flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold text-muted-foreground transition-all hover:bg-background hover:text-foreground",
                                                                 isActive && "bg-primary/10 text-primary shadow-sm hover:bg-primary/10 hover:text-primary",
                                                             )}>
-                                                                {x.label}
+                                                                {t(x.label)}
                                                                 <span className="text-lg font-light opacity-40">›</span>
                                                             </Link>
                                                         );
@@ -291,7 +305,7 @@ export function StoreLayout() {
 
                                             <div className="px-5 py-5">
                                                 <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                                                    Shop by category
+                                                    {t("mobile.shopByCategory")}
                                                 </p>
 
                                                 <MobileCategoryLinks
@@ -310,16 +324,11 @@ export function StoreLayout() {
 
                                                         <div>
                                                             <p className="text-sm font-bold">
-                                                                Need shopping
-                                                                help?
+                                                                {t("mobile.needHelp")}
                                                             </p>
 
                                                             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                                                                Contact our
-                                                                support team for
-                                                                product and
-                                                                order
-                                                                assistance.
+                                                                {t("mobile.helpDescription")}
                                                             </p>
 
                                                             <a
@@ -345,13 +354,13 @@ export function StoreLayout() {
                             onSubmit={submit}
                             className="flex h-11 items-center rounded-2xl border bg-muted/35 px-1 transition-all focus-within:border-primary/60 focus-within:bg-background focus-within:ring-4 focus-within:ring-primary/10"
                         >
-                            <Search className="ml-3 size-4 text-muted-foreground" />
+                            <Search className="ms-3 size-4 text-muted-foreground" />
 
                             <input
                                 className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm outline-none"
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
-                                placeholder="Search products..."
+                                placeholder={t("header.searchPlaceholder")}
                             />
 
                             <Button
@@ -359,7 +368,7 @@ export function StoreLayout() {
                                 size="sm"
                                 className="h-9 rounded-xl px-4"
                             >
-                                Search
+                                {t("common.search")}
                             </Button>
                         </form>
                     </div>
@@ -376,11 +385,11 @@ export function StoreLayout() {
                             {nav.map((x) => {
                                 const isActive = isStoreNavItemActive(x, location.pathname, location.search);
                                 return (
-                                    <Link key={x.label} to={x.to} className={cn(
+                                    <Link key={t(x.label)} to={x.to} className={cn(
                                         "relative flex h-full items-center rounded-lg px-4 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted/40 hover:text-primary",
                                         isActive && "text-primary",
                                     )}>
-                                        {x.label}
+                                        {t(x.label)}
                                         <span className={cn(
                                             "absolute inset-x-4 bottom-0 h-0.5 origin-center scale-x-0 rounded-full bg-primary transition-transform duration-200",
                                             isActive && "scale-x-100",
@@ -398,7 +407,7 @@ export function StoreLayout() {
                                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-brand-orange opacity-60" />
                                 <span className="relative inline-flex size-2 rounded-full bg-brand-orange" />
                             </span>
-                            Featured products
+                            {t("nav.featured")}
                             <span className="transition-transform group-hover:translate-x-1">
                                 →
                             </span>
@@ -420,26 +429,25 @@ export function StoreLayout() {
                     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-6 px-4 py-9 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
                         <div>
                             <h2 className="text-xl font-black tracking-tight text-foreground dark:text-white sm:text-2xl">
-                                Shop smarter with EasyCart
+                                {t("footer.title")}
                             </h2>
 
                             <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground dark:text-slate-400">
-                                Trusted products, secure shopping and an
-                                experience designed to make every order simple.
+                                {t("footer.description")}
                             </p>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2.5 text-xs font-semibold">
                             <span className="rounded-full border bg-background/70 px-4 py-2 text-muted-foreground shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:shadow-none">
-                                Secure checkout
+                                {t("footer.secureCheckout")}
                             </span>
 
                             <span className="rounded-full border bg-background/70 px-4 py-2 text-muted-foreground shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:shadow-none">
-                                Fast delivery
+                                {t("footer.fastDelivery")}
                             </span>
 
                             <span className="rounded-full border bg-background/70 px-4 py-2 text-muted-foreground shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:shadow-none">
-                                Easy returns
+                                {t("footer.easyReturns")}
                             </span>
                         </div>
                     </div>
@@ -450,9 +458,7 @@ export function StoreLayout() {
                         <Logo />
 
                         <p className="mt-5 max-w-md text-sm leading-7 text-muted-foreground dark:text-slate-400">
-                            Products you can trust, availability you can see,
-                            and a shopping experience designed to feel
-                            effortless.
+                            {t("footer.about")}
                         </p>
 
                         <a
@@ -465,29 +471,24 @@ export function StoreLayout() {
                     </div>
 
                     <FooterGroup
-                        title="Shop"
-                        links={["All products", "New arrivals", "Categories"]}
+                        title={t("footer.shop")}
+                        links={[t("footer.allProducts"), t("footer.newArrivals"), t("footer.categories")]}
                     />
 
                     <FooterGroup
-                        title="Customer care"
-                        links={[
-                            "Contact support",
-                            "Delivery & returns",
-                            "Privacy policy",
-                        ]}
+                        title={t("footer.customerCare")}
+                        links={[t("footer.contactSupport"), t("footer.deliveryReturns"), t("footer.privacy")]}
                     />
                 </div>
 
                 <div className="relative border-t border-border/70 dark:border-white/10">
                     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3 px-4 py-5 text-xs text-muted-foreground sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8 dark:text-slate-500">
                         <span>
-                            © {new Date().getFullYear()} EasyCart. All rights
-                            reserved.
+                            © {new Date().getFullYear()} EasyCart. {t("footer.rights")}
                         </span>
 
                         <span>
-                            Made for a better online shopping experience.
+                            {t("footer.betterExperience")}
                         </span>
                     </div>
                 </div>

@@ -1,4 +1,5 @@
 using ECommerce.Entities.Notifications.Contracts;
+using ECommerce.Entities.Products;
 
 namespace ECommerce.Services.Notifications;
 
@@ -16,6 +17,12 @@ public interface IAdminNotificationService
         long orderId,
         string orderNumber,
         string status,
+        CancellationToken cancellationToken = default);
+
+    Task<PendingAdminNotification> CreateReviewSubmittedAsync(
+        ProductReview review,
+        string productName,
+        string customerName,
         CancellationToken cancellationToken = default);
 
     Task<PendingAdminNotification> CreatePaymentStatusChangedAsync(

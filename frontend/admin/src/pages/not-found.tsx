@@ -30,10 +30,8 @@ export default function AdminNotFoundPage() {
                         <Button variant="outline" onClick={() => navigate(-1)}>
                             <ArrowLeft /> Go back
                         </Button>
-                        <Button asChild>
-                            <Link to="/dashboard">
-                                <Home /> Open dashboard
-                            </Link>
+                        <Button render={<Link to="/dashboard" />}>
+                            <Home /> Open dashboard
                         </Button>
                     </div>
                 </CardContent>

@@ -17,6 +17,7 @@ import {
     Warehouse,
     ShoppingCart,
     Users,
+    Star,
 } from "lucide-react";
 import { useI18n } from "@/i18n/i18n-provider";
 import { useAdminAuth } from "@/features/auth/auth-context";
@@ -35,6 +36,12 @@ const data = {
             url: "/products",
             icon: <PackageIcon />,
             permission: Permissions.ProductsView,
+        },
+        {
+            title: "Reviews",
+            url: "/reviews",
+            icon: <Star />,
+            permission: Permissions.ProductsManage,
         },
         {
             title: "Inventory",
@@ -59,6 +66,11 @@ const data = {
             url: "/system",
             icon: <SettingsIcon />,
             items: [
+                {
+                    title: "Storefront hero",
+                    url: "/system/storefront",
+                    permission: Permissions.SystemManage,
+                },
                 {
                     title: "General Types",
                     url: "/system/general-types",

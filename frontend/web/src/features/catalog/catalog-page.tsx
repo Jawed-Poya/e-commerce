@@ -24,8 +24,10 @@ import {
 } from "../../shared/components/ui/select";
 import { Skeleton } from "../../shared/components/ui/skeleton";
 import type { CategoryLookup } from "../../shared/types/product";
+import { useI18n } from "../../i18n/i18n-provider";
 
 export function CatalogPage() {
+    const { t } = useI18n();
     const [params, setParams] = useSearchParams();
     const [search, setSearch] = useState(params.get("search") ?? "");
     const [filtersOpen, setFiltersOpen] = useState(false);
@@ -141,7 +143,7 @@ export function CatalogPage() {
         params.get("search")
             ? {
                   key: "search",
-                  label: `Search: ${params.get("search")}`,
+                  label: t("catalog.searchLabel", { value: params.get("search") ?? "" }),
               }
             : null,
         category
@@ -175,18 +177,18 @@ export function CatalogPage() {
         params.get("stock") === "in"
             ? {
                   key: "stock",
-                  label: "In stock",
+                  label: t("catalog.inStock"),
               }
             : params.get("stock") === "out"
               ? {
                     key: "stock",
-                    label: "Out of stock",
+                    label: t("catalog.outOfStock"),
                 }
               : null,
         params.get("isFeatured") === "true"
             ? {
                   key: "isFeatured",
-                  label: "Featured",
+                  label: t("catalog.featured"),
               }
             : null,
     ].filter(Boolean) as {
@@ -222,12 +224,12 @@ export function CatalogPage() {
                     to="/"
                     className="rounded-md px-1 py-1 transition-colors hover:text-primary"
                 >
-                    Home
+                    {t("common.home")}
                 </Link>
 
-                <ChevronRight className="size-3.5 opacity-50" />
+                <ChevronRight className="size-3.5 opacity-50 rtl:rotate-180" />
 
-                <span className="text-foreground">Shop</span>
+                <span className="text-foreground">{t("catalog.shop")}</span>
             </nav>
 
             <section className="relative mb-8 overflow-hidden rounded-[28px] border bg-gradient-to-br from-primary/10 via-background to-orange-500/5 px-6 py-9 sm:px-9 lg:px-12 lg:py-12">
@@ -238,24 +240,22 @@ export function CatalogPage() {
                     <div>
                         <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/70 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-primary shadow-sm backdrop-blur">
                             <PackageSearch className="size-3.5" />
-                            Curated marketplace
+                            {t("catalog.curated")}
                         </div>
 
                         <h1 className="mt-5 max-w-3xl text-4xl font-black tracking-[-0.045em] sm:text-5xl lg:text-6xl">
-                            Find products made for you.
+                            {t("catalog.heroTitle")}
                         </h1>
 
                         <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
-                            Browse the complete catalog with clear prices, real
-                            availability, useful product details, and flexible
-                            filtering.
+                            {t("catalog.heroDescription")}
                         </p>
                     </div>
 
                     {!query.isLoading && query.data && (
                         <div className="w-fit rounded-2xl border bg-background/80 px-5 py-4 shadow-sm backdrop-blur">
                             <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                                Available now
+                                {t("catalog.availableNow")}
                             </span>
 
                             <span className="mt-1 block text-2xl font-black">
@@ -263,7 +263,7 @@ export function CatalogPage() {
                             </span>
 
                             <span className="text-xs text-muted-foreground">
-                                products in the catalog
+                                {t("catalog.productsInCatalog")}
                             </span>
                         </div>
                     )}
@@ -290,7 +290,7 @@ export function CatalogPage() {
                                     onChange={(event) =>
                                         setSearch(event.target.value)
                                     }
-                                    placeholder="Search by product name or barcode..."
+                                    placeholder={t("catalog.searchPlaceholder")}
                                 />
 
                                 <Button className="h-10 rounded-lg px-5 font-semibold">
@@ -308,7 +308,7 @@ export function CatalogPage() {
                                         className="h-12 rounded-xl lg:hidden"
                                     >
                                         <SlidersHorizontal className="size-4" />
-                                        Filters
+                                        {t("catalog.filters")}
                                         {activeFilters.length > 0 && (
                                             <span className="grid size-5 place-items-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                                                 {activeFilters.length}
@@ -438,13 +438,13 @@ export function CatalogPage() {
                         </div>
                     ) : query.isError ? (
                         <EmptyState
-                            title="The catalog is unavailable"
+                            title={t("catalog.unavailableTitle")}
                             text="We couldn't load products right now. Please try again shortly."
                         />
                     ) : !query.data?.items.length ? (
                         <EmptyState
-                            title="No matching products"
-                            text="Try a different search or remove one of the active filters."
+                            title={t("catalog.noMatches")}
+                            text={t("catalog.noMatchesDescription")}
                             action={clearFilters}
                         />
                     ) : (
@@ -530,6 +530,7 @@ function FilterPanel({
     onClear: () => void;
     hasFilters: boolean;
 }) {
+    const { t } = useI18n();
     const orderedCategories = flattenCategoryTree(categories);
 
     return (
@@ -540,11 +541,11 @@ function FilterPanel({
                         <span className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary">
                             <SlidersHorizontal className="size-4" />
                         </span>
-                        Filters
+                        {t("catalog.filters")}
                     </span>
 
                     <span className="mt-2 block text-xs leading-5 text-muted-foreground">
-                        Refine products by the details that matter to you.
+                        {t("catalog.heroDescription")}
                     </span>
                 </div>
 
@@ -554,13 +555,13 @@ function FilterPanel({
                         onClick={onClear}
                         className="shrink-0 rounded-lg px-2 py-1.5 text-xs font-bold text-destructive transition-colors hover:bg-destructive/10"
                     >
-                        Reset
+                        {t("catalog.clearFilters")}
                     </button>
                 )}
             </div>
 
             <div className="grid gap-3">
-                <Filter label="Category">
+                <Filter label={t("catalog.category")}>
                     <Select
                         value={categoryId}
                         onValueChange={(value) => onChange("categoryId", value)}
@@ -570,7 +571,7 @@ function FilterPanel({
                         </SelectTrigger>
 
                         <SelectContent>
-                            <SelectItem value="all">All categories</SelectItem>
+                            <SelectItem value="all">{t("catalog.allCategories")}</SelectItem>
 
                             {orderedCategories.map(({ category, depth }) => (
                                 <SelectItem
@@ -591,7 +592,7 @@ function FilterPanel({
                     </Select>
                 </Filter>
 
-                <Filter label="Brand">
+                <Filter label={t("catalog.brand")}>
                     <Select
                         value={brandId}
                         onValueChange={(value) => onChange("brandId", value)}
@@ -601,7 +602,7 @@ function FilterPanel({
                         </SelectTrigger>
 
                         <SelectContent>
-                            <SelectItem value="all">All brands</SelectItem>
+                            <SelectItem value="all">{t("catalog.allBrands")}</SelectItem>
 
                             {brands.map((item) => (
                                 <SelectItem
@@ -615,7 +616,7 @@ function FilterPanel({
                     </Select>
                 </Filter>
 
-                <Filter label="Price range">
+                <Filter label={t("catalog.priceRange")}>
                     <PriceRange
                         minimum={priceMinimum}
                         maximum={priceMaximum}
@@ -625,45 +626,45 @@ function FilterPanel({
                     />
                 </Filter>
 
-                <Filter label="Availability">
+                <Filter label={t("catalog.availability")}>
                     <ChoiceGroup
                         value={stock}
                         onChange={(value) => onChange("stock", value)}
                         options={[
                             {
                                 value: "all",
-                                label: "Any",
+                                label: t("catalog.any"),
                             },
                             {
                                 value: "in",
-                                label: "In stock",
+                                label: t("catalog.inStock"),
                             },
                             {
                                 value: "out",
-                                label: "Sold out",
+                                label: t("product.soldOut"),
                             },
                         ]}
                     />
                 </Filter>
 
-                <Filter label="Collection">
+                <Filter label={t("catalog.collection")}>
                     <ChoiceGroup
                         value={featured}
                         onChange={(value) => onChange("isFeatured", value)}
                         options={[
                             {
                                 value: "all",
-                                label: "All products",
+                                label: t("catalog.allProducts"),
                             },
                             {
                                 value: "true",
-                                label: "Featured",
+                                label: t("catalog.featured"),
                             },
                         ]}
                     />
                 </Filter>
 
-                <Filter label="Unit">
+                <Filter label={t("catalog.unit")}>
                     <Select
                         value={unitId}
                         onValueChange={(value) => onChange("unitId", value)}
@@ -673,7 +674,7 @@ function FilterPanel({
                         </SelectTrigger>
 
                         <SelectContent>
-                            <SelectItem value="all">All units</SelectItem>
+                            <SelectItem value="all">{t("catalog.allUnits")}</SelectItem>
 
                             {units.map((item) => (
                                 <SelectItem
@@ -749,6 +750,7 @@ function PriceRange({
     selectedMaximum: string;
     onChange: (minimum: number, maximum: number) => void;
 }) {
+    const { t } = useI18n();
     const span = Math.max(1, maximum - minimum);
     const step = span <= 100 ? 1 : span <= 500 ? 5 : span <= 2000 ? 10 : 50;
 
@@ -781,9 +783,9 @@ function PriceRange({
     return (
         <div>
             <div className="grid grid-cols-2 gap-2">
-                <PriceValue label="Minimum" value={draftMinimum} />
+                <PriceValue label={t("catalog.minimum")} value={draftMinimum} />
 
-                <PriceValue label="Maximum" value={draftMaximum} align="end" />
+                <PriceValue label={t("catalog.maximum")} value={draftMaximum} align="end" />
             </div>
 
             <div className="relative mt-5 h-6">
@@ -799,7 +801,7 @@ function PriceRange({
 
                 <input
                     type="range"
-                    aria-label="Minimum price"
+                    aria-label={t("catalog.minimum")}
                     min={minimum}
                     max={maximum}
                     step={step}
@@ -820,7 +822,7 @@ function PriceRange({
 
                 <input
                     type="range"
-                    aria-label="Maximum price"
+                    aria-label={t("catalog.maximum")}
                     min={minimum}
                     max={maximum}
                     step={step}
@@ -860,7 +862,7 @@ function PriceValue({
     return (
         <div
             className={`rounded-xl border bg-background px-3 py-2.5 shadow-sm ${
-                align === "end" ? "text-right" : ""
+                align === "end" ? "text-end" : ""
             }`}
         >
             <small className="block text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
@@ -920,7 +922,7 @@ function Pagination({
                 onClick={() => onPage(page - 1)}
                 className="rounded-xl"
             >
-                <ChevronLeft className="size-4" />
+                <ChevronLeft className="size-4 rtl:rotate-180" />
             </Button>
 
             {pages.map((value) => (
@@ -942,7 +944,7 @@ function Pagination({
                 onClick={() => onPage(page + 1)}
                 className="rounded-xl"
             >
-                <ChevronRight className="size-4" />
+                <ChevronRight className="size-4 rtl:rotate-180" />
             </Button>
         </nav>
     );
