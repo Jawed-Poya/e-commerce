@@ -1,0 +1,10 @@
+.vs
+node_modules/
+bin/
+obj/
+backend/wwwroot/uploads/
+
+# Local AI agent configuration and instructions
+.agents/
+.codex/
+AGENTS.md

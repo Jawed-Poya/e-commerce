@@ -1,0 +1,178 @@
+import apiClient from "@/api/api-client";
+import { apiOrigin } from "@/api/axios";
+
+export function resolveProductImageUrl(path: string | null | undefined) {
+    if (!path) return null;
+    if (/^https?:\/\//i.test(path) || path.startsWith("blob:")) return path;
+    return new URL(path.startsWith("/") ? path : `/${path}`, apiOrigin).toString();
+}
+
+export interface ProductListItem {
+    id: number;
+    name: string;
+    barcode: string | null;
+    shortDescription: string | null;
+    description: string | null;
+    slug: string | null;
+    categoryId: number;
+    categoryName: string;
+    brandId: number | null;
+    unitId: number | null;
+    minimumValue: number | null;
+    maximumValue: number | null;
+    isFeatured: boolean;
+    isActive: boolean;
+    stock: number;
+    price: number | null;
+    oldPrice: number | null;
+    priceCustomerTypeName: string | null;
+    isDefaultPrice: boolean;
+    viewCount: number;
+    primaryImageUrl: string | null;
+    images: ProductListImage[];
+}
+
+export interface ProductListImage {
+    id: number;
+    url: string;
+    isPrimary: boolean;
+    sortOrder: number;
+}
+
+export interface ProductDetails extends Omit<ProductListItem, "stock" | "price" | "primaryImageUrl" | "images"> {
+    brandName: string | null;
+    unitName: string | null;
+    priceCustomerTypeId: number | null;
+    createdAt: string;
+    updatedAt: string | null;
+    inventory: { quantity: number; reservedQuantity: number; availableQuantity: number; minimumQuantity: number; expireDate: string | null } | null;
+    prices: ProductPrice[];
+    images: (ProductListImage & { originalFileName: string | null; contentType: string; size: number })[];
+}
+
+export interface ProductPrice {
+    id: number;
+    customerTypeId: number;
+    customerTypeName: string;
+    regularPrice: number;
+    salePrice: number | null;
+    startDate: string | null;
+    endDate: string | null;
+    isDefault: boolean;
+}
+
+export type ProductPriceInput = Omit<ProductPrice, "id" | "customerTypeName" | "isDefault"> & { id?: number };
+
+export interface PagedProducts {
+    items: ProductListItem[];
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+    hasPreviousPage: boolean;
+    hasNextPage: boolean;
+}
+
+export interface ProductListFilters {
+    search?: string;
+    page?: number;
+    pageSize?: number;
+    categoryId?: number;
+    brandId?: number;
+    unitId?: number;
+    isFeatured?: boolean;
+    isActive?: boolean;
+    minPrice?: number;
+    maxPrice?: number;
+    sortBy?: "name" | "price" | "createdAt";
+    sortDescending?: boolean;
+}
+
+
+export interface CreateSingleProductInput {
+    image: File;
+    galleryImages?: File[];
+    name: string;
+    barcode?: string | null;
+    shortDescription?: string | null;
+    description?: string | null;
+    slug?: string | null;
+    categoryId: number;
+    brandId?: number | null;
+    unitId?: number | null;
+    minimumValue?: number | null;
+    maximumValue?: number | null;
+    isFeatured: boolean;
+    isActive: boolean;
+}
+
+export interface CreateSingleProductResult {
+    createdCount: number;
+    products: { id: number; name: string; barcode: string | null; slug: string; primaryImageUrl: string }[];
+}
+
+export type BulkUpdateProduct = Pick<ProductListItem,
+    "id" | "name" | "barcode" | "categoryId" | "brandId" | "unitId" |
+    "shortDescription" | "description" | "slug" | "minimumValue" |
+    "maximumValue" | "isFeatured" | "isActive" | "primaryImageUrl" | "images"> & { image?: File; galleryImages?: File[]; removedImageIds?: number[] };
+
+function append(formData: FormData, key: string, value: string | number | boolean | null | undefined) {
+    if (value !== null && value !== undefined) formData.append(key, String(value));
+}
+
+export const productService = {
+    getAll(params?: ProductListFilters) {
+        return apiClient.get<PagedProducts>("/products", params);
+    },
+    createSingle(product: CreateSingleProductInput) {
+        const formData = new FormData();
+        const prefix = "Products[0]";
+        formData.append(`${prefix}.Image`, product.image, product.image.name);
+        product.galleryImages?.forEach(image => formData.append(`${prefix}.GalleryImages`, image, image.name));
+        append(formData, `${prefix}.Name`, product.name.trim());
+        append(formData, `${prefix}.Barcode`, product.barcode?.trim() || null);
+        append(formData, `${prefix}.ShortDescription`, product.shortDescription?.trim() || null);
+        append(formData, `${prefix}.Description`, product.description?.trim() || null);
+        append(formData, `${prefix}.Slug`, product.slug?.trim() || null);
+        append(formData, `${prefix}.CategoryId`, product.categoryId);
+        append(formData, `${prefix}.BrandId`, product.brandId);
+        append(formData, `${prefix}.UnitId`, product.unitId);
+        append(formData, `${prefix}.MinimumValue`, product.minimumValue);
+        append(formData, `${prefix}.MaximumValue`, product.maximumValue);
+        append(formData, `${prefix}.IsFeatured`, product.isFeatured);
+        append(formData, `${prefix}.IsActive`, product.isActive);
+        return apiClient.post<CreateSingleProductResult>("/products/bulk", formData);
+    },
+    bulkUpdate(products: BulkUpdateProduct[]) {
+        const formData = new FormData();
+        products.forEach((product, index) => {
+            const prefix = `Products[${index}]`;
+            append(formData, `${prefix}.Id`, product.id);
+            append(formData, `${prefix}.Name`, product.name.trim());
+            append(formData, `${prefix}.Barcode`, product.barcode?.trim());
+            append(formData, `${prefix}.ShortDescription`, product.shortDescription?.trim());
+            append(formData, `${prefix}.Description`, product.description?.trim());
+            append(formData, `${prefix}.Slug`, product.slug?.trim());
+            append(formData, `${prefix}.CategoryId`, product.categoryId);
+            append(formData, `${prefix}.BrandId`, product.brandId);
+            append(formData, `${prefix}.UnitId`, product.unitId);
+            append(formData, `${prefix}.MinimumValue`, product.minimumValue);
+            append(formData, `${prefix}.MaximumValue`, product.maximumValue);
+            append(formData, `${prefix}.IsFeatured`, product.isFeatured);
+            append(formData, `${prefix}.IsActive`, product.isActive);
+            if (product.image) formData.append(`${prefix}.Image`, product.image, product.image.name);
+            product.galleryImages?.forEach(image => formData.append(`${prefix}.GalleryImages`, image, image.name));
+            product.removedImageIds?.forEach(id => formData.append(`${prefix}.RemovedImageIds`, String(id)));
+        });
+        return apiClient.put<{ updatedCount: number }>("/products/bulk", formData);
+    },
+    getById(id: number) {
+        return apiClient.get<ProductDetails>(`/products/${id}`);
+    },
+    replacePrices(productId: number, prices: ProductPriceInput[]) {
+        return apiClient.put<ProductPrice[]>(`/products/${productId}/prices`, { prices });
+    },
+    deleteMany(ids: number[]) {
+        return Promise.all(ids.map(id => apiClient.delete<void>(`/products/${id}`)));
+    },
+};
