@@ -19,6 +19,8 @@ public sealed class ProductDetailsDto
     public bool IsFeatured { get; set; }
     public bool IsActive { get; set; }
     public long ViewCount { get; set; }
+    public double AverageRating { get; set; }
+    public int ReviewCount { get; set; }
     public decimal? Price { get; set; }
     public decimal? OldPrice { get; set; }
     public long? PriceCustomerTypeId { get; set; }

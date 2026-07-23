@@ -12,6 +12,17 @@ export interface ProductLookups {
     defaultCustomerTypeId: number;
 }
 
+export interface ProductBulkPriceFormValue {
+    customerTypeId: number;
+    customerTypeName: string;
+    regularPrice: number;
+    salePrice: number | null;
+    startDate: string | null;
+    endDate: string | null;
+    isDefault: boolean;
+    enabled: boolean;
+}
+
 export interface ProductBulkItemFormValues {
     clientId: string;
 
@@ -35,6 +46,8 @@ export interface ProductBulkItemFormValues {
     isActive: boolean;
 
     slug: string;
+
+    prices: ProductBulkPriceFormValue[];
 }
 
 export interface ProductBulkFormValues {

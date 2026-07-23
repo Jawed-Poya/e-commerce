@@ -45,6 +45,7 @@ public sealed class BulkUpdateProductItemRequest
     public int? MaximumValue { get; set; }
     public bool IsFeatured { get; set; }
     public bool IsActive { get; set; }
+    public List<ProductPriceItemRequest> Prices { get; set; } = [];
 }
 
 public sealed record BulkUpdateProductsResponse(int UpdatedCount);

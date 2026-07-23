@@ -55,4 +55,6 @@ public sealed class CreateBulkProductItemRequest
 
     [StringLength(250)]
     public string? Slug { get; set; }
+
+    public List<ECommerce.Entities.Products.Contracts.ProductPriceItemRequest> Prices { get; set; } = [];
 }

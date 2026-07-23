@@ -50,7 +50,7 @@ export function ProductBulkCreatePage() {
         );
     }
 
-    const { categories, brands, units } = data;
+    const { categories, brands, units, customerTypes, defaultCustomerTypeId } = data;
 
     return (
         <FormProvider {...form}>
@@ -115,6 +115,8 @@ export function ProductBulkCreatePage() {
                                 categories={categories}
                                 brands={brands}
                                 units={units}
+                                customerTypes={customerTypes}
+                                defaultCustomerTypeId={defaultCustomerTypeId}
                                 disabled={isSubmitting}
                                 onRemove={() => removeProduct(index)}
                             />

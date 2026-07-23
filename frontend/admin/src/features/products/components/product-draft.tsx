@@ -23,6 +23,7 @@ import type {
 } from "../types/product-bulk-types";
 import { useI18n } from "@/i18n/i18n-provider";
 import { flattenTree } from "@/lib/utils";
+import { CustomerPricingFields, createCustomerPriceDrafts } from "./customer-pricing-fields";
 import {
     IMAGE_FILE_ACCEPT,
     isSupportedImageFile,
@@ -36,6 +37,8 @@ interface ProductDraftCardProps {
     categories: ProductLookupOption[];
     brands: ProductLookupOption[];
     units: ProductLookupOption[];
+    customerTypes: ProductLookupOption[];
+    defaultCustomerTypeId: number;
 
     disabled?: boolean;
     onRemove: () => void;
@@ -149,6 +152,8 @@ export function ProductDraftCard({
     categories,
     brands,
     units,
+    customerTypes,
+    defaultCustomerTypeId,
     disabled,
     onRemove,
 }: ProductDraftCardProps) {
@@ -156,8 +161,17 @@ export function ProductDraftCard({
     const {
         register,
         control,
+        getValues,
+        setValue,
         formState: { errors },
     } = useFormContext<ProductBulkFormValues>();
+
+    useEffect(() => {
+        const current = getValues(`products.${index}.prices`);
+        if (!current?.length && customerTypes.length) {
+            setValue(`products.${index}.prices`, createCustomerPriceDrafts(customerTypes, defaultCustomerTypeId), { shouldValidate: false });
+        }
+    }, [customerTypes, defaultCustomerTypeId, getValues, index, setValue]);
 
     const productErrors = errors.products?.[index];
 
@@ -409,6 +423,20 @@ export function ProductDraftCard({
                             message={productErrors?.description?.message}
                         />
                     </div>
+
+                    <Controller
+                        control={control}
+                        name={`products.${index}.prices`}
+                        render={({ field }) => (
+                            <CustomerPricingFields
+                                prices={field.value ?? []}
+                                onChange={field.onChange}
+                                disabled={disabled}
+                                compact
+                            />
+                        )}
+                    />
+                    <FieldError message={productErrors?.prices?.message as string | undefined} />
 
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Controller

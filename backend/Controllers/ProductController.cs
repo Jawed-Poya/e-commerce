@@ -42,6 +42,14 @@ public class ProductsController : ControllerBase
         return Ok(ApiResponse<ECommerce.Dtos.ProductDetailsDto>.Ok(product));
     }
 
+    [HttpGet("by-slug/{slug}")]
+    public async Task<IActionResult> GetBySlug(string slug)
+    {
+        var product = await _service.GetBySlugAsync(slug);
+        if (product is null) return NotFound(ApiResponse<object>.Fail("Product not found."));
+        return Ok(ApiResponse<ECommerce.Dtos.ProductDetailsDto>.Ok(product));
+    }
+
     [HttpPost("{id:long}/views")]
     public async Task<IActionResult> RecordView(long id, CancellationToken cancellationToken)
     {
