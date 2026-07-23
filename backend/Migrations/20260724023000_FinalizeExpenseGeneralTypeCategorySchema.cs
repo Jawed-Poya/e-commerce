@@ -7,40 +7,22 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ECommerce.Migrations;
 
 /// <summary>
-/// Repairs databases where the operation-payment migration is recorded as applied
-/// but the Expenses.GeneralTypeCategoryId schema change is missing or incomplete.
-/// The statements are intentionally idempotent so this migration is also safe on
-/// databases whose schema is already correct.
+/// Final idempotent guard for databases whose migration history says the expense
+/// category conversion ran while the physical GeneralTypeCategoryId schema is missing.
+/// Every step is a separate SQL command to avoid SQL Server batch-compilation errors.
 /// </summary>
 [DbContext(typeof(ApplicationDbContext))]
-[Migration("20260724013000_RepairExpenseGeneralTypeCategorySchema")]
-public sealed class RepairExpenseGeneralTypeCategorySchema : Migration
+[Migration("20260724023000_FinalizeExpenseGeneralTypeCategorySchema")]
+public sealed class FinalizeExpenseGeneralTypeCategorySchema : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
         migrationBuilder.Sql("""
 IF OBJECT_ID(N'[dbo].[Expenses]', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.Expenses', N'GeneralTypeCategoryId') IS NULL
 BEGIN
-    DECLARE @legacyExpenseFk sysname;
-
-    SELECT TOP (1) @legacyExpenseFk = fk.[name]
-    FROM sys.foreign_keys fk
-    INNER JOIN sys.foreign_key_columns fkc ON fkc.[constraint_object_id] = fk.[object_id]
-    INNER JOIN sys.tables parentTable ON parentTable.[object_id] = fk.[parent_object_id]
-    INNER JOIN sys.columns parentColumn
-        ON parentColumn.[object_id] = parentTable.[object_id]
-       AND parentColumn.[column_id] = fkc.[parent_column_id]
-    WHERE parentTable.[name] = N'Expenses'
-      AND parentColumn.[name] = N'CategoryId';
-
-    IF @legacyExpenseFk IS NOT NULL
-        EXEC(N'ALTER TABLE [dbo].[Expenses] DROP CONSTRAINT [' + @legacyExpenseFk + N']');
-
-    IF COL_LENGTH(N'dbo.Expenses', N'CategoryId') IS NOT NULL
-        ALTER TABLE [dbo].[Expenses] ALTER COLUMN [CategoryId] bigint NULL;
-
-    IF COL_LENGTH(N'dbo.Expenses', N'GeneralTypeCategoryId') IS NULL
-        ALTER TABLE [dbo].[Expenses] ADD [GeneralTypeCategoryId] bigint NULL;
+    ALTER TABLE [dbo].[Expenses]
+        ADD [GeneralTypeCategoryId] bigint NULL;
 END;
 """);
 
@@ -62,24 +44,6 @@ END;
         migrationBuilder.Sql("""
 IF OBJECT_ID(N'[dbo].[Types]', N'U') IS NOT NULL
 BEGIN
-    IF OBJECT_ID(N'[dbo].[ExpenseCategories]', N'U') IS NOT NULL
-    BEGIN
-        INSERT INTO [dbo].[Types]
-            ([Name], [Group], [SortOrder], [ParentId], [ImageUrl], [CreatedAt], [UpdatedAt], [IsDeleted], [DeletedAt])
-        SELECT
-            ec.[Name], 5, ROW_NUMBER() OVER (ORDER BY ec.[Id]) - 1,
-            NULL, NULL, SYSUTCDATETIME(), NULL, 0, NULL
-        FROM [dbo].[ExpenseCategories] ec
-        WHERE ec.[IsDeleted] = 0
-          AND NOT EXISTS
-          (
-              SELECT 1 FROM [dbo].[Types] t
-              WHERE t.[Group] = 5
-                AND t.[Name] = ec.[Name]
-                AND t.[IsDeleted] = 0
-          );
-    END;
-
     INSERT INTO [dbo].[Types]
         ([Name], [Group], [SortOrder], [ParentId], [ImageUrl], [CreatedAt], [UpdatedAt], [IsDeleted], [DeletedAt])
     SELECT defaults.[Name], 5, defaults.[SortOrder], NULL, NULL,
@@ -98,8 +62,6 @@ BEGIN
 END;
 """);
 
-        // Must be a new SQL command after the ALTER TABLE command. Otherwise
-        // SQL Server reports Invalid column name during batch compilation.
         migrationBuilder.Sql("""
 IF OBJECT_ID(N'[dbo].[Expenses]', N'U') IS NOT NULL
    AND OBJECT_ID(N'[dbo].[Types]', N'U') IS NOT NULL
@@ -140,7 +102,6 @@ END;
 
     protected override void Down(MigrationBuilder migrationBuilder)
     {
-        // Intentionally left empty. This migration repairs schema drift for a column
-        // already required by the current model; rolling it back would recreate the error.
+        // This migration repairs required schema and is intentionally non-destructive.
     }
 }
