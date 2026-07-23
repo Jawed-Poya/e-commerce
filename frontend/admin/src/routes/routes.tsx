@@ -18,6 +18,11 @@ import ProfilePage from "@/pages/profile";
 import AdminNotFoundPage from "@/pages/not-found";
 import StorefrontContentPage from "@/pages/storefront-content";
 import ReviewsPage from "@/pages/reviews";
+import OperationsDashboardPage from "@/pages/operations-dashboard";
+import PurchasesPage from "@/pages/purchases";
+import ManualSalesPage from "@/pages/manual-sales";
+import StaffPage from "@/pages/staff";
+import ExpensesPage from "@/pages/expenses";
 
 import { ProtectedRoute } from "@/features/auth/protected-route";
 import { PermissionRoute } from "@/features/auth/permission-route";
@@ -100,6 +105,16 @@ export const router = createBrowserRouter([
                             Permissions.InventoryView,
                             <InventoryPage />,
                         ),
+                    },
+                    {
+                        path: "operations",
+                        children: [
+                            { index: true, element: allowed(Permissions.OperationsView, <OperationsDashboardPage />) },
+                            { path: "purchases", element: allowed(Permissions.PurchasesView, <PurchasesPage />) },
+                            { path: "sales", element: allowed(Permissions.ManualSalesView, <ManualSalesPage />) },
+                            { path: "staff", element: allowed(Permissions.StaffView, <StaffPage />) },
+                            { path: "expenses", element: allowed(Permissions.ExpensesView, <ExpensesPage />) },
+                        ],
                     },
                     {
                         path: "orders",

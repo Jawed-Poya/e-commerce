@@ -10,6 +10,7 @@ using ECommerce.Services.GeneralTypes;
 using ECommerce.Services.Inventory;
 using ECommerce.Services.Notifications;
 using ECommerce.Services.Orders;
+using ECommerce.Services.Operations;
 using ECommerce.Services.Products;
 using ECommerce.Services.Storefront;
 using ECommerce.Services.Reviews;
@@ -41,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminUserService, AdminUserService>();
         services.AddScoped<IStorefrontContentService, StorefrontContentService>();
         services.AddScoped<IProductReviewService, ProductReviewService>();
+        services.AddScoped<IOperationsService, OperationsService>();
 
         return services;
     }

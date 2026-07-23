@@ -6,6 +6,7 @@ using API.Entities.Products;
 using API.Entities.Types;
 using ECommerce.Entities;
 using ECommerce.Entities.Notifications;
+using ECommerce.Entities.Operations;
 using ECommerce.Entities.Products;
 using ECommerce.Entities.Storefront;
 using ECommerce.Entities.Users;
@@ -68,6 +69,15 @@ public class ApplicationDbContext
 
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<StorefrontContent> StorefrontContents => Set<StorefrontContent>();
+    public DbSet<Supplier> Suppliers => Set<Supplier>();
+    public DbSet<Purchase> Purchases => Set<Purchase>();
+    public DbSet<PurchaseItem> PurchaseItems => Set<PurchaseItem>();
+    public DbSet<InventorySale> InventorySales => Set<InventorySale>();
+    public DbSet<InventorySaleItem> InventorySaleItems => Set<InventorySaleItem>();
+    public DbSet<Staff> StaffMembers => Set<Staff>();
+    public DbSet<StaffSalaryPayment> StaffSalaryPayments => Set<StaffSalaryPayment>();
+    public DbSet<ExpenseCategory> ExpenseCategories => Set<ExpenseCategory>();
+    public DbSet<Expense> Expenses => Set<Expense>();
 
     #endregion
 
@@ -101,6 +111,15 @@ public class ApplicationDbContext
         builder.Entity<Order>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<GeneralType>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<StorefrontContent>().HasQueryFilter(x => !x.IsDeleted);
+        builder.Entity<Supplier>().HasQueryFilter(x => !x.IsDeleted);
+        builder.Entity<Purchase>().HasQueryFilter(x => !x.IsDeleted);
+        builder.Entity<PurchaseItem>().HasQueryFilter(x => !x.IsDeleted && !x.Purchase.IsDeleted && !x.Product.IsDeleted);
+        builder.Entity<InventorySale>().HasQueryFilter(x => !x.IsDeleted);
+        builder.Entity<InventorySaleItem>().HasQueryFilter(x => !x.IsDeleted && !x.InventorySale.IsDeleted && !x.Product.IsDeleted);
+        builder.Entity<Staff>().HasQueryFilter(x => !x.IsDeleted);
+        builder.Entity<StaffSalaryPayment>().HasQueryFilter(x => !x.IsDeleted && !x.Staff.IsDeleted);
+        builder.Entity<ExpenseCategory>().HasQueryFilter(x => !x.IsDeleted);
+        builder.Entity<Expense>().HasQueryFilter(x => !x.IsDeleted && !x.Category.IsDeleted);
         builder.Entity<ProductImage>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted);
         builder.Entity<ProductInventory>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted);
         builder.Entity<ProductPrice>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted && !x.CustomerType.IsDeleted);

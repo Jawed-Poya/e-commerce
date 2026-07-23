@@ -39,7 +39,7 @@ export function NavMain({
 }) {
     const { t, language } = useI18n();
     const { pathname } = useLocation();
-    const translate = (title: string) => t(navKeys[title as keyof typeof navKeys] ?? "nav.platform");
+    const translate = (title: string) => { const key = navKeys[title as keyof typeof navKeys]; return key ? t(key) : title; };
     const matchesRoute = (url: string) => pathname === url || pathname.startsWith(`${url}/`) || (url === "/dashboard" && pathname === "/");
     return (
         <SidebarGroup>

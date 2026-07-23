@@ -3,6 +3,8 @@ using API.Entities.Types;
 using ECommerce.Data;
 using ECommerce.Entities.Common;
 using ECommerce.Entities.Users;
+using ECommerce.Entities.Operations;
+using ECommerce.Entities.Products;
 using ECommerce.Options;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +24,7 @@ public static class DatabaseInitializer
         await EnsureRolesAsync(services);
         await EnsureAdminPermissionsAsync(services);
         await EnsureDefaultCustomerTypeAsync(context);
+        await EnsureOperationDefaultsAsync(context);
         await EnsureAdminAsync(services);
     }
 
@@ -93,6 +96,35 @@ public static class DatabaseInitializer
         });
 
         await context.SaveChangesAsync();
+    }
+
+
+    private static async Task EnsureOperationDefaultsAsync(ApplicationDbContext context)
+    {
+        var changed = false;
+        if (!await context.ExpenseCategories.AnyAsync())
+        {
+            context.ExpenseCategories.AddRange(
+                new ExpenseCategory { Name = "Rent", Description = "Office, shop, and warehouse rent." },
+                new ExpenseCategory { Name = "Utilities", Description = "Electricity, water, internet, and communication." },
+                new ExpenseCategory { Name = "Transport", Description = "Delivery, fuel, and transportation." },
+                new ExpenseCategory { Name = "Office", Description = "Office supplies and administration." },
+                new ExpenseCategory { Name = "Other", Description = "Other operational expenses." });
+            changed = true;
+        }
+
+        if (!await context.Warehouses.AnyAsync())
+        {
+            context.Warehouses.Add(new Warehouse
+            {
+                Name = "Main Warehouse",
+                Code = "MAIN",
+                IsActive = true
+            });
+            changed = true;
+        }
+
+        if (changed) await context.SaveChangesAsync();
     }
 
     private static async Task EnsureAdminAsync(IServiceProvider services)

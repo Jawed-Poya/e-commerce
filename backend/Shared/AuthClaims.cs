@@ -35,6 +35,18 @@ public static class AppPermissions
     public const string UsersManage = "users.manage";
     public const string RolesManage = "roles.manage";
 
+    public const string OperationsView = "operations.view";
+    public const string PurchasesView = "purchases.view";
+    public const string PurchasesManage = "purchases.manage";
+    public const string ManualSalesView = "manual-sales.view";
+    public const string ManualSalesManage = "manual-sales.manage";
+    public const string StaffView = "staff.view";
+    public const string StaffManage = "staff.manage";
+    public const string PayrollView = "payroll.view";
+    public const string PayrollManage = "payroll.manage";
+    public const string ExpensesView = "expenses.view";
+    public const string ExpensesManage = "expenses.manage";
+
     public const string SystemManage = "system.manage";
 
     public static readonly IReadOnlyCollection<string> All =
@@ -53,6 +65,17 @@ public static class AppPermissions
         UsersView,
         UsersManage,
         RolesManage,
+        OperationsView,
+        PurchasesView,
+        PurchasesManage,
+        ManualSalesView,
+        ManualSalesManage,
+        StaffView,
+        StaffManage,
+        PayrollView,
+        PayrollManage,
+        ExpensesView,
+        ExpensesManage,
         SystemManage
     ];
 
@@ -84,6 +107,20 @@ public static class AppPermissions
             [
                 new(CustomersView, "View customers", "View customers, addresses, and order history."),
                 new(CustomersManage, "Manage customers", "Create, edit, delete, and assign customer types.")
+            ],
+            ["Operations"] =
+            [
+                new(OperationsView, "View operations", "View operational and financial summaries."),
+                new(PurchasesView, "View purchases", "View suppliers and purchase receipts."),
+                new(PurchasesManage, "Manage purchases", "Create suppliers and receive product purchases."),
+                new(ManualSalesView, "View manual sales", "View point-of-sale and manual sales."),
+                new(ManualSalesManage, "Manage manual sales", "Record sales and deduct available stock."),
+                new(StaffView, "View staff", "View staff records."),
+                new(StaffManage, "Manage staff", "Create, update, and remove staff records."),
+                new(PayrollView, "View payroll", "View staff salary payments."),
+                new(PayrollManage, "Manage payroll", "Record salary payments and adjustments."),
+                new(ExpensesView, "View expenses", "View expense categories and transactions."),
+                new(ExpensesManage, "Manage expenses", "Create expense categories and record expenses.")
             ],
             ["Administration"] =
             [

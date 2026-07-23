@@ -18,6 +18,7 @@ import {
     ShoppingCart,
     Users,
     Star,
+    BriefcaseBusiness,
 } from "lucide-react";
 import { useI18n } from "@/i18n/i18n-provider";
 import { useAdminAuth } from "@/features/auth/auth-context";
@@ -48,6 +49,18 @@ const data = {
             url: "/inventory",
             icon: <Warehouse />,
             permission: Permissions.InventoryView,
+        },
+        {
+            title: "Operations",
+            url: "/operations",
+            icon: <BriefcaseBusiness />,
+            items: [
+                { title: "Overview", url: "/operations", permission: Permissions.OperationsView },
+                { title: "Purchases", url: "/operations/purchases", permission: Permissions.PurchasesView },
+                { title: "Manual sales", url: "/operations/sales", permission: Permissions.ManualSalesView },
+                { title: "Staff & payroll", url: "/operations/staff", permission: Permissions.StaffView },
+                { title: "Expenses", url: "/operations/expenses", permission: Permissions.ExpensesView },
+            ],
         },
         {
             title: "Orders",

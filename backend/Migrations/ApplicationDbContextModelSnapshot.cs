@@ -1045,6 +1045,214 @@ namespace ECommerce.Migrations
                         });
                 });
 
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.Supplier", b =>
+                {
+                    b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    b.Property<string>("Address").HasColumnType("nvarchar(max)");
+                    b.Property<string>("ContactPerson").HasMaxLength(150).HasColumnType("nvarchar(150)");
+                    b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
+                    b.Property<DateTime?>("DeletedAt").HasColumnType("datetime2");
+                    b.Property<string>("Email").HasMaxLength(256).HasColumnType("nvarchar(256)");
+                    b.Property<bool>("IsActive").HasColumnType("bit");
+                    b.Property<bool>("IsDeleted").HasColumnType("bit");
+                    b.Property<string>("Name").IsRequired().HasMaxLength(180).HasColumnType("nvarchar(180)");
+                    b.Property<string>("Phone").HasMaxLength(40).HasColumnType("nvarchar(40)");
+                    b.Property<string>("TaxNumber").HasMaxLength(80).HasColumnType("nvarchar(80)");
+                    b.Property<DateTime?>("UpdatedAt").HasColumnType("datetime2");
+                    b.HasKey("Id");
+                    b.HasIndex("Name");
+                    b.ToTable("Suppliers");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.Purchase", b =>
+                {
+                    b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
+                    b.Property<string>("CreatedByUserId").HasColumnType("nvarchar(max)");
+                    b.Property<DateTime?>("DeletedAt").HasColumnType("datetime2");
+                    b.Property<decimal>("Discount").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<bool>("IsDeleted").HasColumnType("bit");
+                    b.Property<string>("Notes").HasColumnType("nvarchar(max)");
+                    b.Property<decimal>("OtherCost").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<decimal>("PaidAmount").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<int>("PaymentStatus").HasColumnType("int");
+                    b.Property<DateOnly>("PurchaseDate").HasColumnType("date");
+                    b.Property<string>("PurchaseNumber").IsRequired().HasMaxLength(50).HasColumnType("nvarchar(50)");
+                    b.Property<string>("ReferenceNumber").HasMaxLength(100).HasColumnType("nvarchar(100)");
+                    b.Property<int>("Status").HasColumnType("int");
+                    b.Property<decimal>("Subtotal").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<long?>("SupplierId").HasColumnType("bigint");
+                    b.Property<decimal>("Tax").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<decimal>("Total").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<DateTime?>("UpdatedAt").HasColumnType("datetime2");
+                    b.HasKey("Id");
+                    b.HasIndex("PurchaseDate");
+                    b.HasIndex("PurchaseNumber").IsUnique();
+                    b.HasIndex("SupplierId");
+                    b.ToTable("Purchases");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.PurchaseItem", b =>
+                {
+                    b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
+                    b.Property<DateTime?>("DeletedAt").HasColumnType("datetime2");
+                    b.Property<DateOnly?>("ExpireDate").HasColumnType("date");
+                    b.Property<bool>("IsDeleted").HasColumnType("bit");
+                    b.Property<decimal>("LineTotal").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<string>("LotNumber").HasMaxLength(100).HasColumnType("nvarchar(100)");
+                    b.Property<long>("ProductId").HasColumnType("bigint");
+                    b.Property<long>("PurchaseId").HasColumnType("bigint");
+                    b.Property<decimal>("Quantity").HasPrecision(18, 3).HasColumnType("decimal(18,3)");
+                    b.Property<decimal>("UnitCost").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<DateTime?>("UpdatedAt").HasColumnType("datetime2");
+                    b.HasKey("Id");
+                    b.HasIndex("ProductId");
+                    b.HasIndex("PurchaseId");
+                    b.ToTable("PurchaseItems");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.InventorySale", b =>
+                {
+                    b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
+                    b.Property<string>("CreatedByUserId").HasColumnType("nvarchar(max)");
+                    b.Property<long?>("CustomerId").HasColumnType("bigint");
+                    b.Property<string>("CustomerName").HasMaxLength(180).HasColumnType("nvarchar(180)");
+                    b.Property<string>("CustomerPhone").HasMaxLength(40).HasColumnType("nvarchar(40)");
+                    b.Property<DateTime?>("DeletedAt").HasColumnType("datetime2");
+                    b.Property<decimal>("Discount").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<bool>("IsDeleted").HasColumnType("bit");
+                    b.Property<string>("Notes").HasColumnType("nvarchar(max)");
+                    b.Property<decimal>("PaidAmount").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<string>("PaymentMethod").IsRequired().HasMaxLength(50).HasColumnType("nvarchar(50)");
+                    b.Property<int>("PaymentStatus").HasColumnType("int");
+                    b.Property<DateOnly>("SaleDate").HasColumnType("date");
+                    b.Property<string>("SaleNumber").IsRequired().HasMaxLength(50).HasColumnType("nvarchar(50)");
+                    b.Property<decimal>("Subtotal").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<decimal>("Tax").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<decimal>("Total").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<DateTime?>("UpdatedAt").HasColumnType("datetime2");
+                    b.HasKey("Id");
+                    b.HasIndex("CustomerId");
+                    b.HasIndex("SaleDate");
+                    b.HasIndex("SaleNumber").IsUnique();
+                    b.ToTable("InventorySales");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.InventorySaleItem", b =>
+                {
+                    b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
+                    b.Property<DateTime?>("DeletedAt").HasColumnType("datetime2");
+                    b.Property<long>("InventorySaleId").HasColumnType("bigint");
+                    b.Property<bool>("IsDeleted").HasColumnType("bit");
+                    b.Property<decimal>("LineTotal").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<long>("ProductId").HasColumnType("bigint");
+                    b.Property<decimal>("Quantity").HasPrecision(18, 3).HasColumnType("decimal(18,3)");
+                    b.Property<decimal>("UnitPrice").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<DateTime?>("UpdatedAt").HasColumnType("datetime2");
+                    b.HasKey("Id");
+                    b.HasIndex("InventorySaleId");
+                    b.HasIndex("ProductId");
+                    b.ToTable("InventorySaleItems");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.Staff", b =>
+                {
+                    b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    b.Property<string>("Address").HasColumnType("nvarchar(max)");
+                    b.Property<decimal>("BaseSalary").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
+                    b.Property<DateTime?>("DeletedAt").HasColumnType("datetime2");
+                    b.Property<string>("Department").HasMaxLength(120).HasColumnType("nvarchar(120)");
+                    b.Property<string>("Email").HasMaxLength(256).HasColumnType("nvarchar(256)");
+                    b.Property<string>("EmployeeNumber").IsRequired().HasMaxLength(50).HasColumnType("nvarchar(50)");
+                    b.Property<string>("FullName").IsRequired().HasMaxLength(180).HasColumnType("nvarchar(180)");
+                    b.Property<DateOnly>("HireDate").HasColumnType("date");
+                    b.Property<bool>("IsActive").HasColumnType("bit");
+                    b.Property<bool>("IsDeleted").HasColumnType("bit");
+                    b.Property<string>("Notes").HasColumnType("nvarchar(max)");
+                    b.Property<string>("Phone").HasMaxLength(40).HasColumnType("nvarchar(40)");
+                    b.Property<string>("Position").HasMaxLength(120).HasColumnType("nvarchar(120)");
+                    b.Property<DateTime?>("UpdatedAt").HasColumnType("datetime2");
+                    b.HasKey("Id");
+                    b.HasIndex("EmployeeNumber").IsUnique();
+                    b.HasIndex("IsActive");
+                    b.ToTable("StaffMembers");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.StaffSalaryPayment", b =>
+                {
+                    b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    b.Property<decimal>("BaseSalary").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<decimal>("Bonus").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
+                    b.Property<string>("CreatedByUserId").HasColumnType("nvarchar(max)");
+                    b.Property<decimal>("Deduction").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<DateTime?>("DeletedAt").HasColumnType("datetime2");
+                    b.Property<bool>("IsDeleted").HasColumnType("bit");
+                    b.Property<decimal>("NetAmount").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<DateOnly>("PaidDate").HasColumnType("date");
+                    b.Property<string>("PaymentMethod").IsRequired().HasMaxLength(50).HasColumnType("nvarchar(50)");
+                    b.Property<int>("PeriodMonth").HasColumnType("int");
+                    b.Property<int>("PeriodYear").HasColumnType("int");
+                    b.Property<string>("ReferenceNumber").HasMaxLength(100).HasColumnType("nvarchar(100)");
+                    b.Property<long>("StaffId").HasColumnType("bigint");
+                    b.Property<string>("Notes").HasColumnType("nvarchar(max)");
+                    b.Property<DateTime?>("UpdatedAt").HasColumnType("datetime2");
+                    b.HasKey("Id");
+                    b.HasIndex("PaidDate");
+                    b.HasIndex("StaffId", "PeriodYear", "PeriodMonth").IsUnique();
+                    b.ToTable("StaffSalaryPayments");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.ExpenseCategory", b =>
+                {
+                    b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
+                    b.Property<DateTime?>("DeletedAt").HasColumnType("datetime2");
+                    b.Property<string>("Description").HasColumnType("nvarchar(max)");
+                    b.Property<bool>("IsActive").HasColumnType("bit");
+                    b.Property<bool>("IsDeleted").HasColumnType("bit");
+                    b.Property<string>("Name").IsRequired().HasMaxLength(150).HasColumnType("nvarchar(150)");
+                    b.Property<DateTime?>("UpdatedAt").HasColumnType("datetime2");
+                    b.HasKey("Id");
+                    b.HasIndex("Name").IsUnique();
+                    b.ToTable("ExpenseCategories");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.Expense", b =>
+                {
+                    b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    b.Property<decimal>("Amount").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<long>("CategoryId").HasColumnType("bigint");
+                    b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
+                    b.Property<string>("CreatedByUserId").HasColumnType("nvarchar(max)");
+                    b.Property<DateTime?>("DeletedAt").HasColumnType("datetime2");
+                    b.Property<string>("Description").IsRequired().HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+                    b.Property<DateOnly>("ExpenseDate").HasColumnType("date");
+                    b.Property<bool>("IsDeleted").HasColumnType("bit");
+                    b.Property<string>("PaymentMethod").IsRequired().HasMaxLength(50).HasColumnType("nvarchar(50)");
+                    b.Property<string>("ReferenceNumber").HasMaxLength(100).HasColumnType("nvarchar(100)");
+                    b.Property<DateTime?>("UpdatedAt").HasColumnType("datetime2");
+                    b.Property<string>("Vendor").HasMaxLength(180).HasColumnType("nvarchar(180)");
+                    b.HasKey("Id");
+                    b.HasIndex("CategoryId");
+                    b.HasIndex("ExpenseDate");
+                    b.ToTable("Expenses");
+                });
+
             modelBuilder.Entity("ECommerce.Entities.Storefront.StorefrontContent", b =>
                 {
                     b.Property<long>("Id")
@@ -1306,6 +1514,7 @@ namespace ECommerce.Migrations
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
+
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
@@ -1648,6 +1857,77 @@ namespace ECommerce.Migrations
                     b.Navigation("Product");
                 });
 
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.Purchase", b =>
+                {
+                    b.HasOne("ECommerce.Entities.Operations.Supplier", "Supplier")
+                        .WithMany("Purchases")
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                    b.Navigation("Supplier");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.PurchaseItem", b =>
+                {
+                    b.HasOne("API.Entities.Products.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                    b.HasOne("ECommerce.Entities.Operations.Purchase", "Purchase")
+                        .WithMany("Items")
+                        .HasForeignKey("PurchaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                    b.Navigation("Product");
+                    b.Navigation("Purchase");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.InventorySale", b =>
+                {
+                    b.HasOne("API.Entities.Customers.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                    b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.InventorySaleItem", b =>
+                {
+                    b.HasOne("ECommerce.Entities.Operations.InventorySale", "InventorySale")
+                        .WithMany("Items")
+                        .HasForeignKey("InventorySaleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                    b.HasOne("API.Entities.Products.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                    b.Navigation("InventorySale");
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.StaffSalaryPayment", b =>
+                {
+                    b.HasOne("ECommerce.Entities.Operations.Staff", "Staff")
+                        .WithMany("SalaryPayments")
+                        .HasForeignKey("StaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                    b.Navigation("Staff");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.Expense", b =>
+                {
+                    b.HasOne("ECommerce.Entities.Operations.ExpenseCategory", "Category")
+                        .WithMany("Expenses")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                    b.Navigation("Category");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("ECommerce.Entities.Users.Role", null)
@@ -1697,6 +1977,32 @@ namespace ECommerce.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.Supplier", b =>
+                {
+                    b.Navigation("Purchases");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.Purchase", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.InventorySale", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.Staff", b =>
+                {
+                    b.Navigation("SalaryPayments");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.ExpenseCategory", b =>
+                {
+                    b.Navigation("Expenses");
                 });
 
             modelBuilder.Entity("API.Entities.Customers.Customer", b =>
