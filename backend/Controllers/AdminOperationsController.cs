@@ -130,7 +130,7 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
     private string? UserId() => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
 
     private bool HasAnyPermission(params string[] permissions) =>
-        User.IsInRole("Admin") || permissions.Any(permission => User.Claims.Any(claim => claim.Type == AppClaimTypes.Permission && claim.Value == permission));
+        User.IsInRole("Admin") || permissions.Any(permission => User.Claims.Any(claim => claim.Type == AuthClaims.Permission && claim.Value == permission));
 
     private async Task<IActionResult> Handle<T>(Func<Task<T>> action)
     {
