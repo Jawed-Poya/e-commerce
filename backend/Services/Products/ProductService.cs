@@ -147,6 +147,11 @@ public class ProductService : IProductService
                     .Select(price => price.CustomerType.Name)
                     .FirstOrDefault(),
             ViewCount = product.ViewCount,
+            ReviewCount = _context.ProductReviews.Count(review => review.ProductId == product.Id && review.IsApproved && !review.IsDeleted),
+            AverageRating = _context.ProductReviews
+                .Where(review => review.ProductId == product.Id && review.IsApproved && !review.IsDeleted)
+                .Select(review => (double?)review.Rating)
+                .Average() ?? 0,
             PrimaryImageUrl = product.Images
                 .Where(image => image.IsPrimary)
                 .Select(image => "/" + image.ImagePath.Replace("\\", "/"))
@@ -201,6 +206,8 @@ public class ProductService : IProductService
                 product.PriceCustomerTypeName,
                 effectiveTypeId == defaultType.Id || !product.HasRequestedPrice,
                 product.ViewCount,
+                product.AverageRating,
+                product.ReviewCount,
                 product.PrimaryImageUrl,
                 product.Images)).ToList(),
             TotalCount = total,
@@ -226,6 +233,7 @@ public class ProductService : IProductService
         var ids = request.Products.Select(x => x.Id).ToArray();
         var products = await _context.Products
             .Include(x => x.Images)
+            .Include(x => x.Prices)
             .Where(x => ids.Contains(x.Id) && !x.IsDeleted)
             .ToDictionaryAsync(x => x.Id, cancellationToken);
 
@@ -270,6 +278,16 @@ public class ProductService : IProductService
         if (slugConflict)
             throw new ProductConflictException("One or more slugs already belong to another product.");
 
+        var customerTypeIds = await _context.Types
+            .AsNoTracking()
+            .Where(type => type.Group == GeneralTypeEnum.CustomerType && !type.IsDeleted)
+            .Select(type => type.Id)
+            .ToListAsync(cancellationToken);
+        var defaultCustomerTypeId = await _defaultCustomerType.GetIdAsync(cancellationToken);
+        foreach (var item in request.Products)
+            if (item.Prices.Count > 0)
+                ValidatePriceItems(item.Prices, customerTypeIds, defaultCustomerTypeId, $"Products[{item.Id}].Prices");
+
         var storedImages = new List<StoredProductImage>();
         var oldImagePaths = new List<string>();
         try
@@ -293,6 +311,9 @@ public class ProductService : IProductService
                 product.IsFeatured = item.IsFeatured;
                 product.IsActive = item.IsActive;
                 product.UpdatedAt = DateTime.UtcNow;
+
+                if (item.Prices.Count > 0)
+                    ReplacePrices(product, item.Prices);
 
                 if (item.RemovedImageIds.Count > 0)
                 {
@@ -374,11 +395,19 @@ public class ProductService : IProductService
 
     public Task<ProductDetailsDto?> GetByIdAsync(long id) =>
         TransientSqlRetry.ExecuteAsync(
-            cancellationToken => GetByIdCoreAsync(id, cancellationToken),
+            cancellationToken => GetDetailsCoreAsync(product => product.Id == id, cancellationToken),
             CancellationToken.None);
 
-    private async Task<ProductDetailsDto?> GetByIdCoreAsync(
-        long id,
+    public Task<ProductDetailsDto?> GetBySlugAsync(string slug)
+    {
+        var normalized = slug.Trim();
+        return TransientSqlRetry.ExecuteAsync(
+            cancellationToken => GetDetailsCoreAsync(product => product.Slug == normalized, cancellationToken),
+            CancellationToken.None);
+    }
+
+    private async Task<ProductDetailsDto?> GetDetailsCoreAsync(
+        System.Linq.Expressions.Expression<Func<Product, bool>> predicate,
         CancellationToken cancellationToken)
     {
         var product = await _context.Products
@@ -390,9 +419,8 @@ public class ProductService : IProductService
             .Include(entity => entity.Images)
             .Include(entity => entity.Prices)
                 .ThenInclude(price => price.CustomerType)
-            .FirstOrDefaultAsync(
-                entity => entity.Id == id && !entity.IsDeleted,
-                cancellationToken);
+            .Where(entity => !entity.IsDeleted)
+            .FirstOrDefaultAsync(predicate, cancellationToken);
 
         if (product is null) return null;
 
@@ -421,6 +449,11 @@ public class ProductService : IProductService
             IsActive = product.IsActive,
             IsFeatured = product.IsFeatured,
             ViewCount = product.ViewCount,
+            ReviewCount = await _context.ProductReviews.CountAsync(review => review.ProductId == product.Id && review.IsApproved && !review.IsDeleted, cancellationToken),
+            AverageRating = await _context.ProductReviews
+                .Where(review => review.ProductId == product.Id && review.IsApproved && !review.IsDeleted)
+                .Select(review => (double?)review.Rating)
+                .AverageAsync(cancellationToken) ?? 0,
             Price = resolved?.Price,
             OldPrice = resolved?.OldPrice,
             PriceCustomerTypeId = resolved?.CustomerTypeId,
@@ -589,6 +622,15 @@ public class ProductService : IProductService
             cancellationToken
         );
 
+        var customerTypeIds = await _context.Types
+            .AsNoTracking()
+            .Where(type => type.Group == GeneralTypeEnum.CustomerType && !type.IsDeleted)
+            .Select(type => type.Id)
+            .ToListAsync(cancellationToken);
+        var defaultCustomerTypeId = await _defaultCustomerType.GetIdAsync(cancellationToken);
+        foreach (var item in request.Products.Select((value, index) => new { value, index }))
+            ValidatePriceItems(item.value.Prices, customerTypeIds, defaultCustomerTypeId, $"Products[{item.index}].Prices");
+
         var reservedSlugs = new HashSet<string>(
             StringComparer.OrdinalIgnoreCase
         );
@@ -672,6 +714,9 @@ public class ProductService : IProductService
                         ReservedQuantity = 0
                     }
                 };
+
+                foreach (var price in item.Request.Prices)
+                    product.Prices.Add(CreatePrice(price));
 
                 product.Images.Add(
                     new ProductImage
@@ -969,6 +1014,61 @@ public class ProductService : IProductService
         );
     }
 
+    private static void ValidatePriceItems(
+        IReadOnlyCollection<ProductPriceItemRequest> prices,
+        IReadOnlyCollection<long> customerTypeIds,
+        long defaultCustomerTypeId,
+        string key)
+    {
+        if (prices.Count == 0)
+            throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["A default customer price is required."] });
+        if (prices.GroupBy(price => price.CustomerTypeId).Any(group => group.Count() > 1))
+            throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Each customer type may appear only once."] });
+        if (!prices.Any(price => price.CustomerTypeId == defaultCustomerTypeId))
+            throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["The default customer type price is required."] });
+        foreach (var price in prices)
+        {
+            if (!customerTypeIds.Contains(price.CustomerTypeId))
+                throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["One or more customer types are invalid or inactive."] });
+            if (price.RegularPrice < 0 || price.SalePrice < 0)
+                throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Prices cannot be negative."] });
+            if (price.SalePrice.HasValue && price.SalePrice.Value > price.RegularPrice)
+                throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Sale price cannot exceed regular price."] });
+            if (price.StartDate.HasValue && price.EndDate.HasValue && price.StartDate > price.EndDate)
+                throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Sale end date must be on or after the start date."] });
+        }
+    }
+
+    private static ProductPrice CreatePrice(ProductPriceItemRequest price) => new()
+    {
+        CustomerTypeId = price.CustomerTypeId,
+        RegularPrice = price.RegularPrice,
+        SalePrice = price.SalePrice,
+        StartDate = price.StartDate,
+        EndDate = price.EndDate
+    };
+
+    private static void ReplacePrices(Product product, IReadOnlyCollection<ProductPriceItemRequest> prices)
+    {
+        var requestedIds = prices.Select(price => price.CustomerTypeId).ToHashSet();
+        foreach (var existing in product.Prices.Where(price => !requestedIds.Contains(price.CustomerTypeId)).ToList())
+            product.Prices.Remove(existing);
+        foreach (var request in prices)
+        {
+            var existing = product.Prices.FirstOrDefault(price => price.CustomerTypeId == request.CustomerTypeId);
+            if (existing is null)
+                product.Prices.Add(CreatePrice(request));
+            else
+            {
+                existing.RegularPrice = request.RegularPrice;
+                existing.SalePrice = request.SalePrice;
+                existing.StartDate = request.StartDate;
+                existing.EndDate = request.EndDate;
+                existing.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+    }
+
     private static ResolvedProductPrice? ResolvePrice(
         IEnumerable<ProductPrice> prices,
         long requestedTypeId,
@@ -1018,6 +1118,8 @@ public class ProductService : IProductService
         public decimal? OldPrice { get; init; }
         public string? PriceCustomerTypeName { get; init; }
         public long ViewCount { get; init; }
+        public double AverageRating { get; init; }
+        public int ReviewCount { get; init; }
         public string? PrimaryImageUrl { get; init; }
         public IReadOnlyList<ProductListImageResponse> Images { get; init; } = [];
     }

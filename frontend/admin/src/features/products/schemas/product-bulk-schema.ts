@@ -73,6 +73,16 @@ export const ProductBulkItemSchema = z
         isActive: z.boolean(),
 
         slug: z.string().trim().max(250, "Slug cannot exceed 250 characters."),
+        prices: z.array(z.object({
+            customerTypeId: z.number().int().positive(),
+            customerTypeName: z.string(),
+            regularPrice: z.number().nonnegative(),
+            salePrice: z.number().nonnegative().nullable(),
+            startDate: z.string().nullable(),
+            endDate: z.string().nullable(),
+            isDefault: z.boolean(),
+            enabled: z.boolean(),
+        })),
     })
     .superRefine((product, context) => {
         if (
@@ -87,6 +97,42 @@ export const ProductBulkItemSchema = z
                     "Maximum value must be greater than or equal to minimum value.",
             });
         }
+
+        const defaultPrice = product.prices.find((price) => price.isDefault);
+        if (!defaultPrice?.enabled) {
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["prices"],
+                message: "A default customer price is required.",
+            });
+        }
+
+        product.prices.forEach((price, index) => {
+            if (!price.enabled) return;
+
+            if (
+                price.salePrice != null &&
+                price.salePrice > price.regularPrice
+            ) {
+                context.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: ["prices", index, "salePrice"],
+                    message: "Sale price cannot exceed regular price.",
+                });
+            }
+
+            if (
+                price.startDate &&
+                price.endDate &&
+                price.endDate < price.startDate
+            ) {
+                context.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: ["prices", index, "endDate"],
+                    message: "Sale end date cannot be earlier than start date.",
+                });
+            }
+        });
     });
 
 export const ProductBulkFormSchema = z.object({

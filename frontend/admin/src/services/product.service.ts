@@ -28,6 +28,8 @@ export interface ProductListItem {
     priceCustomerTypeName: string | null;
     isDefaultPrice: boolean;
     viewCount: number;
+    averageRating: number;
+    reviewCount: number;
     primaryImageUrl: string | null;
     images: ProductListImage[];
 }
@@ -104,6 +106,7 @@ export interface CreateSingleProductInput {
     maximumValue?: number | null;
     isFeatured: boolean;
     isActive: boolean;
+    prices: ProductPriceInput[];
 }
 
 export interface CreateSingleProductResult {
@@ -114,7 +117,7 @@ export interface CreateSingleProductResult {
 export type BulkUpdateProduct = Pick<ProductListItem,
     "id" | "name" | "barcode" | "categoryId" | "brandId" | "unitId" |
     "shortDescription" | "description" | "slug" | "minimumValue" |
-    "maximumValue" | "isFeatured" | "isActive" | "primaryImageUrl" | "images"> & { image?: File; galleryImages?: File[]; removedImageIds?: number[] };
+    "maximumValue" | "isFeatured" | "isActive" | "primaryImageUrl" | "images"> & { image?: File; galleryImages?: File[]; removedImageIds?: number[]; prices: ProductPriceInput[] };
 
 function append(formData: FormData, key: string, value: string | number | boolean | null | undefined) {
     if (value !== null && value !== undefined) formData.append(key, String(value));
@@ -141,6 +144,14 @@ export const productService = {
         append(formData, `${prefix}.MaximumValue`, product.maximumValue);
         append(formData, `${prefix}.IsFeatured`, product.isFeatured);
         append(formData, `${prefix}.IsActive`, product.isActive);
+        product.prices.forEach((price, index) => {
+            const pricePrefix = `${prefix}.Prices[${index}]`;
+            append(formData, `${pricePrefix}.CustomerTypeId`, price.customerTypeId);
+            append(formData, `${pricePrefix}.RegularPrice`, price.regularPrice);
+            append(formData, `${pricePrefix}.SalePrice`, price.salePrice);
+            append(formData, `${pricePrefix}.StartDate`, price.startDate);
+            append(formData, `${pricePrefix}.EndDate`, price.endDate);
+        });
         return apiClient.post<CreateSingleProductResult>("/products/bulk", formData);
     },
     bulkUpdate(products: BulkUpdateProduct[]) {
@@ -163,11 +174,23 @@ export const productService = {
             if (product.image) formData.append(`${prefix}.Image`, product.image, product.image.name);
             product.galleryImages?.forEach(image => formData.append(`${prefix}.GalleryImages`, image, image.name));
             product.removedImageIds?.forEach(id => formData.append(`${prefix}.RemovedImageIds`, String(id)));
+            product.prices.forEach((price, priceIndex) => {
+                const pricePrefix = `${prefix}.Prices[${priceIndex}]`;
+                append(formData, `${pricePrefix}.Id`, price.id);
+                append(formData, `${pricePrefix}.CustomerTypeId`, price.customerTypeId);
+                append(formData, `${pricePrefix}.RegularPrice`, price.regularPrice);
+                append(formData, `${pricePrefix}.SalePrice`, price.salePrice);
+                append(formData, `${pricePrefix}.StartDate`, price.startDate);
+                append(formData, `${pricePrefix}.EndDate`, price.endDate);
+            });
         });
         return apiClient.put<{ updatedCount: number }>("/products/bulk", formData);
     },
     getById(id: number) {
         return apiClient.get<ProductDetails>(`/products/${id}`);
+    },
+    getBySlug(slug: string) {
+        return apiClient.get<ProductDetails>(`/products/by-slug/${encodeURIComponent(slug)}`);
     },
     replacePrices(productId: number, prices: ProductPriceInput[]) {
         return apiClient.put<ProductPrice[]>(`/products/${productId}/prices`, { prices });

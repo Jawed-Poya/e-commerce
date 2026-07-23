@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BadgeDollarSign, ImagePlus, LoaderCircle, PackagePlus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, ImagePlus, LoaderCircle, PackagePlus, Save } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,9 +14,9 @@ import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
 import { useProductLookupsQuery } from "@/features/products/hooks/use-product-mutation";
 import { productKeys } from "@/keys/product-keys";
-import { productService, resolveProductImageUrl, type ProductPriceInput } from "@/services/product.service";
+import { productService, resolveProductImageUrl } from "@/services/product.service";
+import { CustomerPricingFields, activePriceInputs, createCustomerPriceDrafts, validatePriceDrafts, type CustomerPriceDraft } from "./customer-pricing-fields";
 
-interface PriceDraft extends ProductPriceInput { customerTypeName: string; isDefault: boolean; enabled: boolean }
 const empty = { name: "", barcode: "", shortDescription: "", description: "", slug: "", categoryId: 0, brandId: null as number | null, unitId: null as number | null, minimumValue: null as number | null, maximumValue: null as number | null, isFeatured: false, isActive: true };
 
 export function ProductEditorPage() {
@@ -32,7 +31,7 @@ export function ProductEditorPage() {
   const { data: product, isLoading: productLoading } = useQuery({ queryKey: productKeys.detail(id ?? 0), queryFn: async () => (await productService.getById(id!)).data, enabled: editing });
   const [form, setForm] = useState(empty);
   const [image, setImage] = useState<File | null>(null);
-  const [prices, setPrices] = useState<PriceDraft[]>([]);
+  const [prices, setPrices] = useState<CustomerPriceDraft[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -42,10 +41,11 @@ export function ProductEditorPage() {
 
   useEffect(() => {
     if (!lookups) return;
-    setPrices(lookups.customerTypes.map(type => {
-      const existing = product?.prices.find(price => price.customerTypeId === type.id);
-      return { id: existing?.id, customerTypeId: type.id, customerTypeName: type.name, regularPrice: existing?.regularPrice ?? 0, salePrice: existing?.salePrice ?? null, startDate: existing?.startDate ?? null, endDate: existing?.endDate ?? null, isDefault: type.id === lookups.defaultCustomerTypeId, enabled: Boolean(existing) || type.id === lookups.defaultCustomerTypeId };
-    }));
+    setPrices(createCustomerPriceDrafts(
+      lookups.customerTypes,
+      lookups.defaultCustomerTypeId,
+      product?.prices.map(price => ({ ...price, enabled: true })) ?? [],
+    ));
   }, [lookups, product]);
 
   const preview = useMemo(() => image ? URL.createObjectURL(image) : resolveProductImageUrl(product?.images.find(x => x.isPrimary)?.url), [image, product]);
@@ -56,30 +56,20 @@ export function ProductEditorPage() {
     if (form.minimumValue != null && form.minimumValue < 0) return toast.error("Minimum value cannot be negative.");
     if (form.maximumValue != null && form.maximumValue < 0) return toast.error("Maximum value cannot be negative.");
     if (form.minimumValue != null && form.maximumValue != null && form.minimumValue > form.maximumValue) return toast.error("Maximum value must be at least the minimum value.");
-    const activePrices = prices.filter(price => price.enabled).map(price => ({
-      id: price.id,
-      customerTypeId: price.customerTypeId,
-      regularPrice: Number(price.regularPrice),
-      salePrice: price.salePrice == null ? null : Number(price.salePrice),
-      startDate: price.startDate,
-      endDate: price.endDate,
-    }));
-    const defaultPrice = prices.find(x => x.isDefault);
-    if (canManagePricing && (!defaultPrice?.enabled || Number(defaultPrice.regularPrice) < 0)) return toast.error("A valid default customer price is required.");
-    if (canManagePricing && activePrices.some(x => x.regularPrice < 0 || (x.salePrice != null && (x.salePrice < 0 || x.salePrice >= x.regularPrice)))) return toast.error("Prices must be non-negative and sale price must be lower than regular price.");
-    if (canManagePricing && activePrices.some(x => x.startDate && x.endDate && x.endDate < x.startDate)) return toast.error("A sale end date cannot be earlier than its start date.");
+    const activePrices = activePriceInputs(prices);
+    const pricingError = canManagePricing ? validatePriceDrafts(prices) : null;
+    if (pricingError) return toast.error(pricingError);
     if (!editing && !image) return toast.error("A primary product image is required.");
     setSaving(true);
     try {
       let productId = id;
       if (editing && product) {
-        await productService.bulkUpdate([{ id: product.id, ...form, primaryImageUrl: product.images.find(x => x.isPrimary)?.url ?? null, images: product.images.map(x => ({ id: x.id, url: x.url, isPrimary: x.isPrimary, sortOrder: x.sortOrder })), image: image ?? undefined }]);
+        await productService.bulkUpdate([{ id: product.id, ...form, primaryImageUrl: product.images.find(x => x.isPrimary)?.url ?? null, images: product.images.map(x => ({ id: x.id, url: x.url, isPrimary: x.isPrimary, sortOrder: x.sortOrder })), image: image ?? undefined, prices: canManagePricing ? activePrices : product.prices }]);
       } else {
-        const created = await productService.createSingle({ ...form, image: image!, galleryImages: [] });
+        const created = await productService.createSingle({ ...form, image: image!, galleryImages: [], prices: activePrices });
         productId = created.data.products[0]?.id ?? null;
       }
       if (!productId) throw new Error("The product was saved but no product id was returned.");
-      if (canManagePricing) await productService.replacePrices(productId, activePrices);
       await queryClient.invalidateQueries({ queryKey: productKeys.all });
       toast.success(canManagePricing
         ? (editing ? "Product and customer prices updated." : "Product and customer prices created.")
@@ -113,17 +103,7 @@ export function ProductEditorPage() {
           <label className="flex items-center gap-3 rounded-lg border p-3"><Checkbox checked={form.isFeatured} onCheckedChange={v => setForm(x => ({ ...x, isFeatured: v === true }))} /><span><strong className="block text-sm">Featured product</strong><span className="text-xs text-muted-foreground">Highlight it on the storefront.</span></span></label>
         </CardContent></Card>
 
-        <Card><CardHeader><CardTitle className="flex items-center gap-2"><BadgeDollarSign className="size-5" />Customer-type pricing</CardTitle></CardHeader><CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">{canManagePricing ? "Enable the customer groups that need their own price. The default row is always required for guests and general customers." : "You can view customer pricing, but your role does not have permission to change it."}</p>
-          {prices.map((price, index) => <div key={price.customerTypeId} className="grid gap-3 rounded-xl border p-4 md:grid-cols-[180px_1fr_1fr_1fr_1fr_auto] md:items-end">
-            <label className="flex items-center gap-2 pb-2"><Checkbox checked={price.enabled} disabled={price.isDefault || !canManagePricing} onCheckedChange={v => setPrices(rows => rows.map((row, i) => i === index ? { ...row, enabled: v === true } : row))} /><span className="text-sm font-medium">{price.customerTypeName}</span>{price.isDefault && <Badge>Default</Badge>}</label>
-            <Field label="Regular price"><Input type="number" min={0} step="0.01" disabled={!price.enabled || !canManagePricing} value={price.regularPrice} onChange={e => setPrices(rows => rows.map((row, i) => i === index ? { ...row, regularPrice: Number(e.target.value) } : row))} /></Field>
-            <Field label="Sale price"><Input type="number" min={0} step="0.01" disabled={!price.enabled || !canManagePricing} value={price.salePrice ?? ""} onChange={e => setPrices(rows => rows.map((row, i) => i === index ? { ...row, salePrice: e.target.value ? Number(e.target.value) : null } : row))} /></Field>
-            <Field label="Sale starts"><Input type="date" disabled={!price.enabled || price.salePrice == null || !canManagePricing} value={price.startDate ?? ""} onChange={e => setPrices(rows => rows.map((row, i) => i === index ? { ...row, startDate: e.target.value || null } : row))} /></Field>
-            <Field label="Sale ends"><Input type="date" disabled={!price.enabled || price.salePrice == null || !canManagePricing} value={price.endDate ?? ""} onChange={e => setPrices(rows => rows.map((row, i) => i === index ? { ...row, endDate: e.target.value || null } : row))} /></Field>
-            {!price.isDefault && <Button type="button" size="icon" variant="ghost" disabled={!price.enabled || !canManagePricing} onClick={() => setPrices(rows => rows.map((row, i) => i === index ? { ...row, enabled: false } : row))}><Trash2 className="size-4 text-destructive" /></Button>}
-          </div>)}
-        </CardContent></Card>
+        <CustomerPricingFields prices={prices} onChange={setPrices} disabled={!canManagePricing} />
       </div>
       <Card className="h-fit xl:sticky xl:top-20"><CardHeader><CardTitle className="flex items-center gap-2"><ImagePlus className="size-5" />Primary image</CardTitle></CardHeader><CardContent className="space-y-4">
         <label className="block cursor-pointer overflow-hidden rounded-xl border border-dashed bg-muted/30">

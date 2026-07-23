@@ -23,6 +23,7 @@ import { ProductSectionNavigation } from "@/features/products/components/product
 import { ProductFiltersDialog, type AppliedProductFilters } from "@/features/products/components/product-filters-dialog";
 import { ProductPagination } from "@/features/products/components/product-pagination";
 import { DeleteButton } from "@/components/delete-button";
+import { CustomerPricingFields, activePriceInputs, createCustomerPriceDrafts, validatePriceDrafts } from "@/features/products/components/customer-pricing-fields";
 import {
     IMAGE_FILE_ACCEPT,
     isSupportedImageFile,
@@ -64,20 +65,58 @@ export default function ProductsPage() {
     const [activeEditor, setActiveEditor] = useState(0);
     const { data, isLoading, isError, isFetching } = useProducts({ ...filters, search: search || undefined, page, pageSize });
     const { data: lookups } = useProductLookupsQuery();
-    const products = data?.items ?? [];
+    const products = useMemo(() => data?.items ?? [], [data?.items]);
     const activeFilterCount = Object.values(filters).filter(value => value !== undefined).length;
     const selectedProducts = useMemo(() => products.filter(x => selected.includes(x.id)), [products, selected]);
 
-    useEffect(() => setSelected(ids => ids.filter(id => products.some(x => x.id === id))), [products]);
+    useEffect(() => {
+        setSelected((ids) => {
+            const next = ids.filter((id) => products.some((product) => product.id === id));
+            return next.length === ids.length && next.every((id, index) => id === ids[index])
+                ? ids
+                : next;
+        });
+    }, [products]);
     const toggle = (id: number) => setSelected(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]);
-    const editProducts = (items: ProductListItem[]) => {
-        setDrafts(items.map(({ id, name, barcode, shortDescription, description, slug, categoryId, brandId, unitId, minimumValue, maximumValue, isFeatured, isActive, primaryImageUrl, images }) =>
-            ({ id, name, barcode, shortDescription, description, slug, categoryId, brandId, unitId, minimumValue, maximumValue, isFeatured, isActive, primaryImageUrl, images: images ?? [] })));
-        setActiveEditor(0);
-        setOpen(true);
+    const editProducts = async (items: ProductListItem[]) => {
+        if (!lookups) return toast.error("Product pricing lookups are still loading.");
+        setSaving(true);
+        try {
+            const details = await Promise.all(items.map(async (item) => (await productService.getById(item.id)).data));
+            setDrafts(details.map((item) => ({
+                id: item.id,
+                name: item.name,
+                barcode: item.barcode,
+                shortDescription: item.shortDescription,
+                description: item.description,
+                slug: item.slug,
+                categoryId: item.categoryId,
+                brandId: item.brandId,
+                unitId: item.unitId,
+                minimumValue: item.minimumValue,
+                maximumValue: item.maximumValue,
+                isFeatured: item.isFeatured,
+                isActive: item.isActive,
+                primaryImageUrl: item.images.find(image => image.isPrimary)?.url ?? null,
+                images: item.images,
+                prices: activePriceInputs(createCustomerPriceDrafts(lookups.customerTypes, lookups.defaultCustomerTypeId, item.prices.map(price => ({ ...price, enabled: true })))),
+            })));
+            setActiveEditor(0);
+            setOpen(true);
+        } catch (error) {
+            toast.error(getUpdateErrorMessage(error, { connection: t("update.connectionError"), endpoint: t("update.endpointError"), failed: t("update.failed") }));
+        } finally {
+            setSaving(false);
+        }
     };
     const change = (id: number, values: Partial<BulkUpdateProduct>) => setDrafts(items => items.map(item => item.id === id ? { ...item, ...values } : item));
     const save = async () => {
+        if (!lookups) return;
+        for (const draft of drafts) {
+            const priceDrafts = createCustomerPriceDrafts(lookups.customerTypes, lookups.defaultCustomerTypeId, draft.prices.map(price => ({ ...price, enabled: true })));
+            const error = validatePriceDrafts(priceDrafts);
+            if (error) return toast.error(`${draft.name}: ${error}`);
+        }
         setSaving(true);
         try {
             const response = await productService.bulkUpdate(drafts);
@@ -105,7 +144,7 @@ export default function ProductsPage() {
 
     return <div className="space-y-6">
         <PageHeader title={t("products.title")} description={t("products.subtitle")} actions={<>
-                {selected.length > 0 && <Button variant="outline" onClick={() => editProducts(selectedProducts)}><Pencil className="me-2 size-4" />{t("products.updateSelected")} ({selected.length})</Button>}
+                {selected.length > 0 && <Button variant="outline" onClick={() => void editProducts(selectedProducts)}><Pencil className="me-2 size-4" />{t("products.updateSelected")} ({selected.length})</Button>}
                 {selected.length > 0 && <DeleteButton id="selected-products" onDelete={deleteSelected} triggerLabel={`${t("products.deleteSelected")} (${selected.length})`} title={t("products.deleteTitle")} description={t("products.deleteDescription")} cancelLabel={t("form.cancel")} confirmLabel={t("products.confirmDelete")} loadingLabel={t("products.deleting")} />}
                 <Button onClick={() => navigate("/products/new")}><Plus className="me-2 size-4" />New product</Button>
             </>} />
@@ -160,6 +199,11 @@ export default function ProductsPage() {
                         <div className="space-y-2"><Label>{t("form.slug")}</Label><Input value={item.slug ?? ""} onChange={e => change(item.id, { slug: e.target.value || null })} /></div>
                         <div className="space-y-2"><Label>{t("form.shortDescription")}</Label><Textarea rows={2} value={item.shortDescription ?? ""} onChange={e => change(item.id, { shortDescription: e.target.value || null })} /></div>
                         <div className="space-y-2"><Label>{t("form.description")}</Label><Textarea rows={5} value={item.description ?? ""} onChange={e => change(item.id, { description: e.target.value || null })} /></div>
+                        {lookups ? <CustomerPricingFields
+                            prices={createCustomerPriceDrafts(lookups.customerTypes, lookups.defaultCustomerTypeId, item.prices.map(price => ({ ...price, enabled: true })))}
+                            onChange={next => change(item.id, { prices: activePriceInputs(next) })}
+                            compact
+                        /> : null}
                         <div className="grid gap-4 sm:grid-cols-2">
                             <ToggleCard title={t("bulk.activeProduct")} description={t("update.activeHelp")} checked={item.isActive} onChange={isActive => change(item.id, { isActive })} />
                             <ToggleCard title={t("bulk.featuredProduct")} description={t("update.featuredHelp")} checked={item.isFeatured} onChange={isFeatured => change(item.id, { isFeatured })} />

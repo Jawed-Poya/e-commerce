@@ -87,6 +87,15 @@ function createProductsFormData(request: CreateBulkProductsRequest): FormData {
         appendOptionalValue(formData, `${prefix}.UnitId`, product.unitId);
 
         appendOptionalValue(formData, `${prefix}.Slug`, product.slug);
+
+        product.prices.filter((price) => price.enabled).forEach((price, priceIndex) => {
+            const pricePrefix = `${prefix}.Prices[${priceIndex}]`;
+            formData.append(`${pricePrefix}.CustomerTypeId`, String(price.customerTypeId));
+            formData.append(`${pricePrefix}.RegularPrice`, String(price.regularPrice));
+            appendOptionalValue(formData, `${pricePrefix}.SalePrice`, price.salePrice);
+            appendOptionalValue(formData, `${pricePrefix}.StartDate`, price.startDate);
+            appendOptionalValue(formData, `${pricePrefix}.EndDate`, price.endDate);
+        });
     });
 
     return formData;

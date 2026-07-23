@@ -21,6 +21,8 @@ public sealed record ProductListItemResponse(
     string? PriceCustomerTypeName,
     bool IsDefaultPrice,
     long ViewCount,
+    double AverageRating,
+    int ReviewCount,
     string? PrimaryImageUrl,
     IReadOnlyList<ProductListImageResponse> Images
 );

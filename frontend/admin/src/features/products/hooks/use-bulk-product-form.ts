@@ -70,6 +70,7 @@ function createProductDraft(file: File): ProductBulkItemFormValues {
         isActive: true,
 
         slug: slugify(defaultName),
+        prices: [],
     };
 }
 
