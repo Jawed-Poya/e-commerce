@@ -20,12 +20,32 @@ public static class DatabaseInitializer
         var services = scope.ServiceProvider;
         var context = services.GetRequiredService<ApplicationDbContext>();
 
+        await EnsurePreMigrationSchemaCompatibilityAsync(context);
         await context.Database.MigrateAsync();
         await EnsureRolesAsync(services);
         await EnsureAdminPermissionsAsync(services);
         await EnsureDefaultCustomerTypeAsync(context);
         await EnsureOperationDefaultsAsync(context);
         await EnsureAdminAsync(services);
+    }
+
+    private static async Task EnsurePreMigrationSchemaCompatibilityAsync(ApplicationDbContext context)
+    {
+        // Some upgraded databases have the payment/general-type migration recorded
+        // while the physical expense category column is absent. Repair only this
+        // additive schema prerequisite before EF evaluates the remaining migrations.
+        // A new database cannot be queried yet, so MigrateAsync handles it normally.
+        if (!await context.Database.CanConnectAsync())
+            return;
+
+        await context.Database.ExecuteSqlRawAsync("""
+IF OBJECT_ID(N'[dbo].[Expenses]', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.Expenses', N'GeneralTypeCategoryId') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[Expenses]
+        ADD [GeneralTypeCategoryId] bigint NULL;
+END;
+""");
     }
 
     private static async Task EnsureRolesAsync(IServiceProvider services)
