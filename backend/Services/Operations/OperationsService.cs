@@ -128,6 +128,7 @@ public sealed class OperationsService(
         var total = Math.Max(0, subtotal - request.Discount + request.Tax + request.OtherCost);
         ValidateInitialPayment(request.PaidAmount, total);
         var purchaseDate = request.PurchaseDate == default ? DateOnly.FromDateTime(DateTime.UtcNow) : request.PurchaseDate;
+        var currencyCode = await GetCurrencyCodeAsync(ct);
         var purchase = new Purchase
         {
             PurchaseNumber = DocumentNumber("PUR"),
@@ -140,6 +141,7 @@ public sealed class OperationsService(
             OtherCost = request.OtherCost,
             Total = total,
             PaidAmount = request.PaidAmount,
+            CurrencyCode = currencyCode,
             PaymentStatus = PaymentStatus(request.PaidAmount, total),
             ReferenceNumber = Clean(request.ReferenceNumber),
             Notes = Clean(request.Notes),
@@ -218,6 +220,7 @@ public sealed class OperationsService(
         var total = Math.Max(0, subtotal - request.Discount + request.Tax);
         ValidateInitialPayment(request.PaidAmount, total);
         var saleDate = request.SaleDate == default ? DateOnly.FromDateTime(DateTime.UtcNow) : request.SaleDate;
+        var currencyCode = await GetCurrencyCodeAsync(ct);
         var sale = new InventorySale
         {
             SaleNumber = DocumentNumber("SAL"),
@@ -231,6 +234,7 @@ public sealed class OperationsService(
             Tax = request.Tax,
             Total = total,
             PaidAmount = request.PaidAmount,
+            CurrencyCode = currencyCode,
             PaymentStatus = PaymentStatus(request.PaidAmount, total),
             Notes = Clean(request.Notes),
             CreatedByUserId = userId
@@ -326,6 +330,7 @@ public sealed class OperationsService(
         if (net < 0) throw new ArgumentException("Deductions cannot exceed salary plus bonus.");
         ValidateInitialPayment(request.PaidAmount, net);
         var paidDate = PaymentDate(request.PaidDate);
+        var currencyCode = await GetCurrencyCodeAsync(ct);
         var entity = new StaffSalaryPayment
         {
             StaffId = staff.Id,
@@ -337,6 +342,7 @@ public sealed class OperationsService(
             NetAmount = net,
             PaidAmount = request.PaidAmount,
             PaymentStatus = PaymentStatus(request.PaidAmount, net),
+            CurrencyCode = currencyCode,
             PaidDate = paidDate,
             PaymentMethod = PaymentMethod(request.PaymentMethod),
             ReferenceNumber = Clean(request.ReferenceNumber),
@@ -408,11 +414,13 @@ public sealed class OperationsService(
         RequireText(request.Description, "Expense description");
         if (request.Amount <= 0) throw new ArgumentException("Expense amount must be greater than zero.");
         var category = await context.Types.SingleOrDefaultAsync(x => x.Id == request.CategoryId && x.Group == GeneralTypeEnum.ExpenseCategory, ct) ?? throw new ArgumentException("Expense category not found.");
+        var currencyCode = await GetCurrencyCodeAsync(ct);
         var entity = new Expense
         {
             ExpenseDate = request.ExpenseDate == default ? DateOnly.FromDateTime(DateTime.UtcNow) : request.ExpenseDate,
             GeneralTypeCategoryId = category.Id,
             Amount = request.Amount,
+            CurrencyCode = currencyCode,
             Vendor = Clean(request.Vendor),
             PaymentMethod = PaymentMethod(request.PaymentMethod),
             ReferenceNumber = Clean(request.ReferenceNumber),
@@ -423,6 +431,13 @@ public sealed class OperationsService(
         await context.SaveChangesAsync(ct);
         return new ExpenseResponse(entity.Id, entity.ExpenseDate, category.Id, category.Name, entity.Amount, entity.Vendor, entity.PaymentMethod, entity.ReferenceNumber, entity.Description, entity.CreatedAt);
     }
+
+
+    private async Task<string> GetCurrencyCodeAsync(CancellationToken ct) =>
+        await context.TenantSettings.AsNoTracking()
+            .Where(item => item.TenantId == context.CurrentTenantId)
+            .Select(item => item.MainCurrencyCode)
+            .FirstOrDefaultAsync(ct) ?? "USD";
 
     private async Task ConsumeInventoryLotsAsync(long productId, decimal quantity, CancellationToken ct)
     {

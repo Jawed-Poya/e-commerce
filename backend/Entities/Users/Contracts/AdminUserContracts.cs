@@ -8,6 +8,8 @@ public sealed record AdminUserListItemResponse(
     bool IsActive,
     IReadOnlyCollection<string> Roles,
     int PermissionCount,
+    long? BranchId,
+    string? BranchName,
     DateTime? LastLoginAt,
     DateTime CreatedAt);
 
@@ -20,6 +22,8 @@ public sealed record AdminUserDetailsResponse(
     IReadOnlyCollection<string> Roles,
     IReadOnlyCollection<string> DirectPermissions,
     IReadOnlyCollection<string> EffectivePermissions,
+    long? BranchId,
+    string? BranchName,
     DateTime? LastLoginAt,
     DateTime CreatedAt);
 
@@ -29,6 +33,7 @@ public sealed record CreateAdminUserRequest(
     string? Phone,
     string Password,
     bool IsActive,
+    long? BranchId,
     IReadOnlyCollection<string>? Roles,
     IReadOnlyCollection<string>? Permissions);
 
@@ -37,6 +42,7 @@ public sealed record UpdateAdminUserRequest(
     string Email,
     string? Phone,
     bool IsActive,
+    long? BranchId,
     IReadOnlyCollection<string>? Roles,
     IReadOnlyCollection<string>? Permissions);
 

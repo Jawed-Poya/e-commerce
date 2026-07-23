@@ -5,10 +5,15 @@ public static class AuthClaims
     public const string CustomerId = "customer_id";
     public const string CustomerTypeId = "customer_type_id";
     public const string Permission = "permission";
+    public const string TenantId = "tenant_id";
+    public const string TenantSlug = "tenant_slug";
+    public const string BranchId = "branch_id";
+    public const string PlatformAdmin = "platform_admin";
 }
 
 public static class AppRoles
 {
+    public const string PlatformAdmin = "PlatformAdmin";
     public const string Admin = "Admin";
     public const string Customer = "Customer";
 }
@@ -47,6 +52,14 @@ public static class AppPermissions
     public const string ExpensesView = "expenses.view";
     public const string ExpensesManage = "expenses.manage";
 
+    public const string TenantProfileManage = "tenant.profile.manage";
+    public const string TenantBranchesManage = "tenant.branches.manage";
+    public const string TenantClaimsManage = "tenant.claims.manage";
+    public const string TenantReportsView = "tenant.reports.view";
+    public const string TenantTrashManage = "tenant.trash.manage";
+    public const string TenantSettingsManage = "tenant.settings.manage";
+    public const string PlatformTenantsManage = "platform.tenants.manage";
+
     public const string SystemManage = "system.manage";
 
     public static readonly IReadOnlyCollection<string> All =
@@ -76,6 +89,13 @@ public static class AppPermissions
         PayrollManage,
         ExpensesView,
         ExpensesManage,
+        TenantProfileManage,
+        TenantBranchesManage,
+        TenantClaimsManage,
+        TenantReportsView,
+        TenantTrashManage,
+        TenantSettingsManage,
+        PlatformTenantsManage,
         SystemManage
     ];
 
@@ -122,12 +142,22 @@ public static class AppPermissions
                 new(ExpensesView, "View expenses", "View expense categories and transactions."),
                 new(ExpensesManage, "Manage expenses", "Create expense categories and record expenses.")
             ],
+            ["Tenant administration"] =
+            [
+                new(TenantProfileManage, "Manage company profile", "Update the tenant company profile and brand assets."),
+                new(TenantBranchesManage, "Manage branches", "Create and maintain company branches."),
+                new(TenantClaimsManage, "Manage tenant claims", "Assign only permissions enabled for the tenant and held by the assigning user."),
+                new(TenantReportsView, "View tenant reports", "View filtered revenue, cost, inventory, payroll, and profitability reports."),
+                new(TenantTrashManage, "Manage trash", "Restore or permanently purge tenant records."),
+                new(TenantSettingsManage, "Manage tenant settings", "Configure currency, branding, fonts, and retention policies.")
+            ],
             ["Administration"] =
             [
                 new(UsersView, "View users", "View administrator and staff accounts."),
                 new(UsersManage, "Manage users", "Create, edit, activate, and reset user passwords."),
                 new(RolesManage, "Manage roles and permissions", "Create roles and assign permission claims."),
-                new(SystemManage, "Manage system settings", "Manage general types and system-level configuration.")
+                new(SystemManage, "Manage system settings", "Manage general types and system-level configuration."),
+                new(PlatformTenantsManage, "Manage platform tenants", "Create tenants and manage subscriptions across the SaaS platform.")
             ]
         };
 }

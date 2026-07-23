@@ -10,5 +10,7 @@ public class Role : IdentityRole<string>
         ConcurrencyStamp = Guid.NewGuid().ToString("N");
     }
 
+    public long? TenantId { get; set; }
+
     public string? Description { get; set; }
 }

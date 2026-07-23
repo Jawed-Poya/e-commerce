@@ -7,6 +7,7 @@ using ECommerce.Entities.Users;
 using ECommerce.Entities.Users.Contracts;
 using ECommerce.Options;
 using ECommerce.Services.Customers;
+using ECommerce.Services.Tenancy;
 using ECommerce.Shared;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,8 @@ public sealed class AuthService(
     ApplicationDbContext context,
     IDefaultCustomerTypeResolver defaultCustomerType,
     ICurrentCustomerAccessor currentCustomer,
+    ITenantContext tenantContext,
+    ITenantPermissionService tenantPermissions,
     IOptions<JwtOptions> jwtOptions) : IAuthService
 {
     private readonly JwtOptions _jwt = jwtOptions.Value;
@@ -99,11 +102,15 @@ public sealed class AuthService(
 
         var user = new User
         {
-            UserName = email ?? phone,
+            UserName = tenantContext.TenantId <= 1
+                ? email ?? phone
+                : $"{tenantContext.TenantId}:{email ?? phone}",
             Email = email,
             PhoneNumber = phone,
             FullName = string.Join(' ', new[] { firstName, lastName }.Where(value => !string.IsNullOrWhiteSpace(value))),
-            IsActive = true
+            IsActive = true,
+            TenantId = tenantContext.TenantId,
+            BranchId = tenantContext.BranchId
         };
 
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
@@ -188,7 +195,7 @@ public sealed class AuthService(
             user.PhoneNumber,
             user.AvatarUrl,
             user.IsActive,
-            roles,
+            roles.Select(DisplayRoleName).ToArray(),
             permissions,
             user.LastLoginAt,
             user.CreatedAt);
@@ -212,18 +219,22 @@ public sealed class AuthService(
             throw new ArgumentException("Enter a valid phone number.");
 
         if (await context.Users.AnyAsync(
-                item => item.Id != user.Id && item.Email == email,
+                item => item.Id != user.Id &&
+                    item.TenantId == user.TenantId &&
+                    item.Email == email,
                 cancellationToken))
             throw new InvalidOperationException("This email address is already in use.");
 
         if (phone.Length > 0 && await context.Users.AnyAsync(
-                item => item.Id != user.Id && item.PhoneNumber == phone,
+                item => item.Id != user.Id &&
+                    item.TenantId == user.TenantId &&
+                    item.PhoneNumber == phone,
                 cancellationToken))
             throw new InvalidOperationException("This phone number is already in use.");
 
         user.FullName = fullName;
         user.Email = email;
-        user.UserName = email;
+        user.UserName = user.TenantId <= 1 ? email : $"{user.TenantId}:{email}";
         user.PhoneNumber = phone.Length == 0 ? null : phone;
 
         var result = await userManager.UpdateAsync(user);
@@ -269,14 +280,13 @@ public sealed class AuthService(
         var value = identifier?.Trim();
         if (string.IsNullOrWhiteSpace(value)) return null;
 
-        var byName = await userManager.FindByNameAsync(value);
-        if (byName is not null) return byName;
-
-        if (value.Contains('@'))
-            return await userManager.FindByEmailAsync(value.ToLowerInvariant());
-
+        var normalized = value.ToUpperInvariant();
         var phone = NormalizePhone(value);
-        return await context.Users.FirstOrDefaultAsync(user => user.PhoneNumber == phone);
+        return await context.Users.FirstOrDefaultAsync(user =>
+            user.TenantId == tenantContext.TenantId &&
+            (user.NormalizedUserName == normalized ||
+             user.NormalizedEmail == normalized ||
+             user.PhoneNumber == phone));
     }
 
     private async Task<AuthResponse> CreateResponseAsync(
@@ -301,6 +311,11 @@ public sealed class AuthService(
             claims.Add(new Claim(AuthClaims.Permission, permission));
         if (authUser.CustomerId.HasValue) claims.Add(new Claim(AuthClaims.CustomerId, authUser.CustomerId.Value.ToString()));
         if (authUser.CustomerTypeId.HasValue) claims.Add(new Claim(AuthClaims.CustomerTypeId, authUser.CustomerTypeId.Value.ToString()));
+        claims.Add(new Claim(AuthClaims.TenantId, user.TenantId.ToString()));
+        claims.Add(new Claim(AuthClaims.TenantSlug, tenantContext.TenantSlug));
+        if (user.BranchId.HasValue) claims.Add(new Claim(AuthClaims.BranchId, user.BranchId.Value.ToString()));
+        if (roles.Contains(AppRoles.PlatformAdmin, StringComparer.OrdinalIgnoreCase))
+            claims.Add(new Claim(AuthClaims.PlatformAdmin, "true"));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Key));
         var token = new JwtSecurityToken(
@@ -344,23 +359,24 @@ public sealed class AuthService(
             user.FullName,
             user.Email,
             user.PhoneNumber,
-            roles.ToArray(),
+            roles.Select(DisplayRoleName).ToArray(),
             permissions,
             customer?.Id,
             customer?.CustomerTypeId,
             customer?.CustomerType?.Name,
-            roles.Contains(AppRoles.Admin, StringComparer.OrdinalIgnoreCase) || permissions.Count > 0);
+            roles.Contains(AppRoles.Admin, StringComparer.OrdinalIgnoreCase) ||
+                roles.Contains(AppRoles.PlatformAdmin, StringComparer.OrdinalIgnoreCase) || permissions.Count > 0,
+            user.TenantId,
+            user.BranchId,
+            tenantContext.TenantSlug,
+            roles.Contains(AppRoles.PlatformAdmin, StringComparer.OrdinalIgnoreCase));
     }
 
     private async Task<IReadOnlyCollection<string>> GetPermissionsAsync(
         User user,
         IReadOnlyCollection<string> roles)
     {
-        // The built-in Admin role is the authority boundary. Do not make an
-        // administrator depend on AspNetRoleClaims being populated correctly in
-        // an older database. Returning the complete permission set also keeps the
-        // JWT and admin UI consistent with the server-side policy bypass.
-        if (roles.Contains(AppRoles.Admin, StringComparer.OrdinalIgnoreCase))
+        if (roles.Contains(AppRoles.PlatformAdmin, StringComparer.OrdinalIgnoreCase))
             return AppPermissions.All.OrderBy(value => value).ToArray();
 
         var permissions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -383,7 +399,20 @@ public sealed class AuthService(
             }
         }
 
-        return permissions.OrderBy(value => value).ToArray();
+        var enabledForTenant = (await tenantPermissions.GetTenantPermissionsAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return permissions
+            .Where(enabledForTenant.Contains)
+            .OrderBy(value => value)
+            .ToArray();
+    }
+
+    private static string DisplayRoleName(string roleName)
+    {
+        var separator = roleName.IndexOf(':');
+        return roleName.StartsWith("tenant-", StringComparison.OrdinalIgnoreCase) && separator >= 0
+            ? roleName[(separator + 1)..]
+            : roleName;
     }
 
     private static string NormalizePhone(string? value) =>
