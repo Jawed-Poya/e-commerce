@@ -95,9 +95,7 @@ export function CartPage() {
                         </h1>
 
                         <p className="mt-2 text-sm text-muted-foreground">
-                            {cart.items.length}{" "}
-                            {cart.items.length === 1 ? "product" : "products"}{" "}
-                            in your cart
+                            {t("cart.itemsInCart", { count: cart.items.length })}
                         </p>
                     </div>
 
@@ -150,7 +148,7 @@ export function CartPage() {
                                         </Link>
 
                                         <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-                                            ${item.price.toFixed(2)} each
+                                            ${item.price.toFixed(2)} {t("cart.each")}
                                         </p>
 
                                         <p className="mt-2 text-lg font-black tracking-tight sm:hidden">
@@ -229,7 +227,7 @@ export function CartPage() {
                                     <div className="hidden min-w-32 flex-col items-end justify-between py-1 sm:flex">
                                         <div className="text-end">
                                             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                                Item total
+                                                {t("cart.itemTotal")}
                                             </p>
 
                                             <p className="mt-1 text-xl font-black tracking-tight">
@@ -345,8 +343,7 @@ export function CartPage() {
                             </Button>
 
                             <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
-                                Taxes and delivery details are confirmed at
-                                checkout.
+                                {t("cart.checkoutDisclaimer")}
                             </p>
                         </div>
                     </aside>

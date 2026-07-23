@@ -369,7 +369,7 @@ export function CheckoutPage() {
                             <div className="mt-5 rounded-2xl border border-primary/20 bg-primary/5 p-5">
                                 {configQuery.isLoading ? (
                                     <p className="text-sm text-muted-foreground">
-                                        Loading bank instructions...
+                                        {t("checkout.loadingBank")}
                                     </p>
                                 ) : bankOption?.bankDetails ? (
                                     <div className="space-y-4">
@@ -428,7 +428,7 @@ export function CheckoutPage() {
                                     </div>
                                 ) : (
                                     <p className="text-sm text-destructive">
-                                        Bank account details are not configured.
+                                        {t("checkout.bankMissing")}
                                     </p>
                                 )}
                             </div>
@@ -461,7 +461,7 @@ export function CheckoutPage() {
                             <div>
                                 <p className="font-bold">{t("checkout.orderSummary")}</p>
                                 <p className="text-xs text-muted-foreground">
-                                    {cart.count} item{cart.count === 1 ? "" : "s"}
+                                    {t("checkout.itemsCount", { count: cart.count })}
                                 </p>
                             </div>
                         </div>
@@ -549,13 +549,11 @@ export function CheckoutPage() {
 
                         <div className="mt-4 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
                             <BadgeCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
-                            The backend verifies current prices and reserves
-                            inventory atomically.
+                            {t("checkout.inventoryVerified")}
                         </div>
                         <div className="mt-2 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
                             <Truck className="mt-0.5 size-4 shrink-0 text-primary" />
-                            Final payment approval and delivery status are
-                            managed by the admin team.
+                            {t("checkout.adminApproval")}
                         </div>
                     </div>
                 </aside>

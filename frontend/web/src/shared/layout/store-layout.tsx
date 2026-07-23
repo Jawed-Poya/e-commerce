@@ -25,6 +25,7 @@ import { useI18n } from "../../i18n/i18n-provider";
 import { PwaInstallButton } from "../../features/pwa/pwa-install-button";
 import { Button } from "../components/ui/button";
 import { cn } from "../lib/utils";
+import { useTenant } from "../../features/tenancy/tenant-context";
 
 type StoreNavItem = {
     to: string;
@@ -50,22 +51,15 @@ function isStoreNavItemActive(item: StoreNavItem, pathname: string, search: stri
 }
 
 function Logo() {
+    const { tenant } = useTenant();
+    const name = tenant?.name ?? "EasyCart";
     return (
-        <Link
-            to="/"
-            className="group flex shrink-0 items-center gap-2.5 font-black tracking-tight"
-        >
-            <span className="relative grid size-10 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-blue-500 text-xs text-white shadow-lg shadow-primary/20 transition-all duration-300 group-hover:-rotate-3 group-hover:scale-105">
-                <span className="relative z-10">EA</span>
-
+        <Link to="/" className="group flex min-w-0 shrink-0 items-center gap-2.5 font-black tracking-tight">
+            <span className="relative grid size-10 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-brand-orange text-xs text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-300 group-hover:-rotate-3 group-hover:scale-105">
+                {tenant?.logoUrl ? <img src={tenant.logoUrl} alt="" className="size-full object-cover" /> : <span className="relative z-10">{name.split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase()}</span>}
                 <span className="absolute -right-2 -top-2 size-6 rounded-full bg-white/20" />
-                <span className="absolute -bottom-3 -left-3 size-8 rounded-full bg-blue-300/20" />
             </span>
-
-            <span className="text-xl tracking-[-0.04em] text-foreground">
-                Easy
-                <span className="text-brand-orange">Cart</span>
-            </span>
+            <span className="max-w-36 truncate text-xl tracking-[-0.04em] text-foreground sm:max-w-48">{name}</span>
         </Link>
     );
 }
@@ -79,6 +73,7 @@ export function StoreLayout() {
     const cart = useCart();
     const auth = useAuth();
     const { language, direction, t } = useI18n();
+    const { tenant } = useTenant();
     const accountPath = auth.isAuthenticated ? "/account" : "/account/login";
 
     const submit = (e: FormEvent) => {
@@ -236,7 +231,7 @@ export function StoreLayout() {
                                                                 e.target.value,
                                                             )
                                                         }
-                                                        placeholder="Search products"
+                                                        placeholder={t("header.searchPlaceholder")}
                                                     />
 
                                                     <Button
@@ -244,7 +239,7 @@ export function StoreLayout() {
                                                         size="sm"
                                                         className="rounded-xl px-4"
                                                     >
-                                                        Search
+                                                        {t("common.search")}
                                                     </Button>
                                                 </form>
                                             </div>
@@ -252,14 +247,14 @@ export function StoreLayout() {
                                             <div className="grid grid-cols-3 gap-2 px-5 pb-5">
                                                 <MobileAction
                                                     icon={<UserRound className="size-5" />}
-                                                    label={auth.isAuthenticated ? auth.user?.customerTypeName ?? "Account" : "Sign in"}
+                                                    label={auth.isAuthenticated ? auth.user?.customerTypeName ?? t("common.account") : t("common.login")}
                                                     to={accountPath}
                                                     onNavigate={() => setOpen(false)}
                                                 />
 
                                                 <MobileAction
                                                     icon={<Heart className="size-5" />}
-                                                    label="Wishlist"
+                                                    label={t("common.wishlist")}
                                                     count={cart.wishlist.length}
                                                     to="/wishlist"
                                                     onNavigate={() => setOpen(false)}
@@ -278,7 +273,7 @@ export function StoreLayout() {
                                                             value={cart.count}
                                                         />
                                                     </span>
-                                                    Cart
+                                                    {t("common.cart")}
                                                 </Link>
                                             </div>
 
@@ -484,7 +479,7 @@ export function StoreLayout() {
                 <div className="relative border-t border-border/70 dark:border-white/10">
                     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3 px-4 py-5 text-xs text-muted-foreground sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8 dark:text-slate-500">
                         <span>
-                            © {new Date().getFullYear()} EasyCart. {t("footer.rights")}
+                            © {new Date().getFullYear()} {tenant?.name ?? "EasyCart"}. {t("footer.rights")}
                         </span>
 
                         <span>

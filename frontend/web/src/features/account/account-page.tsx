@@ -66,7 +66,7 @@ export function AccountPage() {
                         <h2 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">{t("account.orderNumbers")}</h2>
                         <p className="mt-2 text-sm text-muted-foreground">{t("account.orderNumbersDescription")}</p>
                     </div>
-                    <Button asChild variant="outline" className="hidden rounded-xl sm:flex"><Link to="/track-order"><PackageSearch /> Guest tracking</Link></Button>
+                    <Button asChild variant="outline" className="hidden rounded-xl sm:flex"><Link to="/track-order"><PackageSearch /> {t("account.guestTracking")}</Link></Button>
                 </div>
 
                 <div className="mt-6 grid gap-4">
@@ -82,7 +82,7 @@ export function AccountPage() {
                                 </div>
                                 <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
                                     <span className="flex items-center gap-1.5"><CalendarDays className="size-3.5" />{new Date(order.createdAt).toLocaleString(language === "en" ? "en-US" : "fa-AF")}</span>
-                                    <span>{order.itemCount} item{order.itemCount === 1 ? "" : "s"}</span>
+                                    <span>{t("common.itemCount", { count: order.itemCount })}</span>
                                     <span>{order.paymentMethod}</span>
                                 </div>
                             </div>
