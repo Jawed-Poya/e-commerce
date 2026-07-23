@@ -92,9 +92,10 @@ public sealed class AdminRolesController(IAdminUserService users) : ControllerBa
 
     [Authorize(Policy = AppPermissions.UsersView)]
     [HttpGet("permissions")]
-    public ActionResult<ApiResponse<IReadOnlyCollection<PermissionGroupResponse>>> GetPermissions()
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<PermissionGroupResponse>>>> GetPermissions(
+        CancellationToken cancellationToken)
     {
         return Ok(ApiResponse<IReadOnlyCollection<PermissionGroupResponse>>.Ok(
-            users.GetPermissionGroups()));
+            await users.GetPermissionGroupsAsync(cancellationToken)));
     }
 }

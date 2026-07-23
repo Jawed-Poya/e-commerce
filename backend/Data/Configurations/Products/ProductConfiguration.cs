@@ -35,11 +35,11 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(x => x.ViewCount)
             .HasDefaultValue(0L);
 
-        builder.HasIndex(x => x.Barcode)
+        builder.HasIndex(x => new { x.TenantId, x.Barcode })
             .IsUnique()
             .HasFilter("[Barcode] IS NOT NULL");
 
-        builder.HasIndex(x => x.Slug)
+        builder.HasIndex(x => new { x.TenantId, x.Slug })
             .IsUnique()
             .HasFilter("[Slug] IS NOT NULL");
 

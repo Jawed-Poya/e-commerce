@@ -1,0 +1,51 @@
+namespace ECommerce.Dtos.Tenancy;
+
+public sealed record TenantReportSummaryResponse(
+    DateTime StartDate,
+    DateTime EndDate,
+    string CurrencyCode,
+    IReadOnlyCollection<string> AvailableCurrencies,
+    decimal OnlineRevenue,
+    decimal ManualSalesRevenue,
+    decimal TotalRevenue,
+    decimal CashReceived,
+    decimal Purchases,
+    decimal Expenses,
+    decimal PayrollObligation,
+    decimal PayrollPaid,
+    decimal CashPaid,
+    decimal NetCashFlow,
+    decimal OperatingBalance,
+    decimal OutstandingReceivables,
+    decimal OutstandingSupplierPayables,
+    decimal OutstandingPayroll,
+    int OnlineOrders,
+    int ManualSales,
+    int PurchaseCount,
+    int CustomerCount,
+    int ProductCount,
+    int LowStockProducts,
+    decimal AverageOrderValue,
+    IReadOnlyCollection<TenantReportTrendPoint> Trend,
+    IReadOnlyCollection<TenantTopProductResponse> TopProducts,
+    IReadOnlyCollection<TenantReportLineResponse> Results,
+    int TotalResults,
+    int Page,
+    int PageSize);
+
+public sealed record TenantReportTrendPoint(DateOnly Date, decimal Revenue, decimal Cost, decimal Net);
+public sealed record TenantTopProductResponse(long ProductId, string ProductName, decimal Quantity, decimal Revenue);
+public sealed record TenantReportLineResponse(
+    string Source,
+    long Id,
+    string Reference,
+    DateTime Date,
+    string Description,
+    string Status,
+    decimal Amount,
+    decimal PaidAmount,
+    decimal BalanceAmount,
+    string CurrencyCode,
+    string Direction,
+    long? BranchId,
+    string? BranchName);

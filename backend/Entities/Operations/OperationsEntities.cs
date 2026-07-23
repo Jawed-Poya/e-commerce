@@ -34,6 +34,7 @@ public sealed class Purchase : BaseEntity
     public decimal OtherCost { get; set; }
     public decimal Total { get; set; }
     public decimal PaidAmount { get; set; }
+    public string CurrencyCode { get; set; } = "USD";
     public string? ReferenceNumber { get; set; }
     public string? Notes { get; set; }
     public string? CreatedByUserId { get; set; }
@@ -81,6 +82,7 @@ public sealed class InventorySale : BaseEntity
     public decimal Tax { get; set; }
     public decimal Total { get; set; }
     public decimal PaidAmount { get; set; }
+    public string CurrencyCode { get; set; } = "USD";
     public string? Notes { get; set; }
     public string? CreatedByUserId { get; set; }
     public ICollection<InventorySaleItem> Items { get; set; } = [];
@@ -138,6 +140,7 @@ public sealed class StaffSalaryPayment : BaseEntity
     public decimal NetAmount { get; set; }
     public decimal PaidAmount { get; set; }
     public DocumentPaymentStatus PaymentStatus { get; set; }
+    public string CurrencyCode { get; set; } = "USD";
     public DateOnly PaidDate { get; set; }
     public string PaymentMethod { get; set; } = "Cash";
     public string? ReferenceNumber { get; set; }
@@ -176,6 +179,7 @@ public sealed class Expense : BaseEntity
     public long? GeneralTypeCategoryId { get; set; }
     public GeneralType? GeneralTypeCategory { get; set; }
     public decimal Amount { get; set; }
+    public string CurrencyCode { get; set; } = "USD";
     public string? Vendor { get; set; }
     public string PaymentMethod { get; set; } = "Cash";
     public string? ReferenceNumber { get; set; }

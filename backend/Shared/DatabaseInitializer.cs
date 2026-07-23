@@ -5,6 +5,7 @@ using ECommerce.Entities.Common;
 using ECommerce.Entities.Users;
 using ECommerce.Entities.Operations;
 using ECommerce.Entities.Products;
+using ECommerce.Entities.Tenancy;
 using ECommerce.Options;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,7 @@ public static class DatabaseInitializer
 
         await EnsurePreMigrationSchemaCompatibilityAsync(context);
         await context.Database.MigrateAsync();
+        await EnsureDefaultTenantAsync(context);
         await EnsureRolesAsync(services);
         await EnsureAdminPermissionsAsync(services);
         await EnsureDefaultCustomerTypeAsync(context);
@@ -48,11 +50,71 @@ END;
 """);
     }
 
+
+    private static async Task EnsureDefaultTenantAsync(ApplicationDbContext context)
+    {
+        var tenant = await context.Tenants.OrderBy(item => item.Id).FirstOrDefaultAsync();
+        if (tenant is null)
+        {
+            tenant = new Tenant
+            {
+                Name = "Default Company",
+                Slug = "default",
+                LegalName = "Default Company",
+                IsActive = true
+            };
+            context.Tenants.Add(tenant);
+            await context.SaveChangesAsync();
+        }
+
+        if (!await context.Branches.AnyAsync(item => item.TenantId == tenant.Id))
+        {
+            context.Branches.Add(new Branch
+            {
+                TenantId = tenant.Id,
+                Name = "Main Branch",
+                Code = "MAIN",
+                IsMain = true,
+                IsActive = true
+            });
+        }
+
+        if (!await context.TenantSettings.AnyAsync(item => item.TenantId == tenant.Id))
+            context.TenantSettings.Add(new TenantSetting { TenantId = tenant.Id });
+
+        if (!await context.TenantSubscriptions.AnyAsync(item => item.TenantId == tenant.Id))
+            context.TenantSubscriptions.Add(new TenantSubscription
+            {
+                TenantId = tenant.Id,
+                Plan = TenantPlan.Full,
+                Status = SubscriptionStatus.Active,
+                StartsAt = DateTime.UtcNow,
+                MaxUsers = 1000,
+                MaxBranches = 100,
+                MaxProducts = 1_000_000
+            });
+
+        var granted = await context.TenantPermissionGrants
+            .Where(item => item.TenantId == tenant.Id)
+            .Select(item => item.Permission)
+            .ToListAsync();
+        context.TenantPermissionGrants.AddRange(AppPermissions.All
+            .Where(permission => !granted.Contains(permission, StringComparer.OrdinalIgnoreCase))
+            .Select(permission => new TenantPermissionGrant
+            {
+                TenantId = tenant.Id,
+                Permission = permission,
+                IsEnabled = true
+            }));
+
+        await context.SaveChangesAsync();
+    }
+
     private static async Task EnsureRolesAsync(IServiceProvider services)
     {
         var roleManager = services.GetRequiredService<RoleManager<Role>>();
 
-        foreach (var roleName in new[] { AppRoles.Admin, AppRoles.Customer })
+        foreach (var roleName in new[] { AppRoles.PlatformAdmin, AppRoles.Admin, AppRoles.Customer })
         {
             var existingRole = await roleManager.FindByNameAsync(roleName);
             if (existingRole is not null)
@@ -166,12 +228,16 @@ END;
             return;
 
         var userManager = services.GetRequiredService<UserManager<User>>();
-        var admin = await userManager.FindByEmailAsync(email);
+        var context = services.GetRequiredService<ApplicationDbContext>();
+        var normalizedEmail = userManager.NormalizeEmail(email);
+        var admin = await context.Users.FirstOrDefaultAsync(user =>
+            user.TenantId == 1 && user.NormalizedEmail == normalizedEmail);
 
         if (admin is null)
         {
             admin = new User
             {
+                TenantId = 1,
                 UserName = email,
                 Email = email,
                 FullName = string.IsNullOrWhiteSpace(seed.FullName)
@@ -225,15 +291,16 @@ END;
             }
         }
 
-        if (await userManager.IsInRoleAsync(admin, AppRoles.Admin))
-            return;
-
-        var addRoleResult = await userManager.AddToRoleAsync(admin, AppRoles.Admin);
-        if (!addRoleResult.Succeeded)
+        foreach (var role in new[] { AppRoles.Admin, AppRoles.PlatformAdmin })
         {
-            throw new InvalidOperationException(
-                "Could not assign the admin role: " +
-                string.Join(" ", addRoleResult.Errors.Select(error => error.Description)));
+            if (await userManager.IsInRoleAsync(admin, role)) continue;
+            var addRoleResult = await userManager.AddToRoleAsync(admin, role);
+            if (!addRoleResult.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    $"Could not assign the {role} role: " +
+                    string.Join(" ", addRoleResult.Errors.Select(error => error.Description)));
+            }
         }
     }
 }

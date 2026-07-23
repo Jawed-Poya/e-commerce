@@ -20,7 +20,11 @@ public sealed record AuthUserResponse(
     long? CustomerId,
     long? CustomerTypeId,
     string? CustomerTypeName,
-    bool IsAdmin
+    bool IsAdmin,
+    long TenantId,
+    long? BranchId,
+    string TenantSlug,
+    bool IsPlatformAdmin
 );
 
 public sealed record AuthResponse(

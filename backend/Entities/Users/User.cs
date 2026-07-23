@@ -13,6 +13,10 @@ public class User : IdentityUser<string>
         ConcurrencyStamp = Guid.NewGuid().ToString("N");
     }
 
+    public long TenantId { get; set; } = 1;
+
+    public long? BranchId { get; set; }
+
     public string FullName { get; set; } = null!;
 
     public string? AvatarUrl { get; set; }

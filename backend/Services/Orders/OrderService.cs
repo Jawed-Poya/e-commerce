@@ -40,9 +40,10 @@ public sealed class OrderService(
     {
         var bankDetails = GetBankDetails();
         var content = await storefrontContent.GetAsync(cancellationToken);
+        var currency = await GetTenantCurrencyAsync(cancellationToken);
 
         return new CheckoutConfigurationResponse(
-            NormalizeCurrency(_options.Currency),
+            currency,
             content.ShippingEnabled,
             Math.Max(0, content.FlatShippingFee),
             Math.Max(0, content.FreeShippingThreshold),
@@ -67,6 +68,7 @@ public sealed class OrderService(
         CancellationToken cancellationToken = default)
     {
         ValidateCheckoutRequest(request);
+        var currency = await GetTenantCurrencyAsync(cancellationToken);
 
         var groupedItems = request.Items
             .GroupBy(item => item.ProductId)
@@ -125,7 +127,7 @@ public sealed class OrderService(
                     Tax = 0,
                     ProductName = product.Name,
                     ProductBarcode = product.Barcode,
-                    Currency = NormalizeCurrency(_options.Currency)
+                    Currency = currency
                 });
             }
 
@@ -151,7 +153,7 @@ public sealed class OrderService(
                 TaxTotal = 0,
                 ShippingTotal = shippingTotal,
                 Total = total,
-                Currency = NormalizeCurrency(_options.Currency),
+                Currency = currency,
                 ReservationExpiresAt = now.AddMinutes(Math.Max(30, _options.ReservationMinutes)),
                 ShippingAddressJson = JsonSerializer.Serialize(request.ShippingAddress, JsonOptions),
                 BillingAddressJson = JsonSerializer.Serialize(request.ShippingAddress, JsonOptions),
@@ -166,7 +168,7 @@ public sealed class OrderService(
                             ? CleanOptional(request.BankTransferReference)
                             : null,
                         Amount = total,
-                        Currency = NormalizeCurrency(_options.Currency),
+                        Currency = currency,
                         Status = PaymentStatus.Pending
                     }
                 ],
@@ -993,6 +995,16 @@ public sealed class OrderService(
 
     private static string? NormalizeEmail(string? value) =>
         CleanOptional(value)?.ToLowerInvariant();
+
+
+    private async Task<string> GetTenantCurrencyAsync(CancellationToken cancellationToken)
+    {
+        var currency = await context.TenantSettings.AsNoTracking()
+            .Where(item => item.TenantId == context.CurrentTenantId)
+            .Select(item => item.MainCurrencyCode)
+            .FirstOrDefaultAsync(cancellationToken);
+        return NormalizeCurrency(currency ?? _options.Currency);
+    }
 
     private static string NormalizeCurrency(string? value)
     {

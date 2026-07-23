@@ -13,10 +13,12 @@ using ECommerce.Services.Orders;
 using ECommerce.Services.Operations;
 using ECommerce.Services.Products;
 using ECommerce.Services.Storefront;
+using ECommerce.Services.Tenancy;
 using ECommerce.Services.Reviews;
 using ECommerce.Services.Users;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 public static class DependencyInjection
 {
@@ -24,6 +26,13 @@ public static class DependencyInjection
     {
         services.AddHttpContextAccessor();
         services.AddMemoryCache();
+        services.AddScoped<TenantContext>();
+        services.AddScoped<ITenantContext>(provider => provider.GetRequiredService<TenantContext>());
+        services.AddScoped<ITenantPermissionService, TenantPermissionService>();
+        services.AddScoped<ITenantManagementService, TenantManagementService>();
+        services.AddScoped<ITenantPlanGuard, TenantPlanGuard>();
+        services.AddScoped<ITrashService, TrashService>();
+        services.AddHostedService<TrashCleanupHostedService>();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IProductPricingService, ProductPricingService>();
         services.AddScoped<IGeneralTypeService, GeneralTypesService>();
@@ -57,6 +66,12 @@ public static class DependencyInjection
 
         services.AddDbContext<ApplicationDbContext>(options =>
         {
+            // Tenant migrations are intentionally hand-authored and idempotent so
+            // existing single-company databases can be upgraded safely. EF Core 10
+            // otherwise treats the stale design-time snapshot as a startup error
+            // before those compatibility migrations can run.
+            options.ConfigureWarnings(warnings =>
+                warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
             options.UseSqlServer(
                 configuration.GetConnectionString("DefaultConnection"),
                 sqlOptions =>
@@ -81,7 +96,7 @@ public static class DependencyInjection
         options.Password.RequireLowercase = true;
         options.Password.RequireNonAlphanumeric = false;
 
-        options.User.RequireUniqueEmail = true;
+        options.User.RequireUniqueEmail = false;
         options.SignIn.RequireConfirmedEmail = false;
         options.SignIn.RequireConfirmedPhoneNumber = false;
 

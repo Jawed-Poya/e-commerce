@@ -15,8 +15,8 @@ public sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         b.Property(x => x.LastName).HasMaxLength(100);
         b.Property(x => x.Phone).HasMaxLength(30).IsRequired();
         b.Property(x => x.Email).HasMaxLength(256);
-        b.HasIndex(x => x.Phone).IsUnique();
-        b.HasIndex(x => x.Email).IsUnique().HasFilter("[Email] IS NOT NULL");
+        b.HasIndex(x => new { x.TenantId, x.Phone }).IsUnique();
+        b.HasIndex(x => new { x.TenantId, x.Email }).IsUnique().HasFilter("[Email] IS NOT NULL");
         b.HasOne(x => x.CustomerType).WithMany().HasForeignKey(x => x.CustomerTypeId).OnDelete(DeleteBehavior.Restrict);
     }
 }
@@ -48,7 +48,7 @@ public sealed class InventoryTransactionConfiguration : IEntityTypeConfiguration
         b.Property(x => x.ReferenceType).HasMaxLength(50);
         b.Property(x => x.IdempotencyKey).HasMaxLength(100);
         b.Property(x => x.Description).HasMaxLength(500);
-        b.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("[IdempotencyKey] IS NOT NULL");
+        b.HasIndex(x => new { x.TenantId, x.IdempotencyKey }).IsUnique().HasFilter("[IdempotencyKey] IS NOT NULL");
         b.HasIndex(x => new { x.ReferenceType, x.ReferenceId });
     }
 }
@@ -58,7 +58,7 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
     public void Configure(EntityTypeBuilder<Order> b)
     {
         b.Property(x => x.OrderNumber).HasMaxLength(50).IsRequired();
-        b.HasIndex(x => x.OrderNumber).IsUnique();
+        b.HasIndex(x => new { x.TenantId, x.OrderNumber }).IsUnique();
         b.Property(x => x.Currency).HasMaxLength(3).IsRequired();
         b.Property(x => x.Total).HasPrecision(18, 2);
         b.Property(x => x.Subtotal).HasPrecision(18, 2);
@@ -101,7 +101,7 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         b.Property(x => x.ExternalReference).HasMaxLength(150);
         b.Property(x => x.Amount).HasPrecision(18, 2);
         b.Property(x => x.Currency).HasMaxLength(3).IsRequired();
-        b.HasIndex(x => new { x.Provider, x.ExternalReference }).IsUnique().HasFilter("[ExternalReference] IS NOT NULL");
+        b.HasIndex(x => new { x.TenantId, x.Provider, x.ExternalReference }).IsUnique().HasFilter("[ExternalReference] IS NOT NULL");
     }
 }
 
@@ -113,8 +113,8 @@ public sealed class ProductVariantConfiguration : IEntityTypeConfiguration<Produ
         b.Property(x => x.Sku).HasMaxLength(100).IsRequired();
         b.Property(x => x.Barcode).HasMaxLength(100);
         b.Property(x => x.PriceAdjustment).HasPrecision(18, 2);
-        b.HasIndex(x => x.Sku).IsUnique();
-        b.HasIndex(x => x.Barcode).IsUnique().HasFilter("[Barcode] IS NOT NULL");
+        b.HasIndex(x => new { x.TenantId, x.Sku }).IsUnique();
+        b.HasIndex(x => new { x.TenantId, x.Barcode }).IsUnique().HasFilter("[Barcode] IS NOT NULL");
         b.HasOne(x => x.Product).WithMany(x => x.Variants).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
     }
 }
@@ -125,7 +125,7 @@ public sealed class WarehouseConfiguration : IEntityTypeConfiguration<Warehouse>
     {
         b.Property(x => x.Name).HasMaxLength(150).IsRequired();
         b.Property(x => x.Code).HasMaxLength(30).IsRequired();
-        b.HasIndex(x => x.Code).IsUnique();
+        b.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
     }
 }
 

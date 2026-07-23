@@ -48,5 +48,6 @@ public interface IAdminUserService
 
     Task DeleteRoleAsync(string id, CancellationToken cancellationToken = default);
 
-    IReadOnlyCollection<PermissionGroupResponse> GetPermissionGroups();
+    Task<IReadOnlyCollection<PermissionGroupResponse>> GetPermissionGroupsAsync(
+        CancellationToken cancellationToken = default);
 }

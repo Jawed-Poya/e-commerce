@@ -4,6 +4,7 @@ using System.Security.Claims;
 using ECommerce.Options;
 using ECommerce.Shared;
 using ECommerce.Services.Notifications;
+using ECommerce.Services.Tenancy;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.IdentityModel.Tokens;
@@ -93,7 +94,7 @@ builder.Services.AddAuthorization(options =>
     {
         options.AddPolicy(permission, policy =>
             policy.RequireAssertion(context =>
-                context.User.IsInRole(AppRoles.Admin) ||
+                context.User.IsInRole(AppRoles.PlatformAdmin) ||
                 context.User.HasClaim(AuthClaims.Permission, permission)));
     }
 });
@@ -112,8 +113,10 @@ await app.InitializeDatabaseAsync();
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseCors("CorsPolicy");
 app.UseAuthentication();
+app.UseMiddleware<TenantResolutionMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<StoreNotificationHub>("/hubs/store-notifications");

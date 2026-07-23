@@ -9,6 +9,11 @@ using ECommerce.Entities.Notifications;
 using ECommerce.Entities.Operations;
 using ECommerce.Entities.Products;
 using ECommerce.Entities.Storefront;
+using ECommerce.Entities.Tenancy;
+using ECommerce.Services.Tenancy;
+using System.Linq.Expressions;
+using System.Security.Claims;
+using System.Text.Json;
 using ECommerce.Entities.Users;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -16,11 +21,39 @@ using Microsoft.EntityFrameworkCore;
 public class ApplicationDbContext
     : IdentityDbContext<User, Role, string>
 {
+    private readonly ITenantContext _tenantContext;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+
+    private static readonly HashSet<string> TrashRootTypes = new(StringComparer.Ordinal)
+    {
+        nameof(Product),
+        nameof(Customer),
+        nameof(Order),
+        nameof(GeneralType),
+        nameof(Supplier),
+        nameof(Purchase),
+        nameof(InventorySale),
+        nameof(Staff),
+        nameof(StaffSalaryPayment),
+        nameof(Expense),
+        nameof(Warehouse),
+        nameof(ProductReview),
+        nameof(Notification),
+        nameof(StorefrontContent)
+    };
+
     public ApplicationDbContext(
-        DbContextOptions<ApplicationDbContext> options)
+        DbContextOptions<ApplicationDbContext> options,
+        ITenantContext tenantContext,
+        IHttpContextAccessor httpContextAccessor)
         : base(options)
     {
+        _tenantContext = tenantContext;
+        _httpContextAccessor = httpContextAccessor;
     }
+
+    public long CurrentTenantId => _tenantContext.TenantId;
+    public bool BypassTenantFilter => false;
 
     #region Catalog
 
@@ -82,6 +115,13 @@ public class ApplicationDbContext
     public DbSet<ExpenseCategory> ExpenseCategories => Set<ExpenseCategory>();
     public DbSet<Expense> Expenses => Set<Expense>();
 
+    public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<Branch> Branches => Set<Branch>();
+    public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
+    public DbSet<TenantPermissionGrant> TenantPermissionGrants => Set<TenantPermissionGrant>();
+    public DbSet<TenantSetting> TenantSettings => Set<TenantSetting>();
+    public DbSet<TrashRecord> TrashRecords => Set<TrashRecord>();
+
     #endregion
 
 
@@ -97,10 +137,57 @@ public class ApplicationDbContext
         builder.Entity<GeneralType>()
             .HasIndex(x => new
             {
+                x.TenantId,
                 x.Group,
                 x.Name
             })
             .IsUnique();
+
+
+        builder.Entity<Tenant>(entity =>
+        {
+            entity.HasIndex(item => item.Slug).IsUnique();
+            entity.HasOne(item => item.Setting).WithOne(item => item.Tenant)
+                .HasForeignKey<TenantSetting>(item => item.TenantId).OnDelete(DeleteBehavior.Cascade);
+        });
+        builder.Entity<Branch>(entity =>
+        {
+            entity.HasIndex(item => new { item.TenantId, item.Code }).IsUnique();
+            entity.HasOne(item => item.Tenant).WithMany(item => item.Branches)
+                .HasForeignKey(item => item.TenantId).OnDelete(DeleteBehavior.Cascade);
+        });
+        builder.Entity<TenantSubscription>(entity =>
+        {
+            entity.Property(item => item.MonthlyPrice).HasPrecision(18, 2);
+            entity.HasIndex(item => new { item.TenantId, item.Status });
+            entity.HasOne(item => item.Tenant).WithMany(item => item.Subscriptions)
+                .HasForeignKey(item => item.TenantId).OnDelete(DeleteBehavior.Cascade);
+        });
+        builder.Entity<TenantPermissionGrant>(entity =>
+        {
+            entity.HasIndex(item => new { item.TenantId, item.Permission }).IsUnique();
+            entity.HasOne(item => item.Tenant).WithMany(item => item.PermissionGrants)
+                .HasForeignKey(item => item.TenantId).OnDelete(DeleteBehavior.Cascade);
+        });
+        builder.Entity<TenantSetting>(entity =>
+        {
+            entity.HasIndex(item => item.TenantId).IsUnique();
+        });
+        builder.Entity<TrashRecord>(entity =>
+        {
+            entity.HasIndex(item => new { item.TenantId, item.EntityType, item.EntityId, item.PurgedAt });
+        });
+        builder.Entity<User>(entity =>
+        {
+            entity.HasIndex(item => new { item.TenantId, item.NormalizedEmail })
+                .IsUnique()
+                .HasFilter("[NormalizedEmail] IS NOT NULL");
+            entity.HasIndex(item => item.BranchId);
+        });
+        builder.Entity<Role>(entity =>
+        {
+            entity.HasIndex(item => item.TenantId);
+        });
 
         builder.Entity<StorefrontContent>(entity =>
         {
@@ -140,6 +227,8 @@ public class ApplicationDbContext
         builder.Entity<OrderItem>().HasQueryFilter(x => !x.IsDeleted && !x.Order.IsDeleted && !x.Product.IsDeleted);
         builder.Entity<Payment>().HasQueryFilter(x => !x.IsDeleted && !x.Order.IsDeleted);
         builder.Entity<OrderStatusHistory>().HasQueryFilter(x => !x.IsDeleted && !x.Order.IsDeleted);
+
+        ApplyTenantQueryFilters(builder);
     }
 
     public override int SaveChanges()
@@ -157,12 +246,103 @@ public class ApplicationDbContext
     private void ApplyAuditFields()
     {
         var now = DateTime.UtcNow;
-        foreach (var entry in ChangeTracker.Entries<API.Entities.Common.BaseEntity>())
+        var trash = new List<TrashRecord>();
+
+        foreach (var entry in ChangeTracker.Entries<API.Entities.Common.BaseEntity>().ToArray())
         {
-            if (entry.State == EntityState.Added && entry.Entity.CreatedAt == default)
-                entry.Entity.CreatedAt = now;
-            if (entry.State == EntityState.Modified)
+            if (entry.Entity is TrashRecord)
+                continue;
+
+            if (entry.State == EntityState.Added)
+            {
+                if (entry.Entity.CreatedAt == default) entry.Entity.CreatedAt = now;
+                if (entry.Entity.TenantId <= 0) entry.Entity.TenantId = _tenantContext.TenantId;
+                entry.Entity.BranchId ??= _tenantContext.BranchId;
+            }
+
+            var isDeleteTransition = entry.State == EntityState.Deleted ||
+                (entry.State == EntityState.Modified &&
+                 entry.Property(nameof(API.Entities.Common.BaseEntity.IsDeleted)).IsModified &&
+                 !entry.Property(nameof(API.Entities.Common.BaseEntity.IsDeleted)).OriginalValue.Equals(true) &&
+                 entry.Entity.IsDeleted);
+
+            if (isDeleteTransition)
+            {
+                entry.State = EntityState.Modified;
+                entry.Entity.IsDeleted = true;
+                entry.Entity.DeletedAt ??= now;
                 entry.Entity.UpdatedAt = now;
+                if (TrashRootTypes.Contains(entry.Entity.GetType().Name))
+                    trash.Add(CreateTrashRecord(entry.Entity, now));
+            }
+            else if (entry.State == EntityState.Modified)
+            {
+                entry.Entity.UpdatedAt = now;
+            }
         }
+
+        if (trash.Count > 0) TrashRecords.AddRange(trash);
+    }
+
+    private TrashRecord CreateTrashRecord(API.Entities.Common.BaseEntity entity, DateTime now)
+    {
+        var type = entity.GetType().Name;
+        var displayProperty = entity.GetType().GetProperty("Name")
+            ?? entity.GetType().GetProperty("FullName")
+            ?? entity.GetType().GetProperty("OrderNumber")
+            ?? entity.GetType().GetProperty("PurchaseNumber")
+            ?? entity.GetType().GetProperty("SaleNumber")
+            ?? entity.GetType().GetProperty("EmployeeNumber")
+            ?? entity.GetType().GetProperty("Title")
+            ?? entity.GetType().GetProperty("Description");
+        var displayName = displayProperty?.GetValue(entity)?.ToString();
+        var principal = _httpContextAccessor.HttpContext?.User;
+        var deletedByUserId = principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+        var deletedByName = principal?.FindFirstValue(ClaimTypes.Name)
+            ?? principal?.Identity?.Name;
+        return new TrashRecord
+        {
+            TenantId = entity.TenantId <= 0 ? _tenantContext.TenantId : entity.TenantId,
+            BranchId = entity.BranchId,
+            EntityType = type,
+            EntityId = entity.Id.ToString(),
+            DisplayName = string.IsNullOrWhiteSpace(displayName) ? $"{type} #{entity.Id}" : displayName!,
+            DeletedByUserId = deletedByUserId,
+            DeletedByName = deletedByName,
+            SnapshotJson = JsonSerializer.Serialize(entity, entity.GetType(), new JsonSerializerOptions
+            {
+                ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles
+            }),
+            CreatedAt = now
+        };
+    }
+
+    private void ApplyTenantQueryFilters(ModelBuilder builder)
+    {
+        foreach (var entityType in builder.Model.GetEntityTypes()
+                     .Where(item => typeof(API.Entities.Common.BaseEntity).IsAssignableFrom(item.ClrType)))
+        {
+            var parameter = Expression.Parameter(entityType.ClrType, "entity");
+            var tenantProperty = Expression.Property(parameter, nameof(API.Entities.Common.BaseEntity.TenantId));
+            var currentTenant = Expression.Property(Expression.Constant(this), nameof(CurrentTenantId));
+            var bypass = Expression.Property(Expression.Constant(this), nameof(BypassTenantFilter));
+            Expression tenantBody = Expression.OrElse(bypass, Expression.Equal(tenantProperty, currentTenant));
+
+            var existing = entityType.GetQueryFilter();
+            if (existing is not null)
+            {
+                var existingBody = new ReplaceExpressionVisitor(existing.Parameters[0], parameter)
+                    .Visit(existing.Body)!;
+                tenantBody = Expression.AndAlso(existingBody, tenantBody);
+            }
+
+            entityType.SetQueryFilter(Expression.Lambda(tenantBody, parameter));
+        }
+    }
+
+    private sealed class ReplaceExpressionVisitor(Expression oldValue, Expression newValue) : ExpressionVisitor
+    {
+        public override Expression? Visit(Expression? node) =>
+            node == oldValue ? newValue : base.Visit(node);
     }
 }
