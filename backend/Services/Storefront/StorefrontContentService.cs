@@ -48,6 +48,9 @@ public sealed class StorefrontContentService(
         entity.HeroImageUrl = Clean(request.HeroImageUrl);
         entity.PrimaryButtonUrl = NormalizeInternalUrl(request.PrimaryButtonUrl, "/products");
         entity.SecondaryButtonUrl = NormalizeInternalUrl(request.SecondaryButtonUrl, "/products?featured=true");
+        entity.ShippingEnabled = request.ShippingEnabled;
+        entity.FlatShippingFee = Math.Max(0, request.FlatShippingFee);
+        entity.FreeShippingThreshold = Math.Max(0, request.FreeShippingThreshold);
         entity.HeroContentJson = JsonSerializer.Serialize(
             new HeroTranslations(request.En, request.Ps, request.Dr),
             JsonOptions);
@@ -99,6 +102,9 @@ public sealed class StorefrontContentService(
             entity.HeroImageUrl,
             entity.PrimaryButtonUrl,
             entity.SecondaryButtonUrl,
+            entity.ShippingEnabled,
+            Math.Max(0, entity.FlatShippingFee),
+            Math.Max(0, entity.FreeShippingThreshold),
             translations.En,
             translations.Ps,
             translations.Dr,
@@ -112,6 +118,9 @@ public sealed class StorefrontContentService(
             null,
             "/products",
             "/products?featured=true",
+            true,
+            7.50m,
+            75m,
             translations.En,
             translations.Ps,
             translations.Dr,

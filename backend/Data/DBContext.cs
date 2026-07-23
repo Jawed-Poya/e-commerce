@@ -107,6 +107,8 @@ public class ApplicationDbContext
             entity.Property(item => item.HeroImageUrl).HasMaxLength(2048);
             entity.Property(item => item.PrimaryButtonUrl).HasMaxLength(500);
             entity.Property(item => item.SecondaryButtonUrl).HasMaxLength(500);
+            entity.Property(item => item.FlatShippingFee).HasPrecision(18, 2);
+            entity.Property(item => item.FreeShippingThreshold).HasPrecision(18, 2);
         });
 
         builder.Entity<Product>().HasQueryFilter(x => !x.IsDeleted);

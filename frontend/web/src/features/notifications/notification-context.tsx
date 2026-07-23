@@ -50,15 +50,15 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     const [items, setItems] = useState<StoreNotification[]>([]);
     const [trackedIds, setTrackedIds] = useState(getTrackedProductIds);
     const [seenIds, setSeenIds] = useState<number[]>(readSeenIds);
+    const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
+        () => ("Notification" in window ? Notification.permission : "unsupported"),
+    );
     const [realtimeStatus, setRealtimeStatus] =
         useState<RealtimeStatus>("connecting");
     const deliveredIds = useRef(new Set<number>());
     const lastCheck = useRef(
         localStorage.getItem(lastCheckKey) ?? new Date().toISOString(),
     );
-
-    const permission: NotificationPermission | "unsupported" =
-        "Notification" in window ? Notification.permission : "unsupported";
 
     const showBrowserNotification = useCallback((item: StoreNotification) => {
         if (!("Notification" in window) || Notification.permission !== "granted")
@@ -104,24 +104,30 @@ export function NotificationProvider({ children }: PropsWithChildren) {
         [showBrowserNotification],
     );
 
+    const syncTrackedIds = useCallback(() => {
+        const next = getTrackedProductIds();
+        setTrackedIds((current) =>
+            sameNumberArray(current, next) ? current : next,
+        );
+    }, []);
+
     const trackProduct = useCallback((productId: number) => {
         addTrackedProduct(productId);
-        setTrackedIds(getTrackedProductIds());
-    }, []);
+        syncTrackedIds();
+    }, [syncTrackedIds]);
 
     useEffect(() => {
         [...cart.items.map((item) => item.id), ...cart.wishlist].forEach(
             addTrackedProduct,
         );
-        setTrackedIds(getTrackedProductIds());
-    }, [cart.items, cart.wishlist]);
+        syncTrackedIds();
+    }, [cart.items, cart.wishlist, syncTrackedIds]);
 
     useEffect(() => {
-        const sync = () => setTrackedIds(getTrackedProductIds());
-        window.addEventListener("easycart-tracked-products-changed", sync);
+        window.addEventListener("easycart-tracked-products-changed", syncTrackedIds);
         return () =>
-            window.removeEventListener("easycart-tracked-products-changed", sync);
-    }, []);
+            window.removeEventListener("easycart-tracked-products-changed", syncTrackedIds);
+    }, [syncTrackedIds]);
 
     const poll = useCallback(async () => {
         if (!trackedIds.length) return;
@@ -205,6 +211,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     const enableBrowserNotifications = useCallback(async () => {
         if (!("Notification" in window)) return false;
         const result = await Notification.requestPermission();
+        setPermission(result);
         if (result === "granted") await poll();
         return result === "granted";
     }, [poll]);
@@ -260,4 +267,9 @@ function readSeenIds(): number[] {
     } catch {
         return [];
     }
+}
+
+function sameNumberArray(left: number[], right: number[]) {
+    return left.length === right.length &&
+        left.every((value, index) => value === right[index]);
 }

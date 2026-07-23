@@ -33,6 +33,7 @@ export interface PaymentOption {
 
 export interface CheckoutConfiguration {
     currency: string;
+    shippingEnabled: boolean;
     flatShippingFee: number;
     freeShippingThreshold: number;
     paymentMethods: PaymentOption[];

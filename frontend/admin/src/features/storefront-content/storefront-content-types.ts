@@ -10,6 +10,9 @@ export interface StorefrontContent {
     heroImageUrl: string | null;
     primaryButtonUrl: string;
     secondaryButtonUrl: string;
+    shippingEnabled: boolean;
+    flatShippingFee: number;
+    freeShippingThreshold: number;
     en: LocalizedHeroContent;
     ps: LocalizedHeroContent;
     dr: LocalizedHeroContent;

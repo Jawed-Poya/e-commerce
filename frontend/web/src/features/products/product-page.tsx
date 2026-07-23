@@ -6,6 +6,7 @@ import {
   Heart,
   PackageCheck,
   ShoppingBag,
+  Star,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -17,30 +18,41 @@ import { Button } from "../../shared/components/ui/button";
 import { Skeleton } from "../../shared/components/ui/skeleton";
 import { cn } from "../../shared/lib/utils";
 import type { ProductDetails } from "../../shared/types/product";
-import { useCart } from "../cart/cart-context";
+import { maximumCartQuantity, minimumCartQuantity, useCart } from "../cart/cart-context";
 import { useStoreNotifications } from "../notifications/notification-context";
 import { ProductReviews } from "../reviews/product-reviews";
 import { useI18n } from "../../i18n/i18n-provider";
 
 export function ProductPage() {
-  const { id } = useParams();
+  const { id: identifier } = useParams();
+  const numericIdentifier = Number(identifier);
+  const isNumericIdentifier = Number.isInteger(numericIdentifier) && numericIdentifier > 0;
 
   const q = useQuery({
-    queryKey: ["product", id],
-    queryFn: () => apiGet<ProductDetails>(`/products/${id}`),
-    enabled: Boolean(id),
+    queryKey: ["product", identifier],
+    queryFn: () =>
+      apiGet<ProductDetails>(
+        isNumericIdentifier
+          ? `/products/${numericIdentifier}`
+          : `/products/by-slug/${encodeURIComponent(identifier ?? "")}`,
+      ),
+    enabled: Boolean(identifier),
   });
 
   const [selected, setSelected] = useState<number | null>(null);
   const cart = useCart();
-  const notifications = useStoreNotifications();
+  const {
+    trackProduct,
+    permission: notificationPermission,
+    enableBrowserNotifications,
+  } = useStoreNotifications();
   const { t } = useI18n();
-  const productId = Number(id);
+  const productId = q.data?.id;
 
   useEffect(() => {
-    if (!Number.isInteger(productId) || productId < 1 || !q.data) return;
+    if (!productId) return;
 
-    notifications.trackProduct(productId);
+    trackProduct(productId);
     const viewKey = `easycart-product-view-${productId}`;
     if (sessionStorage.getItem(viewKey)) return;
 
@@ -48,7 +60,7 @@ export function ProductPage() {
     void apiPost<void>(`/products/${productId}/views`).catch(() => {
       sessionStorage.removeItem(viewKey);
     });
-  }, [notifications, productId, q.data]);
+  }, [productId, trackProduct]);
 
   if (q.isLoading) {
     return (
@@ -120,6 +132,17 @@ export function ProductPage() {
     p.images[0];
 
   const liked = cart.wishlist.includes(p.id);
+  const minimumQuantity = minimumCartQuantity({ ...p, stock });
+  const maximumQuantity = maximumCartQuantity({ ...p, stock });
+  const canAddToCart = hasPrice && maximumQuantity >= minimumQuantity;
+  const notificationLabel =
+    notificationPermission === "granted"
+      ? t("product.alertsEnabled")
+      : notificationPermission === "denied"
+        ? t("product.alertsBlocked")
+        : notificationPermission === "unsupported"
+          ? t("product.alertsUnavailable")
+          : t("product.enableAlerts");
 
   const addToCart = () =>
     cart.addItem({
@@ -128,6 +151,9 @@ export function ProductPage() {
       image: active?.url,
       price: price!,
       stock,
+      slug: p.slug,
+      minimumValue: p.minimumValue,
+      maximumValue: p.maximumValue,
     });
 
   return (
@@ -279,6 +305,10 @@ export function ProductPage() {
                     <Eye className="size-3.5" />{" "}
                     {t("product.views", { count: p.viewCount })}
                   </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                    {p.reviewCount > 0 ? p.averageRating.toFixed(1) : "—"} ({p.reviewCount})
+                  </span>
                 </div>
               </div>
 
@@ -334,11 +364,19 @@ export function ProductPage() {
               </div>
             </div>
 
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span>{t("product.minimumQuantity", { count: minimumQuantity })}</span>
+              <span aria-hidden="true">·</span>
+              <span>{t("product.maximumQuantity", { count: maximumQuantity })}</span>
+              <span aria-hidden="true">·</span>
+              <span>{t("product.alertTrackingDescription")}</span>
+            </div>
+
             <div className="mt-6 hidden gap-3 sm:flex">
               <Button
                 size="lg"
                 className="h-12 flex-1 rounded-xl font-bold shadow-md shadow-primary/15"
-                disabled={stock < 1 || !hasPrice}
+                disabled={!canAddToCart}
                 onClick={addToCart}
               >
                 <ShoppingBag className="size-4.5" />
@@ -348,13 +386,16 @@ export function ProductPage() {
               <Button
                 size="lg"
                 variant="outline"
-                onClick={() => void notifications.enableBrowserNotifications()}
-                className="h-12 rounded-xl px-5"
+                disabled={notificationPermission === "denied" || notificationPermission === "unsupported"}
+                onClick={() => void enableBrowserNotifications()}
+                className={cn(
+                  "h-12 rounded-xl px-5",
+                  notificationPermission === "granted" &&
+                    "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300",
+                )}
               >
                 <BellRing className="size-4.5" />
-                <span className="hidden md:inline">
-                  {t("product.notifyMe")}
-                </span>
+                <span className="hidden md:inline">{notificationLabel}</span>
               </Button>
 
               <Button
@@ -452,7 +493,7 @@ export function ProductPage() {
           <Button
             type="button"
             className="h-11 min-w-36 rounded-xl px-5 font-bold shadow-md shadow-primary/15"
-            disabled={stock < 1 || !hasPrice}
+            disabled={!canAddToCart}
             onClick={addToCart}
           >
             <ShoppingBag className="size-4" />
