@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, BadgePercent, Barcode, Boxes, CalendarDays, Eye, ImageIcon, PackageCheck, Star } from "lucide-react";
+import { ArrowLeft, BadgePercent, Barcode, Boxes, CalendarDays, Eye, ImageIcon, PackageCheck, Pencil, Star } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
+import { useAdminAuth } from "@/features/auth/auth-context";
+import { hasPermission, Permissions } from "@/features/auth/permissions";
 import { useProduct } from "@/features/products/hooks/use-products";
 import { useProductLookupsQuery } from "@/features/products/hooks/use-product-mutation";
 import { ProductPricingDialog } from "@/features/products/components/product-pricing-dialog";
@@ -18,6 +20,9 @@ export default function ProductDetailsPage() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { t, language } = useI18n();
+    const { user } = useAdminAuth();
+    const canManageProduct = hasPermission(user, Permissions.ProductsManage);
+    const canManagePricing = hasPermission(user, Permissions.ProductPricingManage);
     const productId = Number(id);
     const { data: product, isLoading, isError } = useProduct(productId);
     const { data: lookups, refetch: refetchLookups } = useProductLookupsQuery();
@@ -40,7 +45,7 @@ export default function ProductDetailsPage() {
     const inventory = product.inventory;
 
     return <div className="space-y-6">
-        <PageHeader title={product.name} description={product.shortDescription || t("details.subtitle")} actions={<Button variant="outline" onClick={() => navigate("/products")}><ArrowLeft className="me-2 size-4 rtl:rotate-180" />{t("details.back")}</Button>} />
+        <PageHeader title={product.name} description={product.shortDescription || t("details.subtitle")} actions={<div className="flex gap-2"><Button variant="outline" onClick={() => navigate("/products")}><ArrowLeft className="me-2 size-4 rtl:rotate-180" />{t("details.back")}</Button>{canManageProduct && <Button onClick={() => navigate(`/products/${product.id}/edit`)}><Pencil className="me-2 size-4" />Edit product</Button>}</div>} />
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(420px,.95fr)]">
             <Card className="overflow-hidden"><CardContent className="p-0">
@@ -60,9 +65,9 @@ export default function ProductDetailsPage() {
 
         <div className="grid gap-6 lg:grid-cols-2">
             <Card><CardHeader><CardTitle>{t("details.inventory")}</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-2"><Detail label={t("details.totalStock")} value={formatNumber(inventory?.quantity)} /><Detail label={t("details.availableStock")} value={formatNumber(inventory?.availableQuantity)} /><Detail label={t("details.reservedStock")} value={formatNumber(inventory?.reservedQuantity)} /><Detail label={t("details.minimumStock")} value={formatNumber(inventory?.minimumQuantity)} /><Detail label={t("details.expiry")} value={inventory?.expireDate || "—"} /><Detail label={t("details.updated")} value={date(product.updatedAt)} /></CardContent></Card>
-            <Card><CardHeader><div className="flex items-center justify-between gap-3"><div><CardTitle>{t("details.pricing")}</CardTitle><p className="mt-1 text-xs text-muted-foreground">{t("pricing.description")}</p></div><Button variant="outline" size="sm" onClick={() => setPricingOpen(true)}><BadgePercent className="me-2 size-4" />{t("pricing.manage")}</Button></div></CardHeader><CardContent>{product.prices.length === 0 ? <div className="border border-dashed p-6 text-center"><p className="text-sm font-medium">{t("pricing.noTiers")}</p><p className="mt-1 text-xs text-muted-foreground">{t("pricing.noTiersHelp")}</p><Button className="mt-4" size="sm" onClick={() => setPricingOpen(true)}>{t("pricing.addTier")}</Button></div> : <div className="divide-y border">{product.prices.map(price => { const status = getSaleStatus(price.salePrice, price.startDate, price.endDate); return <div key={price.id} className="grid gap-3 p-3 text-sm sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"><div><p className="flex flex-wrap items-center gap-2 font-medium">{price.customerTypeName}{price.isDefault && <Badge>Default / guests</Badge>}</p><p className="mt-1 text-[11px] text-muted-foreground">{price.startDate || price.endDate ? `${shortDate(price.startDate) ?? "…"} – ${shortDate(price.endDate) ?? "…"}` : t("pricing.always")}</p></div><div className="text-start sm:text-end"><p className={price.salePrice != null ? "text-xs text-muted-foreground line-through" : "font-semibold"}>{money(price.regularPrice)}</p>{price.salePrice != null && <p className="mt-0.5 font-semibold text-primary">{money(price.salePrice)}</p>}</div>{price.salePrice != null && <span className="justify-self-start sm:justify-self-end"><Badge variant={status === "active" ? "default" : "outline"}>{t(status === "active" ? "pricing.active" : status === "upcoming" ? "pricing.upcoming" : "pricing.ended")}</Badge></span>}</div>; })}</div>}</CardContent></Card>
+            <Card><CardHeader><div className="flex items-center justify-between gap-3"><div><CardTitle>{t("details.pricing")}</CardTitle><p className="mt-1 text-xs text-muted-foreground">{t("pricing.description")}</p></div>{canManagePricing && <Button variant="outline" size="sm" onClick={() => setPricingOpen(true)}><BadgePercent className="me-2 size-4" />{t("pricing.manage")}</Button>}</div></CardHeader><CardContent>{product.prices.length === 0 ? <div className="border border-dashed p-6 text-center"><p className="text-sm font-medium">{t("pricing.noTiers")}</p><p className="mt-1 text-xs text-muted-foreground">{t("pricing.noTiersHelp")}</p>{canManagePricing && <Button className="mt-4" size="sm" onClick={() => setPricingOpen(true)}>{t("pricing.addTier")}</Button>}</div> : <div className="divide-y border">{product.prices.map(price => { const status = getSaleStatus(price.salePrice, price.startDate, price.endDate); return <div key={price.id} className="grid gap-3 p-3 text-sm sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"><div><p className="flex flex-wrap items-center gap-2 font-medium">{price.customerTypeName}{price.isDefault && <Badge>Default / guests</Badge>}</p><p className="mt-1 text-[11px] text-muted-foreground">{price.startDate || price.endDate ? `${shortDate(price.startDate) ?? "…"} – ${shortDate(price.endDate) ?? "…"}` : t("pricing.always")}</p></div><div className="text-start sm:text-end"><p className={price.salePrice != null ? "text-xs text-muted-foreground line-through" : "font-semibold"}>{money(price.regularPrice)}</p>{price.salePrice != null && <p className="mt-0.5 font-semibold text-primary">{money(price.salePrice)}</p>}</div>{price.salePrice != null && <span className="justify-self-start sm:justify-self-end"><Badge variant={status === "active" ? "default" : "outline"}>{t(status === "active" ? "pricing.active" : status === "upcoming" ? "pricing.upcoming" : "pricing.ended")}</Badge></span>}</div>; })}</div>}</CardContent></Card>
         </div>
-        <ProductPricingDialog productId={product.id} productName={product.name} prices={product.prices} customerTypes={lookups?.customerTypes ?? []} defaultCustomerTypeId={lookups?.defaultCustomerTypeId ?? null} open={pricingOpen} onOpenChange={setPricingOpen} />
+        {canManagePricing && <ProductPricingDialog productId={product.id} productName={product.name} prices={product.prices} customerTypes={lookups?.customerTypes ?? []} defaultCustomerTypeId={lookups?.defaultCustomerTypeId ?? null} open={pricingOpen} onOpenChange={setPricingOpen} />}
     </div>;
 }
 

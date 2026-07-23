@@ -10,7 +10,8 @@ export function ProductSectionNavigation() {
     return (
         <nav aria-label={t("products.navigation")} className="flex items-center gap-1 border-b" role="navigation">
             <NavLink end to="/products" className={({ isActive }) => cn(buttonVariants({ variant: "ghost", size: "sm" }), "border-b-2 border-transparent", isActive && "border-primary bg-muted text-foreground")}>{t("nav.allProducts")}</NavLink>
-            <NavLink to="/products/new" className={({ isActive }) => cn(buttonVariants({ variant: "ghost", size: "sm" }), "border-b-2 border-transparent", isActive && "border-primary bg-muted text-foreground")}>{t("products.bulkCreate")}</NavLink>
+            <NavLink to="/products/new" className={({ isActive }) => cn(buttonVariants({ variant: "ghost", size: "sm" }), "border-b-2 border-transparent", isActive && "border-primary bg-muted text-foreground")}>New product</NavLink>
+            <NavLink to="/products/bulk" className={({ isActive }) => cn(buttonVariants({ variant: "ghost", size: "sm" }), "border-b-2 border-transparent", isActive && "border-primary bg-muted text-foreground")}>{t("products.bulkCreate")}</NavLink>
         </nav>
     );
 }

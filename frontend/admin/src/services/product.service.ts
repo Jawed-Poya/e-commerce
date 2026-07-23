@@ -88,6 +88,29 @@ export interface ProductListFilters {
     sortDescending?: boolean;
 }
 
+
+export interface CreateSingleProductInput {
+    image: File;
+    galleryImages?: File[];
+    name: string;
+    barcode?: string | null;
+    shortDescription?: string | null;
+    description?: string | null;
+    slug?: string | null;
+    categoryId: number;
+    brandId?: number | null;
+    unitId?: number | null;
+    minimumValue?: number | null;
+    maximumValue?: number | null;
+    isFeatured: boolean;
+    isActive: boolean;
+}
+
+export interface CreateSingleProductResult {
+    createdCount: number;
+    products: { id: number; name: string; barcode: string | null; slug: string; primaryImageUrl: string }[];
+}
+
 export type BulkUpdateProduct = Pick<ProductListItem,
     "id" | "name" | "barcode" | "categoryId" | "brandId" | "unitId" |
     "shortDescription" | "description" | "slug" | "minimumValue" |
@@ -100,6 +123,25 @@ function append(formData: FormData, key: string, value: string | number | boolea
 export const productService = {
     getAll(params?: ProductListFilters) {
         return apiClient.get<PagedProducts>("/products", params);
+    },
+    createSingle(product: CreateSingleProductInput) {
+        const formData = new FormData();
+        const prefix = "Products[0]";
+        formData.append(`${prefix}.Image`, product.image, product.image.name);
+        product.galleryImages?.forEach(image => formData.append(`${prefix}.GalleryImages`, image, image.name));
+        append(formData, `${prefix}.Name`, product.name.trim());
+        append(formData, `${prefix}.Barcode`, product.barcode?.trim() || null);
+        append(formData, `${prefix}.ShortDescription`, product.shortDescription?.trim() || null);
+        append(formData, `${prefix}.Description`, product.description?.trim() || null);
+        append(formData, `${prefix}.Slug`, product.slug?.trim() || null);
+        append(formData, `${prefix}.CategoryId`, product.categoryId);
+        append(formData, `${prefix}.BrandId`, product.brandId);
+        append(formData, `${prefix}.UnitId`, product.unitId);
+        append(formData, `${prefix}.MinimumValue`, product.minimumValue);
+        append(formData, `${prefix}.MaximumValue`, product.maximumValue);
+        append(formData, `${prefix}.IsFeatured`, product.isFeatured);
+        append(formData, `${prefix}.IsActive`, product.isActive);
+        return apiClient.post<CreateSingleProductResult>("/products/bulk", formData);
     },
     bulkUpdate(products: BulkUpdateProduct[]) {
         const formData = new FormData();

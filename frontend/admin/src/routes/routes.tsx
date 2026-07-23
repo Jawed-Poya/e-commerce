@@ -4,6 +4,7 @@ import Dashboard from "@/pages/dashboard";
 import ProductsPage from "@/pages/products";
 import GeneralTypesPage from "@/pages/general-types";
 import { ProductBulkCreatePage } from "@/features/products/components/product-bulk-create-page";
+import { ProductEditorPage } from "@/features/products/components/product-editor-page";
 import ProductDetailsPage from "@/pages/product-details";
 import { InventoryPage } from "@/features/inventory/components/inventory-page";
 import OrdersPage from "@/pages/orders";
@@ -17,6 +18,7 @@ import ProfilePage from "@/pages/profile";
 import AdminNotFoundPage from "@/pages/not-found";
 import StorefrontContentPage from "@/pages/storefront-content";
 import ReviewsPage from "@/pages/reviews";
+
 import { ProtectedRoute } from "@/features/auth/protected-route";
 import { PermissionRoute } from "@/features/auth/permission-route";
 import { Permissions } from "@/features/auth/permissions";
@@ -59,6 +61,13 @@ export const router = createBrowserRouter([
                                 path: "new",
                                 element: allowed(
                                     Permissions.ProductsManage,
+                                    <ProductEditorPage />,
+                                ),
+                            },
+                            {
+                                path: "bulk",
+                                element: allowed(
+                                    Permissions.ProductsManage,
                                     <ProductBulkCreatePage />,
                                 ),
                             },
@@ -73,7 +82,7 @@ export const router = createBrowserRouter([
                                 path: ":id/edit",
                                 element: allowed(
                                     Permissions.ProductsManage,
-                                    <>Edit Product</>,
+                                    <ProductEditorPage />,
                                 ),
                             },
                         ],

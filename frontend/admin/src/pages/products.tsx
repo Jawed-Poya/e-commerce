@@ -107,7 +107,7 @@ export default function ProductsPage() {
         <PageHeader title={t("products.title")} description={t("products.subtitle")} actions={<>
                 {selected.length > 0 && <Button variant="outline" onClick={() => editProducts(selectedProducts)}><Pencil className="me-2 size-4" />{t("products.updateSelected")} ({selected.length})</Button>}
                 {selected.length > 0 && <DeleteButton id="selected-products" onDelete={deleteSelected} triggerLabel={`${t("products.deleteSelected")} (${selected.length})`} title={t("products.deleteTitle")} description={t("products.deleteDescription")} cancelLabel={t("form.cancel")} confirmLabel={t("products.confirmDelete")} loadingLabel={t("products.deleting")} />}
-                <Button onClick={() => navigate("/products/new")}><Plus className="me-2 size-4" />{t("products.bulkCreate")}</Button>
+                <Button onClick={() => navigate("/products/new")}><Plus className="me-2 size-4" />New product</Button>
             </>} />
         <ProductSectionNavigation />
         <div className="flex flex-col gap-2 sm:flex-row">
