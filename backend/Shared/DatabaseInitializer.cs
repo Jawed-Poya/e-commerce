@@ -102,14 +102,23 @@ public static class DatabaseInitializer
     private static async Task EnsureOperationDefaultsAsync(ApplicationDbContext context)
     {
         var changed = false;
-        if (!await context.ExpenseCategories.AnyAsync())
+        var expenseCategoryNames = new[] { "Rent", "Utilities", "Transport", "Office", "Other" };
+        var existingExpenseCategoryNames = await context.Types
+            .Where(type => type.Group == GeneralTypeEnum.ExpenseCategory)
+            .Select(type => type.Name)
+            .ToListAsync();
+        var missingExpenseCategories = expenseCategoryNames
+            .Where(name => !existingExpenseCategoryNames.Contains(name, StringComparer.OrdinalIgnoreCase))
+            .Select((name, index) => new GeneralType
+            {
+                Name = name,
+                Group = GeneralTypeEnum.ExpenseCategory,
+                SortOrder = index
+            })
+            .ToList();
+        if (missingExpenseCategories.Count > 0)
         {
-            context.ExpenseCategories.AddRange(
-                new ExpenseCategory { Name = "Rent", Description = "Office, shop, and warehouse rent." },
-                new ExpenseCategory { Name = "Utilities", Description = "Electricity, water, internet, and communication." },
-                new ExpenseCategory { Name = "Transport", Description = "Delivery, fuel, and transportation." },
-                new ExpenseCategory { Name = "Office", Description = "Office supplies and administration." },
-                new ExpenseCategory { Name = "Other", Description = "Other operational expenses." });
+            context.Types.AddRange(missingExpenseCategories);
             changed = true;
         }
 

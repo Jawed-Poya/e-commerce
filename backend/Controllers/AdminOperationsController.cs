@@ -19,23 +19,21 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
     public async Task<IActionResult> Summary(CancellationToken ct) => Ok(ApiResponse<OperationSummary>.Ok(await service.GetSummaryAsync(ct)));
 
     [HttpGet("products")]
-    public async Task<IActionResult> Products(CancellationToken ct)
+    public async Task<IActionResult> Products([FromQuery] string? search, [FromQuery] int take = 20, CancellationToken ct = default)
     {
-        if (!HasAnyPermission(
-                AppPermissions.OperationsView,
-                AppPermissions.PurchasesView,
-                AppPermissions.ManualSalesView))
-        {
-            return Forbid();
-        }
-
-        return Ok(ApiResponse<IReadOnlyList<OperationProductLookup>>.Ok(
-            await service.GetProductLookupsAsync(ct)));
+        if (!HasAnyPermission(AppPermissions.OperationsView, AppPermissions.PurchasesView, AppPermissions.ManualSalesView)) return Forbid();
+        return Ok(ApiResponse<IReadOnlyList<OperationProductLookup>>.Ok(await service.GetProductLookupsAsync(search, take, ct)));
     }
+
+    [Authorize(Policy = AppPermissions.ManualSalesView)]
+    [HttpGet("customers")]
+    public async Task<IActionResult> Customers([FromQuery] string? search, [FromQuery] int take = 20, CancellationToken ct = default) =>
+        Ok(ApiResponse<IReadOnlyList<OperationCustomerLookup>>.Ok(await service.GetCustomerLookupsAsync(search, take, ct)));
 
     [Authorize(Policy = AppPermissions.PurchasesView)]
     [HttpGet("suppliers")]
-    public async Task<IActionResult> Suppliers(CancellationToken ct) => Ok(ApiResponse<IReadOnlyList<SupplierResponse>>.Ok(await service.GetSuppliersAsync(ct)));
+    public async Task<IActionResult> Suppliers([FromQuery] string? search, [FromQuery] int take = 50, CancellationToken ct = default) =>
+        Ok(ApiResponse<IReadOnlyList<SupplierResponse>>.Ok(await service.GetSuppliersAsync(search, take, ct)));
 
     [Authorize(Policy = AppPermissions.PurchasesManage)]
     [HttpPost("suppliers")]
@@ -53,6 +51,14 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
     [HttpPost("purchases")]
     public Task<IActionResult> CreatePurchase(CreatePurchaseRequest request, CancellationToken ct) => Handle(async () => ApiResponse<PurchaseListItem>.Ok(await service.CreatePurchaseAsync(request, UserId(), ct), "Purchase received and stock updated."));
 
+    [Authorize(Policy = AppPermissions.PurchasesView)]
+    [HttpGet("purchases/{id:long}/payments")]
+    public async Task<IActionResult> PurchasePayments(long id, CancellationToken ct) => Ok(ApiResponse<IReadOnlyList<DocumentPaymentResponse>>.Ok(await service.GetPurchasePaymentsAsync(id, ct)));
+
+    [Authorize(Policy = AppPermissions.PurchasesManage)]
+    [HttpPost("purchases/{id:long}/payments")]
+    public Task<IActionResult> AddPurchasePayment(long id, RecordDocumentPaymentRequest request, CancellationToken ct) => Handle(async () => ApiResponse<PurchaseListItem>.Ok(await service.AddPurchasePaymentAsync(id, request, UserId(), ct), "Purchase payment recorded."));
+
     [Authorize(Policy = AppPermissions.ManualSalesView)]
     [HttpGet("sales")]
     public async Task<IActionResult> Sales(CancellationToken ct) => Ok(ApiResponse<IReadOnlyList<InventorySaleListItem>>.Ok(await service.GetSalesAsync(ct)));
@@ -60,6 +66,14 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
     [Authorize(Policy = AppPermissions.ManualSalesManage)]
     [HttpPost("sales")]
     public Task<IActionResult> CreateSale(CreateInventorySaleRequest request, CancellationToken ct) => Handle(async () => ApiResponse<InventorySaleListItem>.Ok(await service.CreateSaleAsync(request, UserId(), ct), "Sale recorded and stock updated."));
+
+    [Authorize(Policy = AppPermissions.ManualSalesView)]
+    [HttpGet("sales/{id:long}/payments")]
+    public async Task<IActionResult> SalePayments(long id, CancellationToken ct) => Ok(ApiResponse<IReadOnlyList<DocumentPaymentResponse>>.Ok(await service.GetSalePaymentsAsync(id, ct)));
+
+    [Authorize(Policy = AppPermissions.ManualSalesManage)]
+    [HttpPost("sales/{id:long}/payments")]
+    public Task<IActionResult> AddSalePayment(long id, RecordDocumentPaymentRequest request, CancellationToken ct) => Handle(async () => ApiResponse<InventorySaleListItem>.Ok(await service.AddSalePaymentAsync(id, request, UserId(), ct), "Sale payment recorded."));
 
     [Authorize(Policy = AppPermissions.StaffView)]
     [HttpGet("staff")]
@@ -83,7 +97,15 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
 
     [Authorize(Policy = AppPermissions.PayrollManage)]
     [HttpPost("salaries")]
-    public Task<IActionResult> CreateSalary(CreateSalaryPaymentRequest request, CancellationToken ct) => Handle(async () => ApiResponse<SalaryPaymentResponse>.Ok(await service.CreateSalaryPaymentAsync(request, UserId(), ct), "Salary payment recorded."));
+    public Task<IActionResult> CreateSalary(CreateSalaryPaymentRequest request, CancellationToken ct) => Handle(async () => ApiResponse<SalaryPaymentResponse>.Ok(await service.CreateSalaryPaymentAsync(request, UserId(), ct), "Salary record created."));
+
+    [Authorize(Policy = AppPermissions.PayrollView)]
+    [HttpGet("salaries/{id:long}/payments")]
+    public async Task<IActionResult> SalaryPayments(long id, CancellationToken ct) => Ok(ApiResponse<IReadOnlyList<DocumentPaymentResponse>>.Ok(await service.GetSalaryInstallmentsAsync(id, ct)));
+
+    [Authorize(Policy = AppPermissions.PayrollManage)]
+    [HttpPost("salaries/{id:long}/payments")]
+    public Task<IActionResult> AddSalaryPayment(long id, RecordDocumentPaymentRequest request, CancellationToken ct) => Handle(async () => ApiResponse<SalaryPaymentResponse>.Ok(await service.AddSalaryInstallmentAsync(id, request, UserId(), ct), "Salary payment recorded."));
 
     [Authorize(Policy = AppPermissions.ExpensesView)]
     [HttpGet("expense-categories")]
@@ -91,7 +113,7 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
 
     [Authorize(Policy = AppPermissions.ExpensesManage)]
     [HttpPost("expense-categories")]
-    public Task<IActionResult> CreateExpenseCategory(ExpenseCategoryUpsertRequest request, CancellationToken ct) => Handle(async () => ApiResponse<ExpenseCategoryResponse>.Ok(await service.SaveExpenseCategoryAsync(null, request, ct), "Expense category created."));
+    public Task<IActionResult> CreateExpenseCategory(ExpenseCategoryUpsertRequest request, CancellationToken ct) => Handle(async () => ApiResponse<ExpenseCategoryResponse>.Ok(await service.SaveExpenseCategoryAsync(null, request, ct), "Expense category created in General Types."));
 
     [Authorize(Policy = AppPermissions.ExpensesManage)]
     [HttpPut("expense-categories/{id:long}")]
@@ -105,19 +127,17 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
     [HttpPost("expenses")]
     public Task<IActionResult> CreateExpense(CreateExpenseRequest request, CancellationToken ct) => Handle(async () => ApiResponse<ExpenseResponse>.Ok(await service.CreateExpenseAsync(request, UserId(), ct), "Expense recorded."));
 
-    private string? UserId() => User.FindFirstValue(ClaimTypes.NameIdentifier);
+    private string? UserId() => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
 
     private bool HasAnyPermission(params string[] permissions) =>
-        User.IsInRole(AppRoles.Admin) ||
-        permissions.Any(permission => User.HasClaim(AuthClaims.Permission, permission));
+        User.IsInRole("Admin") || permissions.Any(permission => User.Claims.Any(claim => claim.Type == AppClaimTypes.Permission && claim.Value == permission));
 
-    private async Task<IActionResult> Handle<T>(Func<Task<ApiResponse<T>>> action)
+    private async Task<IActionResult> Handle<T>(Func<Task<T>> action)
     {
         try { return Ok(await action()); }
-        catch (KeyNotFoundException ex) { return NotFound(ApiResponse<object>.Fail(ex.Message)); }
-        catch (ArgumentException ex) { return BadRequest(ApiResponse<object>.Fail(ex.Message)); }
-        catch (DbUpdateConcurrencyException) { return Conflict(ApiResponse<object>.Fail("Inventory changed while this document was being saved. Refresh stock and try again.")); }
-        catch (DbUpdateException) { return Conflict(ApiResponse<object>.Fail("The operation conflicted with another saved record. Refresh the page and try again.")); }
-        catch (InvalidOperationException ex) { return Conflict(ApiResponse<object>.Fail(ex.Message)); }
+        catch (KeyNotFoundException exception) { return NotFound(ApiResponse<object>.Fail(exception.Message)); }
+        catch (ArgumentException exception) { return BadRequest(ApiResponse<object>.Fail(exception.Message)); }
+        catch (InvalidOperationException exception) { return Conflict(ApiResponse<object>.Fail(exception.Message)); }
+        catch (DbUpdateConcurrencyException) { return Conflict(ApiResponse<object>.Fail("Inventory changed while this operation was being saved. Refresh the page and try again.")); }
     }
 }

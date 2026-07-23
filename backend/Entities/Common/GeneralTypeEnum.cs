@@ -10,5 +10,6 @@ public enum GeneralTypeEnum
 
     ProductUnit = 3,
 
-    CustomerType = 4
+    CustomerType = 4,
+    ExpenseCategory = 5
 }
