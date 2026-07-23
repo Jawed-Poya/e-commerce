@@ -11,6 +11,7 @@ using ECommerce.Entities.Products;
 using ECommerce.Options;
 using ECommerce.Services.Customers;
 using ECommerce.Services.Notifications;
+using ECommerce.Services.Storefront;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OrderEntity = API.Entities.Orders.Order;
@@ -24,7 +25,8 @@ public sealed class OrderService(
     ICurrentCustomerAccessor currentCustomer,
     IDefaultCustomerTypeResolver defaultCustomerType,
     IStoreNotificationService notifications,
-    IAdminNotificationService adminNotifications) : IOrderService
+    IAdminNotificationService adminNotifications,
+    IStorefrontContentService storefrontContent) : IOrderService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -33,14 +35,17 @@ public sealed class OrderService(
 
     private readonly CommerceOptions _options = commerceOptions.Value;
 
-    public CheckoutConfigurationResponse GetCheckoutConfiguration()
+    public async Task<CheckoutConfigurationResponse> GetCheckoutConfigurationAsync(
+        CancellationToken cancellationToken = default)
     {
         var bankDetails = GetBankDetails();
+        var content = await storefrontContent.GetAsync(cancellationToken);
 
         return new CheckoutConfigurationResponse(
             NormalizeCurrency(_options.Currency),
-            Math.Max(0, _options.FlatShippingFee),
-            Math.Max(0, _options.FreeShippingThreshold),
+            content.ShippingEnabled,
+            Math.Max(0, content.FlatShippingFee),
+            Math.Max(0, content.FreeShippingThreshold),
             [
                 new PaymentOptionResponse(
                     PaymentMethod.CashOnDelivery,
@@ -125,9 +130,12 @@ public sealed class OrderService(
             }
 
             var subtotal = orderItems.Sum(item => item.Quantity * item.UnitPrice);
-            var shippingTotal = subtotal >= Math.Max(0, _options.FreeShippingThreshold)
+            var shippingRules = await storefrontContent.GetAsync(cancellationToken);
+            var freeThreshold = Math.Max(0, shippingRules.FreeShippingThreshold);
+            var qualifiesForFreeShipping = freeThreshold > 0 && subtotal >= freeThreshold;
+            var shippingTotal = !shippingRules.ShippingEnabled || qualifiesForFreeShipping
                 ? 0
-                : Math.Max(0, _options.FlatShippingFee);
+                : Math.Max(0, shippingRules.FlatShippingFee);
             var total = subtotal + shippingTotal;
             var now = DateTime.UtcNow;
 

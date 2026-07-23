@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ImagePlus, LoaderCircle, MonitorSmartphone, Save } from "lucide-react";
+import { ImagePlus, LoaderCircle, MonitorSmartphone, Save, Truck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { apiOrigin } from "@/api/axios";
 import { storefrontContentService } from "@/features/storefront-content/storefront-content-service";
 import type {
@@ -29,6 +30,9 @@ const initialForm: UpdateStorefrontContentRequest = {
     heroImageUrl: null,
     primaryButtonUrl: "/products",
     secondaryButtonUrl: "/products?featured=true",
+    shippingEnabled: true,
+    flatShippingFee: 7.5,
+    freeShippingThreshold: 75,
     en: { ...emptyLocale },
     ps: { ...emptyLocale },
     dr: { ...emptyLocale },
@@ -161,6 +165,70 @@ export default function StorefrontContentPage() {
                                         }))
                                     }
                                 />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Truck className="size-5 text-primary" /> Delivery rules
+                            </CardTitle>
+                            <p className="text-xs text-muted-foreground">
+                                Control the delivery fee shown in the cart and enforced by checkout.
+                            </p>
+                        </CardHeader>
+                        <CardContent className="grid gap-5">
+                            <div className="flex items-center justify-between gap-4 rounded-xl border p-4">
+                                <div>
+                                    <Label htmlFor="shipping-enabled">Enable delivery charge</Label>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Turn this off when every storefront order should have free delivery.
+                                    </p>
+                                </div>
+                                <Switch
+                                    id="shipping-enabled"
+                                    checked={form.shippingEnabled}
+                                    onCheckedChange={(checked) =>
+                                        setForm((current) => ({ ...current, shippingEnabled: checked }))
+                                    }
+                                />
+                            </div>
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label>Flat delivery fee</Label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        disabled={!form.shippingEnabled}
+                                        value={form.flatShippingFee}
+                                        onChange={(event) =>
+                                            setForm((current) => ({
+                                                ...current,
+                                                flatShippingFee: Math.max(0, Number(event.target.value) || 0),
+                                            }))
+                                        }
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Free delivery from</Label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={form.freeShippingThreshold}
+                                        onChange={(event) =>
+                                            setForm((current) => ({
+                                                ...current,
+                                                freeShippingThreshold: Math.max(0, Number(event.target.value) || 0),
+                                            }))
+                                        }
+                                    />
+                                    <p className="text-[11px] text-muted-foreground">
+                                        Set to 0 to disable threshold-based free delivery.
+                                    </p>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>

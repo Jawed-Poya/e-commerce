@@ -6,7 +6,8 @@ namespace ECommerce.Services.Orders;
 
 public interface IOrderService
 {
-    CheckoutConfigurationResponse GetCheckoutConfiguration();
+    Task<CheckoutConfigurationResponse> GetCheckoutConfigurationAsync(
+        CancellationToken cancellationToken = default);
 
     Task<OrderConfirmationResponse> CreateAsync(
         CreateCheckoutOrderRequest request,

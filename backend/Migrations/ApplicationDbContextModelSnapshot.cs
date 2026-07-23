@@ -1164,6 +1164,66 @@ namespace ECommerce.Migrations
                     b.ToTable("InventorySaleItems");
                 });
 
+            modelBuilder.Entity("ECommerce.Entities.Operations.PurchasePayment", b =>
+                {
+                    b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    b.Property<decimal>("Amount").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
+                    b.Property<string>("CreatedByUserId").HasColumnType("nvarchar(max)");
+                    b.Property<DateTime?>("DeletedAt").HasColumnType("datetime2");
+                    b.Property<bool>("IsDeleted").HasColumnType("bit");
+                    b.Property<string>("Notes").HasColumnType("nvarchar(max)");
+                    b.Property<DateOnly>("PaymentDate").HasColumnType("date");
+                    b.Property<string>("PaymentMethod").IsRequired().HasMaxLength(50).HasColumnType("nvarchar(50)");
+                    b.Property<long>("PurchaseId").HasColumnType("bigint");
+                    b.Property<string>("ReferenceNumber").HasMaxLength(100).HasColumnType("nvarchar(100)");
+                    b.Property<DateTime?>("UpdatedAt").HasColumnType("datetime2");
+                    b.HasKey("Id");
+                    b.HasIndex("PurchaseId", "PaymentDate");
+                    b.ToTable("PurchasePayments");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.InventorySalePayment", b =>
+                {
+                    b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    b.Property<decimal>("Amount").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
+                    b.Property<string>("CreatedByUserId").HasColumnType("nvarchar(max)");
+                    b.Property<DateTime?>("DeletedAt").HasColumnType("datetime2");
+                    b.Property<long>("InventorySaleId").HasColumnType("bigint");
+                    b.Property<bool>("IsDeleted").HasColumnType("bit");
+                    b.Property<string>("Notes").HasColumnType("nvarchar(max)");
+                    b.Property<DateOnly>("PaymentDate").HasColumnType("date");
+                    b.Property<string>("PaymentMethod").IsRequired().HasMaxLength(50).HasColumnType("nvarchar(50)");
+                    b.Property<string>("ReferenceNumber").HasMaxLength(100).HasColumnType("nvarchar(100)");
+                    b.Property<DateTime?>("UpdatedAt").HasColumnType("datetime2");
+                    b.HasKey("Id");
+                    b.HasIndex("InventorySaleId", "PaymentDate");
+                    b.ToTable("InventorySalePayments");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.StaffSalaryInstallment", b =>
+                {
+                    b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    b.Property<decimal>("Amount").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
+                    b.Property<string>("CreatedByUserId").HasColumnType("nvarchar(max)");
+                    b.Property<DateTime?>("DeletedAt").HasColumnType("datetime2");
+                    b.Property<bool>("IsDeleted").HasColumnType("bit");
+                    b.Property<string>("Notes").HasColumnType("nvarchar(max)");
+                    b.Property<DateOnly>("PaymentDate").HasColumnType("date");
+                    b.Property<string>("PaymentMethod").IsRequired().HasMaxLength(50).HasColumnType("nvarchar(50)");
+                    b.Property<string>("ReferenceNumber").HasMaxLength(100).HasColumnType("nvarchar(100)");
+                    b.Property<long>("StaffSalaryPaymentId").HasColumnType("bigint");
+                    b.Property<DateTime?>("UpdatedAt").HasColumnType("datetime2");
+                    b.HasKey("Id");
+                    b.HasIndex("StaffSalaryPaymentId", "PaymentDate");
+                    b.ToTable("StaffSalaryInstallments");
+                });
+
             modelBuilder.Entity("ECommerce.Entities.Operations.Staff", b =>
                 {
                     b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
@@ -1201,7 +1261,9 @@ namespace ECommerce.Migrations
                     b.Property<DateTime?>("DeletedAt").HasColumnType("datetime2");
                     b.Property<bool>("IsDeleted").HasColumnType("bit");
                     b.Property<decimal>("NetAmount").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<decimal>("PaidAmount").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
                     b.Property<DateOnly>("PaidDate").HasColumnType("date");
+                    b.Property<int>("PaymentStatus").HasColumnType("int");
                     b.Property<string>("PaymentMethod").IsRequired().HasMaxLength(50).HasColumnType("nvarchar(50)");
                     b.Property<int>("PeriodMonth").HasColumnType("int");
                     b.Property<int>("PeriodYear").HasColumnType("int");
@@ -1236,12 +1298,13 @@ namespace ECommerce.Migrations
                     b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
                     b.Property<decimal>("Amount").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
-                    b.Property<long>("CategoryId").HasColumnType("bigint");
+                    b.Property<long?>("CategoryId").HasColumnType("bigint");
                     b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
                     b.Property<string>("CreatedByUserId").HasColumnType("nvarchar(max)");
                     b.Property<DateTime?>("DeletedAt").HasColumnType("datetime2");
                     b.Property<string>("Description").IsRequired().HasMaxLength(1000).HasColumnType("nvarchar(1000)");
                     b.Property<DateOnly>("ExpenseDate").HasColumnType("date");
+                    b.Property<long?>("GeneralTypeCategoryId").HasColumnType("bigint");
                     b.Property<bool>("IsDeleted").HasColumnType("bit");
                     b.Property<string>("PaymentMethod").IsRequired().HasMaxLength(50).HasColumnType("nvarchar(50)");
                     b.Property<string>("ReferenceNumber").HasMaxLength(100).HasColumnType("nvarchar(100)");
@@ -1250,6 +1313,7 @@ namespace ECommerce.Migrations
                     b.HasKey("Id");
                     b.HasIndex("CategoryId");
                     b.HasIndex("ExpenseDate");
+                    b.HasIndex("GeneralTypeCategoryId");
                     b.ToTable("Expenses");
                 });
 
@@ -1266,6 +1330,14 @@ namespace ECommerce.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<decimal>("FlatShippingFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("FreeShippingThreshold")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("HeroContentJson")
                         .IsRequired()
@@ -1290,6 +1362,9 @@ namespace ECommerce.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("ShippingEnabled")
+                        .HasColumnType("bit");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -1908,6 +1983,36 @@ namespace ECommerce.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("ECommerce.Entities.Operations.PurchasePayment", b =>
+                {
+                    b.HasOne("ECommerce.Entities.Operations.Purchase", "Purchase")
+                        .WithMany("Payments")
+                        .HasForeignKey("PurchaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                    b.Navigation("Purchase");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.InventorySalePayment", b =>
+                {
+                    b.HasOne("ECommerce.Entities.Operations.InventorySale", "InventorySale")
+                        .WithMany("Payments")
+                        .HasForeignKey("InventorySaleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                    b.Navigation("InventorySale");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.StaffSalaryInstallment", b =>
+                {
+                    b.HasOne("ECommerce.Entities.Operations.StaffSalaryPayment", "StaffSalaryPayment")
+                        .WithMany("Installments")
+                        .HasForeignKey("StaffSalaryPaymentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                    b.Navigation("StaffSalaryPayment");
+                });
+
             modelBuilder.Entity("ECommerce.Entities.Operations.StaffSalaryPayment", b =>
                 {
                     b.HasOne("ECommerce.Entities.Operations.Staff", "Staff")
@@ -1923,9 +2028,13 @@ namespace ECommerce.Migrations
                     b.HasOne("ECommerce.Entities.Operations.ExpenseCategory", "Category")
                         .WithMany("Expenses")
                         .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
+                    b.HasOne("API.Entities.Types.GeneralType", "GeneralTypeCategory")
+                        .WithMany()
+                        .HasForeignKey("GeneralTypeCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
                     b.Navigation("Category");
+                    b.Navigation("GeneralTypeCategory");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -1988,16 +2097,23 @@ namespace ECommerce.Migrations
             modelBuilder.Entity("ECommerce.Entities.Operations.Purchase", b =>
                 {
                     b.Navigation("Items");
+                    b.Navigation("Payments");
                 });
 
             modelBuilder.Entity("ECommerce.Entities.Operations.InventorySale", b =>
                 {
                     b.Navigation("Items");
+                    b.Navigation("Payments");
                 });
 
             modelBuilder.Entity("ECommerce.Entities.Operations.Staff", b =>
                 {
                     b.Navigation("SalaryPayments");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Operations.StaffSalaryPayment", b =>
+                {
+                    b.Navigation("Installments");
                 });
 
             modelBuilder.Entity("ECommerce.Entities.Operations.ExpenseCategory", b =>

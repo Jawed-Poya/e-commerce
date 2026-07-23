@@ -7,22 +7,41 @@ import {
     Truck,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 
 import { imageUrl } from "../../shared/api/api-client";
 import { Button } from "../../shared/components/ui/button";
-import { useCart } from "./cart-context";
+import { productPath } from "../../shared/lib/product-path";
+import { getCheckoutConfiguration } from "../checkout/checkout-api";
+import {
+    cartQuantityStep,
+    maximumCartQuantity,
+    minimumCartQuantity,
+    useCart,
+} from "./cart-context";
 import { useI18n } from "../../i18n/i18n-provider";
 
 export function CartPage() {
     const cart = useCart();
     const { t } = useI18n();
+    const configuration = useQuery({
+        queryKey: ["checkout-configuration"],
+        queryFn: getCheckoutConfiguration,
+        staleTime: 5 * 60_000,
+    });
 
     const subtotal = cart.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0,
     );
 
-    const shipping = subtotal >= 75 || !subtotal ? 0 : 7.5;
+    const rules = configuration.data;
+    const threshold = rules?.freeShippingThreshold ?? 0;
+    const qualifiesForFreeShipping = threshold > 0 && subtotal >= threshold;
+    const shipping =
+        !subtotal || !rules?.shippingEnabled || qualifiesForFreeShipping
+            ? 0
+            : rules.flatShippingFee;
     const total = subtotal + shipping;
 
     if (!cart.items.length) {
@@ -103,7 +122,7 @@ export function CartPage() {
                                     className="grid min-w-0 grid-cols-[105px_minmax(0,1fr)] gap-3 rounded-2xl border bg-card p-2.5 shadow-[0_6px_22px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-md sm:grid-cols-[130px_minmax(0,1fr)_auto] sm:gap-5 sm:p-4"
                                 >
                                     <Link
-                                        to={`/products/${item.id}`}
+                                        to={productPath(item)}
                                         className="relative block overflow-hidden rounded-xl bg-muted"
                                     >
                                         <img
@@ -124,7 +143,7 @@ export function CartPage() {
 
                                     <div className="flex min-w-0 flex-col py-1">
                                         <Link
-                                            to={`/products/${item.id}`}
+                                            to={productPath(item)}
                                             className="line-clamp-2 text-sm font-bold leading-5 transition-colors hover:text-primary sm:text-base sm:leading-6"
                                         >
                                             {item.name}
@@ -149,12 +168,12 @@ export function CartPage() {
                                                     size="icon"
                                                     className="size-9 rounded-none"
                                                     disabled={
-                                                        item.quantity <= 1
+                                                        item.quantity <= minimumCartQuantity(item)
                                                     }
                                                     onClick={() =>
                                                         cart.updateQuantity(
                                                             item.id,
-                                                            item.quantity - 1,
+                                                            item.quantity - cartQuantityStep(item),
                                                         )
                                                     }
                                                     aria-label={`Decrease ${item.name} quantity`}
@@ -172,13 +191,12 @@ export function CartPage() {
                                                     size="icon"
                                                     className="size-9 rounded-none"
                                                     disabled={
-                                                        item.quantity >=
-                                                        item.stock
+                                                        item.quantity >= maximumCartQuantity(item)
                                                     }
                                                     onClick={() =>
                                                         cart.updateQuantity(
                                                             item.id,
-                                                            item.quantity + 1,
+                                                            item.quantity + cartQuantityStep(item),
                                                         )
                                                     }
                                                     aria-label={`Increase ${item.name} quantity`}
@@ -200,6 +218,12 @@ export function CartPage() {
                                                 <Trash2 className="size-4" />
                                             </Button>
                                         </div>
+                                        {(minimumCartQuantity(item) > 1 || item.maximumValue != null) && (
+                                            <p className="mt-2 text-[10px] text-muted-foreground">
+                                                {t("product.minimumQuantity", { count: minimumCartQuantity(item) })} ·{" "}
+                                                {t("product.maximumQuantity", { count: maximumCartQuantity(item) })}
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div className="hidden min-w-32 flex-col items-end justify-between py-1 sm:flex">
@@ -233,7 +257,7 @@ export function CartPage() {
                             ))}
                         </div>
 
-                        {subtotal < 75 && (
+                        {rules?.shippingEnabled && threshold > 0 && subtotal < threshold && (
                             <div className="mt-5 rounded-2xl border border-primary/15 bg-primary/5 p-4">
                                 <div className="flex items-start gap-3">
                                     <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
@@ -243,12 +267,13 @@ export function CartPage() {
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center justify-between gap-3">
                                             <p className="text-sm font-bold">
-                                                You are close to free delivery
+                                                {t("cart.closeToFreeDelivery")}
                                             </p>
 
                                             <span className="text-xs font-bold text-primary">
-                                                ${(75 - subtotal).toFixed(2)}{" "}
-                                                left
+                                                {t("cart.amountLeft", {
+                                                    amount: `$${(threshold - subtotal).toFixed(2)}`,
+                                                })}
                                             </span>
                                         </div>
 
@@ -258,7 +283,7 @@ export function CartPage() {
                                                 style={{
                                                     width: `${Math.min(
                                                         100,
-                                                        (subtotal / 75) * 100,
+                                                        (subtotal / threshold) * 100,
                                                     )}%`,
                                                 }}
                                             />
@@ -341,7 +366,7 @@ export function CartPage() {
 
                         <p className="text-[10px] text-muted-foreground">
                             {shipping
-                                ? `Includes $${shipping.toFixed(2)} delivery`
+                                ? t("cart.includesDelivery", { amount: `$${shipping.toFixed(2)}` })
                                 : t("cart.freeDelivery")}
                         </p>
                     </div>

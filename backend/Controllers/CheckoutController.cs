@@ -10,10 +10,11 @@ namespace ECommerce.Controllers;
 public sealed class CheckoutController(IOrderService orders) : ControllerBase
 {
     [HttpGet("configuration")]
-    public ActionResult<ApiResponse<CheckoutConfigurationResponse>> GetConfiguration()
+    public async Task<ActionResult<ApiResponse<CheckoutConfigurationResponse>>> GetConfiguration(
+        CancellationToken cancellationToken)
     {
         return Ok(ApiResponse<CheckoutConfigurationResponse>.Ok(
-            orders.GetCheckoutConfiguration()));
+            await orders.GetCheckoutConfigurationAsync(cancellationToken)));
     }
 
     [HttpPost("orders")]

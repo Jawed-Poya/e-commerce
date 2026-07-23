@@ -54,6 +54,7 @@ public sealed record BankTransferDetailsResponse(
 
 public sealed record CheckoutConfigurationResponse(
     string Currency,
+    bool ShippingEnabled,
     decimal FlatShippingFee,
     decimal FreeShippingThreshold,
     IReadOnlyCollection<PaymentOptionResponse> PaymentMethods

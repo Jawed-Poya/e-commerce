@@ -1,3 +1,4 @@
+import { productPath } from "../../shared/lib/product-path";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import {
@@ -218,7 +219,7 @@ export function HomePage() {
                         <h2 className="mt-5 text-3xl font-black leading-tight tracking-[-0.04em] sm:text-4xl lg:text-5xl">{t("home.selectedForYou")}</h2>
                         <p className="mt-4 max-w-md text-sm leading-7 text-primary-foreground/75 sm:text-base">{t("home.selectedDescription")}</p>
                         <Button asChild variant="orange" size="lg" className="mt-7 h-12 rounded-xl px-6 font-bold shadow-lg">
-                            <Link to={deal ? `/products/${deal.id}` : "/products"}>{t("home.viewProduct")}<ArrowRight className="size-4 rtl:rotate-180" /></Link>
+                            <Link to={deal ? productPath(deal) : "/products"}>{t("home.viewProduct")}<ArrowRight className="size-4 rtl:rotate-180" /></Link>
                         </Button>
                     </div>
                     {deal && (
@@ -229,7 +230,23 @@ export function HomePage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-1">
                     <Promo icon={<Sparkles className="size-5" />} label={t("home.newArrivals")} title={t("home.freshProducts")} description={t("home.freshDescription")} className="from-orange-50 to-orange-100 dark:from-orange-950/50 dark:to-orange-900/20" />
-                    <Promo icon={<Truck className="size-5" />} label={t("home.freeDelivery")} title={t("home.qualifyingOrders")} description={t("home.deliveryDescription")} className="from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/20" />
+                    <Promo
+                        icon={<Truck className="size-5" />}
+                        label={t("home.freeDelivery")}
+                        title={
+                            content.data?.shippingEnabled === false
+                                ? t("home.everyOrderFree")
+                                : (content.data?.freeShippingThreshold ?? 0) > 0
+                                  ? t("home.qualifyingOrders", {
+                                        amount: `$${content.data!.freeShippingThreshold.toFixed(2)}`,
+                                    })
+                                  : t("home.flatDelivery", {
+                                        amount: `$${(content.data?.flatShippingFee ?? 0).toFixed(2)}`,
+                                    })
+                        }
+                        description={t("home.deliveryDescription")}
+                        className="from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/20"
+                    />
                 </div>
             </section>
 

@@ -29,6 +29,8 @@ export type Product = {
     priceCustomerTypeName: string | null;
     isDefaultPrice: boolean;
     viewCount: number;
+    averageRating: number;
+    reviewCount: number;
     primaryImageUrl: string | null;
     images: ProductImage[];
 };

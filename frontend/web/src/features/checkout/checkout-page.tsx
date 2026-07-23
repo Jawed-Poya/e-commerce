@@ -101,8 +101,12 @@ export function CheckoutPage() {
     );
 
     const config = configQuery.data;
+    const qualifiesForFreeShipping =
+        Boolean(config) &&
+        config!.freeShippingThreshold > 0 &&
+        subtotal >= config!.freeShippingThreshold;
     const shipping =
-        config && subtotal < config.freeShippingThreshold
+        config?.shippingEnabled && !qualifiesForFreeShipping
             ? config.flatShippingFee
             : 0;
     const estimatedTotal = subtotal + shipping;
