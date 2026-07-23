@@ -3,6 +3,7 @@ using ECommerce.Entities.Operations;
 namespace ECommerce.Entities.Operations.Contracts;
 
 public sealed record OperationProductLookup(long Id, string Name, string? Barcode, decimal AvailableQuantity, decimal? DefaultPrice);
+public sealed record OperationCustomerLookup(long Id, string Name, string Phone, string? Email, string? CustomerTypeName);
 public sealed record OperationSummary(decimal PurchasesThisMonth, decimal SalesThisMonth, decimal ExpensesThisMonth, decimal SalariesThisMonth, int LowStockProducts);
 
 public sealed class CreateSupplierRequest
@@ -25,6 +26,8 @@ public sealed class CreatePurchaseRequest
     public decimal Tax { get; set; }
     public decimal OtherCost { get; set; }
     public decimal PaidAmount { get; set; }
+    public string PaymentMethod { get; set; } = "Cash";
+    public string? PaymentReferenceNumber { get; set; }
     public string? ReferenceNumber { get; set; }
     public string? Notes { get; set; }
     public List<PurchaseItemRequest> Items { get; set; } = [];
@@ -37,7 +40,7 @@ public sealed class PurchaseItemRequest
     public string? LotNumber { get; set; }
     public DateOnly? ExpireDate { get; set; }
 }
-public sealed record PurchaseListItem(long Id, string PurchaseNumber, DateOnly PurchaseDate, string? SupplierName, int ItemCount, decimal Total, decimal PaidAmount, DocumentPaymentStatus PaymentStatus, PurchaseStatus Status, DateTime CreatedAt);
+public sealed record PurchaseListItem(long Id, string PurchaseNumber, DateOnly PurchaseDate, string? SupplierName, int ItemCount, decimal Total, decimal PaidAmount, decimal RemainingAmount, DocumentPaymentStatus PaymentStatus, PurchaseStatus Status, DateTime CreatedAt);
 
 public sealed class CreateInventorySaleRequest
 {
@@ -49,6 +52,7 @@ public sealed class CreateInventorySaleRequest
     public decimal Tax { get; set; }
     public decimal PaidAmount { get; set; }
     public string PaymentMethod { get; set; } = "Cash";
+    public string? PaymentReferenceNumber { get; set; }
     public string? Notes { get; set; }
     public List<InventorySaleItemRequest> Items { get; set; } = [];
 }
@@ -58,7 +62,17 @@ public sealed class InventorySaleItemRequest
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
 }
-public sealed record InventorySaleListItem(long Id, string SaleNumber, DateOnly SaleDate, string CustomerName, int ItemCount, decimal Total, decimal PaidAmount, DocumentPaymentStatus PaymentStatus, DateTime CreatedAt);
+public sealed record InventorySaleListItem(long Id, string SaleNumber, DateOnly SaleDate, string CustomerName, int ItemCount, decimal Total, decimal PaidAmount, decimal RemainingAmount, DocumentPaymentStatus PaymentStatus, DateTime CreatedAt);
+
+public sealed class RecordDocumentPaymentRequest
+{
+    public decimal Amount { get; set; }
+    public DateOnly PaymentDate { get; set; }
+    public string PaymentMethod { get; set; } = "Cash";
+    public string? ReferenceNumber { get; set; }
+    public string? Notes { get; set; }
+}
+public sealed record DocumentPaymentResponse(long Id, decimal Amount, DateOnly PaymentDate, string PaymentMethod, string? ReferenceNumber, string? Notes, DateTime CreatedAt);
 
 public sealed class StaffUpsertRequest
 {
@@ -83,12 +97,13 @@ public sealed class CreateSalaryPaymentRequest
     public int PeriodMonth { get; set; }
     public decimal Bonus { get; set; }
     public decimal Deduction { get; set; }
+    public decimal PaidAmount { get; set; }
     public DateOnly PaidDate { get; set; }
     public string PaymentMethod { get; set; } = "Cash";
     public string? ReferenceNumber { get; set; }
     public string? Notes { get; set; }
 }
-public sealed record SalaryPaymentResponse(long Id, long StaffId, string StaffName, int PeriodYear, int PeriodMonth, decimal BaseSalary, decimal Bonus, decimal Deduction, decimal NetAmount, DateOnly PaidDate, string PaymentMethod, string? ReferenceNumber, DateTime CreatedAt);
+public sealed record SalaryPaymentResponse(long Id, long StaffId, string StaffName, int PeriodYear, int PeriodMonth, decimal BaseSalary, decimal Bonus, decimal Deduction, decimal NetAmount, decimal PaidAmount, decimal RemainingAmount, DocumentPaymentStatus PaymentStatus, DateOnly PaidDate, string PaymentMethod, string? ReferenceNumber, DateTime CreatedAt);
 
 public sealed class ExpenseCategoryUpsertRequest
 {

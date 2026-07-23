@@ -1,6 +1,7 @@
 using API.Entities.Common;
 using API.Entities.Customers;
 using API.Entities.Products;
+using API.Entities.Types;
 
 namespace ECommerce.Entities.Operations;
 
@@ -37,6 +38,7 @@ public sealed class Purchase : BaseEntity
     public string? Notes { get; set; }
     public string? CreatedByUserId { get; set; }
     public ICollection<PurchaseItem> Items { get; set; } = [];
+    public ICollection<PurchasePayment> Payments { get; set; } = [];
 }
 
 public sealed class PurchaseItem : BaseEntity
@@ -50,6 +52,18 @@ public sealed class PurchaseItem : BaseEntity
     public decimal LineTotal { get; set; }
     public string? LotNumber { get; set; }
     public DateOnly? ExpireDate { get; set; }
+}
+
+public sealed class PurchasePayment : BaseEntity
+{
+    public long PurchaseId { get; set; }
+    public Purchase Purchase { get; set; } = null!;
+    public decimal Amount { get; set; }
+    public DateOnly PaymentDate { get; set; }
+    public string PaymentMethod { get; set; } = "Cash";
+    public string? ReferenceNumber { get; set; }
+    public string? Notes { get; set; }
+    public string? CreatedByUserId { get; set; }
 }
 
 public sealed class InventorySale : BaseEntity
@@ -70,6 +84,7 @@ public sealed class InventorySale : BaseEntity
     public string? Notes { get; set; }
     public string? CreatedByUserId { get; set; }
     public ICollection<InventorySaleItem> Items { get; set; } = [];
+    public ICollection<InventorySalePayment> Payments { get; set; } = [];
 }
 
 public sealed class InventorySaleItem : BaseEntity
@@ -81,6 +96,18 @@ public sealed class InventorySaleItem : BaseEntity
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal LineTotal { get; set; }
+}
+
+public sealed class InventorySalePayment : BaseEntity
+{
+    public long InventorySaleId { get; set; }
+    public InventorySale InventorySale { get; set; } = null!;
+    public decimal Amount { get; set; }
+    public DateOnly PaymentDate { get; set; }
+    public string PaymentMethod { get; set; } = "Cash";
+    public string? ReferenceNumber { get; set; }
+    public string? Notes { get; set; }
+    public string? CreatedByUserId { get; set; }
 }
 
 public sealed class Staff : BaseEntity
@@ -109,13 +136,30 @@ public sealed class StaffSalaryPayment : BaseEntity
     public decimal Bonus { get; set; }
     public decimal Deduction { get; set; }
     public decimal NetAmount { get; set; }
+    public decimal PaidAmount { get; set; }
+    public DocumentPaymentStatus PaymentStatus { get; set; }
     public DateOnly PaidDate { get; set; }
+    public string PaymentMethod { get; set; } = "Cash";
+    public string? ReferenceNumber { get; set; }
+    public string? Notes { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public ICollection<StaffSalaryInstallment> Installments { get; set; } = [];
+}
+
+public sealed class StaffSalaryInstallment : BaseEntity
+{
+    public long StaffSalaryPaymentId { get; set; }
+    public StaffSalaryPayment StaffSalaryPayment { get; set; } = null!;
+    public decimal Amount { get; set; }
+    public DateOnly PaymentDate { get; set; }
     public string PaymentMethod { get; set; } = "Cash";
     public string? ReferenceNumber { get; set; }
     public string? Notes { get; set; }
     public string? CreatedByUserId { get; set; }
 }
 
+// Kept for compatibility with databases created by AddInventoryOperations.
+// New expense categories are stored in GeneralType with Group=ExpenseCategory.
 public sealed class ExpenseCategory : BaseEntity
 {
     public string Name { get; set; } = null!;
@@ -127,8 +171,10 @@ public sealed class ExpenseCategory : BaseEntity
 public sealed class Expense : BaseEntity
 {
     public DateOnly ExpenseDate { get; set; }
-    public long CategoryId { get; set; }
-    public ExpenseCategory Category { get; set; } = null!;
+    public long? CategoryId { get; set; }
+    public ExpenseCategory? Category { get; set; }
+    public long? GeneralTypeCategoryId { get; set; }
+    public GeneralType? GeneralTypeCategory { get; set; }
     public decimal Amount { get; set; }
     public string? Vendor { get; set; }
     public string PaymentMethod { get; set; } = "Cash";

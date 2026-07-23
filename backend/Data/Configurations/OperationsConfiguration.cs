@@ -32,6 +32,7 @@ public sealed class PurchaseConfiguration : IEntityTypeConfiguration<Purchase>
         b.HasIndex(x => x.PurchaseNumber).IsUnique();
         b.HasIndex(x => x.PurchaseDate);
         b.HasOne(x => x.Supplier).WithMany(x => x.Purchases).HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+        b.HasMany(x => x.Payments).WithOne(x => x.Purchase).HasForeignKey(x => x.PurchaseId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -64,6 +65,7 @@ public sealed class InventorySaleConfiguration : IEntityTypeConfiguration<Invent
         b.HasIndex(x => x.SaleNumber).IsUnique();
         b.HasIndex(x => x.SaleDate);
         b.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+        b.HasMany(x => x.Payments).WithOne(x => x.InventorySale).HasForeignKey(x => x.InventorySaleId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -103,11 +105,13 @@ public sealed class StaffSalaryPaymentConfiguration : IEntityTypeConfiguration<S
         b.Property(x => x.Bonus).HasPrecision(18, 2);
         b.Property(x => x.Deduction).HasPrecision(18, 2);
         b.Property(x => x.NetAmount).HasPrecision(18, 2);
+        b.Property(x => x.PaidAmount).HasPrecision(18, 2);
         b.Property(x => x.PaymentMethod).HasMaxLength(50).IsRequired();
         b.Property(x => x.ReferenceNumber).HasMaxLength(100);
         b.HasIndex(x => new { x.StaffId, x.PeriodYear, x.PeriodMonth }).IsUnique();
         b.HasIndex(x => x.PaidDate);
         b.HasOne(x => x.Staff).WithMany(x => x.SalaryPayments).HasForeignKey(x => x.StaffId).OnDelete(DeleteBehavior.Restrict);
+        b.HasMany(x => x.Installments).WithOne(x => x.StaffSalaryPayment).HasForeignKey(x => x.StaffSalaryPaymentId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -131,5 +135,40 @@ public sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
         b.Property(x => x.Description).HasMaxLength(1000).IsRequired();
         b.HasIndex(x => x.ExpenseDate);
         b.HasOne(x => x.Category).WithMany(x => x.Expenses).HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.GeneralTypeCategory).WithMany().HasForeignKey(x => x.GeneralTypeCategoryId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+
+public sealed class PurchasePaymentConfiguration : IEntityTypeConfiguration<PurchasePayment>
+{
+    public void Configure(EntityTypeBuilder<PurchasePayment> b)
+    {
+        b.Property(x => x.Amount).HasPrecision(18, 2);
+        b.Property(x => x.PaymentMethod).HasMaxLength(50).IsRequired();
+        b.Property(x => x.ReferenceNumber).HasMaxLength(100);
+        b.HasIndex(x => new { x.PurchaseId, x.PaymentDate });
+    }
+}
+
+public sealed class InventorySalePaymentConfiguration : IEntityTypeConfiguration<InventorySalePayment>
+{
+    public void Configure(EntityTypeBuilder<InventorySalePayment> b)
+    {
+        b.Property(x => x.Amount).HasPrecision(18, 2);
+        b.Property(x => x.PaymentMethod).HasMaxLength(50).IsRequired();
+        b.Property(x => x.ReferenceNumber).HasMaxLength(100);
+        b.HasIndex(x => new { x.InventorySaleId, x.PaymentDate });
+    }
+}
+
+public sealed class StaffSalaryInstallmentConfiguration : IEntityTypeConfiguration<StaffSalaryInstallment>
+{
+    public void Configure(EntityTypeBuilder<StaffSalaryInstallment> b)
+    {
+        b.Property(x => x.Amount).HasPrecision(18, 2);
+        b.Property(x => x.PaymentMethod).HasMaxLength(50).IsRequired();
+        b.Property(x => x.ReferenceNumber).HasMaxLength(100);
+        b.HasIndex(x => new { x.StaffSalaryPaymentId, x.PaymentDate });
     }
 }
