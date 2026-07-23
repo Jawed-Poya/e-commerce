@@ -11,6 +11,7 @@ import {
     ComboboxList,
 } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/i18n-provider";
 
 interface Identifiable {
     id: number;
@@ -43,6 +44,7 @@ export function ServerSearchCombobox<T extends Identifiable>({
     allowClear = true,
     className,
 }: ServerSearchComboboxProps<T>) {
+    const { t } = useI18n();
     const [inputValue, setInputValue] = useState(value ? getLabel(value) : "");
     const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -109,7 +111,7 @@ export function ServerSearchCombobox<T extends Identifiable>({
                 {query.isFetching ? (
                     <div className="flex items-center justify-center gap-2 border-t px-3 py-2 text-xs text-muted-foreground">
                         <LoaderCircle className="size-3.5 animate-spin" />
-                        Searching…
+                        {t("common.searching")}
                     </div>
                 ) : null}
                 <ComboboxEmpty>{emptyText}</ComboboxEmpty>

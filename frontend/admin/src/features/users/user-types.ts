@@ -6,6 +6,8 @@ export interface AdminUserListItem {
     isActive: boolean;
     roles: string[];
     permissionCount: number;
+    branchId: number | null;
+    branchName: string | null;
     lastLoginAt: string | null;
     createdAt: string;
 }
@@ -19,6 +21,8 @@ export interface AdminUserDetails {
     roles: string[];
     directPermissions: string[];
     effectivePermissions: string[];
+    branchId: number | null;
+    branchName: string | null;
     lastLoginAt: string | null;
     createdAt: string;
 }
@@ -49,6 +53,7 @@ export interface CreateUserRequest {
     phone: string | null;
     password: string;
     isActive: boolean;
+    branchId: number | null;
     roles: string[];
     permissions: string[];
 }
@@ -58,6 +63,7 @@ export interface UpdateUserRequest {
     email: string;
     phone: string | null;
     isActive: boolean;
+    branchId: number | null;
     roles: string[];
     permissions: string[];
 }

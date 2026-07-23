@@ -3,6 +3,7 @@ export const GENERAL_TYPE_GROUPS = [
     { value: "ProductBrand", labelKey: "types.brand" },
     { value: "ProductUnit", labelKey: "types.unit" },
     { value: "CustomerType", labelKey: "types.customerType" },
+    { value: "ExpenseCategory", labelKey: "types.expenseCategory" },
 ] as const;
 
 export function getGroupLabelKey(group: string) {

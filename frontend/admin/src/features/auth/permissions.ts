@@ -27,18 +27,23 @@ export const Permissions = {
     ExpensesView: "expenses.view",
     ExpensesManage: "expenses.manage",
     SystemManage: "system.manage",
+    TenantProfileManage: "tenant.profile.manage",
+    TenantBranchesManage: "tenant.branches.manage",
+    TenantClaimsManage: "tenant.claims.manage",
+    TenantReportsView: "tenant.reports.view",
+    TenantTrashManage: "tenant.trash.manage",
+    TenantSettingsManage: "tenant.settings.manage",
+    PlatformTenantsManage: "platform.tenants.manage",
 } as const;
 
 export function isSystemAdministrator(
-    user: Pick<AuthUser, "roles"> | null | undefined,
+    user: Pick<AuthUser, "roles" | "isPlatformAdmin"> | null | undefined,
 ) {
-    return (
-        user?.roles.some((role) => role.toLowerCase() === "admin") ?? false
-    );
+    return Boolean(user?.isPlatformAdmin || user?.roles.some((role) => role.toLowerCase() === "platformadmin"));
 }
 
 export function hasPermission(
-    user: Pick<AuthUser, "roles" | "permissions"> | null | undefined,
+    user: Pick<AuthUser, "roles" | "permissions" | "isPlatformAdmin"> | null | undefined,
     permission: string,
 ) {
     return Boolean(
@@ -52,8 +57,7 @@ export function getDefaultAdminRoute(
     permissions: string[],
     roles: string[] = [],
 ) {
-    if (roles.some((role) => role.toLowerCase() === "admin"))
-        return "/dashboard";
+    if (roles.some((role) => role.toLowerCase() === "platformadmin")) return "/platform/tenants";
     const set = new Set(permissions);
     if (set.has(Permissions.DashboardView)) return "/dashboard";
     if (set.has(Permissions.ProductsView)) return "/products";
@@ -67,6 +71,8 @@ export function getDefaultAdminRoute(
     if (set.has(Permissions.CustomersView)) return "/customers";
     if (set.has(Permissions.UsersView)) return "/system/users";
     if (set.has(Permissions.RolesManage)) return "/system/roles";
+    if (set.has(Permissions.TenantReportsView)) return "/reports";
+    if (set.has(Permissions.TenantProfileManage)) return "/company";
     if (set.has(Permissions.SystemManage)) return "/system/general-types";
     return "/dashboard";
 }

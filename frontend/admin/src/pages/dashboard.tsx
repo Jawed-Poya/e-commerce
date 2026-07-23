@@ -199,7 +199,7 @@ export default function Dashboard() {
                             to="/inventory"
                             className={buttonVariants({ variant: "outline", className: "w-full" })}
                         >
-                            Open inventory <ArrowRight />
+                            Open inventory <ArrowRight className="rtl:rotate-180" />
                         </Link>
                     </CardContent>
                 </Card>
@@ -235,7 +235,7 @@ export default function Dashboard() {
                             to="/orders"
                             className={buttonVariants({ variant: "ghost", size: "sm" })}
                         >
-                            All orders <ArrowRight />
+                            All orders <ArrowRight className="rtl:rotate-180" />
                         </Link>
                     </CardHeader>
                     <CardContent className="px-0">
@@ -355,13 +355,13 @@ function MetricCard({
     return (
         <Card className="overflow-hidden">
             <CardContent className="relative p-5">
-                <div className="absolute right-0 top-0 size-24 translate-x-8 -translate-y-8 rounded-full bg-primary/5" />
+                <div className="absolute end-0 top-0 size-24 -translate-y-8 rounded-full bg-primary/5 ltr:translate-x-8 rtl:-translate-x-8" />
                 <div className="relative flex items-start justify-between gap-4">
-                    <div>
+                    <div className="min-w-0 flex-1 text-start">
                         <p className="text-xs font-medium text-muted-foreground">
                             {label}
                         </p>
-                        <p className="mt-2 text-2xl font-bold tracking-tight">
+                        <p className="mt-2 break-words text-2xl font-bold tracking-tight">
                             {value}
                         </p>
                         <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
@@ -397,7 +397,7 @@ function SalesChart({
                         {formatMoney(totalRevenue, currency)}
                     </p>
                 </div>
-                <div className="text-right">
+                <div className="text-end">
                     <p className="text-xs text-muted-foreground">Orders placed</p>
                     <p className="mt-1 text-lg font-semibold">
                         {totalOrders.toLocaleString()}
@@ -418,7 +418,7 @@ function SalesChart({
                                 style={{ height: `${height}%` }}
                             />
                             {(index === 0 || index === points.length - 1) && (
-                                <span className="absolute -bottom-5 text-[9px] text-muted-foreground">
+                                <span className="absolute -bottom-5 start-0 text-[9px] text-muted-foreground">
                                     {new Date(point.date).toLocaleDateString(undefined, {
                                         month: "short",
                                         day: "numeric",

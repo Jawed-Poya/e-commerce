@@ -11,6 +11,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
+import { SimpleCombobox } from "@/components/simple-combobox";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -301,44 +302,24 @@ export function ProductPricingDialog({
                                                 <Label htmlFor={`type-${draft.key}`}>
                                                     {t("pricing.customerType")} *
                                                 </Label>
-                                                <select
-                                                    id={`type-${draft.key}`}
-                                                    value={draft.customerTypeId ?? ""}
+                                                <SimpleCombobox<number>
+                                                    value={draft.customerTypeId}
                                                     disabled={isDefault}
-                                                    onChange={(event) =>
-                                                        change(draft.key, {
-                                                            customerTypeId:
-                                                                event.target.value
-                                                                    ? Number(
-                                                                          event.target
-                                                                              .value,
-                                                                      )
-                                                                    : null,
-                                                        })
+                                                    onValueChange={(value) =>
+                                                        change(draft.key, { customerTypeId: value })
                                                     }
+                                                    options={customerTypes.map((option) => ({
+                                                        value: option.id,
+                                                        label: option.name,
+                                                        description: option.id === defaultCustomerTypeId ? "Default / public price" : undefined,
+                                                    }))}
+                                                    placeholder="Select customer type"
                                                     className={cn(
-                                                        "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none focus:ring-2 focus:ring-ring",
                                                         hasDuplicateCustomerType &&
-                                                            selectedIds.filter(
-                                                                (id) =>
-                                                                    id ===
-                                                                    draft.customerTypeId,
-                                                            ).length > 1 &&
+                                                            selectedIds.filter((id) => id === draft.customerTypeId).length > 1 &&
                                                             "ring-1 ring-destructive",
                                                     )}
-                                                >
-                                                    <option value="">
-                                                        Select customer type
-                                                    </option>
-                                                    {customerTypes.map((option) => (
-                                                        <option
-                                                            key={option.id}
-                                                            value={option.id}
-                                                        >
-                                                            {option.name}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                />
                                             </div>
 
                                             <MoneyInput

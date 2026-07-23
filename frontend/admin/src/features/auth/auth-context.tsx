@@ -21,6 +21,7 @@ import {
     saveAdminSession,
 } from "./auth-storage";
 import type { AuthUser, LoginRequest } from "./auth-types";
+import { saveTenantSlug } from "@/features/tenancy/tenant-storage";
 
 type AuthContextValue = {
     user: AuthUser | null;
@@ -119,8 +120,10 @@ export function AdminAuthProvider({ children }: PropsWithChildren) {
                     return;
                 }
 
+                saveTenantSlug(current.tenantSlug);
                 localStorage.setItem(adminSessionKey, JSON.stringify(current));
                 setUser(current);
+                await queryClient.invalidateQueries({ queryKey: ["tenant"] });
             } catch (error) {
                 const status = isAxiosError(error)
                     ? error.response?.status
@@ -202,11 +205,13 @@ export function AdminAuthProvider({ children }: PropsWithChildren) {
                     throw new Error("Administrator access is required.");
                 }
 
+                saveTenantSlug(confirmedUser.tenantSlug);
                 localStorage.setItem(
                     adminSessionKey,
                     JSON.stringify(confirmedUser),
                 );
                 setUser(confirmedUser);
+                await queryClient.invalidateQueries({ queryKey: ["tenant"] });
             } catch (error) {
                 clearSessionState(response.token);
                 throw new Error(authenticationErrorMessage(error));

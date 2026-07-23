@@ -7,14 +7,16 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useI18n, type Language } from "@/i18n/i18n-provider";
 import { AdminNotificationCenter } from "@/features/notifications/admin-notification-center";
+import { useTenant } from "@/features/tenancy/tenant-context";
 
 const languages: Language[] = ["en", "ps", "dr"];
 
 function AppHeader() {
     const { language, setLanguage, t } = useI18n();
+    const { tenant } = useTenant();
 
     return <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-sm supports-backdrop-filter:bg-background/20">
-        <div className="flex items-center gap-3"><SidebarTrigger /><Separator orientation="vertical" className="h-6" /><h1 className="text-sm font-semibold">{t("nav.dashboard")}</h1></div>
+        <div className="flex items-center gap-3"><SidebarTrigger /><Separator orientation="vertical" className="h-6" /><div className="min-w-0"><h1 className="truncate text-sm font-semibold">{tenant?.name ?? t("nav.dashboard")}</h1><p className="hidden truncate text-[10px] text-muted-foreground sm:block">{tenant?.slug}</p></div></div>
         <div className="flex items-center gap-1">
             <DropdownMenu>
                 <DropdownMenuTrigger render={<Button variant="ghost" className="h-8 gap-2 px-2" />}><Languages className="size-4" /><span className="hidden text-xs sm:inline">{t(`language.${language}`)}</span><ChevronDown className="size-3.5 text-muted-foreground" /></DropdownMenuTrigger>

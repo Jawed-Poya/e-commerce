@@ -1,13 +1,15 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { LoaderCircle } from "lucide-react";
 import { useAdminAuth } from "./auth-context";
+import { useI18n } from "@/i18n/i18n-provider";
 
 export function ProtectedRoute() {
     const auth = useAdminAuth();
     const location = useLocation();
+    const { t } = useI18n();
 
     if (auth.loading) {
-        return <div className="grid min-h-screen place-items-center bg-background"><div className="text-center"><LoaderCircle className="mx-auto size-8 animate-spin text-primary" /><p className="mt-3 text-sm text-muted-foreground">Checking admin session...</p></div></div>;
+        return <div className="grid min-h-screen place-items-center bg-background"><div className="text-center"><LoaderCircle className="mx-auto size-8 animate-spin text-primary" /><p className="mt-3 text-sm text-muted-foreground">{t("common.checkingSession")}</p></div></div>;
     }
 
     if (!auth.isAuthenticated) {
