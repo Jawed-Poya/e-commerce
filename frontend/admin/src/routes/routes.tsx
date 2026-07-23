@@ -23,6 +23,10 @@ import PurchasesPage from "@/pages/purchases";
 import ManualSalesPage from "@/pages/manual-sales";
 import StaffPage from "@/pages/staff";
 import ExpensesPage from "@/pages/expenses";
+import CompanySettingsPage from "@/pages/company-settings";
+import TenantReportsPage from "@/pages/tenant-reports";
+import TrashPage from "@/pages/trash";
+import PlatformTenantsPage from "@/pages/platform-tenants";
 
 import { ProtectedRoute } from "@/features/auth/protected-route";
 import { PermissionRoute } from "@/features/auth/permission-route";
@@ -157,6 +161,22 @@ export const router = createBrowserRouter([
                     {
                         path: "profile",
                         element: <ProfilePage />,
+                    },
+                    {
+                        path: "company",
+                        element: allowed(Permissions.TenantProfileManage, <CompanySettingsPage />),
+                    },
+                    {
+                        path: "reports",
+                        element: allowed(Permissions.TenantReportsView, <TenantReportsPage />),
+                    },
+                    {
+                        path: "trash",
+                        element: allowed(Permissions.TenantTrashManage, <TrashPage />),
+                    },
+                    {
+                        path: "platform/tenants",
+                        element: allowed(Permissions.PlatformTenantsManage, <PlatformTenantsPage />),
                     },
                     {
                         path: "system/general-types",

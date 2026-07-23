@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { PageHeader } from "@/components/page-header";
+import { SimpleCombobox } from "@/components/simple-combobox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,8 +32,24 @@ export default function OrdersPage() {
         <Card>
             <CardContent className="grid gap-3 md:grid-cols-[1fr_200px_200px]">
                 <div className="relative"><Search className="absolute left-2 top-2 size-4 text-muted-foreground" /><Input className="pl-8" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Order number, customer or phone..." /></div>
-                <select className="h-8 border bg-background px-2 text-xs" value={status} onChange={e => { setStatus(e.target.value as OrderStatus | ""); setPage(1); }}><option value="">All order statuses</option>{["Pending","Confirmed","Processing","Delivered","Cancelled"].map(x => <option key={x}>{x}</option>)}</select>
-                <select className="h-8 border bg-background px-2 text-xs" value={paymentStatus} onChange={e => { setPaymentStatus(e.target.value as PaymentStatus | ""); setPage(1); }}><option value="">All payment statuses</option>{["Pending","Paid","Failed","Cancelled"].map(x => <option key={x}>{x}</option>)}</select>
+                <SimpleCombobox<OrderStatus | "">
+                    value={status}
+                    onValueChange={(value) => { setStatus(value ?? ""); setPage(1); }}
+                    options={[
+                        { value: "", label: "All order statuses" },
+                        ...(["Pending", "Confirmed", "Processing", "Delivered", "Cancelled"] as OrderStatus[]).map((value) => ({ value, label: value })),
+                    ]}
+                    placeholder="All order statuses"
+                />
+                <SimpleCombobox<PaymentStatus | "">
+                    value={paymentStatus}
+                    onValueChange={(value) => { setPaymentStatus(value ?? ""); setPage(1); }}
+                    options={[
+                        { value: "", label: "All payment statuses" },
+                        ...(["Pending", "Paid", "Failed", "Cancelled"] as PaymentStatus[]).map((value) => ({ value, label: value })),
+                    ]}
+                    placeholder="All payment statuses"
+                />
             </CardContent>
         </Card>
 

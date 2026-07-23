@@ -58,7 +58,7 @@ export function InventoryPage() {
         setRefreshing(false);
     };
 
-    return <div className="space-y-6">
+    return <div className="min-w-0 space-y-6">
         <PageHeader title={t("inventory.title")} description={t("inventory.subtitle")} actions={<Button variant="outline" onClick={refresh} disabled={refreshing}><RefreshCw className={cn("me-2 size-4", refreshing && "animate-spin")} />{t("inventory.refresh")}</Button>} />
 
         <div className="inline-flex border bg-muted/40 p-1" role="tablist" aria-label={t("inventory.title")}>
@@ -106,7 +106,7 @@ function InventoryOverview() {
 
     const clearFilters = () => { setSearch(""); setStatus(undefined); setCategoryId(undefined); setPage(1); };
 
-    return <div className="space-y-5">
+    return <div className="min-w-0 space-y-5">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <MetricCard icon={Boxes} label={t("inventory.totalProducts")} value={data?.summary.totalProducts} detail={t("inventory.activeCount").replace("{count}", formatNumber(data?.summary.activeProducts))} />
             <MetricCard icon={PackageCheck} label={t("inventory.availableUnits")} value={data?.summary.availableQuantity} detail={t("inventory.onHandCount").replace("{count}", formatNumber(data?.summary.totalQuantity))} tone="success" />
@@ -115,7 +115,7 @@ function InventoryOverview() {
             <MetricCard icon={PackageSearch} label={t("inventory.outOfStock")} value={data?.summary.outOfStockProducts} detail={t("inventory.needsAttention")} tone="danger" />
         </div>
 
-        <Card>
+        <Card className="min-w-0 overflow-hidden">
             <CardHeader className="border-b">
                 <CardTitle>{t("inventory.stockCatalog")}</CardTitle>
                 <p className="text-xs text-muted-foreground">{t("inventory.stockCatalogHelp")}</p>
@@ -140,7 +140,26 @@ function InventoryOverview() {
                     </Button>)}
                 </div>
 
-                <div className="overflow-x-auto border">
+                <div className="grid gap-3 md:hidden">
+                    {isLoading && <MobileMessage message={t("common.loading")} loading />}
+                    {isError && <MobileMessage message={t("inventory.loadError")} destructive />}
+                    {!isLoading && !isError && products.length === 0 && <MobileMessage message={t("inventory.empty")} />}
+                    {products.map(item => <div key={item.productId} className="rounded-xl border bg-background p-4">
+                        <div className="flex items-start gap-3">
+                            {resolveProductImageUrl(item.primaryImageUrl) ? <img src={resolveProductImageUrl(item.primaryImageUrl)!} alt="" className="size-12 shrink-0 rounded-lg border bg-muted object-cover" /> : <div className="flex size-12 shrink-0 items-center justify-center rounded-lg border bg-muted"><Boxes className="size-4 text-muted-foreground" /></div>}
+                            <div className="min-w-0 flex-1"><p className="truncate font-semibold">{item.name}</p><p className="mt-1 truncate text-xs text-muted-foreground">{item.barcode || t("inventory.noBarcode")} · {item.categoryName}</p><div className="mt-2"><StockStatusBadge item={item} /></div></div>
+                        </div>
+                        <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                            <MobileValue label={t("inventory.onHand")} value={formatNumber(item.quantity)} />
+                            <MobileValue label={t("inventory.reserved")} value={formatNumber(item.reservedQuantity)} />
+                            <MobileValue label={t("inventory.available")} value={formatNumber(item.availableQuantity)} strong />
+                            <MobileValue label={t("inventory.reorderPoint")} value={formatNumber(item.minimumQuantity)} />
+                        </div>
+                        <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3"><Expiry item={item} /><div className="flex shrink-0 gap-1"><Button variant="outline" size="icon-sm" aria-label={t("inventory.adjustStock")} onClick={() => setAdjusting(item)}><SlidersHorizontal className="size-4" /></Button><Button variant="outline" size="icon-sm" aria-label={t("inventory.settingsTitle")} onClick={() => setEditingSettings(item)}><Settings2 className="size-4" /></Button><Button variant="ghost" size="icon-sm" aria-label={t("details.open")} onClick={() => navigate(`/products/${item.productId}`)}><Eye className="size-4" /></Button></div></div>
+                    </div>)}
+                </div>
+
+                <div className="responsive-table hidden border md:block">
                     <Table>
                         <TableHeader><TableRow>
                             <TableHead className="min-w-64">{t("products.product")}</TableHead>
@@ -211,7 +230,18 @@ function InventoryTransactions() {
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground"><span>{t("inventory.fromDate")}: {from || t("filters.all")}</span><span>{t("inventory.toDate")}: {to || t("filters.all")}</span></div>
 
-            <div className="overflow-x-auto border"><Table>
+            <div className="grid gap-3 md:hidden">
+                {isLoading && <MobileMessage message={t("common.loading")} loading />}
+                {isError && <MobileMessage message={t("inventory.transactionsError")} destructive />}
+                {!isLoading && !isError && (data?.items.length ?? 0) === 0 && <MobileMessage message={t("inventory.noTransactions")} />}
+                {data?.items.map(transaction => <div key={transaction.id} className="rounded-xl border bg-background p-4">
+                    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-semibold">{transaction.productName}</p><p className="mt-1 text-xs text-muted-foreground">{transaction.productBarcode || t("inventory.noBarcode")}</p></div><MovementBadge type={transaction.type} label={typeOptions.find(option => option.id === transaction.type)?.name ?? transaction.type} /></div>
+                    <div className="mt-4 grid grid-cols-2 gap-2 text-sm"><MobileValue label={t("inventory.change")} value={`${transaction.quantity > 0 ? "+" : ""}${formatNumber(transaction.quantity)}`} strong /><MobileValue label={t("inventory.beforeAfter")} value={`${formatNumber(transaction.quantityBefore)} → ${formatNumber(transaction.quantityAfter)}`} /></div>
+                    <div className="mt-3 border-t pt-3"><p className="text-xs text-muted-foreground">{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(transaction.createdAt))}</p><p className="mt-2 line-clamp-2 text-sm">{transaction.description || t("inventory.noNote")}</p>{transaction.referenceId && <p className="mt-1 text-xs text-muted-foreground">{transaction.referenceType} #{transaction.referenceId}</p>}<Button variant="ghost" size="sm" className="mt-2 w-full" onClick={() => navigate(`/products/${transaction.productId}`)}><Eye className="me-2 size-4" />{t("details.open")}</Button></div>
+                </div>)}
+            </div>
+
+            <div className="responsive-table hidden border md:block"><Table>
                 <TableHeader><TableRow><TableHead>{t("inventory.date")}</TableHead><TableHead className="min-w-56">{t("products.product")}</TableHead><TableHead>{t("inventory.movementType")}</TableHead><TableHead className="text-end">{t("inventory.change")}</TableHead><TableHead className="text-end">{t("inventory.beforeAfter")}</TableHead><TableHead className="min-w-52">{t("inventory.note")}</TableHead><TableHead /></TableRow></TableHeader>
                 <TableBody>
                     {isLoading && <LoadingRow colSpan={7} />}
@@ -270,6 +300,15 @@ function Expiry({ item }: { item: InventoryListItem }) {
 
 function NumberCell({ value, muted = false }: { value: number; muted?: boolean }) {
     return <TableCell className={cn("text-end font-medium tabular-nums", muted && "text-muted-foreground")}>{formatNumber(value)}</TableCell>;
+}
+
+
+function MobileValue({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+    return <div className="rounded-lg bg-muted/45 p-2.5"><p className="text-[10px] text-muted-foreground">{label}</p><p className={cn("mt-1 break-words tabular-nums", strong ? "font-bold" : "font-medium")}>{value}</p></div>;
+}
+
+function MobileMessage({ message, loading = false, destructive = false }: { message: string; loading?: boolean; destructive?: boolean }) {
+    return <div className={cn("grid min-h-28 place-items-center rounded-xl border p-4 text-center text-sm text-muted-foreground", destructive && "text-destructive")}>{loading ? <LoaderCircle className="size-5 animate-spin" /> : message}</div>;
 }
 
 function LoadingRow({ colSpan }: { colSpan: number }) {

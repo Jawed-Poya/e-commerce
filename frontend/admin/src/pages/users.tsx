@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/page-header";
+import { SimpleCombobox } from "@/components/simple-combobox";
 import { ConfirmActionDialog } from "@/components/confirm-action-dialog";
 import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
@@ -41,6 +42,8 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { PermissionChecklist } from "@/features/users/components/permission-checklist";
+import { tenantService } from "@/features/tenancy/tenant-service";
+import type { Branch } from "@/features/tenancy/tenant-types";
 import { userService } from "@/features/users/user-service";
 import type {
     AdminUserDetails,
@@ -54,6 +57,7 @@ const emptyForm: CreateUserRequest = {
     phone: null,
     password: "",
     isActive: true,
+    branchId: null,
     roles: [],
     permissions: [],
 };
@@ -93,6 +97,10 @@ export default function UsersPage() {
         queryKey: ["admin-permissions"],
         queryFn: userService.getPermissions,
     });
+    const tenantProfile = useQuery({
+        queryKey: ["tenant", "profile"],
+        queryFn: tenantService.profile,
+    });
 
     const save = useMutation({
         mutationFn: async () => {
@@ -101,6 +109,7 @@ export default function UsersPage() {
                 email: form.email,
                 phone: form.phone || null,
                 isActive: form.isActive,
+                branchId: form.branchId,
                 roles: form.roles,
                 permissions: form.permissions,
             };
@@ -153,6 +162,7 @@ export default function UsersPage() {
                 phone: user.phone,
                 password: "",
                 isActive: user.isActive,
+                branchId: user.branchId,
                 roles: [...user.roles],
                 permissions: [...user.directPermissions],
             });
@@ -205,31 +215,25 @@ export default function UsersPage() {
                             placeholder="Search name, email, or phone..."
                         />
                     </div>
-                    <select
-                        className="h-9 border border-input bg-background px-3 text-sm"
+                    <SimpleCombobox
                         value={role}
-                        onChange={(event) => setRole(event.target.value)}
-                    >
-                        <option value="">All roles</option>
-                        {roles.data?.map((item) => (
-                            <option key={item.id} value={item.name}>
-                                {item.name}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        className="h-9 border border-input bg-background px-3 text-sm"
+                        onValueChange={(value) => setRole(value ?? "")}
+                        options={[
+                            { value: "", label: "All roles" },
+                            ...(roles.data ?? []).map((item) => ({ value: item.name, label: item.name })),
+                        ]}
+                        placeholder="All roles"
+                    />
+                    <SimpleCombobox<"" | "active" | "inactive">
                         value={status}
-                        onChange={(event) =>
-                            setStatus(
-                                event.target.value as "" | "active" | "inactive",
-                            )
-                        }
-                    >
-                        <option value="">All statuses</option>
-                        <option value="active">Active</option>
-                        <option value="inactive">Disabled</option>
-                    </select>
+                        onValueChange={(value) => setStatus(value ?? "")}
+                        options={[
+                            { value: "", label: "All statuses" },
+                            { value: "active", label: "Active" },
+                            { value: "inactive", label: "Disabled" },
+                        ]}
+                        placeholder="All statuses"
+                    />
                     <Button
                         variant="outline"
                         onClick={() => users.refetch()}
@@ -280,6 +284,9 @@ export default function UsersPage() {
                                                 </p>
                                                 <p className="mt-0.5 text-xs text-muted-foreground">
                                                     {user.email ?? user.phone ?? "No contact"}
+                                                </p>
+                                                <p className="mt-1 text-[11px] text-muted-foreground">
+                                                    {user.branchName ?? "Company-wide"}
                                                 </p>
                                             </div>
                                         </div>
@@ -399,6 +406,7 @@ export default function UsersPage() {
                 setForm={setForm}
                 roles={roles.data ?? []}
                 permissionGroups={permissions.data ?? []}
+                branches={tenantProfile.data?.branches ?? []}
                 saving={save.isPending}
                 onSave={() => save.mutate()}
             />
@@ -457,6 +465,7 @@ function UserDialog({
     setForm,
     roles,
     permissionGroups,
+    branches,
     saving,
     onSave,
 }: {
@@ -467,6 +476,7 @@ function UserDialog({
     setForm: React.Dispatch<React.SetStateAction<CreateUserRequest>>;
     roles: RoleListItem[];
     permissionGroups: Awaited<ReturnType<typeof userService.getPermissions>>;
+    branches: Branch[];
     saving: boolean;
     onSave: () => void;
 }) {
@@ -532,6 +542,27 @@ function UserDialog({
                             }))
                         }
                     />
+                    <div className="space-y-2">
+                        <Label>Branch</Label>
+                        <SimpleCombobox<number>
+                            value={form.branchId}
+                            onValueChange={(value) =>
+                                setForm((current) => ({ ...current, branchId: value }))
+                            }
+                            options={branches
+                                .filter((branch) => branch.isActive)
+                                .map((branch) => ({
+                                    value: branch.id,
+                                    label: branch.name,
+                                    description: branch.isMain ? "Main branch" : branch.code,
+                                }))}
+                            placeholder="Company-wide access"
+                            emptyText="No active branch found."
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Leave empty for company-wide access, or restrict operational context to one branch.
+                        </p>
+                    </div>
                     {!editing && (
                         <Field
                             label="Initial password"

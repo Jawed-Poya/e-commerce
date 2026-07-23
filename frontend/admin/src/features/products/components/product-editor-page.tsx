@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ImagePlus, LoaderCircle, PackagePlus, Save } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
+import { SimpleCombobox } from "@/components/simple-combobox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -91,9 +92,9 @@ export function ProductEditorPage() {
         <Card><CardHeader><CardTitle className="flex items-center gap-2"><PackagePlus className="size-5" />Product information</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-2">
           <Field label="Product name *"><Input value={form.name} onChange={e => setForm(x => ({ ...x, name: e.target.value }))} /></Field>
           <Field label="Barcode"><Input value={form.barcode} onChange={e => setForm(x => ({ ...x, barcode: e.target.value }))} /></Field>
-          <Field label="Category *"><Select value={form.categoryId} onChange={value => setForm(x => ({ ...x, categoryId: value }))} options={lookups?.categories ?? []} placeholder="Select category" /></Field>
-          <Field label="Brand"><Select value={form.brandId ?? 0} onChange={value => setForm(x => ({ ...x, brandId: value || null }))} options={lookups?.brands ?? []} placeholder="No brand" /></Field>
-          <Field label="Unit"><Select value={form.unitId ?? 0} onChange={value => setForm(x => ({ ...x, unitId: value || null }))} options={lookups?.units ?? []} placeholder="No unit" /></Field>
+          <Field label="Category *"><SimpleCombobox<number> value={form.categoryId || null} onValueChange={(value) => setForm((x) => ({ ...x, categoryId: value ?? 0 }))} options={(lookups?.categories ?? []).map((option) => ({ value: option.id, label: option.name }))} placeholder="Select category" /></Field>
+          <Field label="Brand"><SimpleCombobox<number> value={form.brandId} onValueChange={(value) => setForm((x) => ({ ...x, brandId: value }))} options={(lookups?.brands ?? []).map((option) => ({ value: option.id, label: option.name }))} placeholder="No brand" /></Field>
+          <Field label="Unit"><SimpleCombobox<number> value={form.unitId} onValueChange={(value) => setForm((x) => ({ ...x, unitId: value }))} options={(lookups?.units ?? []).map((option) => ({ value: option.id, label: option.name }))} placeholder="No unit" /></Field>
           <Field label="Slug"><Input value={form.slug} onChange={e => setForm(x => ({ ...x, slug: e.target.value }))} placeholder="Generated automatically when empty" /></Field>
           <Field label="Minimum value"><Input type="number" min={0} value={form.minimumValue ?? ""} onChange={e => setForm(x => ({ ...x, minimumValue: e.target.value ? Number(e.target.value) : null }))} /></Field>
           <Field label="Maximum value"><Input type="number" min={0} value={form.maximumValue ?? ""} onChange={e => setForm(x => ({ ...x, maximumValue: e.target.value ? Number(e.target.value) : null }))} /></Field>
@@ -117,4 +118,3 @@ export function ProductEditorPage() {
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-2"><Label>{label}</Label>{children}</div>; }
-function Select({ value, onChange, options, placeholder }: { value: number; onChange: (value: number) => void; options: { id: number; name: string }[]; placeholder: string }) { return <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={value} onChange={e => onChange(Number(e.target.value))}><option value={0}>{placeholder}</option>{options.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select>; }

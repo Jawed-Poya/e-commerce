@@ -4,6 +4,7 @@ import { Banknote, LoaderCircle, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
+import { SimpleCombobox } from "@/components/simple-combobox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -97,7 +98,7 @@ export function PaymentLedgerDialog(props: PaymentLedgerDialogProps) {
                             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                 <Field label="Amount"><Input type="number" min={0.01} max={maxAmount} step="0.01" value={form.amount} onChange={(event) => setForm((x) => ({ ...x, amount: Number(event.target.value) }))} /></Field>
                                 <Field label="Payment date"><Input type="date" value={form.paymentDate} onChange={(event) => setForm((x) => ({ ...x, paymentDate: event.target.value }))} /></Field>
-                                <Field label="Method"><select className="h-9 w-full border bg-background px-3 text-sm" value={form.paymentMethod} onChange={(event) => setForm((x) => ({ ...x, paymentMethod: event.target.value }))}><option>Cash</option><option>Card</option><option>Bank transfer</option><option>Cheque</option><option>Other</option></select></Field>
+                                <Field label="Method"><SimpleCombobox value={form.paymentMethod} onValueChange={(value) => setForm((x) => ({ ...x, paymentMethod: value ?? "Cash" }))} options={["Cash", "Card", "Bank transfer", "Cheque", "Other"].map((value) => ({ value, label: value }))} placeholder="Select payment method" /></Field>
                                 <Field label="Reference"><Input value={form.referenceNumber} onChange={(event) => setForm((x) => ({ ...x, referenceNumber: event.target.value }))} /></Field>
                             </div>
                             <Field label="Notes"><Textarea rows={2} value={form.notes} onChange={(event) => setForm((x) => ({ ...x, notes: event.target.value }))} /></Field>

@@ -13,6 +13,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useI18n } from "@/i18n/i18n-provider";
 
 interface ConfirmActionDialogProps {
     trigger: ReactElement;
@@ -28,12 +29,13 @@ export function ConfirmActionDialog({
     trigger,
     title,
     description,
-    confirmLabel = "Continue",
+    confirmLabel,
     destructive = false,
     pending = false,
     onConfirm,
 }: ConfirmActionDialogProps) {
     const [open, setOpen] = useState(false);
+    const { t } = useI18n();
 
     const confirm = async () => {
         try {
@@ -65,14 +67,14 @@ export function ConfirmActionDialog({
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={pending}>
-                        Cancel
+                        {t("form.cancel")}
                     </AlertDialogCancel>
                     <AlertDialogAction
                         variant={destructive ? "destructive" : "default"}
                         disabled={pending}
                         onClick={() => void confirm()}
                     >
-                        {pending ? "Working..." : confirmLabel}
+                        {pending ? t("common.working") : confirmLabel || t("common.continue")}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

@@ -3,9 +3,11 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useI18n } from "@/i18n/i18n-provider";
 
 export default function AdminNotFoundPage() {
     const navigate = useNavigate();
+    const { language, t } = useI18n();
 
     return (
         <div className="relative grid min-h-[calc(100vh-8rem)] place-items-center overflow-hidden px-4 py-12">
@@ -17,21 +19,21 @@ export default function AdminNotFoundPage() {
                     </div>
                     <div>
                         <p className="text-sm font-bold uppercase tracking-[0.24em] text-primary">
-                            Error 404
+                            {t("notFound.error")}
                         </p>
                         <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">
-                            This admin page does not exist
+                            {t("notFound.title")}
                         </h1>
                         <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-muted-foreground sm:text-base">
-                            The link may be outdated, the page may have moved, or your address may contain a typing mistake.
+                            {t("notFound.description")}
                         </p>
                     </div>
                     <div className="flex flex-col justify-center gap-3 sm:flex-row">
                         <Button variant="outline" onClick={() => navigate(-1)}>
-                            <ArrowLeft /> Go back
+                            <ArrowLeft className={language === "en" ? "" : "rotate-180"} /> {t("notFound.back")}
                         </Button>
                         <Button render={<Link to="/dashboard" />}>
-                            <Home /> Open dashboard
+                            <Home /> {t("notFound.dashboard")}
                         </Button>
                     </div>
                 </CardContent>
