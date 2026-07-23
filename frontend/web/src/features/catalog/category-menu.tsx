@@ -14,8 +14,10 @@ import { Button } from "../../shared/components/ui/button";
 import { cn } from "../../shared/lib/utils";
 import { buildCategoryTree, type CategoryNode } from "./category-tree";
 import { useLookups } from "./use-catalog";
+import { useI18n } from "../../i18n/i18n-provider";
 
 export function CategoryMegaMenu() {
+    const { t } = useI18n();
     const lookups = useLookups();
     const categories = lookups.data?.categories ?? [];
 
@@ -42,7 +44,7 @@ export function CategoryMegaMenu() {
                         <span className="grid size-7 place-items-center rounded-lg border border-primary/10 bg-background/80 shadow-sm transition-colors group-data-[state=open]:border-white/10 group-data-[state=open]:bg-white/15 group-data-[state=open]:text-white">
                             <Menu className="size-4" />
                         </span>
-                        Browse categories
+                        {t("category.browse")}
                     </span>
 
                     <ChevronDown className="size-4 transition-transform duration-200 group-data-[state=open]:rotate-180" />
@@ -65,12 +67,11 @@ export function CategoryMegaMenu() {
                             <aside className="border-r border-border/70 bg-muted/20 p-3 dark:bg-muted/10">
                                 <div className="mb-3 px-3 pb-1 pt-2">
                                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-                                        Product departments
+                                        {t("category.departments")}
                                     </p>
 
                                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                                        Choose a category to explore its
-                                        products.
+                                        {t("category.choose")}
                                     </p>
                                 </div>
 
@@ -116,10 +117,7 @@ export function CategoryMegaMenu() {
                                                             {
                                                                 category.productCount
                                                             }{" "}
-                                                            {category.productCount ===
-                                                            1
-                                                                ? "product"
-                                                                : "products"}
+                                                            {category.productCount === 1 ? t("common.product") : t("common.productsLower")}
                                                         </small>
                                                     </span>
                                                 </span>
@@ -168,7 +166,7 @@ function ActiveCategory({ category }: { category: CategoryNode }) {
 
                     <div className="min-w-0">
                         <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-primary">
-                            Featured category
+                            {t("category.featured")}
                         </p>
 
                         <h2 className="mt-1 truncate text-2xl font-black tracking-[-0.03em]">
@@ -176,7 +174,7 @@ function ActiveCategory({ category }: { category: CategoryNode }) {
                         </h2>
 
                         <p className="mt-1 text-xs text-muted-foreground">
-                            Explore related products and subcategories.
+                            {t("category.exploreRelated")}
                         </p>
                     </div>
                 </div>
@@ -186,7 +184,7 @@ function ActiveCategory({ category }: { category: CategoryNode }) {
                         to={`/products?categoryId=${category.id}`}
                         className="group flex shrink-0 items-center gap-2 rounded-xl border bg-background px-4 py-2.5 text-sm font-bold text-primary shadow-sm outline-none transition-all hover:border-primary/30 hover:bg-primary/5 focus:bg-primary/5"
                     >
-                        View all
+                        {t("category.viewAll")}
                         <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
                     </Link>
                 </DropdownMenu.Item>
@@ -232,9 +230,7 @@ function ActiveCategory({ category }: { category: CategoryNode }) {
                             ) : (
                                 <small className="mt-2 block text-muted-foreground">
                                     {subcategory.productCount}{" "}
-                                    {subcategory.productCount === 1
-                                        ? "product"
-                                        : "products"}
+                                    {subcategory.productCount === 1 ? t("common.product") : t("common.productsLower")}
                                 </small>
                             )}
                         </div>
@@ -247,11 +243,10 @@ function ActiveCategory({ category }: { category: CategoryNode }) {
                             <ShoppingBag className="size-5" />
                         </span>
 
-                        <p className="mt-4 font-bold">Browse {category.name}</p>
+                        <p className="mt-4 font-bold">{t("category.browseName", { name: category.name })}</p>
 
                         <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-muted-foreground">
-                            This category does not have subcategories yet. You
-                            can still view all available products.
+                            {t("category.noSubcategories")}
                         </p>
 
                         <DropdownMenu.Item asChild>
@@ -259,7 +254,7 @@ function ActiveCategory({ category }: { category: CategoryNode }) {
                                 to={`/products?categoryId=${category.id}`}
                                 className="mt-4 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-primary outline-none transition-colors hover:bg-primary/5"
                             >
-                                View products
+                                {t("category.viewProducts")}
                                 <ArrowRight className="size-4" />
                             </Link>
                         </DropdownMenu.Item>
@@ -303,6 +298,7 @@ function CategoryImage({
 }
 
 function CategoryLoading() {
+    const { t } = useI18n();
     return (
         <div className="grid min-h-[420px] place-items-center">
             <div className="text-center">
@@ -310,10 +306,10 @@ function CategoryLoading() {
                     <ShoppingBag className="size-5 animate-pulse" />
                 </span>
 
-                <p className="mt-4 text-sm font-bold">Loading categories...</p>
+                <p className="mt-4 text-sm font-bold">{t("category.loading")}</p>
 
                 <p className="mt-1 text-xs text-muted-foreground">
-                    Preparing the product catalog.
+                    {t("category.preparing")}
                 </p>
             </div>
         </div>
@@ -321,6 +317,7 @@ function CategoryLoading() {
 }
 
 function EmptyCategories() {
+    const { t } = useI18n();
     return (
         <div className="grid min-h-72 place-items-center p-8 text-center">
             <div>
@@ -328,11 +325,10 @@ function EmptyCategories() {
                     <ShoppingBag className="size-6" />
                 </span>
 
-                <b className="mt-4 block text-base">No categories available</b>
+                <b className="mt-4 block text-base">{t("category.empty")}</b>
 
                 <small className="mx-auto mt-2 block max-w-xs leading-5 text-muted-foreground">
-                    Categories will appear here after they are configured in the
-                    product catalog.
+                    {t("category.emptyHelp")}
                 </small>
             </div>
         </div>
@@ -375,6 +371,7 @@ function MobileCategoryBranch({
     category: CategoryNode;
     onNavigate: () => void;
 }) {
+    const { t } = useI18n();
     return (
         <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
             <Link
@@ -402,14 +399,12 @@ function MobileCategoryBranch({
 
                         <span className="mt-0.5 block text-[10px] text-muted-foreground">
                             {category.productCount}{" "}
-                            {category.productCount === 1
-                                ? "product"
-                                : "products"}
+                            {category.productCount === 1 ? t("common.product") : t("common.productsLower")}
                         </span>
                     </span>
                 </span>
 
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-primary" />
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-primary rtl:rotate-180" />
             </Link>
 
             {category.children.length > 0 && (
@@ -427,7 +422,7 @@ function MobileCategoryBranch({
                         >
                             <span className="truncate">{child.name}</span>
 
-                            <ChevronRight className="size-3.5 shrink-0 opacity-40 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
+                            <ChevronRight className="size-3.5 shrink-0 opacity-40 transition-all group-hover:translate-x-0.5 group-hover:opacity-100 rtl:rotate-180" />
                         </Link>
                     ))}
                 </div>

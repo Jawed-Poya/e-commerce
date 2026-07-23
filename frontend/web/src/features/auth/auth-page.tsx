@@ -69,7 +69,7 @@ export function AuthPage() {
             setError(
                 requestError instanceof ApiError
                     ? requestError.message
-                    : "The account request could not be completed.",
+                    : t("auth.requestError"),
             );
         } finally {
             setSubmitting(false);
@@ -83,20 +83,20 @@ export function AuthPage() {
                 <div className="absolute -bottom-40 -left-24 size-96 rounded-full bg-blue-500/25 blur-3xl" />
                 <div className="relative z-10">
                     <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-bold backdrop-blur">
-                        <Sparkles className="size-4" /> Optional customer account
+                        <Sparkles className="size-4" /> {t("auth.optionalAccount")}
                     </span>
                     <h1 className="mt-8 max-w-lg text-5xl font-black leading-[1.03] tracking-[-0.055em]">
-                        Your right price, orders, and alerts in one place.
+                        {t("auth.heroTitle")}
                     </h1>
                     <p className="mt-6 max-w-lg text-base leading-8 text-slate-300">
-                        Shopping still works without an account. Signing in simply lets EasyCart detect your customer type, show your assigned price, and keep your orders together.
+                        {t("auth.heroDescription")}
                     </p>
                 </div>
 
                 <div className="relative z-10 mt-auto grid gap-3">
-                    <Benefit icon={<BadgeCheck />} title="Customer-type pricing" text="VIP, wholesale, staff, or any type your admin creates." />
-                    <Benefit icon={<ShieldCheck />} title="Server-verified checkout" text="Prices and stock are always recalculated by the backend." />
-                    <Benefit icon={<UserRound />} title="Order history" text="Your order numbers stay available after checkout." />
+                    <Benefit icon={<BadgeCheck />} title={t("auth.pricingBenefit")} text={t("auth.pricingBenefitHelp")} />
+                    <Benefit icon={<ShieldCheck />} title={t("auth.checkoutBenefit")} text={t("auth.checkoutBenefitHelp")} />
+                    <Benefit icon={<UserRound />} title={t("auth.historyBenefit")} text={t("auth.historyBenefitHelp")} />
                 </div>
             </section>
 
@@ -129,10 +129,10 @@ export function AuthPage() {
                                     <AuthField label={t("common.lastName")} value={form.lastName} onChange={(value) => update("lastName", value)} />
                                 </div>
                                 <AuthField label={t("auth.phone")} required value={form.phone} onChange={(value) => update("phone", value)} placeholder="+93 ..." />
-                                <AuthField label={t("common.email")} type="email" value={form.email} onChange={(value) => update("email", value)} placeholder="Optional, but recommended" />
+                                <AuthField label={t("common.email")} type="email" value={form.email} onChange={(value) => update("email", value)} placeholder={t("auth.optionalEmail")} />
                             </>
                         ) : (
-                            <AuthField label={t("auth.identifier")} required value={form.identifier} onChange={(value) => update("identifier", value)} placeholder="you@example.com or +93 ..." />
+                            <AuthField label={t("auth.identifier")} required value={form.identifier} onChange={(value) => update("identifier", value)} placeholder={t("auth.identifierPlaceholder")} />
                         )}
 
                         <label className="grid gap-2">
@@ -146,7 +146,7 @@ export function AuthPage() {
                                     value={form.password}
                                     onChange={(event) => update("password", event.target.value)}
                                     className="h-13 w-full rounded-xl border bg-background ps-11 pe-12 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-                                    placeholder="At least 6 characters"
+                                    placeholder={t("auth.passwordPlaceholder")}
                                 />
                                 <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute end-3 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}>
                                     {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -163,7 +163,7 @@ export function AuthPage() {
                     </form>
 
                     <p className="mt-6 text-center text-xs leading-5 text-muted-foreground">
-                        An account is optional. You can close this page and continue shopping as a guest at any time.
+                        {t("auth.optionalHelp")}
                     </p>
                 </div>
             </section>

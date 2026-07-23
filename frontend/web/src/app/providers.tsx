@@ -6,6 +6,7 @@ import { CartProvider } from "../features/cart/cart-context";
 import { NotificationProvider } from "../features/notifications/notification-context";
 import { ThemeProvider } from "./theme-provider";
 import { I18nProvider } from "../i18n/i18n-provider";
+import { TenantProvider } from "../features/tenancy/tenant-context";
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -22,13 +23,15 @@ export function AppProviders({ children }: PropsWithChildren) {
         <ThemeProvider>
             <I18nProvider>
             <QueryClientProvider client={queryClient}>
-                <AuthProvider>
-                    <CartProvider>
-                        <NotificationProvider>
-                            {children}
-                        </NotificationProvider>
-                    </CartProvider>
-                </AuthProvider>
+                <TenantProvider>
+                    <AuthProvider>
+                        <CartProvider>
+                            <NotificationProvider>
+                                {children}
+                            </NotificationProvider>
+                        </CartProvider>
+                    </AuthProvider>
+                </TenantProvider>
             </QueryClientProvider>
             </I18nProvider>
         </ThemeProvider>

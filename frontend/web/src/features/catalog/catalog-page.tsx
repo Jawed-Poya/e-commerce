@@ -294,7 +294,7 @@ export function CatalogPage() {
                                 />
 
                                 <Button className="h-10 rounded-lg px-5 font-semibold">
-                                    Search
+                                    {t("catalog.searchAction")}
                                 </Button>
                             </form>
 
@@ -324,12 +324,11 @@ export function CatalogPage() {
                                         <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-5 py-5 backdrop-blur">
                                             <div>
                                                 <Dialog.Title className="text-lg font-black">
-                                                    Filter products
+                                                    {t("catalog.filterProducts")}
                                                 </Dialog.Title>
 
                                                 <Dialog.Description className="mt-1 text-xs text-muted-foreground">
-                                                    Refine the catalog using
-                                                    product details.
+                                                    {t("catalog.filterDescription")}
                                                 </Dialog.Description>
                                             </div>
 
@@ -349,7 +348,7 @@ export function CatalogPage() {
                                         <div className="sticky bottom-0 border-t bg-background/95 p-5 backdrop-blur">
                                             <Dialog.Close asChild>
                                                 <Button className="h-11 w-full rounded-xl">
-                                                    Show products
+                                                    {t("catalog.showProducts")}
                                                 </Button>
                                             </Dialog.Close>
                                         </div>
@@ -367,16 +366,16 @@ export function CatalogPage() {
 
                                 <SelectContent>
                                     <SelectItem value="newest">
-                                        Newest first
+                                        {t("catalog.newest")}
                                     </SelectItem>
                                     <SelectItem value="name">
-                                        Name A-Z
+                                        {t("catalog.nameAsc")}
                                     </SelectItem>
                                     <SelectItem value="priceLow">
-                                        Price: low to high
+                                        {t("catalog.priceLow")}
                                     </SelectItem>
                                     <SelectItem value="priceHigh">
-                                        Price: high to low
+                                        {t("catalog.priceHigh")}
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
@@ -386,7 +385,7 @@ export function CatalogPage() {
                     {activeFilters.length > 0 && (
                         <div className="mb-6 flex flex-wrap items-center gap-2 rounded-2xl border border-dashed bg-muted/20 p-3">
                             <span className="mr-1 text-xs font-semibold text-muted-foreground">
-                                Active filters:
+                                {t("catalog.activeFilters")}
                             </span>
 
                             {activeFilters.map((filter) => (
@@ -422,7 +421,7 @@ export function CatalogPage() {
                                 onClick={clearFilters}
                                 className="rounded-full px-3 py-2 text-xs font-bold text-destructive transition-colors hover:bg-destructive/10"
                             >
-                                Clear all
+                                {t("catalog.clearAll")}
                             </button>
                         </div>
                     )}
@@ -439,7 +438,7 @@ export function CatalogPage() {
                     ) : query.isError ? (
                         <EmptyState
                             title={t("catalog.unavailableTitle")}
-                            text="We couldn't load products right now. Please try again shortly."
+                            text={t("catalog.loadError")}
                         />
                     ) : !query.data?.items.length ? (
                         <EmptyState
@@ -451,16 +450,11 @@ export function CatalogPage() {
                         <>
                             <div className="mb-5 flex items-center justify-between gap-3">
                                 <p className="text-sm text-muted-foreground">
-                                    Showing{" "}
-                                    <span className="font-bold text-foreground">
-                                        {query.data.items.length}
-                                    </span>{" "}
-                                    products on this page
+                                    {t("catalog.showingPage", { count: query.data.items.length })}
                                 </p>
 
                                 <span className="hidden text-xs text-muted-foreground sm:block">
-                                    Page {query.data.page} of{" "}
-                                    {query.data.totalPages}
+                                    {t("catalog.pageOf", { page: query.data.page, pages: query.data.totalPages })}
                                 </span>
                             </div>
 
@@ -959,6 +953,7 @@ function EmptyState({
     text: string;
     action?: () => void;
 }) {
+    const { t } = useI18n();
     return (
         <div className="relative overflow-hidden rounded-[28px] border border-dashed bg-muted/15 px-6 py-20 text-center">
             <div className="pointer-events-none absolute left-1/2 top-1/2 size-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-3xl" />
@@ -980,7 +975,7 @@ function EmptyState({
                         className="mt-6 rounded-xl"
                         onClick={action}
                     >
-                        Clear filters
+                        {t("catalog.clearFilters")}
                     </Button>
                 )}
             </div>

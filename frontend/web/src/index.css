@@ -74,17 +74,25 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: "Inter", "Segoe UI", sans-serif;
+  --font-sans: var(--tenant-font, Inter, "Segoe UI", sans-serif);
 }
 * {
   @apply border-border;
 }
 html {
   @apply scroll-smooth;
+  font-size: var(--tenant-base-font-size, 16px);
 }
+html[data-language="en"] { --tenant-font: var(--tenant-font-en, Inter), "Segoe UI", sans-serif; }
+html[data-language="dr"] { --tenant-font: var(--tenant-font-dr, Vazirmatn), Tahoma, Arial, sans-serif; }
+html[data-language="ps"] { --tenant-font: var(--tenant-font-ps, "Noto Sans Arabic"), Tahoma, Arial, sans-serif; }
 body {
-  @apply m-0 min-w-80 bg-background text-foreground antialiased;
+  @apply m-0 min-w-80 bg-background font-sans text-foreground antialiased;
+  overflow-x: clip;
 }
+main { min-width: 0; }
+img { max-width: 100%; }
+section { scroll-margin-top: 7rem; }
 button,
 a {
   @apply outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
@@ -140,9 +148,10 @@ select {
   @apply bg-brand-orange text-white;
 }
 
-html[dir="rtl"] body {
-  font-family: "Segoe UI", Tahoma, Arial, sans-serif;
-}
+html[dir="rtl"] body { letter-spacing: 0; }
+html[dir="rtl"] h1,
+html[dir="rtl"] h2,
+html[dir="rtl"] h3 { letter-spacing: 0 !important; }
 html[dir="rtl"] input,
 html[dir="rtl"] textarea {
   text-align: right;
