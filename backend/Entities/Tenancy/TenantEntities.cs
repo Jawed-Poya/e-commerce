@@ -99,8 +99,8 @@ public sealed class TenantSetting
     [MaxLength(20)] public string StorefrontPrimaryColor { get; set; } = "#2563eb";
     [MaxLength(20)] public string StorefrontSecondaryColor { get; set; } = "#0f172a";
     [MaxLength(120)] public string EnglishFontFamily { get; set; } = "Inter";
-    [MaxLength(120)] public string DariFontFamily { get; set; } = "Vazirmatn";
-    [MaxLength(120)] public string PashtoFontFamily { get; set; } = "Noto Sans Arabic";
+    [MaxLength(120)] public string DariFontFamily { get; set; } = "B Nazanin";
+    [MaxLength(120)] public string PashtoFontFamily { get; set; } = "Bahij TheSansArabic";
     public int BaseFontSize { get; set; } = 16;
     public int TrashRetentionDays { get; set; } = 30;
     public bool AllowTenantUserClaimManagement { get; set; } = true;

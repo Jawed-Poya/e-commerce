@@ -45,15 +45,26 @@ const currencies = [
     ["INR", "Indian Rupee", "₹"],
 ] as const;
 
-const fonts = [
-    "Inter",
-    "Manrope",
-    "Poppins",
-    "Vazirmatn",
-    "Noto Sans Arabic",
-    "Tahoma",
-    "Arial",
-];
+const fontOptions = {
+    en: ["Inter", "Manrope", "Poppins", "Segoe UI", "Arial"],
+    dr: ["B Nazanin", "B Mitra", "B Wahid", "B Titr", "Vazirmatn", "Noto Sans Arabic", "Tahoma"],
+    ps: [
+        "Bahij TheSansArabic",
+        "Bahij Nassim",
+        "Bahij Nazanin",
+        "Bahij Roya",
+        "Bahij SultanNahia",
+        "Bahij Tanseek Pro",
+        "Bahij Titr",
+        "Bahij Traffic",
+        "Bahij Uthman Taha",
+        "Bahij Yakout",
+        "Bahij Yekan",
+        "Bahij Zar",
+        "Noto Sans Arabic",
+        "Tahoma",
+    ],
+} as const;
 
 type Tab = "profile" | "branches" | "appearance" | "subscription";
 
@@ -566,6 +577,7 @@ export default function CompanySettingsPage() {
                         />
                         <Field label={t("tenant.englishFont")}>
                             <FontCombobox
+                                language="en"
                                 value={settings.englishFontFamily}
                                 onValueChange={(value) =>
                                     setSettings((current) =>
@@ -578,6 +590,7 @@ export default function CompanySettingsPage() {
                         </Field>
                         <Field label={t("tenant.dariFont")}>
                             <FontCombobox
+                                language="dr"
                                 value={settings.dariFontFamily}
                                 onValueChange={(value) =>
                                     setSettings((current) =>
@@ -590,6 +603,7 @@ export default function CompanySettingsPage() {
                         </Field>
                         <Field label={t("tenant.pashtoFont")}>
                             <FontCombobox
+                                language="ps"
                                 value={settings.pashtoFontFamily}
                                 onValueChange={(value) =>
                                     setSettings((current) =>
@@ -912,9 +926,11 @@ function ColorField({
 }
 
 function FontCombobox({
+    language,
     value,
     onValueChange,
 }: {
+    language: keyof typeof fontOptions;
     value: string;
     onValueChange: (value: string) => void;
 }) {
@@ -922,7 +938,7 @@ function FontCombobox({
         <SimpleCombobox
             value={value}
             onValueChange={(next) => next && onValueChange(next)}
-            options={fonts.map((font) => ({ value: font, label: font }))}
+            options={fontOptions[language].map((font) => ({ value: font, label: font }))}
         />
     );
 }
