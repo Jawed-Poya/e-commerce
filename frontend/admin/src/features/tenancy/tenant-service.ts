@@ -1,5 +1,5 @@
 import apiClient from "@/api/api-client";
-import type { Branch, PublicTenantProfile, TenantPlan, TenantProfile, TenantReportSummary, TenantSettings, TrashItem, SubscriptionStatus } from "./tenant-types";
+import type { Branch, PlatformUpdateTenantRequest, PublicTenantProfile, TenantPlan, TenantProfile, TenantReportSummary, TenantSettings, TrashItem, SubscriptionStatus } from "./tenant-types";
 
 export const tenantService = {
     publicProfile: async () => (await apiClient.get<PublicTenantProfile>("/tenant/public-profile")).data,
@@ -16,6 +16,8 @@ export const tenantService = {
     platformTenants: async () => (await apiClient.get<TenantProfile[]>("/platform/tenants")).data,
     createTenant: async (request: { name: string; slug: string; adminFullName: string; adminEmail: string; adminPassword: string; plan: TenantPlan; mainCurrencyCode: string }) =>
         (await apiClient.post<TenantProfile>("/platform/tenants", request)).data,
+    updateTenant: async (id: number, request: PlatformUpdateTenantRequest) =>
+        (await apiClient.put<TenantProfile>(`/platform/tenants/${id}`, request)).data,
     updateSubscription: async (id: number, request: { plan: TenantPlan; status: SubscriptionStatus; endsAt: string | null }) =>
         (await apiClient.put<TenantProfile>(`/platform/tenants/${id}/subscription`, request)).data,
 };

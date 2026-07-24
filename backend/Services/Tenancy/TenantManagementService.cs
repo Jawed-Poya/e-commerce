@@ -20,6 +20,7 @@ public interface ITenantManagementService
     Task<PublicTenantProfileResponse> GetPublicProfileAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<TenantProfileResponse>> GetTenantsAsync(CancellationToken cancellationToken = default);
     Task<TenantProfileResponse> CreateTenantAsync(CreateTenantRequest request, CancellationToken cancellationToken = default);
+    Task<TenantProfileResponse> UpdateTenantAsync(long tenantId, PlatformUpdateTenantRequest request, CancellationToken cancellationToken = default);
     Task<TenantProfileResponse> UpdateSubscriptionAsync(long tenantId, TenantPlan plan, SubscriptionStatus status, DateTime? endsAt, CancellationToken cancellationToken = default);
 }
 
@@ -66,21 +67,7 @@ public sealed class TenantManagementService(
             context.TenantSettings.Add(setting);
         }
 
-        setting.MainCurrencyCode = request.MainCurrencyCode.Trim().ToUpperInvariant();
-        setting.CurrencySymbol = request.CurrencySymbol.Trim();
-        setting.CurrencyPosition = request.CurrencyPosition.Trim().ToLowerInvariant();
-        setting.CurrencyDecimalPlaces = request.CurrencyDecimalPlaces;
-        setting.AdminPrimaryColor = NormalizeColor(request.AdminPrimaryColor);
-        setting.AdminSecondaryColor = NormalizeColor(request.AdminSecondaryColor);
-        setting.StorefrontPrimaryColor = NormalizeColor(request.StorefrontPrimaryColor);
-        setting.StorefrontSecondaryColor = NormalizeColor(request.StorefrontSecondaryColor);
-        setting.EnglishFontFamily = Required(request.EnglishFontFamily, "English font");
-        setting.DariFontFamily = Required(request.DariFontFamily, "Dari font");
-        setting.PashtoFontFamily = Required(request.PashtoFontFamily, "Pashto font");
-        setting.BaseFontSize = request.BaseFontSize;
-        setting.TrashRetentionDays = request.TrashRetentionDays;
-        setting.AllowTenantUserClaimManagement = request.AllowTenantUserClaimManagement;
-        setting.UpdatedAt = DateTime.UtcNow;
+        ApplySettings(setting, request);
         await context.SaveChangesAsync(cancellationToken);
         return await GetProfileAsync(cancellationToken);
     }
@@ -254,6 +241,80 @@ public sealed class TenantManagementService(
         }
     }
 
+    public async Task<TenantProfileResponse> UpdateTenantAsync(
+        long tenantId,
+        PlatformUpdateTenantRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!tenantContext.IsPlatformAdmin) throw new UnauthorizedAccessException();
+        ValidateSettings(request.Settings);
+
+        var tenant = await context.Tenants
+            .Include(item => item.Setting)
+            .Include(item => item.PermissionGrants)
+            .Include(item => item.Subscriptions)
+            .FirstOrDefaultAsync(item => item.Id == tenantId, cancellationToken)
+            ?? throw new KeyNotFoundException("Company not found.");
+
+        var slug = NormalizeSlug(request.Slug);
+        if (await context.Tenants.AnyAsync(item => item.Id != tenantId && item.Slug == slug, cancellationToken))
+            throw new InvalidOperationException("This company slug is already in use.");
+
+        tenant.Name = Required(request.Name, "Company name");
+        tenant.Slug = slug;
+        tenant.LegalName = Clean(request.LegalName);
+        tenant.RegistrationNumber = Clean(request.RegistrationNumber);
+        tenant.Email = Clean(request.Email)?.ToLowerInvariant();
+        tenant.Phone = Clean(request.Phone);
+        tenant.Address = Clean(request.Address);
+        tenant.LogoUrl = Clean(request.LogoUrl);
+        tenant.FaviconUrl = Clean(request.FaviconUrl);
+        tenant.UpdatedAt = DateTime.UtcNow;
+
+        var setting = tenant.Setting;
+        if (setting is null)
+        {
+            setting = new TenantSetting { TenantId = tenantId };
+            context.TenantSettings.Add(setting);
+        }
+        ApplySettings(setting, request.Settings);
+
+        var plan = tenant.Subscriptions
+            .OrderByDescending(item => item.StartsAt)
+            .Select(item => item.Plan)
+            .FirstOrDefault();
+        var planPermissions = PlanPermissions(plan).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var requestedPermissions = (request.EnabledPermissions ?? Array.Empty<string>())
+            .Where(permission => !string.Equals(permission, AppPermissions.PlatformTenantsManage, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var unsupported = requestedPermissions.Where(permission => !planPermissions.Contains(permission)).OrderBy(value => value).ToArray();
+        if (unsupported.Length > 0)
+            throw new ArgumentException($"The current subscription does not include: {string.Join(", ", unsupported)}.");
+
+        foreach (var permission in AppPermissions.All.Where(value => value != AppPermissions.PlatformTenantsManage))
+        {
+            var grant = tenant.PermissionGrants.FirstOrDefault(item =>
+                string.Equals(item.Permission, permission, StringComparison.OrdinalIgnoreCase));
+            if (grant is null)
+            {
+                context.TenantPermissionGrants.Add(new TenantPermissionGrant
+                {
+                    TenantId = tenantId,
+                    Permission = permission,
+                    IsEnabled = requestedPermissions.Contains(permission)
+                });
+            }
+            else
+            {
+                grant.IsEnabled = requestedPermissions.Contains(permission);
+            }
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+        return Map((await LoadTenantAsync(tenantId, cancellationToken))!);
+    }
+
     public async Task<TenantProfileResponse> UpdateSubscriptionAsync(
         long tenantId,
         TenantPlan plan,
@@ -273,6 +334,7 @@ public sealed class TenantManagementService(
             current = new TenantSubscription { TenantId = tenantId, StartsAt = DateTime.UtcNow };
             context.TenantSubscriptions.Add(current);
         }
+        var previousPlan = current.Plan;
         var limits = PlanLimits(plan);
         current.Plan = plan;
         current.Status = status;
@@ -281,8 +343,15 @@ public sealed class TenantManagementService(
         current.MaxBranches = limits.Branches;
         current.MaxProducts = limits.Products;
 
-        var enabled = PlanPermissions(plan).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var grants = await context.TenantPermissionGrants.Where(item => item.TenantId == tenantId).ToListAsync(cancellationToken);
+        var previouslyEnabled = grants.Where(item => item.IsEnabled).Select(item => item.Permission).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var previousPlanPermissions = PlanPermissions(previousPlan).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var nextPlanPermissions = PlanPermissions(plan).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var enabled = previousPlan == plan
+            ? previouslyEnabled
+            : PlanRank(plan) > PlanRank(previousPlan)
+                ? previouslyEnabled.Concat(nextPlanPermissions.Except(previousPlanPermissions)).ToHashSet(StringComparer.OrdinalIgnoreCase)
+                : previouslyEnabled.Where(nextPlanPermissions.Contains).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var permission in AppPermissions.All.Where(value => value != AppPermissions.PlatformTenantsManage))
         {
             var grant = grants.FirstOrDefault(item => string.Equals(item.Permission, permission, StringComparison.OrdinalIgnoreCase));
@@ -358,6 +427,25 @@ public sealed class TenantManagementService(
             setting.EnglishFontFamily, setting.DariFontFamily, setting.PashtoFontFamily, setting.BaseFontSize,
             setting.TrashRetentionDays, setting.AllowTenantUserClaimManagement);
 
+    private static void ApplySettings(TenantSetting setting, UpdateTenantSettingsRequest request)
+    {
+        setting.MainCurrencyCode = request.MainCurrencyCode.Trim().ToUpperInvariant();
+        setting.CurrencySymbol = request.CurrencySymbol.Trim();
+        setting.CurrencyPosition = request.CurrencyPosition.Trim().ToLowerInvariant();
+        setting.CurrencyDecimalPlaces = request.CurrencyDecimalPlaces;
+        setting.AdminPrimaryColor = NormalizeColor(request.AdminPrimaryColor);
+        setting.AdminSecondaryColor = NormalizeColor(request.AdminSecondaryColor);
+        setting.StorefrontPrimaryColor = NormalizeColor(request.StorefrontPrimaryColor);
+        setting.StorefrontSecondaryColor = NormalizeColor(request.StorefrontSecondaryColor);
+        setting.EnglishFontFamily = Required(request.EnglishFontFamily, "English font");
+        setting.DariFontFamily = Required(request.DariFontFamily, "Dari font");
+        setting.PashtoFontFamily = Required(request.PashtoFontFamily, "Pashto font");
+        setting.BaseFontSize = request.BaseFontSize;
+        setting.TrashRetentionDays = request.TrashRetentionDays;
+        setting.AllowTenantUserClaimManagement = request.AllowTenantUserClaimManagement;
+        setting.UpdatedAt = DateTime.UtcNow;
+    }
+
     private static void ValidateSettings(UpdateTenantSettingsRequest request)
     {
         if (request.MainCurrencyCode?.Trim().Length != 3) throw new ArgumentException("Currency code must contain three letters.");
@@ -387,6 +475,15 @@ public sealed class TenantManagementService(
             throw new ArgumentException("Enter a valid company slug.");
         return slug;
     }
+
+    private static int PlanRank(TenantPlan plan) => plan switch
+    {
+        TenantPlan.Free => 0,
+        TenantPlan.Premium => 1,
+        TenantPlan.Full => 2,
+        TenantPlan.Enterprise => 3,
+        _ => 0
+    };
 
     private static (int Users, int Branches, int Products) PlanLimits(TenantPlan plan) => plan switch
     {

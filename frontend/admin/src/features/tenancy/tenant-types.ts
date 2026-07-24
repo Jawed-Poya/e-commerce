@@ -61,6 +61,21 @@ export interface TenantProfile extends PublicTenantProfile {
     enabledPermissions: string[];
 }
 
+
+export interface PlatformUpdateTenantRequest {
+    name: string;
+    slug: string;
+    legalName: string | null;
+    registrationNumber: string | null;
+    email: string | null;
+    phone: string | null;
+    address: string | null;
+    logoUrl: string | null;
+    faviconUrl: string | null;
+    settings: TenantSettings;
+    enabledPermissions: string[];
+}
+
 export interface TenantReportTrendPoint { date: string; revenue: number; cost: number; net: number }
 export interface TenantTopProduct { productId: number; productName: string; quantity: number; revenue: number }
 export interface TenantReportLine { source: string; id: number; reference: string; date: string; description: string; status: string; amount: number; paidAmount: number; balanceAmount: number; currencyCode: string; direction: "in" | "out"; branchId: number | null; branchName: string | null }

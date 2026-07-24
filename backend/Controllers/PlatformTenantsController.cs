@@ -21,6 +21,13 @@ public sealed class PlatformTenantsController(ITenantManagementService tenants) 
     public async Task<ActionResult<ApiResponse<TenantProfileResponse>>> Create(CreateTenantRequest request, CancellationToken cancellationToken) =>
         StatusCode(StatusCodes.Status201Created, ApiResponse<TenantProfileResponse>.Ok(await tenants.CreateTenantAsync(request, cancellationToken), "Company created."));
 
+    [HttpPut("{id:long}")]
+    public async Task<ActionResult<ApiResponse<TenantProfileResponse>>> Update(
+        long id,
+        PlatformUpdateTenantRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(ApiResponse<TenantProfileResponse>.Ok(await tenants.UpdateTenantAsync(id, request, cancellationToken), "Company settings and permissions updated."));
+
     [HttpPut("{id:long}/subscription")]
     public async Task<ActionResult<ApiResponse<TenantProfileResponse>>> UpdateSubscription(
         long id,
