@@ -15,6 +15,7 @@ import {
     Pencil,
     Plus,
     Save,
+    Share2,
     WalletCards,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -238,12 +239,18 @@ export default function CompanySettingsPage() {
                             <Button
                                 variant="outline"
                                 onClick={async () => {
-                                    await copyText(tenant.site.storefrontUrl!);
-                                    toast.success(t("platform.linkCopied"));
+                                    await copyWithFeedback(tenant.site.storefrontUrl!, t);
                                 }}
                             >
                                 <Copy />
                                 {t("platform.copyLink")}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => void shareStorefront(tenant.name, tenant.site.storefrontUrl!, t)}
+                            >
+                                <Share2 />
+                                {t("platform.shareStorefront")}
                             </Button>
                             <Button
                                 variant="outline"
@@ -424,7 +431,7 @@ export default function CompanySettingsPage() {
                                 <Field label={t("platform.workspaceCode")}>
                                     <div className="flex gap-2">
                                         <Input value={tenant.site.workspaceCode} readOnly dir="ltr" />
-                                        <Button type="button" size="icon" variant="outline" onClick={() => void copyText(tenant.site.workspaceCode)}><Copy /></Button>
+                                        <Button type="button" size="icon" variant="outline" onClick={() => void copyWithFeedback(tenant.site.workspaceCode, t)}><Copy /></Button>
                                     </div>
                                 </Field>
                                 <Field label={t("platform.storefrontAccess")}>
@@ -475,6 +482,7 @@ export default function CompanySettingsPage() {
                                 label={t("platform.storefrontLink")}
                                 value={tenant.site.storefrontUrl}
                                 emptyText={t("platform.storefrontPrivateOrUnpublished")}
+                                shareTitle={tenant.name}
                             />
                             {previewLink ? (
                                 <SiteLinkRow label={t("platform.previewStorefront")} value={previewLink.url} />
@@ -1168,10 +1176,12 @@ function SiteLinkRow({
     label,
     value,
     emptyText,
+    shareTitle,
 }: {
     label: string;
     value: string | null;
     emptyText?: string;
+    shareTitle?: string;
 }) {
     const { t } = useI18n();
     return (
@@ -1182,9 +1192,14 @@ function SiteLinkRow({
             </p>
             {value ? (
                 <div className="mt-3 flex flex-wrap gap-2">
-                    <Button type="button" size="sm" variant="outline" onClick={() => void copyText(value)}>
+                    <Button type="button" size="sm" variant="outline" onClick={() => void copyWithFeedback(value, t)}>
                         <Copy />{t("platform.copyLink")}
                     </Button>
+                    {shareTitle ? (
+                        <Button type="button" size="sm" variant="outline" onClick={() => void shareStorefront(shareTitle, value, t)}>
+                            <Share2 />{t("platform.shareStorefront")}
+                        </Button>
+                    ) : null}
                     <Button
                         type="button"
                         size="sm"
@@ -1203,7 +1218,7 @@ async function copyText(value: string) {
     if (navigator.clipboard?.writeText) {
         try {
             await navigator.clipboard.writeText(value);
-            return;
+            return true;
         } catch {
             // Fallback for non-HTTPS local-network deployments.
         }
@@ -1214,8 +1229,26 @@ async function copyText(value: string) {
     textarea.style.opacity = "0";
     document.body.appendChild(textarea);
     textarea.select();
-    document.execCommand("copy");
+    const copied = document.execCommand("copy");
     textarea.remove();
+    return copied;
+}
+
+async function copyWithFeedback(value: string, t: ReturnType<typeof useI18n>["t"]) {
+    const copied = await copyText(value);
+    copied ? toast.success(t("platform.linkCopied")) : toast.error(t("platform.linkCopyFailed"));
+}
+
+async function shareStorefront(name: string, url: string, t: ReturnType<typeof useI18n>["t"]) {
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: name, text: t("platform.shareStorefrontText"), url });
+            return;
+        } catch (error) {
+            if ((error as DOMException)?.name === "AbortError") return;
+        }
+    }
+    await copyWithFeedback(url, t);
 }
 
 function message(error: unknown, fallback: string) {
