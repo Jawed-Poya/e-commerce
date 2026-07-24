@@ -555,7 +555,7 @@ namespace ECommerce.Migrations
 
                     b.HasIndex("ProductId", "IsPrimary")
                         .IsUnique()
-                        .HasFilter("[IsPrimary] = 1");
+                        .HasFilter("[IsPrimary] = 1 AND [IsDeleted] = 0");
 
                     b.HasIndex("ProductId", "SortOrder");
 

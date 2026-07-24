@@ -181,11 +181,8 @@ export default function ProductsPage() {
             <div className={drafts.length > 1 ? "flex gap-2 overflow-x-auto border-b pb-3" : "hidden"}>{drafts.map((item, index) => <Button key={item.id} type="button" size="sm" variant={activeEditor === index ? "default" : "outline"} onClick={() => setActiveEditor(index)}>{index + 1}. {item.name || t("update.untitled")}</Button>)}</div>
             <div className="min-h-0 overflow-y-auto pe-1">{drafts[activeEditor] && [drafts[activeEditor]].map((item) => {
                 const index = activeEditor;
-                const preview = item.image ? URL.createObjectURL(item.image) : resolveProductImageUrl(item.primaryImageUrl);
                 return <div key={item.id} className="grid gap-5 rounded-xl border p-5 lg:grid-cols-[180px_1fr]">
-                    <div><div className="aspect-square overflow-hidden rounded-lg border bg-muted">{preview ? <img src={preview} alt={item.name} className="size-full object-cover" /> : <ImagePlus className="m-auto mt-16 text-muted-foreground" />}</div>
-                        <Label className="mt-3 flex cursor-pointer items-center justify-center border px-3 py-2 text-sm"><ImagePlus className="me-2 size-4" />{t("update.replaceImage")}<input className="sr-only" type="file" accept={IMAGE_FILE_ACCEPT} onChange={e => change(item.id, { image: e.target.files?.[0] })} /></Label>
-                        <p className="mt-2 text-xs text-muted-foreground">{t("update.keepImage")}</p>
+                    <div><PrimaryImagePicker item={item} onChange={(image) => change(item.id, { image })} />
                         <GalleryImagePicker existingImages={item.images.filter(image => !image.isPrimary && !(item.removedImageIds ?? []).includes(image.id))} files={item.galleryImages ?? []} onChange={galleryImages => change(item.id, { galleryImages })} onRemoveExisting={imageId => change(item.id, { removedImageIds: [...(item.removedImageIds ?? []), imageId] })} />
                     </div>
                     <div className="space-y-4"><h3 className="font-semibold">{t("update.productNumber")} #{index + 1}</h3>
@@ -217,6 +214,25 @@ export default function ProductsPage() {
             </footer>
           </section>
         </div>, document.body)}
+    </div>;
+}
+
+function PrimaryImagePicker({ item, onChange }: { item: BulkUpdateProduct; onChange: (image: File | undefined) => void }) {
+    const { t } = useI18n();
+    const preview = useMemo(() => item.image ? URL.createObjectURL(item.image) : resolveProductImageUrl(item.primaryImageUrl), [item.image, item.primaryImageUrl]);
+    useEffect(() => () => { if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview); }, [preview]);
+
+    const select = (file: File | undefined) => {
+        if (!file) return;
+        if (!isSupportedImageFile(file)) return toast.error("Choose a JPG, PNG, WebP, or AVIF image.");
+        if (file.size > MAXIMUM_IMAGE_FILE_SIZE) return toast.error("The product image cannot be larger than 5 MB.");
+        onChange(file);
+    };
+
+    return <div>
+        <div className="aspect-square overflow-hidden rounded-lg border bg-muted">{preview ? <img src={preview} alt={item.name} className="size-full object-cover" /> : <ImagePlus className="m-auto mt-16 text-muted-foreground" />}</div>
+        <Label className="mt-3 flex cursor-pointer items-center justify-center rounded-md border px-3 py-2 text-sm"><ImagePlus className="me-2 size-4" />{t("update.replaceImage")}<input className="sr-only" type="file" accept={IMAGE_FILE_ACCEPT} onChange={event => { select(event.target.files?.[0]); event.target.value = ""; }} /></Label>
+        {item.image ? <div className="mt-2 flex items-center justify-between gap-2 rounded-md border bg-primary/5 px-2 py-1.5 text-xs"><span className="min-w-0 truncate">{item.image.name}</span><Button type="button" variant="ghost" size="icon-xs" aria-label="Cancel image replacement" onClick={() => onChange(undefined)}><X className="size-3" /></Button></div> : <p className="mt-2 text-xs text-muted-foreground">{t("update.keepImage")}</p>}
     </div>;
 }
 
