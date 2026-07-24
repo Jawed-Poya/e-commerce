@@ -27,7 +27,7 @@ public static class DatabaseInitializer
         var workspace = await EnsureDefaultTenantAsync(context);
         await EnsureRolesAsync(services);
         await EnsureAdminPermissionsAsync(services);
-        await EnsureDefaultCustomerTypeAsync(context, workspace.Tenant.Id, workspace.Branch.Id);
+        await EnsureDefaultCustomerTypesAsync(context);
         await EnsureOperationDefaultsAsync(context, workspace.Tenant.Id, workspace.Branch.Id);
         await EnsureAdminAsync(services, workspace.Tenant.Id, workspace.Branch.Id);
         await EnsureSafeIdentityUserNamesAsync(services);
@@ -308,27 +308,53 @@ END;
         }
     }
 
-    private static async Task EnsureDefaultCustomerTypeAsync(ApplicationDbContext context, long tenantId, long branchId)
+    private static async Task EnsureDefaultCustomerTypesAsync(ApplicationDbContext context)
     {
-        var hasGeneralCustomerType = await context.Types
+        var tenants = await context.Tenants
             .IgnoreQueryFilters()
-            .AnyAsync(type =>
-                type.TenantId == tenantId &&
-                !type.IsDeleted &&
-                type.Group == GeneralTypeEnum.CustomerType &&
-                (type.Name == "General" || type.Name == "Default"));
+            .Where(tenant => tenant.IsActive)
+            .Select(tenant => tenant.Id)
+            .ToListAsync();
 
-        if (hasGeneralCustomerType)
-            return;
-
-        context.Types.Add(new GeneralType
+        foreach (var tenantId in tenants)
         {
-            TenantId = tenantId,
-            BranchId = branchId,
-            Name = "General",
-            Group = GeneralTypeEnum.CustomerType,
-            SortOrder = 0
-        });
+            var general = await context.Types
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(type =>
+                    type.TenantId == tenantId &&
+                    type.Group == GeneralTypeEnum.CustomerType &&
+                    type.Name == "General");
+            if (general is not null && !general.IsDeleted)
+                continue;
+
+            var branchId = await context.Branches
+                .IgnoreQueryFilters()
+                .Where(branch => branch.TenantId == tenantId && branch.IsActive)
+                .OrderByDescending(branch => branch.IsMain)
+                .ThenBy(branch => branch.Id)
+                .Select(branch => (long?)branch.Id)
+                .FirstOrDefaultAsync();
+
+            if (general is not null)
+            {
+                general.IsDeleted = false;
+                general.DeletedAt = null;
+                general.BranchId ??= branchId;
+                general.SortOrder ??= 0;
+                general.UpdatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                context.Types.Add(new GeneralType
+                {
+                    TenantId = tenantId,
+                    BranchId = branchId,
+                    Name = "General",
+                    Group = GeneralTypeEnum.CustomerType,
+                    SortOrder = 0
+                });
+            }
+        }
 
         await context.SaveChangesAsync();
     }
