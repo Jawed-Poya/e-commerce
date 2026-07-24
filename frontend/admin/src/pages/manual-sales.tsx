@@ -35,6 +35,7 @@ import {
 import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
 import { useTenant } from "@/features/tenancy/tenant-context";
+import { useI18n } from "@/i18n/i18n-provider";
 import {
     DocumentLines,
     newDocumentItem,
@@ -64,6 +65,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default function ManualSalesPage() {
     const queryClient = useQueryClient();
     const { formatMoney } = useTenant();
+    const { tr } = useI18n();
     const { user } = useAdminAuth();
     const canManage = hasPermission(user, Permissions.ManualSalesManage);
     const { data: sales, isLoading } = useOperationQuery(
@@ -131,7 +133,7 @@ export default function ManualSalesPage() {
         );
         if (unavailable?.product) {
             return toast.error(
-                `${unavailable.product.name} has only ${unavailable.product.availableQuantity} available.`,
+                `${unavailable.product.name} ${tr("has only")} ${unavailable.product.availableQuantity} ${tr("available.")}`,
             );
         }
         if (form.paidAmount < 0 || form.paidAmount > total) {

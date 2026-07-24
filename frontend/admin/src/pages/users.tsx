@@ -45,6 +45,7 @@ import { PermissionChecklist } from "@/features/users/components/permission-chec
 import { tenantService } from "@/features/tenancy/tenant-service";
 import type { Branch } from "@/features/tenancy/tenant-types";
 import { userService } from "@/features/users/user-service";
+import { useI18n } from "@/i18n/i18n-provider";
 import type {
     AdminUserDetails,
     CreateUserRequest,
@@ -64,6 +65,7 @@ const emptyForm: CreateUserRequest = {
 
 export default function UsersPage() {
     const queryClient = useQueryClient();
+    const { tr } = useI18n();
     const { user: currentUser } = useAdminAuth();
     const canManage = hasPermission(currentUser, Permissions.UsersManage);
     const [search, setSearch] = useState("");
@@ -362,7 +364,7 @@ export default function UsersPage() {
                                                                     <UserRoundX />
                                                                 </Button>
                                                             }
-                                                            title={`Deactivate ${user.fullName}?`}
+                                                            title={`${tr("Deactivate")} ${user.fullName}?`}
                                                             description="The user will no longer be able to sign in. Their roles and permissions remain saved for later reactivation."
                                                             confirmLabel="Deactivate user"
                                                             destructive
