@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-    BarChart3,
     Download,
     HandCoins,
     LoaderCircle,
@@ -116,8 +115,38 @@ export default function TenantReportsPage() {
                 }
             />
 
-            <Card>
-                <CardContent className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-9">
+            <Card className="overflow-hidden">
+                <CardHeader className="border-b bg-muted/20 px-4 py-4 sm:px-5">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <CardTitle className="text-base">{t("reports.filtersTitle")}</CardTitle>
+                            <p className="mt-1 text-xs text-muted-foreground">{t("reports.filtersHelp")}</p>
+                        </div>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="w-full sm:w-auto"
+                            onClick={() => setFilters({
+                                startDate: iso(monthAgo),
+                                endDate: iso(today),
+                                branchId: "",
+                                currencyCode: data?.currencyCode ?? "",
+                                source: "",
+                                status: "",
+                                search: "",
+                                minimumAmount: "",
+                                maximumAmount: "",
+                                sort: "date-desc",
+                                page: 1,
+                                pageSize: 25,
+                            })}
+                        >
+                            {t("reports.resetFilters")}
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="grid min-w-0 gap-4 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3 2xl:grid-cols-4">
                     <Filter label={t("reports.from")}>
                         <Input type="date" value={filters.startDate} onChange={event => setFilters(value => ({ ...value, startDate: event.target.value, page: 1 }))} />
                     </Filter>
@@ -173,7 +202,7 @@ export default function TenantReportsPage() {
                             ]}
                         />
                     </Filter>
-                    <Filter label={t("reports.search")}>
+                    <Filter label={t("reports.search")} className="sm:col-span-2 lg:col-span-3 2xl:col-span-2">
                         <div className="relative">
                             <Search className="absolute start-3 top-2.5 size-4 text-muted-foreground" />
                             <Input
@@ -316,8 +345,8 @@ function ReportCard({ item, money, locale, t }: { item: TenantReportLine; money:
     );
 }
 
-function Filter({ label, children }: { label: string; children: React.ReactNode }) {
-    return <div className="space-y-2"><Label className="text-xs">{label}</Label>{children}</div>;
+function Filter({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
+    return <div className={`min-w-0 space-y-2 ${className}`}><Label className="text-xs font-medium">{label}</Label><div className="min-w-0">{children}</div></div>;
 }
 function Metric({ icon, label, value, help, tone }: { icon: React.ReactNode; label: string; value: string; help: string; tone?: "positive" | "negative" }) {
     return <Card className="overflow-hidden"><CardContent className="relative p-5"><div className={`absolute inset-y-0 start-0 w-1 ${tone === "positive" ? "bg-emerald-500" : tone === "negative" ? "bg-destructive" : "bg-primary"}`} /><div className="flex items-center justify-between gap-3"><span className="text-sm text-muted-foreground">{label}</span><span className="text-primary">{icon}</span></div><p className="mt-4 text-2xl font-black tabular-nums">{value}</p><p className="mt-1 text-xs text-muted-foreground">{help}</p></CardContent></Card>;

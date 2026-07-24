@@ -3,7 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     Building2,
     CheckCircle2,
+    Copy,
     Crown,
+    ExternalLink,
     GitBranch,
     Info,
     LoaderCircle,
@@ -192,6 +194,26 @@ export default function CompanySettingsPage() {
             <PageHeader
                 title={t("tenant.companyTitle")}
                 description={t("tenant.companyDescription")}
+                actions={
+                    <div className="flex flex-wrap gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={async () => {
+                                await copyText(tenant.site.storefrontUrl);
+                                toast.success(t("platform.linkCopied"));
+                            }}
+                        >
+                            <Copy />
+                            {t("platform.copyLink")}
+                        </Button>
+                        <Button variant="outline" asChild>
+                            <a href={tenant.site.storefrontUrl} target="_blank" rel="noreferrer">
+                                <ExternalLink />
+                                {t("platform.storefrontLink")}
+                            </a>
+                        </Button>
+                    </div>
+                }
             />
 
             <div className="flex max-w-full gap-2 overflow-x-auto border-b pb-3">
@@ -676,7 +698,7 @@ export default function CompanySettingsPage() {
                                         {t("tenant.currentPlan")}
                                     </p>
                                     <h2 className="mt-2 text-3xl font-black">
-                                        {tenant.subscription?.plan ?? "—"}
+                                        {tenant.subscription?.planName ?? "—"}
                                     </h2>
                                     <p className="mt-2 text-sm text-muted-foreground">
                                         {t("tenant.status")}: {tenant.subscription?.status ?? "—"}
@@ -983,6 +1005,25 @@ function Limit({
             </p>
         </div>
     );
+}
+
+async function copyText(value: string) {
+    if (navigator.clipboard?.writeText) {
+        try {
+            await navigator.clipboard.writeText(value);
+            return;
+        } catch {
+            // Fallback for non-HTTPS local-network deployments.
+        }
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = value;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    textarea.remove();
 }
 
 function message(error: unknown, fallback: string) {

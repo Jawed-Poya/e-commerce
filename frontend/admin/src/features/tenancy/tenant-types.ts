@@ -1,5 +1,6 @@
 export type TenantPlan = "Free" | "Premium" | "Full" | "Enterprise";
 export type SubscriptionStatus = "Trial" | "Active" | "PastDue" | "Suspended" | "Cancelled" | "Expired";
+export type TenantSiteRoutingMode = "QueryString" | "Subdomain" | "CustomDomain";
 
 export interface Branch {
     id: number;
@@ -13,6 +14,8 @@ export interface Branch {
 
 export interface TenantSubscription {
     id: number;
+    subscriptionPlanId: number | null;
+    planName: string;
     plan: TenantPlan;
     status: SubscriptionStatus;
     startsAt: string;
@@ -20,8 +23,11 @@ export interface TenantSubscription {
     maxUsers: number;
     maxBranches: number;
     maxProducts: number;
+    maxOrdersPerMonth: number;
+    maxStorageMb: number;
     monthlyPrice: number;
     billingCurrencyCode: string;
+    notes: string | null;
 }
 
 export interface TenantSettings {
@@ -41,12 +47,21 @@ export interface TenantSettings {
     allowTenantUserClaimManagement: boolean;
 }
 
+export interface TenantSiteLink {
+    routingMode: TenantSiteRoutingMode;
+    storefrontUrl: string;
+    adminUrl: string;
+    customDomain: string | null;
+    storefrontBaseUrlOverride: string | null;
+}
+
 export interface PublicTenantProfile {
     id: number;
     name: string;
     slug: string;
     logoUrl: string | null;
     faviconUrl: string | null;
+    storefrontUrl?: string;
     settings: TenantSettings;
 }
 
@@ -56,11 +71,32 @@ export interface TenantProfile extends PublicTenantProfile {
     email: string | null;
     phone: string | null;
     address: string | null;
+    site: TenantSiteLink;
     branches: Branch[];
     subscription: TenantSubscription | null;
     enabledPermissions: string[];
 }
 
+
+export interface CreateTenantRequest {
+    name: string;
+    slug: string;
+    adminFullName: string;
+    adminEmail: string;
+    adminPassword: string;
+    subscriptionPlanId: number | null;
+    plan: TenantPlan | null;
+    mainCurrencyCode: string;
+    siteRoutingMode: TenantSiteRoutingMode;
+    customDomain: string | null;
+    storefrontBaseUrlOverride: string | null;
+    maxUsers: number | null;
+    maxBranches: number | null;
+    maxProducts: number | null;
+    maxOrdersPerMonth: number | null;
+    maxStorageMb: number | null;
+    monthlyPrice: number | null;
+}
 
 export interface PlatformUpdateTenantRequest {
     name: string;
@@ -72,6 +108,9 @@ export interface PlatformUpdateTenantRequest {
     address: string | null;
     logoUrl: string | null;
     faviconUrl: string | null;
+    siteRoutingMode: TenantSiteRoutingMode;
+    customDomain: string | null;
+    storefrontBaseUrlOverride: string | null;
     settings: TenantSettings;
     enabledPermissions: string[];
 }
@@ -90,3 +129,49 @@ export interface TenantReportSummary {
 }
 
 export interface TrashItem { id: number; entityType: string; entityId: string; displayName: string; deletedAt: string; deletedByName: string | null; branchId: number | null; branchName: string | null; scheduledPurgeAt: string; snapshotJson: string | null }
+
+
+export interface PlatformSettings {
+    storefrontBaseUrl: string;
+    adminBaseUrl: string;
+    rootDomain: string | null;
+    defaultRoutingMode: TenantSiteRoutingMode;
+    allowCustomDomains: boolean;
+}
+
+export interface SubscriptionPlan {
+    id: number;
+    code: string;
+    name: string;
+    description: string | null;
+    isSystem: boolean;
+    isActive: boolean;
+    sortOrder: number;
+    legacyPlan: TenantPlan;
+    monthlyPrice: number;
+    yearlyPrice: number;
+    currencyCode: string;
+    maxUsers: number;
+    maxBranches: number;
+    maxProducts: number;
+    maxOrdersPerMonth: number;
+    maxStorageMb: number;
+    enabledPermissions: string[];
+}
+
+export type UpsertSubscriptionPlanRequest = Omit<SubscriptionPlan, "id" | "isSystem">;
+
+export interface UpdateTenantSubscriptionRequest {
+    subscriptionPlanId: number | null;
+    plan: TenantPlan | null;
+    status: SubscriptionStatus;
+    endsAt: string | null;
+    maxUsers: number | null;
+    maxBranches: number | null;
+    maxProducts: number | null;
+    maxOrdersPerMonth: number | null;
+    maxStorageMb: number | null;
+    monthlyPrice: number | null;
+    billingCurrencyCode: string | null;
+    notes: string | null;
+}

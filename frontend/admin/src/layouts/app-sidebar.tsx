@@ -42,6 +42,8 @@ const navigation: ProtectedGroup[] = [
     ]},
     { label: "Platform", items: [
         { title: "Tenant companies", url: "/platform/tenants", icon: <Building2 />, permission: Permissions.PlatformTenantsManage },
+        { title: "Subscription plans", url: "/platform/plans", icon: <Crown />, permission: Permissions.PlatformTenantsManage },
+        { title: "Platform settings", url: "/platform/settings", icon: <SettingsIcon />, permission: Permissions.PlatformTenantsManage },
     ]},
 ];
 

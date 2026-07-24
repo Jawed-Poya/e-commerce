@@ -27,6 +27,8 @@ import CompanySettingsPage from "@/pages/company-settings";
 import TenantReportsPage from "@/pages/tenant-reports";
 import TrashPage from "@/pages/trash";
 import PlatformTenantsPage from "@/pages/platform-tenants";
+import PlatformSettingsPage from "@/pages/platform-settings";
+import SubscriptionPlansPage from "@/pages/subscription-plans";
 
 import { ProtectedRoute } from "@/features/auth/protected-route";
 import { PermissionRoute } from "@/features/auth/permission-route";
@@ -177,6 +179,14 @@ export const router = createBrowserRouter([
                     {
                         path: "platform/tenants",
                         element: allowed(Permissions.PlatformTenantsManage, <PlatformTenantsPage />),
+                    },
+                    {
+                        path: "platform/plans",
+                        element: allowed(Permissions.PlatformTenantsManage, <SubscriptionPlansPage />),
+                    },
+                    {
+                        path: "platform/settings",
+                        element: allowed(Permissions.PlatformTenantsManage, <PlatformSettingsPage />),
                     },
                     {
                         path: "system/general-types",
