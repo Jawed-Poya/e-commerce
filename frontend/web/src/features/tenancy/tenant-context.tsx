@@ -10,7 +10,7 @@ export interface TenantSettings {
     adminPrimaryColor: string; adminSecondaryColor: string; storefrontPrimaryColor: string; storefrontSecondaryColor: string;
     englishFontFamily: string; dariFontFamily: string; pashtoFontFamily: string; baseFontSize: number; trashRetentionDays: number; allowTenantUserClaimManagement: boolean;
 }
-export interface PublicTenantProfile { id: number; name: string; slug: string; logoUrl: string | null; faviconUrl: string | null; settings: TenantSettings }
+export interface PublicTenantProfile { id: number; name: string; slug: string; logoUrl: string | null; faviconUrl: string | null; storefrontUrl: string; settings: TenantSettings }
 
 const TenantContext = createContext<{ tenant: PublicTenantProfile | null; loading: boolean } | null>(null);
 
