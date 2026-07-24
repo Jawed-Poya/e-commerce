@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ImagePlus, LoaderCircle, PackagePlus, Save } from "lucide-react";
+import { ArrowLeft, ImagePlus, LoaderCircle, PackagePlus, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { SimpleCombobox } from "@/components/simple-combobox";
@@ -16,6 +16,7 @@ import { hasPermission, Permissions } from "@/features/auth/permissions";
 import { useProductLookupsQuery } from "@/features/products/hooks/use-product-mutation";
 import { productKeys } from "@/keys/product-keys";
 import { productService, resolveProductImageUrl } from "@/services/product.service";
+import { IMAGE_FILE_ACCEPT, isSupportedImageFile, MAXIMUM_IMAGE_FILE_SIZE } from "@/lib/image-files";
 import { CustomerPricingFields, activePriceInputs, createCustomerPriceDrafts, validatePriceDrafts, type CustomerPriceDraft } from "./customer-pricing-fields";
 
 const empty = { name: "", barcode: "", shortDescription: "", description: "", slug: "", categoryId: 0, brandId: null as number | null, unitId: null as number | null, minimumValue: null as number | null, maximumValue: null as number | null, isFeatured: false, isActive: true };
@@ -52,6 +53,19 @@ export function ProductEditorPage() {
   const preview = useMemo(() => image ? URL.createObjectURL(image) : resolveProductImageUrl(product?.images.find(x => x.isPrimary)?.url), [image, product]);
   useEffect(() => () => { if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview); }, [preview]);
 
+  const selectPrimaryImage = (file: File | null) => {
+    if (!file) return;
+    if (!isSupportedImageFile(file)) {
+      toast.error("Choose a JPG, PNG, WebP, or AVIF image.");
+      return;
+    }
+    if (file.size > MAXIMUM_IMAGE_FILE_SIZE) {
+      toast.error("The product image cannot be larger than 5 MB.");
+      return;
+    }
+    setImage(file);
+  };
+
   const save = async () => {
     if (!form.name.trim() || !form.categoryId) return toast.error("Product name and category are required.");
     if (form.minimumValue != null && form.minimumValue < 0) return toast.error("Minimum value cannot be negative.");
@@ -83,7 +97,7 @@ export function ProductEditorPage() {
   };
 
   if (lookupsLoading || productLoading) return <div className="grid min-h-[50vh] place-items-center"><LoaderCircle className="size-7 animate-spin" /></div>;
-  if (editing && !product) return <div className="space-y-4"><PageHeader title="Product not found" /><Button onClick={() => navigate("/products")}><ArrowLeft className="me-2 size-4" />Back to products</Button></div>;
+  if (editing && !product) return <div className="space-y-4"><PageHeader title="Product not found" description="The requested product is unavailable or has been removed." /><Button onClick={() => navigate("/products")}><ArrowLeft className="me-2 size-4" />Back to products</Button></div>;
 
   return <div className="space-y-6">
     <PageHeader title={editing ? "Edit product" : "Create product"} description="Manage catalog details and every customer-type price in one easy form." actions={<div className="flex gap-2"><Button variant="outline" onClick={() => navigate(-1)}>Cancel</Button><Button onClick={save} disabled={saving}>{saving ? <LoaderCircle className="me-2 size-4 animate-spin" /> : <Save className="me-2 size-4" />}{editing ? "Save changes" : "Create product"}</Button></div>} />
@@ -109,9 +123,10 @@ export function ProductEditorPage() {
       <Card className="h-fit xl:sticky xl:top-20"><CardHeader><CardTitle className="flex items-center gap-2"><ImagePlus className="size-5" />Primary image</CardTitle></CardHeader><CardContent className="space-y-4">
         <label className="block cursor-pointer overflow-hidden rounded-xl border border-dashed bg-muted/30">
           {preview ? <img src={preview} alt="Product preview" className="aspect-square w-full object-cover" /> : <div className="grid aspect-square place-items-center text-center text-sm text-muted-foreground"><span><ImagePlus className="mx-auto mb-2 size-8" />Choose a product image</span></div>}
-          <input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={e => setImage(e.target.files?.[0] ?? null)} />
+          <input className="sr-only" type="file" accept={IMAGE_FILE_ACCEPT} onChange={event => { selectPrimaryImage(event.target.files?.[0] ?? null); event.target.value = ""; }} />
         </label>
-        <p className="text-xs text-muted-foreground">JPG, PNG, or WebP. In edit mode, leave this unchanged to keep the current image.</p>
+        {image ? <div className="flex items-center justify-between gap-3 rounded-lg border bg-primary/5 px-3 py-2 text-xs"><span className="min-w-0 truncate font-medium">New image: {image.name}</span><Button type="button" size="icon-xs" variant="ghost" aria-label="Cancel image replacement" onClick={() => setImage(null)}><X className="size-3" /></Button></div> : null}
+        <p className="text-xs text-muted-foreground">JPG, PNG, WebP, or AVIF up to 5 MB. In edit mode, leave this unchanged to keep the current image.</p>
       </CardContent></Card>
     </div>
   </div>;

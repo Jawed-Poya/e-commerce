@@ -341,6 +341,10 @@ public class ProductService : IProductService
                     foreach (var oldImage in product.Images.Where(x => x.IsPrimary).ToList())
                     {
                         oldImagePaths.Add(oldImage.ImagePath);
+                        // Product images are soft-deleted by ApplicationDbContext. Clear the
+                        // primary flag before removing the old row so the filtered unique
+                        // index never conflicts with the replacement image.
+                        oldImage.IsPrimary = false;
                         product.Images.Remove(oldImage);
                     }
                     product.Images.Add(new ProductImage
