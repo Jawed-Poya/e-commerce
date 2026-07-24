@@ -8,6 +8,7 @@ using ECommerce.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OrderStatus = ECommerce.Entities.Orders.OrderStatus;
 
 namespace ECommerce.Controllers;
 
@@ -408,7 +409,8 @@ public sealed class TenantReportsController(
                 (!branchId.HasValue || item.Order.BranchId == branchId))
             .GroupBy(item => new { item.ProductId, item.Product.Name })
             .Select(group => new TenantTopProductResponse(group.Key.ProductId, group.Key.Name,
-                group.Sum(item => item.Quantity), group.Sum(item => item.LineTotal)))
+                group.Sum(item => item.Quantity),
+                group.Sum(item => (item.Quantity * item.UnitPrice) - item.Discount + item.Tax)))
             .ToListAsync(cancellationToken);
         var topManual = await context.InventorySaleItems.AsNoTracking()
             .Where(item => item.InventorySale.SaleDate >= startOnly && item.InventorySale.SaleDate <= endOnly &&
