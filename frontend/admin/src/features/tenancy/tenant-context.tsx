@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/i18n/i18n-provider";
 import { tenantService } from "./tenant-service";
 import type { PublicTenantProfile } from "./tenant-types";
+import { resolveTenantFontStack, resolveTenantHeadingStack } from "./tenant-fonts";
 
 interface TenantContextValue {
     tenant: PublicTenantProfile | null;
@@ -31,9 +32,12 @@ export function TenantProvider({ children }: PropsWithChildren) {
         root.style.setProperty("--primary", settings.adminPrimaryColor);
         root.style.setProperty("--primary-foreground", readableText(settings.adminPrimaryColor));
         root.style.setProperty("--tenant-secondary", settings.adminSecondaryColor);
-        root.style.setProperty("--tenant-font-en", settings.englishFontFamily);
-        root.style.setProperty("--tenant-font-dr", settings.dariFontFamily);
-        root.style.setProperty("--tenant-font-ps", settings.pashtoFontFamily);
+        root.style.setProperty("--tenant-font-en", resolveTenantFontStack("en", settings.englishFontFamily));
+        root.style.setProperty("--tenant-font-dr", resolveTenantFontStack("dr", settings.dariFontFamily));
+        root.style.setProperty("--tenant-font-ps", resolveTenantFontStack("ps", settings.pashtoFontFamily));
+        root.style.setProperty("--tenant-heading-font-en", resolveTenantHeadingStack("en", settings.englishFontFamily));
+        root.style.setProperty("--tenant-heading-font-dr", resolveTenantHeadingStack("dr", settings.dariFontFamily));
+        root.style.setProperty("--tenant-heading-font-ps", resolveTenantHeadingStack("ps", settings.pashtoFontFamily));
         root.style.setProperty("--tenant-base-font-size", `${settings.baseFontSize}px`);
         document.title = `${tenant.name} · Admin`;
         if (tenant.faviconUrl) {
