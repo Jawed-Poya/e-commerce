@@ -7,7 +7,9 @@ import {
     Crown,
     ExternalLink,
     GitBranch,
+    Globe2,
     Info,
+    KeyRound,
     LoaderCircle,
     Palette,
     Pencil,
@@ -35,7 +37,12 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { tenantService } from "@/features/tenancy/tenant-service";
 import { resolveTenantFontStack, tenantFontOptions } from "@/features/tenancy/tenant-fonts";
-import type { Branch, TenantSettings } from "@/features/tenancy/tenant-types";
+import type {
+    Branch,
+    StorefrontAccessMode,
+    StorefrontPreviewLink,
+    TenantSettings,
+} from "@/features/tenancy/tenant-types";
 import { useTenant } from "@/features/tenancy/tenant-context";
 import { useI18n } from "@/i18n/i18n-provider";
 
@@ -50,7 +57,7 @@ const currencies = [
 
 const fontOptions = tenantFontOptions;
 
-type Tab = "profile" | "branches" | "appearance" | "subscription";
+type Tab = "profile" | "site" | "branches" | "appearance" | "subscription";
 
 const blankBranch: Omit<Branch, "id"> = {
     name: "",
@@ -84,6 +91,7 @@ export default function CompanySettingsPage() {
     const [branchOpen, setBranchOpen] = useState(false);
     const [branchId, setBranchId] = useState<number | null>(null);
     const [branch, setBranch] = useState(blankBranch);
+    const [previewLink, setPreviewLink] = useState<StorefrontPreviewLink | null>(null);
 
     useEffect(() => {
         if (!query.data) return;
@@ -132,6 +140,36 @@ export default function CompanySettingsPage() {
         onSuccess: async () => {
             toast.success(t("tenant.settingsUpdated"));
             await refresh();
+        },
+        onError: (error) => toast.error(message(error, t("tenant.operationFailed"))),
+    });
+
+    const saveStorefront = useMutation({
+        mutationFn: (request: { isPublished: boolean; accessMode: StorefrontAccessMode }) =>
+            tenantService.updateStorefront(request),
+        onSuccess: async () => {
+            toast.success(t("platform.storefrontUpdated"));
+            setPreviewLink(null);
+            await refresh();
+        },
+        onError: (error) => toast.error(message(error, t("tenant.operationFailed"))),
+    });
+
+    const rotateStorefrontKey = useMutation({
+        mutationFn: tenantService.rotateStorefrontKey,
+        onSuccess: async () => {
+            toast.success(t("platform.storefrontKeyRotated"));
+            setPreviewLink(null);
+            await refresh();
+        },
+        onError: (error) => toast.error(message(error, t("tenant.operationFailed"))),
+    });
+
+    const createPreviewLink = useMutation({
+        mutationFn: () => tenantService.createPreviewLink(30),
+        onSuccess: (result) => {
+            setPreviewLink(result);
+            toast.success(t("platform.previewGenerated"));
         },
         onError: (error) => toast.error(message(error, t("tenant.operationFailed"))),
     });
@@ -195,24 +233,27 @@ export default function CompanySettingsPage() {
                 title={t("tenant.companyTitle")}
                 description={t("tenant.companyDescription")}
                 actions={
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={async () => {
-                                await copyText(tenant.site.storefrontUrl);
-                                toast.success(t("platform.linkCopied"));
-                            }}
-                        >
-                            <Copy />
-                            {t("platform.copyLink")}
-                        </Button>
-                        <Button variant="outline" asChild>
-                            <a href={tenant.site.storefrontUrl} target="_blank" rel="noreferrer">
+                    tenant.site.storefrontUrl ? (
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={async () => {
+                                    await copyText(tenant.site.storefrontUrl!);
+                                    toast.success(t("platform.linkCopied"));
+                                }}
+                            >
+                                <Copy />
+                                {t("platform.copyLink")}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                render={<a href={tenant.site.storefrontUrl} target="_blank" rel="noreferrer" />}
+                            >
                                 <ExternalLink />
                                 {t("platform.storefrontLink")}
-                            </a>
-                        </Button>
-                    </div>
+                            </Button>
+                        </div>
+                    ) : undefined
                 }
             />
 
@@ -223,6 +264,13 @@ export default function CompanySettingsPage() {
                     icon={<Building2 />}
                 >
                     {t("tenant.profile")}
+                </TabButton>
+                <TabButton
+                    active={tab === "site"}
+                    onClick={() => setTab("site")}
+                    icon={<Globe2 />}
+                >
+                    {t("platform.tab.site")}
                 </TabButton>
                 <TabButton
                     active={tab === "branches"}
@@ -363,6 +411,94 @@ export default function CompanySettingsPage() {
                         </div>
                     </CardContent>
                 </Card>
+            )}
+
+            {tab === "site" && (
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,.85fr)]">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>{t("platform.storefrontConnection")}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-5">
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <Field label={t("platform.workspaceCode")}>
+                                    <div className="flex gap-2">
+                                        <Input value={tenant.site.workspaceCode} readOnly dir="ltr" />
+                                        <Button type="button" size="icon" variant="outline" onClick={() => void copyText(tenant.site.workspaceCode)}><Copy /></Button>
+                                    </div>
+                                </Field>
+                                <Field label={t("platform.storefrontAccess")}>
+                                    <SimpleCombobox<StorefrontAccessMode>
+                                        value={tenant.site.accessMode}
+                                        onValueChange={(value) => value && saveStorefront.mutate({ isPublished: tenant.site.isPublished, accessMode: value })}
+                                        options={[
+                                            { value: "Public", label: t("platform.access.public") },
+                                            { value: "Private", label: t("platform.access.private") },
+                                        ]}
+                                    />
+                                </Field>
+                            </div>
+                            <div className="flex items-center justify-between gap-4 rounded-xl border p-4">
+                                <div>
+                                    <p className="font-medium">{t("platform.publishStorefront")}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">{t("platform.publishStorefrontHelp")}</p>
+                                </div>
+                                <Switch
+                                    checked={tenant.site.isPublished}
+                                    onCheckedChange={(checked) => saveStorefront.mutate({ isPublished: checked, accessMode: tenant.site.accessMode })}
+                                />
+                            </div>
+                            <div className="rounded-xl border bg-muted/30 p-4">
+                                <p className="text-xs font-medium text-muted-foreground">{t("platform.storefrontKey")}</p>
+                                <p className="mt-2 break-all font-mono text-sm" dir="ltr">{tenant.site.storefrontKey}</p>
+                                <p className="mt-2 text-xs leading-5 text-muted-foreground">{t("platform.rotateStorefrontKeyHelp")}</p>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => rotateStorefrontKey.mutate()}
+                                disabled={rotateStorefrontKey.isPending}
+                            >
+                                <KeyRound />
+                                {t("platform.rotateStorefrontKey")}
+                            </Button>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>{t("platform.generatedLinks")}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <SiteLinkRow label={t("platform.adminLink")} value={tenant.site.adminUrl} />
+                            <SiteLinkRow
+                                label={t("platform.storefrontLink")}
+                                value={tenant.site.storefrontUrl}
+                                emptyText={t("platform.storefrontPrivateOrUnpublished")}
+                            />
+                            {previewLink ? (
+                                <SiteLinkRow label={t("platform.previewStorefront")} value={previewLink.url} />
+                            ) : null}
+                            <Button
+                                type="button"
+                                className="w-full"
+                                onClick={() => createPreviewLink.mutate()}
+                                disabled={createPreviewLink.isPending}
+                            >
+                                <ExternalLink />
+                                {t("platform.generatePreview")}
+                            </Button>
+                            {previewLink ? (
+                                <p className="text-xs text-muted-foreground">
+                                    {t("platform.previewExpires")} {new Date(previewLink.expiresAt).toLocaleString(locale)}
+                                </p>
+                            ) : null}
+                            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm leading-6 text-muted-foreground">
+                                {t("platform.singleHostAccessHelp")}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
             )}
 
             {tab === "branches" && (
@@ -643,6 +779,27 @@ export default function CompanySettingsPage() {
                                     )
                                 }
                             />
+                        </Field>
+                        <Field label={t("notifications.retentionDays")}>
+                            <Input
+                                type="number"
+                                min={1}
+                                max={365}
+                                value={settings.notificationRetentionDays}
+                                onChange={(event) =>
+                                    setSettings((current) =>
+                                        current
+                                            ? {
+                                                  ...current,
+                                                  notificationRetentionDays: Number(event.target.value),
+                                              }
+                                            : current,
+                                    )
+                                }
+                            />
+                            <p className="text-xs leading-5 text-muted-foreground">
+                                {t("notifications.retentionHelp")}
+                            </p>
                         </Field>
                         <div className="flex items-center justify-between gap-3 border p-4 md:col-span-2">
                             <div>
@@ -1003,6 +1160,41 @@ function Limit({
             <p className="mt-1 text-xl font-bold">
                 {value.toLocaleString(locale)}
             </p>
+        </div>
+    );
+}
+
+function SiteLinkRow({
+    label,
+    value,
+    emptyText,
+}: {
+    label: string;
+    value: string | null;
+    emptyText?: string;
+}) {
+    const { t } = useI18n();
+    return (
+        <div className="rounded-xl border p-4">
+            <p className="text-xs font-medium text-muted-foreground">{label}</p>
+            <p className="mt-2 break-all text-sm" dir={value ? "ltr" : undefined}>
+                {value ?? emptyText ?? "—"}
+            </p>
+            {value ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => void copyText(value)}>
+                        <Copy />{t("platform.copyLink")}
+                    </Button>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        render={<a href={value} target="_blank" rel="noreferrer" />}
+                    >
+                        <ExternalLink />{t("platform.openLink")}
+                    </Button>
+                </div>
+            ) : null}
         </div>
     );
 }

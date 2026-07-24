@@ -7,10 +7,18 @@ public sealed record BranchResponse(long Id, string Name, string Code, string? P
 
 public sealed record TenantSiteLinkResponse(
     TenantSiteRoutingMode RoutingMode,
-    string StorefrontUrl,
+    StorefrontAccessMode AccessMode,
+    bool IsPublished,
+    string StorefrontKey,
+    string? StorefrontUrl,
     string AdminUrl,
+    string WorkspaceCode,
     string? CustomDomain,
     string? StorefrontBaseUrlOverride);
+
+public sealed record StorefrontPreviewLinkResponse(string Url, DateTime ExpiresAt);
+public sealed record UpdateTenantStorefrontRequest(bool IsPublished, StorefrontAccessMode AccessMode);
+
 
 public sealed record TenantSubscriptionResponse(
     long Id,
@@ -43,6 +51,7 @@ public sealed record TenantSettingsResponse(
     string PashtoFontFamily,
     int BaseFontSize,
     int TrashRetentionDays,
+    int NotificationRetentionDays,
     bool AllowTenantUserClaimManagement);
 
 public sealed record TenantProfileResponse(
@@ -63,7 +72,7 @@ public sealed record TenantProfileResponse(
     IReadOnlyCollection<string> EnabledPermissions);
 
 public sealed record UpdateTenantProfileRequest(string Name, string? LegalName, string? RegistrationNumber, string? Email, string? Phone, string? Address, string? LogoUrl, string? FaviconUrl);
-public sealed record UpdateTenantSettingsRequest(string MainCurrencyCode, string CurrencySymbol, string CurrencyPosition, int CurrencyDecimalPlaces, string AdminPrimaryColor, string AdminSecondaryColor, string StorefrontPrimaryColor, string StorefrontSecondaryColor, string EnglishFontFamily, string DariFontFamily, string PashtoFontFamily, int BaseFontSize, int TrashRetentionDays, bool AllowTenantUserClaimManagement);
+public sealed record UpdateTenantSettingsRequest(string MainCurrencyCode, string CurrencySymbol, string CurrencyPosition, int CurrencyDecimalPlaces, string AdminPrimaryColor, string AdminSecondaryColor, string StorefrontPrimaryColor, string StorefrontSecondaryColor, string EnglishFontFamily, string DariFontFamily, string PashtoFontFamily, int BaseFontSize, int TrashRetentionDays, int NotificationRetentionDays, bool AllowTenantUserClaimManagement);
 public sealed record UpsertBranchRequest(string Name, string Code, string? Phone, string? Address, bool IsMain, bool IsActive);
 
 public sealed record PlatformUpdateTenantRequest(
@@ -77,6 +86,8 @@ public sealed record PlatformUpdateTenantRequest(
     string? LogoUrl,
     string? FaviconUrl,
     TenantSiteRoutingMode SiteRoutingMode,
+    StorefrontAccessMode StorefrontAccessMode,
+    bool IsStorefrontPublished,
     string? CustomDomain,
     string? StorefrontBaseUrlOverride,
     UpdateTenantSettingsRequest Settings,
@@ -92,6 +103,8 @@ public sealed record CreateTenantRequest(
     TenantPlan? Plan,
     string MainCurrencyCode,
     TenantSiteRoutingMode? SiteRoutingMode,
+    StorefrontAccessMode? StorefrontAccessMode,
+    bool? IsStorefrontPublished,
     string? CustomDomain,
     string? StorefrontBaseUrlOverride,
     int? MaxUsers,
@@ -121,7 +134,7 @@ public sealed record PublicTenantProfileResponse(
     string Slug,
     string? LogoUrl,
     string? FaviconUrl,
-    string StorefrontUrl,
+    string? StorefrontUrl,
     TenantSettingsResponse Settings);
 
 public sealed record PlatformSettingsResponse(

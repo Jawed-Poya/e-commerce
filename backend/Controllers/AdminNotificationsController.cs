@@ -1,6 +1,7 @@
 using ECommerce.Entities;
 using ECommerce.Entities.Notifications.Contracts;
 using ECommerce.Services.Notifications;
+using ECommerce.Services.Tenancy;
 using ECommerce.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,7 +14,8 @@ namespace ECommerce.Controllers;
 [Authorize(Policy = AppPermissions.OrdersView)]
 public sealed class AdminNotificationsController(
     IAdminNotificationService notifications,
-    AdminNotificationBroker broker) : ControllerBase
+    AdminNotificationBroker broker,
+    ITenantContext tenantContext) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<ApiResponse<AdminNotificationsResponse>>> Get(
@@ -23,6 +25,20 @@ public sealed class AdminNotificationsController(
     {
         var result = await notifications.GetAsync(after, take, cancellationToken);
         return Ok(ApiResponse<AdminNotificationsResponse>.Ok(result));
+    }
+
+    [HttpDelete("{id:long}")]
+    public async Task<ActionResult<ApiResponse<object>>> Delete(long id, CancellationToken cancellationToken)
+    {
+        await notifications.DeleteAsync(id, cancellationToken);
+        return Ok(ApiResponse<object>.Ok(new { }, "Notification deleted."));
+    }
+
+    [HttpDelete]
+    public async Task<ActionResult<ApiResponse<object>>> Clear(CancellationToken cancellationToken)
+    {
+        var count = await notifications.ClearAsync(cancellationToken);
+        return Ok(ApiResponse<object>.Ok(new { count }, "Notifications cleared."));
     }
 
     [HttpGet("stream")]
@@ -37,7 +53,7 @@ public sealed class AdminNotificationsController(
 
         try
         {
-            using var subscription = broker.Subscribe();
+            using var subscription = broker.Subscribe(tenantContext.TenantId);
 
             await WriteEventAsync(": connected\n\n", requestAborted);
 

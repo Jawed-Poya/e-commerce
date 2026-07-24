@@ -26,6 +26,14 @@ public sealed class PlatformTenantsController(
     public async Task<ActionResult<ApiResponse<TenantProfileResponse>>> Update(long id, PlatformUpdateTenantRequest request, CancellationToken cancellationToken) =>
         Ok(ApiResponse<TenantProfileResponse>.Ok(await tenants.UpdateTenantAsync(id, request, cancellationToken), "Company settings, site link, and permissions updated."));
 
+    [HttpPost("tenants/{id:long}/storefront/rotate-key")]
+    public async Task<ActionResult<ApiResponse<TenantProfileResponse>>> RotateStorefrontKey(long id, CancellationToken cancellationToken) =>
+        Ok(ApiResponse<TenantProfileResponse>.Ok(await tenants.RotateStorefrontKeyAsync(id, cancellationToken), "Storefront key rotated."));
+
+    [HttpPost("tenants/{id:long}/storefront/preview-link")]
+    public async Task<ActionResult<ApiResponse<StorefrontPreviewLinkResponse>>> CreatePreviewLink(long id, [FromQuery] int lifetimeMinutes = 30, CancellationToken cancellationToken = default) =>
+        Ok(ApiResponse<StorefrontPreviewLinkResponse>.Ok(await tenants.CreatePreviewLinkAsync(id, lifetimeMinutes, cancellationToken)));
+
     [HttpPut("tenants/{id:long}/subscription")]
     public async Task<ActionResult<ApiResponse<TenantProfileResponse>>> UpdateSubscription(long id, UpdateTenantSubscriptionRequest request, CancellationToken cancellationToken) =>
         Ok(ApiResponse<TenantProfileResponse>.Ok(await tenants.UpdateSubscriptionAsync(id, request, cancellationToken), "Subscription and tenant limits updated."));

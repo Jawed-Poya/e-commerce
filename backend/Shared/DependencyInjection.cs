@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantManagementService, TenantManagementService>();
         services.AddScoped<IPlatformManagementService, PlatformManagementService>();
         services.AddScoped<ITenantPlanGuard, TenantPlanGuard>();
+        services.AddSingleton<IStorefrontAccessTokenService, StorefrontAccessTokenService>();
         services.AddScoped<ITrashService, TrashService>();
         services.AddHostedService<TrashCleanupHostedService>();
         services.AddScoped<IProductService, ProductService>();
@@ -46,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IStoreNotificationService, StoreNotificationService>();
         services.AddScoped<IAdminNotificationService, AdminNotificationService>();
+        services.AddHostedService<AdminNotificationCleanupHostedService>();
         services.AddSingleton<AdminNotificationBroker>();
         services.AddSingleton<StoreRealtimeMetrics>();
         services.AddScoped<IAdminDashboardService, AdminDashboardService>();

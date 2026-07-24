@@ -39,4 +39,8 @@ public interface IAdminNotificationService
         DateTime? after,
         int take,
         CancellationToken cancellationToken = default);
+
+    Task DeleteAsync(long id, CancellationToken cancellationToken = default);
+    Task<int> ClearAsync(CancellationToken cancellationToken = default);
+    Task<int> CleanupExpiredAsync(CancellationToken cancellationToken = default);
 }

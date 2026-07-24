@@ -6,6 +6,7 @@ import type {
     PlatformUpdateTenantRequest,
     PublicTenantProfile,
     SubscriptionPlan,
+    StorefrontPreviewLink,
     TenantProfile,
     TenantReportSummary,
     TenantSettings,
@@ -20,6 +21,11 @@ export const tenantService = {
     updateProfile: async (request: Pick<TenantProfile, "name" | "legalName" | "registrationNumber" | "email" | "phone" | "address" | "logoUrl" | "faviconUrl">) =>
         (await apiClient.put<TenantProfile>("/tenant/profile", request)).data,
     updateSettings: async (request: TenantSettings) => (await apiClient.put<TenantProfile>("/tenant/settings", request)).data,
+    updateStorefront: async (request: { isPublished: boolean; accessMode: "Public" | "Private" }) =>
+        (await apiClient.put<TenantProfile>("/tenant/storefront", request)).data,
+    rotateStorefrontKey: async () => (await apiClient.post<TenantProfile>("/tenant/storefront/rotate-key")).data,
+    createPreviewLink: async (lifetimeMinutes = 30) =>
+        (await apiClient.post<StorefrontPreviewLink>(`/tenant/storefront/preview-link?lifetimeMinutes=${lifetimeMinutes}`)).data,
     createBranch: async (request: Omit<Branch, "id">) => (await apiClient.post<Branch>("/tenant/branches", request)).data,
     updateBranch: async (id: number, request: Omit<Branch, "id">) => (await apiClient.put<Branch>(`/tenant/branches/${id}`, request)).data,
     reports: async (params: Record<string, unknown>) => (await apiClient.get<TenantReportSummary>("/admin/reports", params)).data,
@@ -34,6 +40,10 @@ export const tenantService = {
         (await apiClient.put<TenantProfile>(`/platform/tenants/${id}`, request)).data,
     updateSubscription: async (id: number, request: UpdateTenantSubscriptionRequest) =>
         (await apiClient.put<TenantProfile>(`/platform/tenants/${id}/subscription`, request)).data,
+    rotateTenantStorefrontKey: async (id: number) =>
+        (await apiClient.post<TenantProfile>(`/platform/tenants/${id}/storefront/rotate-key`)).data,
+    createTenantPreviewLink: async (id: number, lifetimeMinutes = 30) =>
+        (await apiClient.post<StorefrontPreviewLink>(`/platform/tenants/${id}/storefront/preview-link?lifetimeMinutes=${lifetimeMinutes}`)).data,
 
     platformSettings: async () => (await apiClient.get<PlatformSettings>("/platform/settings")).data,
     updatePlatformSettings: async (request: PlatformSettings) =>

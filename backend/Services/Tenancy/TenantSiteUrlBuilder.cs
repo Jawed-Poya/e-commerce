@@ -7,31 +7,30 @@ public static class TenantSiteUrlBuilder
 {
     public static TenantSiteLinkResponse Build(Tenant tenant, PlatformSetting platform)
     {
-        var routingMode = tenant.SiteRoutingMode;
-        var storefrontUrl = routingMode switch
-        {
-            TenantSiteRoutingMode.CustomDomain when platform.AllowCustomDomains && !string.IsNullOrWhiteSpace(tenant.CustomDomain)
-                => WithScheme(tenant.CustomDomain),
-            TenantSiteRoutingMode.Subdomain when !string.IsNullOrWhiteSpace(platform.RootDomain)
-                => BuildSubdomainUrl(tenant.Slug, platform.RootDomain),
-            _ => BuildTenantQueryUrl(tenant.StorefrontBaseUrlOverride ?? platform.StorefrontBaseUrl, tenant.Slug)
-        };
-        var adminUrl = BuildTenantQueryUrl(platform.AdminBaseUrl, tenant.Slug);
-        return new TenantSiteLinkResponse(routingMode, storefrontUrl, adminUrl, tenant.CustomDomain, tenant.StorefrontBaseUrlOverride);
+        var storefrontUrl = tenant.IsStorefrontPublished && tenant.StorefrontAccessMode == StorefrontAccessMode.Public
+            ? BuildStorefrontUrl(platform.StorefrontBaseUrl, tenant.StorefrontKey)
+            : null;
+        var adminUrl = BuildAdminUrl(platform.AdminBaseUrl, tenant.Slug);
+        return new TenantSiteLinkResponse(
+            TenantSiteRoutingMode.PlatformPath,
+            tenant.StorefrontAccessMode,
+            tenant.IsStorefrontPublished,
+            tenant.StorefrontKey,
+            storefrontUrl,
+            adminUrl,
+            tenant.Slug,
+            tenant.CustomDomain,
+            tenant.StorefrontBaseUrlOverride);
     }
 
-    public static string BuildTenantQueryUrl(string baseUrl, string slug)
-    {
-        var uri = RequireAbsoluteUrl(baseUrl, "Base URL");
-        var builder = new UriBuilder(uri);
-        var parameters = builder.Query.TrimStart('?')
-            .Split('&', StringSplitOptions.RemoveEmptyEntries)
-            .Where(item => !item.StartsWith("tenant=", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        parameters.Add($"tenant={Uri.EscapeDataString(slug)}");
-        builder.Query = string.Join('&', parameters);
-        return builder.Uri.ToString().TrimEnd('/');
-    }
+    public static string BuildStorefrontUrl(string baseUrl, string storefrontKey) =>
+        AppendPath(baseUrl, $"store/{Uri.EscapeDataString(storefrontKey)}");
+
+    public static string BuildPreviewUrl(string baseUrl, string token) =>
+        AppendPath(baseUrl, $"preview/{Uri.EscapeDataString(token)}");
+
+    public static string BuildAdminUrl(string baseUrl, string workspaceCode) =>
+        AppendPath(baseUrl, $"workspace/{Uri.EscapeDataString(workspaceCode)}/login");
 
     public static string NormalizeBaseUrl(string? value, string field)
     {
@@ -39,6 +38,8 @@ public static class TenantSiteUrlBuilder
         return uri.ToString().TrimEnd('/');
     }
 
+    // Retained for backward-compatible migrations and old database values. The
+    // active single-host platform no longer resolves tenants by domain.
     public static string? NormalizeDomain(string? value)
     {
         var clean = value?.Trim().ToLowerInvariant();
@@ -51,13 +52,16 @@ public static class TenantSiteUrlBuilder
         return clean;
     }
 
-    private static string BuildSubdomainUrl(string slug, string rootDomain)
+    private static string AppendPath(string baseUrl, string path)
     {
-        var cleanRoot = NormalizeDomain(rootDomain) ?? throw new ArgumentException("Root domain is required for subdomain routing.");
-        return $"https://{slug}.{cleanRoot}";
+        var uri = RequireAbsoluteUrl(baseUrl, "Base URL");
+        var builder = new UriBuilder(uri);
+        var basePath = builder.Path.TrimEnd('/');
+        builder.Path = $"{basePath}/{path.TrimStart('/')}";
+        builder.Query = string.Empty;
+        builder.Fragment = string.Empty;
+        return builder.Uri.ToString().TrimEnd('/');
     }
-
-    private static string WithScheme(string domain) => $"https://{NormalizeDomain(domain)}";
 
     private static Uri RequireAbsoluteUrl(string? value, string field)
     {

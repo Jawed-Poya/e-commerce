@@ -25,7 +25,14 @@ public enum TenantSiteRoutingMode
 {
     QueryString = 1,
     Subdomain = 2,
-    CustomDomain = 3
+    CustomDomain = 3,
+    PlatformPath = 4
+}
+
+public enum StorefrontAccessMode
+{
+    Public = 1,
+    Private = 2
 }
 
 public sealed class Tenant
@@ -43,7 +50,11 @@ public sealed class Tenant
     [MaxLength(2048)] public string? FaviconUrl { get; set; }
     [MaxLength(255)] public string? CustomDomain { get; set; }
     [MaxLength(2048)] public string? StorefrontBaseUrlOverride { get; set; }
-    public TenantSiteRoutingMode SiteRoutingMode { get; set; } = TenantSiteRoutingMode.QueryString;
+    public TenantSiteRoutingMode SiteRoutingMode { get; set; } = TenantSiteRoutingMode.PlatformPath;
+    [MaxLength(64)] public string StorefrontKey { get; set; } = Guid.NewGuid().ToString("N");
+    public StorefrontAccessMode StorefrontAccessMode { get; set; } = StorefrontAccessMode.Public;
+    public bool IsStorefrontPublished { get; set; } = true;
+    public DateTime? StorefrontKeyRotatedAt { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
@@ -130,8 +141,8 @@ public sealed class PlatformSetting
     [MaxLength(2048)] public string StorefrontBaseUrl { get; set; } = "http://localhost:5174";
     [MaxLength(2048)] public string AdminBaseUrl { get; set; } = "http://localhost:5173";
     [MaxLength(255)] public string? RootDomain { get; set; }
-    public TenantSiteRoutingMode DefaultRoutingMode { get; set; } = TenantSiteRoutingMode.QueryString;
-    public bool AllowCustomDomains { get; set; } = true;
+    public TenantSiteRoutingMode DefaultRoutingMode { get; set; } = TenantSiteRoutingMode.PlatformPath;
+    public bool AllowCustomDomains { get; set; } = false;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
@@ -162,6 +173,7 @@ public sealed class TenantSetting
     [MaxLength(120)] public string PashtoFontFamily { get; set; } = "Noto Sans Arabic";
     public int BaseFontSize { get; set; } = 16;
     public int TrashRetentionDays { get; set; } = 30;
+    public int NotificationRetentionDays { get; set; } = 30;
     public bool AllowTenantUserClaimManagement { get; set; } = true;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public Tenant Tenant { get; set; } = null!;
