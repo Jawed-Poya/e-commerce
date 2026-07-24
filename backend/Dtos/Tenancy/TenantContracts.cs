@@ -38,5 +38,17 @@ public sealed record TenantProfileResponse(
 public sealed record UpdateTenantProfileRequest(string Name, string? LegalName, string? RegistrationNumber, string? Email, string? Phone, string? Address, string? LogoUrl, string? FaviconUrl);
 public sealed record UpdateTenantSettingsRequest(string MainCurrencyCode, string CurrencySymbol, string CurrencyPosition, int CurrencyDecimalPlaces, string AdminPrimaryColor, string AdminSecondaryColor, string StorefrontPrimaryColor, string StorefrontSecondaryColor, string EnglishFontFamily, string DariFontFamily, string PashtoFontFamily, int BaseFontSize, int TrashRetentionDays, bool AllowTenantUserClaimManagement);
 public sealed record UpsertBranchRequest(string Name, string Code, string? Phone, string? Address, bool IsMain, bool IsActive);
+public sealed record PlatformUpdateTenantRequest(
+    string Name,
+    string Slug,
+    string? LegalName,
+    string? RegistrationNumber,
+    string? Email,
+    string? Phone,
+    string? Address,
+    string? LogoUrl,
+    string? FaviconUrl,
+    UpdateTenantSettingsRequest Settings,
+    IReadOnlyCollection<string> EnabledPermissions);
 public sealed record CreateTenantRequest(string Name, string Slug, string AdminFullName, string AdminEmail, string AdminPassword, TenantPlan Plan, string MainCurrencyCode);
 public sealed record PublicTenantProfileResponse(long Id, string Name, string Slug, string? LogoUrl, string? FaviconUrl, TenantSettingsResponse Settings);
