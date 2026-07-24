@@ -102,9 +102,6 @@ public sealed class AuthService(
 
         var user = new User
         {
-            UserName = tenantContext.TenantId <= 1
-                ? email ?? phone
-                : $"{tenantContext.TenantId}:{email ?? phone}",
             Email = email,
             PhoneNumber = phone,
             FullName = string.Join(' ', new[] { firstName, lastName }.Where(value => !string.IsNullOrWhiteSpace(value))),
@@ -112,6 +109,7 @@ public sealed class AuthService(
             TenantId = tenantContext.TenantId,
             BranchId = tenantContext.BranchId
         };
+        user.UserName = TenantUserName.Create(user.TenantId, user.Id);
 
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         try
@@ -234,7 +232,8 @@ public sealed class AuthService(
 
         user.FullName = fullName;
         user.Email = email;
-        user.UserName = user.TenantId <= 1 ? email : $"{user.TenantId}:{email}";
+        if (TenantUserName.RequiresRepair(user.UserName))
+            user.UserName = TenantUserName.Create(user.TenantId, user.Id);
         user.PhoneNumber = phone.Length == 0 ? null : phone;
 
         var result = await userManager.UpdateAsync(user);

@@ -62,6 +62,10 @@ export default function PlatformTenantsPage() {
         plan: "Free" as TenantPlan,
         mainCurrencyCode: "USD",
     });
+    const administratorEmailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+        form.adminEmail.trim(),
+    );
+
     const [subscription, setSubscription] = useState({
         plan: "Free" as TenantPlan,
         status: "Active" as SubscriptionStatus,
@@ -256,6 +260,9 @@ export default function PlatformTenantsPage() {
                         <Field label={t("platform.adminEmail")}>
                             <Input
                                 type="email"
+                                inputMode="email"
+                                autoComplete="email"
+                                aria-invalid={Boolean(form.adminEmail) && !administratorEmailIsValid}
                                 value={form.adminEmail}
                                 onChange={(event) =>
                                     setForm((current) => ({
@@ -264,6 +271,11 @@ export default function PlatformTenantsPage() {
                                     }))
                                 }
                             />
+                            {form.adminEmail && !administratorEmailIsValid ? (
+                                <p className="mt-1 text-xs text-destructive">
+                                    {t("platform.adminEmailInvalid")}
+                                </p>
+                            ) : null}
                         </Field>
                         <Field label={t("platform.adminPassword")}>
                             <Input
@@ -318,7 +330,7 @@ export default function PlatformTenantsPage() {
                                 !form.name.trim() ||
                                 !form.slug.trim() ||
                                 !form.adminFullName.trim() ||
-                                !form.adminEmail.trim() ||
+                                !administratorEmailIsValid ||
                                 form.adminPassword.length < 6
                             }
                         >

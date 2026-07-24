@@ -29,6 +29,7 @@ public static class DatabaseInitializer
         await EnsureDefaultCustomerTypeAsync(context, workspace.Tenant.Id, workspace.Branch.Id);
         await EnsureOperationDefaultsAsync(context, workspace.Tenant.Id, workspace.Branch.Id);
         await EnsureAdminAsync(services, workspace.Tenant.Id, workspace.Branch.Id);
+        await EnsureSafeIdentityUserNamesAsync(services);
     }
 
     private static async Task EnsurePreMigrationSchemaCompatibilityAsync(ApplicationDbContext context)
@@ -281,7 +282,6 @@ END;
             {
                 TenantId = tenantId,
                 BranchId = branchId,
-                UserName = tenantId <= 1 ? email : $"{tenantId}:{email}",
                 Email = email,
                 FullName = string.IsNullOrWhiteSpace(seed.FullName)
                     ? "System Administrator"
@@ -289,6 +289,7 @@ END;
                 IsActive = true,
                 EmailConfirmed = true
             };
+            admin.UserName = TenantUserName.Create(tenantId, admin.Id);
 
             var createResult = await userManager.CreateAsync(admin, seed.Password);
             if (!createResult.Succeeded)
@@ -314,10 +315,9 @@ END;
                 changed = true;
             }
 
-            var expectedUserName = tenantId <= 1 ? email : $"{tenantId}:{email}";
-            if (!string.Equals(admin.UserName, expectedUserName, StringComparison.OrdinalIgnoreCase))
+            if (TenantUserName.RequiresRepair(admin.UserName))
             {
-                admin.UserName = expectedUserName;
+                admin.UserName = TenantUserName.Create(tenantId, admin.Id);
                 changed = true;
             }
 
@@ -362,6 +362,27 @@ END;
                 throw new InvalidOperationException(
                     $"Could not assign the {role} role: " +
                     string.Join(" ", addRoleResult.Errors.Select(error => error.Description)));
+            }
+        }
+    }
+
+    private static async Task EnsureSafeIdentityUserNamesAsync(IServiceProvider services)
+    {
+        var context = services.GetRequiredService<ApplicationDbContext>();
+        var userManager = services.GetRequiredService<UserManager<User>>();
+        var users = await context.Users
+            .Where(user => user.UserName == null || user.UserName.Contains(":"))
+            .ToListAsync();
+
+        foreach (var user in users)
+        {
+            user.UserName = TenantUserName.Create(user.TenantId, user.Id);
+            var result = await userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    $"Could not repair the internal username for {user.Email ?? user.Id}: " +
+                    string.Join(" ", result.Errors.Select(error => error.Description)));
             }
         }
     }
