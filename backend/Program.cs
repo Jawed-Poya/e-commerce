@@ -6,6 +6,7 @@ using ECommerce.Shared;
 using ECommerce.Services.Notifications;
 using ECommerce.Services.Tenancy;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.IdentityModel.Tokens;
 
@@ -36,6 +37,10 @@ builder.Services.AddCors(options =>
             .AllowCredentials();
     });
 });
+
+// Replace the static provider with a tenant-aware policy after AddCors has
+// registered its defaults. This supports custom domains without allowing every origin.
+builder.Services.AddSingleton<ICorsPolicyProvider, TenantCorsPolicyProvider>();
 
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("JWT configuration is missing.");

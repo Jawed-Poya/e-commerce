@@ -12,6 +12,7 @@ using ECommerce.Options;
 using ECommerce.Services.Customers;
 using ECommerce.Services.Notifications;
 using ECommerce.Services.Storefront;
+using ECommerce.Services.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OrderEntity = API.Entities.Orders.Order;
@@ -26,7 +27,8 @@ public sealed class OrderService(
     IDefaultCustomerTypeResolver defaultCustomerType,
     IStoreNotificationService notifications,
     IAdminNotificationService adminNotifications,
-    IStorefrontContentService storefrontContent) : IOrderService
+    IStorefrontContentService storefrontContent,
+    ITenantPlanGuard tenantPlanGuard) : IOrderService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -68,6 +70,7 @@ public sealed class OrderService(
         CancellationToken cancellationToken = default)
     {
         ValidateCheckoutRequest(request);
+        await tenantPlanGuard.EnsureOrderCapacityAsync(1, cancellationToken);
         var currency = await GetTenantCurrencyAsync(cancellationToken);
 
         var groupedItems = request.Items

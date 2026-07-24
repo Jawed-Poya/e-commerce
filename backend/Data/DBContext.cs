@@ -118,6 +118,9 @@ public class ApplicationDbContext
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Branch> Branches => Set<Branch>();
     public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
+    public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
+    public DbSet<SubscriptionPlanPermission> SubscriptionPlanPermissions => Set<SubscriptionPlanPermission>();
+    public DbSet<PlatformSetting> PlatformSettings => Set<PlatformSetting>();
     public DbSet<TenantPermissionGrant> TenantPermissionGrants => Set<TenantPermissionGrant>();
     public DbSet<TenantSetting> TenantSettings => Set<TenantSetting>();
     public DbSet<TrashRecord> TrashRecords => Set<TrashRecord>();
@@ -147,6 +150,7 @@ public class ApplicationDbContext
         builder.Entity<Tenant>(entity =>
         {
             entity.HasIndex(item => item.Slug).IsUnique();
+            entity.HasIndex(item => item.CustomDomain).IsUnique().HasFilter("[CustomDomain] IS NOT NULL");
             entity.HasOne(item => item.Setting).WithOne(item => item.Tenant)
                 .HasForeignKey<TenantSetting>(item => item.TenantId).OnDelete(DeleteBehavior.Cascade);
         });
@@ -162,6 +166,24 @@ public class ApplicationDbContext
             entity.HasIndex(item => new { item.TenantId, item.Status });
             entity.HasOne(item => item.Tenant).WithMany(item => item.Subscriptions)
                 .HasForeignKey(item => item.TenantId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.SubscriptionPlan).WithMany(item => item.Subscriptions)
+                .HasForeignKey(item => item.SubscriptionPlanId).OnDelete(DeleteBehavior.SetNull);
+        });
+        builder.Entity<SubscriptionPlan>(entity =>
+        {
+            entity.Property(item => item.MonthlyPrice).HasPrecision(18, 2);
+            entity.Property(item => item.YearlyPrice).HasPrecision(18, 2);
+            entity.HasIndex(item => item.Code).IsUnique();
+        });
+        builder.Entity<SubscriptionPlanPermission>(entity =>
+        {
+            entity.HasIndex(item => new { item.SubscriptionPlanId, item.Permission }).IsUnique();
+            entity.HasOne(item => item.SubscriptionPlan).WithMany(item => item.Permissions)
+                .HasForeignKey(item => item.SubscriptionPlanId).OnDelete(DeleteBehavior.Cascade);
+        });
+        builder.Entity<PlatformSetting>(entity =>
+        {
+            entity.Property(item => item.Id).ValueGeneratedNever();
         });
         builder.Entity<TenantPermissionGrant>(entity =>
         {

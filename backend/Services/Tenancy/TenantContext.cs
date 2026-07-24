@@ -71,26 +71,63 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             return;
         }
 
-        var requestedSlug = httpContext.Request.Headers["X-Tenant-Slug"].FirstOrDefault()
+        var requestHost = httpContext.Request.Host.Host;
+        var forwardedTenantHost = NormalizeHost(httpContext.Request.Headers["X-Tenant-Host"].FirstOrDefault());
+        var host = forwardedTenantHost ?? NormalizeHost(requestHost) ?? "localhost";
+        var isLocalHost = string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase);
+        var isIpAddress = IPAddress.TryParse(host, out _);
+        string? customDomainSlug = null;
+        TenantSiteRoutingMode? requiredHostRoutingMode = null;
+        PlatformSetting? platformSettings = null;
+
+        if (!isLocalHost && !isIpAddress)
+        {
+            platformSettings = await dbContext.PlatformSettings.AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == 1, httpContext.RequestAborted);
+            if (platformSettings?.AllowCustomDomains != false)
+            {
+                customDomainSlug = await dbContext.Tenants.AsNoTracking()
+                    .Where(item => item.CustomDomain == host && item.SiteRoutingMode == TenantSiteRoutingMode.CustomDomain)
+                    .Select(item => item.Slug)
+                    .FirstOrDefaultAsync(httpContext.RequestAborted);
+                if (customDomainSlug is not null)
+                    requiredHostRoutingMode = TenantSiteRoutingMode.CustomDomain;
+            }
+        }
+
+        // A registered custom domain is authoritative. Query/header selection is
+        // used by shared storefront/admin hosts, and subdomains are resolved only
+        // under the configured root domain (never from an arbitrary hostname).
+        var requestedSlug = customDomainSlug
+            ?? httpContext.Request.Headers["X-Tenant-Slug"].FirstOrDefault()
             ?? httpContext.Request.Query["tenant"].FirstOrDefault();
 
-        if (string.IsNullOrWhiteSpace(requestedSlug))
+        if (string.IsNullOrWhiteSpace(requestedSlug) && !isLocalHost && !isIpAddress)
         {
-            var host = httpContext.Request.Host.Host;
-            var isLocalHost = string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase);
-            var isIpAddress = IPAddress.TryParse(host, out _);
-            if (!isLocalHost && !isIpAddress)
+            platformSettings ??= await dbContext.PlatformSettings.AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == 1, httpContext.RequestAborted);
+            var rootDomain = platformSettings?.RootDomain?.Trim().TrimEnd('.').ToLowerInvariant();
+            var storefrontHost = TryGetHost(platformSettings?.StorefrontBaseUrl);
+            var adminHost = TryGetHost(platformSettings?.AdminBaseUrl);
+            if (!string.IsNullOrWhiteSpace(rootDomain) &&
+                !string.Equals(host, storefrontHost, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(host, adminHost, StringComparison.OrdinalIgnoreCase) &&
+                host.EndsWith($".{rootDomain}", StringComparison.OrdinalIgnoreCase))
             {
-                var labels = host.Split('.', StringSplitOptions.RemoveEmptyEntries);
-                if (labels.Length > 2 && !string.Equals(labels[0], "www", StringComparison.OrdinalIgnoreCase))
-                    requestedSlug = labels[0];
+                var prefix = host[..^(rootDomain.Length + 1)];
+                if (!string.IsNullOrWhiteSpace(prefix) && !prefix.Contains('.'))
+                {
+                    requestedSlug = prefix;
+                    requiredHostRoutingMode = TenantSiteRoutingMode.Subdomain;
+                }
             }
         }
 
         if (!string.IsNullOrWhiteSpace(requestedSlug))
         {
             var requestedTenant = await dbContext.Tenants.AsNoTracking()
-                .Where(item => item.Slug == requestedSlug)
+                .Where(item => item.Slug == requestedSlug &&
+                    (!requiredHostRoutingMode.HasValue || item.SiteRoutingMode == requiredHostRoutingMode.Value))
                 .Select(item => new { item.Id, item.Slug, item.IsActive })
                 .FirstOrDefaultAsync(httpContext.RequestAborted);
 
@@ -113,11 +150,22 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
         }
 
         var fallback = await dbContext.Tenants.AsNoTracking()
-            .Where(item => item.IsActive)
-            .OrderBy(item => item.Id)
+            .Where(item => item.IsActive && item.Slug == "default")
             .Select(item => new { item.Id, item.Slug })
-            .FirstOrDefaultAsync(httpContext.RequestAborted);
-        tenantContext.Initialize(fallback?.Id ?? 1, null, fallback?.Slug ?? "default", isPlatformAdmin);
+            .FirstOrDefaultAsync(httpContext.RequestAborted)
+            ?? await dbContext.Tenants.AsNoTracking()
+                .Where(item => item.IsActive)
+                .OrderBy(item => item.Id)
+                .Select(item => new { item.Id, item.Slug })
+                .FirstOrDefaultAsync(httpContext.RequestAborted);
+
+        if (fallback is null || !await HasUsableSubscriptionAsync(dbContext, fallback.Id, httpContext.RequestAborted))
+        {
+            await WriteErrorAsync(httpContext, StatusCodes.Status404NotFound, "No active company workspace is available.");
+            return;
+        }
+
+        tenantContext.Initialize(fallback.Id, null, fallback.Slug, isPlatformAdmin);
         await next(httpContext);
     }
 
@@ -149,6 +197,21 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             return false;
         return !subscription.EndsAt.HasValue || subscription.EndsAt.Value >= DateTime.UtcNow;
     }
+
+    private static string? NormalizeHost(string? value)
+    {
+        var host = value?.Trim().TrimEnd('.').ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(host)) return null;
+        if (host.StartsWith('[') && host.EndsWith(']')) host = host[1..^1];
+        if (host.Contains('/') || host.Contains('\\')) return null;
+        if (host.Contains(':') && !IPAddress.TryParse(host, out _)) return null;
+        return host;
+    }
+
+    private static string? TryGetHost(string? value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            ? uri.Host.Trim().TrimEnd('.').ToLowerInvariant()
+            : null;
 
     private static async Task WriteErrorAsync(
         HttpContext context,
