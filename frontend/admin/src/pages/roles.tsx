@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PermissionChecklist } from "@/features/users/components/permission-checklist";
 import { userService } from "@/features/users/user-service";
 import type { RoleListItem, UpsertRoleRequest } from "@/features/users/user-types";
+import { useI18n } from "@/i18n/i18n-provider";
 
 const emptyForm: UpsertRoleRequest = {
     name: "",
@@ -31,6 +32,7 @@ const emptyForm: UpsertRoleRequest = {
 
 export default function RolesPage() {
     const queryClient = useQueryClient();
+    const { tr } = useI18n();
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState<RoleListItem | null>(null);
     const [form, setForm] = useState<UpsertRoleRequest>(emptyForm);
@@ -88,10 +90,10 @@ export default function RolesPage() {
         setEditing(null);
         setForm((current) => ({
             ...current,
-            name: `${editing.name} Custom`,
+            name: `${editing.name} ${tr("Custom")}`,
             description:
                 current.description ??
-                `Editable permission profile based on ${editing.name}.`,
+                `${tr("Editable permission profile based on")} ${editing.name}.`,
         }));
     };
 
@@ -183,12 +185,12 @@ export default function RolesPage() {
                                                 variant="outline"
                                                 size="icon"
                                                 className="text-destructive"
-                                                aria-label={`Delete ${role.name}`}
+                                                aria-label={`${tr("Delete")} ${role.name}`}
                                             >
                                                 <Trash2 />
                                             </Button>
                                         }
-                                        title={`Delete ${role.name}?`}
+                                        title={`${tr("Delete")} ${role.name}?`}
                                         description="This permanently removes the role. It can only be deleted when no users are assigned to it."
                                         confirmLabel="Delete role"
                                         destructive
@@ -209,7 +211,7 @@ export default function RolesPage() {
                 <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
                     <DialogHeader className="pe-10">
                         <DialogTitle className="text-base">
-                            {editing ? (editing.isSystemRole ? `View ${editing.name}` : `Edit ${editing.name}`) : "Create role"}
+                            {editing ? (editing.isSystemRole ? `${tr("View")} ${editing.name}` : `${tr("Edit")} ${editing.name}`) : "Create role"}
                         </DialogTitle>
                         <DialogDescription>
                             A role is a reusable collection of permission claims. Assign the role to users from the Users page.

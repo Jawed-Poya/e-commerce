@@ -37,8 +37,10 @@ import type {
     TopProductItem,
 } from "@/features/dashboard/dashboard-types";
 import { formatMoney, StatusBadge } from "@/pages/orders";
+import { useI18n } from "@/i18n/i18n-provider";
 
 export default function Dashboard() {
+    const { tr } = useI18n();
     const query = useQuery({
         queryKey: ["admin-dashboard"],
         queryFn: dashboardService.get,
@@ -101,19 +103,19 @@ export default function Dashboard() {
                         data.kpis.revenueLast30Days,
                         data.kpis.currency,
                     )}
-                    help={`${formatMoney(data.kpis.paidRevenue, data.kpis.currency)} all-time paid`}
+                    help={`${formatMoney(data.kpis.paidRevenue, data.kpis.currency)} ${tr("all-time paid")}`}
                     icon={<CircleDollarSign />}
                 />
                 <MetricCard
                     label="Orders"
                     value={data.kpis.totalOrders.toLocaleString()}
-                    help={`${data.kpis.pendingOrders} pending · ${data.kpis.pendingPayments} payments to review`}
+                    help={`${data.kpis.pendingOrders} ${tr("pending")} · ${data.kpis.pendingPayments} ${tr("payments to review")}`}
                     icon={<ShoppingCart />}
                 />
                 <MetricCard
                     label="Website product views"
                     value={data.kpis.totalProductViews.toLocaleString()}
-                    help={`${data.kpis.activeProducts} of ${data.kpis.totalProducts} products active`}
+                    help={`${data.kpis.activeProducts} ${tr("of")} ${data.kpis.totalProducts} ${tr("products active")}`}
                     icon={<Eye />}
                 />
                 <MetricCard
