@@ -312,7 +312,7 @@ public sealed class AuthService(
         if (authUser.CustomerId.HasValue) claims.Add(new Claim(AuthClaims.CustomerId, authUser.CustomerId.Value.ToString()));
         if (authUser.CustomerTypeId.HasValue) claims.Add(new Claim(AuthClaims.CustomerTypeId, authUser.CustomerTypeId.Value.ToString()));
         claims.Add(new Claim(AuthClaims.TenantId, user.TenantId.ToString()));
-        claims.Add(new Claim(AuthClaims.TenantSlug, tenantContext.TenantSlug));
+        claims.Add(new Claim(AuthClaims.TenantSlug, authUser.TenantSlug));
         if (user.BranchId.HasValue) claims.Add(new Claim(AuthClaims.BranchId, user.BranchId.Value.ToString()));
         if (roles.Contains(AppRoles.PlatformAdmin, StringComparer.OrdinalIgnoreCase))
             claims.Add(new Claim(AuthClaims.PlatformAdmin, "true"));
@@ -335,6 +335,12 @@ public sealed class AuthService(
     {
         var identityClaims = await userManager.GetClaimsAsync(user);
         var permissions = await GetPermissionsAsync(user, roles);
+        var tenantSlug = await context.Tenants
+            .AsNoTracking()
+            .Where(item => item.Id == user.TenantId)
+            .Select(item => item.Slug)
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? tenantContext.TenantSlug;
         var linkedCustomerId = long.TryParse(
             identityClaims.FirstOrDefault(claim => claim.Type == AuthClaims.CustomerId)?.Value,
             out var parsedCustomerId)
@@ -368,7 +374,7 @@ public sealed class AuthService(
                 roles.Contains(AppRoles.PlatformAdmin, StringComparer.OrdinalIgnoreCase) || permissions.Count > 0,
             user.TenantId,
             user.BranchId,
-            tenantContext.TenantSlug,
+            tenantSlug,
             roles.Contains(AppRoles.PlatformAdmin, StringComparer.OrdinalIgnoreCase));
     }
 

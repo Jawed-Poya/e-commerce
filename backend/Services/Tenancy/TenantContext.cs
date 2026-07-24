@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Claims;
 using ECommerce.Data;
 using ECommerce.Entities.Tenancy;
@@ -76,9 +77,14 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
         if (string.IsNullOrWhiteSpace(requestedSlug))
         {
             var host = httpContext.Request.Host.Host;
-            var labels = host.Split('.', StringSplitOptions.RemoveEmptyEntries);
-            if (labels.Length > 2 && !string.Equals(labels[0], "www", StringComparison.OrdinalIgnoreCase))
-                requestedSlug = labels[0];
+            var isLocalHost = string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase);
+            var isIpAddress = IPAddress.TryParse(host, out _);
+            if (!isLocalHost && !isIpAddress)
+            {
+                var labels = host.Split('.', StringSplitOptions.RemoveEmptyEntries);
+                if (labels.Length > 2 && !string.Equals(labels[0], "www", StringComparison.OrdinalIgnoreCase))
+                    requestedSlug = labels[0];
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(requestedSlug))
