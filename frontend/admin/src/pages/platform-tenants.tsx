@@ -13,6 +13,7 @@ import {
     Pencil,
     Plus,
     Save,
+    Share2,
     ShoppingCart,
     Users,
     Warehouse,
@@ -211,6 +212,7 @@ export default function PlatformTenantsPage() {
                             onEdit={() => openEdit(tenant)}
                             onSubscription={() => openSubscription(tenant)}
                             onPreview={() => previewMutation.mutate(tenant.id)}
+                            onShare={() => tenant.site.storefrontUrl && void shareStorefront(tenant.name, tenant.site.storefrontUrl, t)}
                             t={t}
                         />
                     ))}
@@ -218,7 +220,7 @@ export default function PlatformTenantsPage() {
             )}
 
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                <DialogContent className="max-h-[96dvh] w-[calc(100vw-1rem)] max-w-[1500px] overflow-y-auto p-4 sm:p-6">
+                <DialogContent className="max-h-[96dvh] w-[calc(100vw-1rem)] max-w-none overflow-y-auto p-4 sm:max-w-[calc(100vw-2rem)] sm:p-6 2xl:max-w-[1600px]">
                     <DialogHeader>
                         <DialogTitle>{t("platform.createTitle")}</DialogTitle>
                         <DialogDescription>{t("platform.createDescription")}</DialogDescription>
@@ -278,7 +280,7 @@ export default function PlatformTenantsPage() {
             </Dialog>
 
             <Dialog open={Boolean(editing && editForm)} onOpenChange={(open) => { if (!open) { setEditing(null); setEditForm(null); } }}>
-                <DialogContent className="max-h-[96dvh] w-[calc(100vw-1rem)] max-w-[1600px] overflow-hidden p-0">
+                <DialogContent className="h-[96dvh] w-[calc(100vw-1rem)] max-w-none grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden p-0 sm:max-w-[calc(100vw-2rem)] 2xl:max-w-[1720px]">
                     {editing && editForm ? (
                         <>
                             <div className="border-b p-4 sm:p-6"><DialogHeader><DialogTitle>{t("platform.editTenant")}</DialogTitle><DialogDescription>{editing.name}</DialogDescription></DialogHeader></div>
@@ -311,7 +313,7 @@ export default function PlatformTenantsPage() {
             </Dialog>
 
             <Dialog open={Boolean(subscriptionTenant)} onOpenChange={(open) => !open && setSubscriptionTenant(null)}>
-                <DialogContent className="max-h-[96dvh] w-[calc(100vw-1rem)] max-w-[1300px] overflow-y-auto p-4 sm:p-6">
+                <DialogContent className="max-h-[96dvh] w-[calc(100vw-1rem)] max-w-none overflow-y-auto p-4 sm:max-w-[calc(100vw-2rem)] sm:p-6 2xl:max-w-[1450px]">
                     <DialogHeader><DialogTitle>{t("platform.manageSubscription")}</DialogTitle><DialogDescription>{subscriptionTenant?.name}</DialogDescription></DialogHeader>
                     <div className="grid gap-4 py-2 sm:grid-cols-2 lg:grid-cols-4">
                         <Field label={t("platform.plan")}><PlanCombobox plans={plansQuery.data ?? []} value={subscriptionForm.subscriptionPlanId} onChange={selectPlan} t={t} /></Field>
@@ -333,7 +335,7 @@ export default function PlatformTenantsPage() {
     );
 }
 
-function TenantCard({ tenant, onEdit, onSubscription, onPreview, t }: { tenant: TenantProfile; onEdit: () => void; onSubscription: () => void; onPreview: () => void; t: ReturnType<typeof useI18n>["t"] }) {
+function TenantCard({ tenant, onEdit, onSubscription, onPreview, onShare, t }: { tenant: TenantProfile; onEdit: () => void; onSubscription: () => void; onPreview: () => void; onShare: () => void; t: ReturnType<typeof useI18n>["t"] }) {
     return (
         <Card className="overflow-hidden">
             <CardContent className="space-y-5 p-5">
@@ -350,15 +352,16 @@ function TenantCard({ tenant, onEdit, onSubscription, onPreview, t }: { tenant: 
                 </div>
 
                 <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
-                    <LinkRow label={t("platform.workspaceCode")} value={tenant.site.workspaceCode} onCopy={() => copyText(tenant.site.workspaceCode)} />
-                    <LinkRow label={t("platform.adminLink")} value={tenant.site.adminUrl} onCopy={() => copyText(tenant.site.adminUrl)} href={tenant.site.adminUrl} />
-                    <LinkRow label={t("platform.storefrontLink")} value={tenant.site.storefrontUrl ?? t("platform.storefrontPrivateOrUnpublished")} onCopy={tenant.site.storefrontUrl ? () => copyText(tenant.site.storefrontUrl!) : undefined} href={tenant.site.storefrontUrl ?? undefined} />
+                    <LinkRow label={t("platform.workspaceCode")} value={tenant.site.workspaceCode} onCopy={() => void copyWithFeedback(tenant.site.workspaceCode, t)} />
+                    <LinkRow label={t("platform.adminLink")} value={tenant.site.adminUrl} onCopy={() => void copyWithFeedback(tenant.site.adminUrl, t)} href={tenant.site.adminUrl} />
+                    <LinkRow label={t("platform.storefrontLink")} value={tenant.site.storefrontUrl ?? t("platform.storefrontPrivateOrUnpublished")} onCopy={tenant.site.storefrontUrl ? () => void copyWithFeedback(tenant.site.storefrontUrl!, t) : undefined} href={tenant.site.storefrontUrl ?? undefined} />
                 </div>
 
                 <div className="flex flex-wrap gap-2">
                     <Button variant="outline" onClick={onEdit}><Pencil />{t("platform.edit")}</Button>
                     <Button variant="outline" onClick={onSubscription}><Crown />{t("platform.managePlan")}</Button>
                     <Button variant="outline" onClick={onPreview}><Eye />{t("platform.previewStorefront")}</Button>
+                    {tenant.site.storefrontUrl ? <Button variant="outline" onClick={onShare}><Share2 />{t("platform.shareStorefront")}</Button> : null}
                 </div>
             </CardContent>
         </Card>
@@ -396,8 +399,8 @@ function SiteEditor({ tenant, form, onChange, onPreview, onRotate, t }: EditorPr
                 <div className="rounded-xl border p-4">
                     <p className="font-semibold">{t("platform.generatedLinks")}</p>
                     <div className="mt-3 space-y-3">
-                        <LinkRow label={t("platform.adminLink")} value={tenant.site.adminUrl} onCopy={() => copyText(tenant.site.adminUrl)} href={tenant.site.adminUrl} />
-                        <LinkRow label={t("platform.storefrontLink")} value={tenant.site.storefrontUrl ?? t("platform.storefrontPrivateOrUnpublished")} onCopy={tenant.site.storefrontUrl ? () => copyText(tenant.site.storefrontUrl!) : undefined} href={tenant.site.storefrontUrl ?? undefined} />
+                        <LinkRow label={t("platform.adminLink")} value={tenant.site.adminUrl} onCopy={() => void copyWithFeedback(tenant.site.adminUrl, t)} href={tenant.site.adminUrl} />
+                        <LinkRow label={t("platform.storefrontLink")} value={tenant.site.storefrontUrl ?? t("platform.storefrontPrivateOrUnpublished")} onCopy={tenant.site.storefrontUrl ? () => void copyWithFeedback(tenant.site.storefrontUrl!, t) : undefined} onShare={tenant.site.storefrontUrl ? () => void shareStorefront(tenant.name, tenant.site.storefrontUrl!, t) : undefined} href={tenant.site.storefrontUrl ?? undefined} />
                     </div>
                 </div>
             </div>
@@ -463,7 +466,7 @@ function FontField({ label, value, options, onChange }: { label: string; value: 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <Field label={label}><div className="flex gap-2"><Input type="color" className="w-14 p-1" value={value} onChange={(e) => onChange(e.target.value)} /><Input value={value} onChange={(e) => onChange(e.target.value)} /></div></Field>; }
 function Field({ label, children }: { label: string; children: ReactNode }) { return <div className="min-w-0 space-y-2"><Label>{label}</Label>{children}</div>; }
 function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: number }) { return <div className="rounded-xl border p-3"><span className="flex items-center gap-2 text-xs text-muted-foreground">{icon}{label}</span><p className="mt-2 text-lg font-bold">{value.toLocaleString()}</p></div>; }
-function LinkRow({ label, value, onCopy, href }: { label: string; value: string; onCopy?: () => void; href?: string }) { return <div className="min-w-0"><p className="text-xs font-semibold text-muted-foreground">{label}</p><div className="mt-1 flex min-w-0 items-center gap-2"><code className="min-w-0 flex-1 truncate text-xs" dir="ltr">{value}</code>{onCopy ? <Button variant="ghost" size="icon" onClick={onCopy}><Copy className="size-4" /></Button> : null}{href ? <Button variant="ghost" size="icon" render={<a href={href} target="_blank" rel="noreferrer" />}><ExternalLink className="size-4" /></Button> : null}</div></div>; }
+function LinkRow({ label, value, onCopy, onShare, href }: { label: string; value: string; onCopy?: () => void; onShare?: () => void; href?: string }) { return <div className="min-w-0"><p className="text-xs font-semibold text-muted-foreground">{label}</p><div className="mt-1 flex min-w-0 items-center gap-1"><code className="min-w-0 flex-1 truncate text-xs" dir="ltr">{value}</code>{onCopy ? <Button type="button" variant="ghost" size="icon" onClick={onCopy}><Copy className="size-4" /></Button> : null}{onShare ? <Button type="button" variant="ghost" size="icon" onClick={onShare}><Share2 className="size-4" /></Button> : null}{href ? <Button type="button" variant="ghost" size="icon" render={<a href={href} target="_blank" rel="noreferrer" />}><ExternalLink className="size-4" /></Button> : null}</div></div>; }
 function emptyCreateTenant(): CreateTenantRequest {
     return {
         name: "", slug: "", adminFullName: "", adminEmail: "", adminPassword: "",
@@ -477,7 +480,12 @@ function emptyCreateTenant(): CreateTenantRequest {
 function emptySubscription(): UpdateTenantSubscriptionRequest { return { subscriptionPlanId: null, plan: null, status: "Active", endsAt: null, maxUsers: null, maxBranches: null, maxProducts: null, maxOrdersPerMonth: null, maxStorageMb: null, monthlyPrice: null, billingCurrencyCode: "USD", notes: null }; }
 async function copyText(value: string) {
     if (navigator.clipboard?.writeText) {
-        try { await navigator.clipboard.writeText(value); return; } catch { /* LAN HTTP fallback below. */ }
+        try {
+            await navigator.clipboard.writeText(value);
+            return true;
+        } catch {
+            // LAN HTTP fallback below.
+        }
     }
     const textarea = document.createElement("textarea");
     textarea.value = value;
@@ -485,8 +493,26 @@ async function copyText(value: string) {
     textarea.style.opacity = "0";
     document.body.appendChild(textarea);
     textarea.select();
-    document.execCommand("copy");
+    const copied = document.execCommand("copy");
     textarea.remove();
+    return copied;
+}
+
+async function copyWithFeedback(value: string, t: ReturnType<typeof useI18n>["t"]) {
+    const copied = await copyText(value);
+    copied ? toast.success(t("platform.linkCopied")) : toast.error(t("platform.linkCopyFailed"));
+}
+
+async function shareStorefront(name: string, url: string, t: ReturnType<typeof useI18n>["t"]) {
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: name, text: t("platform.shareStorefrontText"), url });
+            return;
+        } catch (error) {
+            if ((error as DOMException)?.name === "AbortError") return;
+        }
+    }
+    await copyWithFeedback(url, t);
 }
 function numberOrNull(value: string) { const parsed = Number(value); return value === "" || !Number.isFinite(parsed) ? null : parsed; }
 function subscriptionStatusLabel(status: SubscriptionStatus, t: ReturnType<typeof useI18n>["t"]) {

@@ -218,30 +218,33 @@ function InventoryTransactions() {
 
     const clear = () => { setSearch(""); setType(undefined); setFrom(""); setTo(""); setPage(1); };
 
-    return <Card>
+    return <Card className="min-w-0 overflow-hidden">
         <CardHeader className="border-b"><CardTitle>{t("inventory.ledgerTitle")}</CardTitle><p className="text-xs text-muted-foreground">{t("inventory.ledgerHelp")}</p></CardHeader>
-        <CardContent className="space-y-4 pt-4">
-            <div className="grid gap-2 lg:grid-cols-[minmax(220px,1fr)_220px_160px_160px_auto]">
-                <div className="relative"><Search className="absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} className="ps-9" placeholder={t("inventory.searchTransactions")} /></div>
-                <Combobox items={options} value={selectedType} onValueChange={option => { setType(option?.id === "all" ? undefined : option?.id); setPage(1); }} itemToStringLabel={option => option.name}><ComboboxInput className="w-full" /><ComboboxContent><ComboboxList>{options.map(option => <ComboboxItem key={option.id} value={option}>{option.name}</ComboboxItem>)}</ComboboxList></ComboboxContent></Combobox>
-                <Input type="date" aria-label={t("inventory.fromDate")} value={from} onChange={event => { setFrom(event.target.value); setPage(1); }} />
-                <Input type="date" aria-label={t("inventory.toDate")} value={to} min={from || undefined} onChange={event => { setTo(event.target.value); setPage(1); }} />
-                {hasFilters && <Button variant="destructive" onClick={clear}><X className="me-2 size-4" />{t("filters.removeAll")}</Button>}
+        <CardContent className="min-w-0 space-y-5 pt-4">
+            <div className="rounded-xl border bg-muted/20 p-3 sm:p-4">
+                <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(260px,1.4fr)_minmax(190px,.8fr)_minmax(150px,.65fr)_minmax(150px,.65fr)_auto]">
+                    <div className="relative min-w-0 sm:col-span-2 xl:col-span-1"><Search className="absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} className="w-full ps-9" placeholder={t("inventory.searchTransactions")} /></div>
+                    <div className="min-w-0"><Combobox items={options} value={selectedType} onValueChange={option => { setType(option?.id === "all" ? undefined : option?.id); setPage(1); }} itemToStringLabel={option => option.name}><ComboboxInput className="w-full min-w-0" /><ComboboxContent><ComboboxList>{options.map(option => <ComboboxItem key={option.id} value={option}>{option.name}</ComboboxItem>)}</ComboboxList></ComboboxContent></Combobox></div>
+                    <Input className="min-w-0" type="date" aria-label={t("inventory.fromDate")} value={from} onChange={event => { setFrom(event.target.value); setPage(1); }} />
+                    <Input className="min-w-0" type="date" aria-label={t("inventory.toDate")} value={to} min={from || undefined} onChange={event => { setTo(event.target.value); setPage(1); }} />
+                    {hasFilters ? <Button className="w-full sm:col-span-2 xl:col-span-1 xl:w-auto" variant="destructive" onClick={clear}><X className="me-2 size-4" />{t("filters.removeAll")}</Button> : <div className="hidden xl:block" />}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t pt-3 text-[11px] text-muted-foreground"><span>{t("inventory.fromDate")}: {from || t("filters.all")}</span><span>{t("inventory.toDate")}: {to || t("filters.all")}</span><span>{t("inventory.movementType")}: {selectedType.name}</span></div>
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground"><span>{t("inventory.fromDate")}: {from || t("filters.all")}</span><span>{t("inventory.toDate")}: {to || t("filters.all")}</span></div>
 
-            <div className="grid gap-3 md:hidden">
-                {isLoading && <MobileMessage message={t("common.loading")} loading />}
-                {isError && <MobileMessage message={t("inventory.transactionsError")} destructive />}
-                {!isLoading && !isError && (data?.items.length ?? 0) === 0 && <MobileMessage message={t("inventory.noTransactions")} />}
-                {data?.items.map(transaction => <div key={transaction.id} className="rounded-xl border bg-background p-4">
-                    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-semibold">{transaction.productName}</p><p className="mt-1 text-xs text-muted-foreground">{transaction.productBarcode || t("inventory.noBarcode")}</p></div><MovementBadge type={transaction.type} label={typeOptions.find(option => option.id === transaction.type)?.name ?? transaction.type} /></div>
+            <div className="grid gap-3 xl:hidden sm:grid-cols-2">
+                {isLoading && <div className="sm:col-span-2"><MobileMessage message={t("common.loading")} loading /></div>}
+                {isError && <div className="sm:col-span-2"><MobileMessage message={t("inventory.transactionsError")} destructive /></div>}
+                {!isLoading && !isError && (data?.items.length ?? 0) === 0 && <div className="sm:col-span-2"><MobileMessage message={t("inventory.noTransactions")} /></div>}
+                {data?.items.map(transaction => <article key={transaction.id} className="min-w-0 rounded-xl border bg-background p-4 shadow-xs">
+                    <div className="flex min-w-0 items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-semibold">{transaction.productName}</p><p className="mt-1 truncate text-xs text-muted-foreground">{transaction.productBarcode || t("inventory.noBarcode")}</p></div><div className="shrink-0"><MovementBadge type={transaction.type} label={typeOptions.find(option => option.id === transaction.type)?.name ?? transaction.type} /></div></div>
                     <div className="mt-4 grid grid-cols-2 gap-2 text-sm"><MobileValue label={t("inventory.change")} value={`${transaction.quantity > 0 ? "+" : ""}${formatNumber(transaction.quantity)}`} strong /><MobileValue label={t("inventory.beforeAfter")} value={`${formatNumber(transaction.quantityBefore)} → ${formatNumber(transaction.quantityAfter)}`} /></div>
-                    <div className="mt-3 border-t pt-3"><p className="text-xs text-muted-foreground">{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(transaction.createdAt))}</p><p className="mt-2 line-clamp-2 text-sm">{transaction.description || t("inventory.noNote")}</p>{transaction.referenceId && <p className="mt-1 text-xs text-muted-foreground">{transaction.referenceType} #{transaction.referenceId}</p>}<Button variant="ghost" size="sm" className="mt-2 w-full" onClick={() => navigate(`/products/${transaction.productId}`)}><Eye className="me-2 size-4" />{t("details.open")}</Button></div>
-                </div>)}
+                    <div className="mt-3 rounded-lg bg-muted/35 p-3"><p className="text-xs text-muted-foreground">{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(transaction.createdAt))}</p><p className="mt-2 line-clamp-3 text-sm leading-5">{transaction.description || t("inventory.noNote")}</p>{transaction.referenceId && <p className="mt-1 break-all text-xs text-muted-foreground">{transaction.referenceType} #{transaction.referenceId}</p>}</div>
+                    <Button variant="outline" size="sm" className="mt-3 w-full" onClick={() => navigate(`/products/${transaction.productId}`)}><Eye className="me-2 size-4" />{t("details.open")}</Button>
+                </article>)}
             </div>
 
-            <div className="responsive-table hidden border md:block"><Table>
+            <div className="responsive-table hidden min-w-0 overflow-x-auto rounded-xl border xl:block"><Table className="min-w-[980px]">
                 <TableHeader><TableRow><TableHead>{t("inventory.date")}</TableHead><TableHead className="min-w-56">{t("products.product")}</TableHead><TableHead>{t("inventory.movementType")}</TableHead><TableHead className="text-end">{t("inventory.change")}</TableHead><TableHead className="text-end">{t("inventory.beforeAfter")}</TableHead><TableHead className="min-w-52">{t("inventory.note")}</TableHead><TableHead /></TableRow></TableHeader>
                 <TableBody>
                     {isLoading && <LoadingRow colSpan={7} />}
