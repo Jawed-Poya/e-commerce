@@ -86,7 +86,7 @@ export default function PlatformTenantsPage() {
             setCreateForm(emptyCreateTenant(platformSettingsQuery.data?.defaultRoutingMode));
             await invalidate();
         },
-        onError: (error) => toast.error(message(error)),
+        onError: (error) => toast.error(message(error, t("tenant.operationFailed"))),
     });
     const updateMutation = useMutation({
         mutationFn: () => tenantService.updateTenant(editing!.id, editForm!),
@@ -95,7 +95,7 @@ export default function PlatformTenantsPage() {
             setEditing(null); setEditForm(null);
             await invalidate();
         },
-        onError: (error) => toast.error(message(error)),
+        onError: (error) => toast.error(message(error, t("tenant.operationFailed"))),
     });
     const subscriptionMutation = useMutation({
         mutationFn: () => tenantService.updateSubscription(subscriptionTenant!.id, subscriptionForm),
@@ -104,7 +104,7 @@ export default function PlatformTenantsPage() {
             setSubscriptionTenant(null);
             await invalidate();
         },
-        onError: (error) => toast.error(message(error)),
+        onError: (error) => toast.error(message(error, t("tenant.operationFailed"))),
     });
 
     const openEdit = (tenant: TenantProfile) => {
@@ -238,7 +238,7 @@ export default function PlatformTenantsPage() {
                     <DialogHeader><DialogTitle>{t("platform.manageSubscription")}: {subscriptionTenant?.name}</DialogTitle><DialogDescription>{t("platform.subscriptionLimitsHelp")}</DialogDescription></DialogHeader>
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         <Field label={t("platform.plan")}><PlanCombobox plans={plansQuery.data ?? []} value={subscriptionForm.subscriptionPlanId} onChange={selectPlan} /></Field>
-                        <Field label={t("tenant.status")}><SimpleCombobox value={subscriptionForm.status} onValueChange={(value) => value && setSubscriptionForm((v) => ({ ...v, status: value as SubscriptionStatus }))} options={statuses.map((value) => ({ value, label: value }))} /></Field>
+                        <Field label={t("tenant.status")}><SimpleCombobox value={subscriptionForm.status} onValueChange={(value) => value && setSubscriptionForm((v) => ({ ...v, status: value as SubscriptionStatus }))} options={statuses.map((value) => ({ value, label: subscriptionStatusLabel(value, t) }))} /></Field>
                         <Field label={t("platform.endsAt")}><Input type="date" value={subscriptionForm.endsAt ?? ""} onChange={(e) => setSubscriptionForm((v) => ({ ...v, endsAt: e.target.value || null }))} /></Field>
                         <LimitField icon={<Users />} label={t("tenant.usersLimit")} value={subscriptionForm.maxUsers} onChange={(value) => setSubscriptionForm((v) => ({ ...v, maxUsers: value }))} />
                         <LimitField icon={<Warehouse />} label={t("tenant.branchesLimit")} value={subscriptionForm.maxBranches} onChange={(value) => setSubscriptionForm((v) => ({ ...v, maxBranches: value }))} />
@@ -263,7 +263,7 @@ function TenantCard({ tenant, onEdit, onSubscription, t }: { tenant: TenantProfi
     };
     return <Card className="overflow-hidden"><CardContent className="p-0">
         <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex min-w-0 gap-4"><div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-primary text-primary-foreground">{tenant.logoUrl ? <img src={tenant.logoUrl} alt="" className="size-full object-cover" /> : <Building2 />}</div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-lg font-bold">{tenant.name}</h2><Badge variant={tenant.subscription?.status === "Active" ? "default" : "secondary"}>{tenant.subscription?.status ?? t("platform.noPlan")}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{tenant.slug} · {tenant.subscription?.planName ?? t("platform.noPlan")}</p></div></div>
+            <div className="flex min-w-0 gap-4"><div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-primary text-primary-foreground">{tenant.logoUrl ? <img src={tenant.logoUrl} alt="" className="size-full object-cover" /> : <Building2 />}</div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-lg font-bold">{tenant.name}</h2><Badge variant={tenant.subscription?.status === "Active" ? "default" : "secondary"}>{tenant.subscription ? subscriptionStatusLabel(tenant.subscription.status, t) : t("platform.noPlan")}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{tenant.slug} · {tenant.subscription?.planName ?? t("platform.noPlan")}</p></div></div>
             <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={onEdit}><Pencil />{t("platform.edit")}</Button><Button size="sm" variant="outline" onClick={onSubscription}><Crown />{t("platform.managePlan")}</Button></div>
         </div>
         <div className="grid gap-px border-y bg-border sm:grid-cols-3"><Stat icon={<Users />} value={tenant.subscription?.maxUsers ?? 0} label={t("tenant.usersLimit")} /><Stat icon={<Warehouse />} value={tenant.subscription?.maxBranches ?? 0} label={t("tenant.branchesLimit")} /><Stat icon={<Package />} value={tenant.subscription?.maxProducts ?? 0} label={t("tenant.productsLimit")} /></div>
@@ -342,4 +342,15 @@ async function copyText(value: string) {
     textarea.remove();
 }
 function numberOrNull(value: string) { const parsed = Number(value); return value === "" || !Number.isFinite(parsed) ? null : parsed; }
-function message(error: unknown) { return error instanceof Error ? error.message : "Operation failed."; }
+function subscriptionStatusLabel(status: SubscriptionStatus, t: ReturnType<typeof useI18n>["t"]) {
+    const keys: Record<SubscriptionStatus, string> = {
+        Trial: "subscription.status.Trial",
+        Active: "subscription.status.Active",
+        PastDue: "subscription.status.PastDue",
+        Suspended: "subscription.status.Suspended",
+        Cancelled: "subscription.status.Cancelled",
+        Expired: "subscription.status.Expired",
+    };
+    return t(keys[status] as never);
+}
+function message(error: unknown, fallback: string) { return error instanceof Error ? error.message : fallback; }
