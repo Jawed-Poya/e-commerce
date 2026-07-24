@@ -1,4 +1,5 @@
 using ECommerce.Dtos.Tenancy;
+using ECommerce.Entities;
 using ECommerce.Services.Tenancy;
 using ECommerce.Shared;
 using Microsoft.AspNetCore.Authorization;

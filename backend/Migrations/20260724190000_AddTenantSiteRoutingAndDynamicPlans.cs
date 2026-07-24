@@ -132,13 +132,23 @@ END;
 IF OBJECT_ID(N'[dbo].[TenantSubscriptions]', N'U') IS NOT NULL
    AND OBJECT_ID(N'[dbo].[SubscriptionPlans]', N'U') IS NOT NULL
 BEGIN
-    UPDATE subscription
-    SET [SubscriptionPlanId] = plan.[Id], [PlanName] = plan.[Name],
-        [MaxOrdersPerMonth] = CASE WHEN subscription.[MaxOrdersPerMonth] < 1 THEN plan.[MaxOrdersPerMonth] ELSE subscription.[MaxOrdersPerMonth] END,
-        [MaxStorageMb] = CASE WHEN subscription.[MaxStorageMb] < 1 THEN plan.[MaxStorageMb] ELSE subscription.[MaxStorageMb] END
-    FROM [dbo].[TenantSubscriptions] subscription
-    INNER JOIN [dbo].[SubscriptionPlans] plan ON plan.[LegacyPlan] = subscription.[Plan]
-    WHERE subscription.[SubscriptionPlanId] IS NULL;
+    UPDATE tenantSubscription
+    SET [SubscriptionPlanId] = subscriptionPlan.[Id],
+        [PlanName] = subscriptionPlan.[Name],
+        [MaxOrdersPerMonth] = CASE
+            WHEN tenantSubscription.[MaxOrdersPerMonth] < 1
+                THEN subscriptionPlan.[MaxOrdersPerMonth]
+            ELSE tenantSubscription.[MaxOrdersPerMonth]
+        END,
+        [MaxStorageMb] = CASE
+            WHEN tenantSubscription.[MaxStorageMb] < 1
+                THEN subscriptionPlan.[MaxStorageMb]
+            ELSE tenantSubscription.[MaxStorageMb]
+        END
+    FROM [dbo].[TenantSubscriptions] AS tenantSubscription
+    INNER JOIN [dbo].[SubscriptionPlans] AS subscriptionPlan
+        ON subscriptionPlan.[LegacyPlan] = tenantSubscription.[Plan]
+    WHERE tenantSubscription.[SubscriptionPlanId] IS NULL;
 END;
 """);
 

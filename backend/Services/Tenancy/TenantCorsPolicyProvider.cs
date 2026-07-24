@@ -1,4 +1,5 @@
 using ECommerce.Data;
+using ECommerce.Entities.Tenancy;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
