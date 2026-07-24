@@ -32,6 +32,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { tenantService } from "@/features/tenancy/tenant-service";
+import { resolveTenantFontStack, tenantFontOptions } from "@/features/tenancy/tenant-fonts";
 import type { Branch, TenantSettings } from "@/features/tenancy/tenant-types";
 import { useTenant } from "@/features/tenancy/tenant-context";
 import { useI18n } from "@/i18n/i18n-provider";
@@ -45,26 +46,7 @@ const currencies = [
     ["INR", "Indian Rupee", "₹"],
 ] as const;
 
-const fontOptions = {
-    en: ["Inter", "Manrope", "Poppins", "Segoe UI", "Arial"],
-    dr: ["B Nazanin", "B Mitra", "B Wahid", "B Titr", "Vazirmatn", "Noto Sans Arabic", "Tahoma"],
-    ps: [
-        "Bahij TheSansArabic",
-        "Bahij Nassim",
-        "Bahij Nazanin",
-        "Bahij Roya",
-        "Bahij SultanNahia",
-        "Bahij Tanseek Pro",
-        "Bahij Titr",
-        "Bahij Traffic",
-        "Bahij Uthman Taha",
-        "Bahij Yakout",
-        "Bahij Yekan",
-        "Bahij Zar",
-        "Noto Sans Arabic",
-        "Tahoma",
-    ],
-} as const;
+const fontOptions = tenantFontOptions;
 
 type Tab = "profile" | "branches" | "appearance" | "subscription";
 
@@ -614,6 +596,12 @@ export default function CompanySettingsPage() {
                                 }
                             />
                         </Field>
+                        <div className="flex gap-3 border border-primary/20 bg-primary/5 p-4 md:col-span-2 xl:col-span-3">
+                            <Info className="mt-0.5 size-5 shrink-0 text-primary" />
+                            <p className="text-sm leading-6 text-muted-foreground">
+                                {t("tenant.fontAvailabilityHelp")}
+                            </p>
+                        </div>
                         <Field label={t("tenant.trashRetention")}>
                             <Input
                                 type="number"
@@ -934,12 +922,27 @@ function FontCombobox({
     value: string;
     onValueChange: (value: string) => void;
 }) {
+    const preview = language === "en"
+        ? "The quick brown fox · English preview"
+        : language === "dr"
+          ? "نمونهٔ زندهٔ فونت دری برای فروشگاه و مدیریت"
+          : "د پښتو لیکدود ژوندۍ بېلګه د پلورنځي او مدیریت لپاره";
     return (
-        <SimpleCombobox
-            value={value}
-            onValueChange={(next) => next && onValueChange(next)}
-            options={fontOptions[language].map((font) => ({ value: font, label: font }))}
-        />
+        <div className="space-y-2">
+            <SimpleCombobox
+                value={value}
+                onValueChange={(next) => next && onValueChange(next)}
+                options={fontOptions[language]}
+            />
+            <p
+                dir={language === "en" ? "ltr" : "rtl"}
+                lang={language === "en" ? "en" : language === "dr" ? "fa-AF" : "ps"}
+                className="rounded-lg border bg-muted/30 px-3 py-2 text-sm"
+                style={{ fontFamily: resolveTenantFontStack(language, value) }}
+            >
+                {preview}
+            </p>
+        </div>
     );
 }
 

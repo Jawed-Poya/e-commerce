@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../shared/api/api-client";
 import { useI18n } from "../../i18n/i18n-provider";
 import { configureMoney } from "../../shared/lib/money";
+import { resolveTenantFontStack, resolveTenantHeadingStack } from "./tenant-fonts";
 
 export interface TenantSettings {
     mainCurrencyCode: string; currencySymbol: string; currencyPosition: "before" | "after"; currencyDecimalPlaces: number;
@@ -31,9 +32,12 @@ export function TenantProvider({ children }: PropsWithChildren) {
         root.style.setProperty("--primary", settings.storefrontPrimaryColor);
         root.style.setProperty("--primary-foreground", readableText(settings.storefrontPrimaryColor));
         root.style.setProperty("--brand-orange", settings.storefrontSecondaryColor);
-        root.style.setProperty("--tenant-font-en", settings.englishFontFamily);
-        root.style.setProperty("--tenant-font-dr", settings.dariFontFamily);
-        root.style.setProperty("--tenant-font-ps", settings.pashtoFontFamily);
+        root.style.setProperty("--tenant-font-en", resolveTenantFontStack("en", settings.englishFontFamily));
+        root.style.setProperty("--tenant-font-dr", resolveTenantFontStack("dr", settings.dariFontFamily));
+        root.style.setProperty("--tenant-font-ps", resolveTenantFontStack("ps", settings.pashtoFontFamily));
+        root.style.setProperty("--tenant-heading-font-en", resolveTenantHeadingStack("en", settings.englishFontFamily));
+        root.style.setProperty("--tenant-heading-font-dr", resolveTenantHeadingStack("dr", settings.dariFontFamily));
+        root.style.setProperty("--tenant-heading-font-ps", resolveTenantHeadingStack("ps", settings.pashtoFontFamily));
         root.style.setProperty("--tenant-base-font-size", `${settings.baseFontSize}px`);
         root.dataset.language = language;
         document.title = tenant.name;

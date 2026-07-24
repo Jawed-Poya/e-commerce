@@ -164,16 +164,16 @@
     font-size: var(--tenant-base-font-size, 16px);
   }
   html[data-language="en"] {
-    --tenant-font: var(--tenant-font-en, Inter), Manrope, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-    --tenant-heading-font: Manrope, var(--tenant-font-en, Inter), "Segoe UI", ui-sans-serif, sans-serif;
+    --tenant-font: var(--tenant-font-en, "Inter Variable", "Manrope Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif);
+    --tenant-heading-font: var(--tenant-heading-font-en, "Manrope Variable", "Inter Variable", "Segoe UI", ui-sans-serif, sans-serif);
   }
   html[data-language="dr"] {
-    --tenant-font: var(--tenant-font-dr, "B Nazanin"), "B Mitra", Vazirmatn, "Noto Sans Arabic", Tahoma, Arial, sans-serif;
-    --tenant-heading-font: "B Titr", "B Wahid", var(--tenant-font-dr, "B Nazanin"), Vazirmatn, Tahoma, sans-serif;
+    --tenant-font: var(--tenant-font-dr, "Vazirmatn Variable", "Noto Naskh Arabic Variable", "Noto Sans Arabic Variable", Tahoma, Arial, sans-serif);
+    --tenant-heading-font: var(--tenant-heading-font-dr, "Noto Naskh Arabic Variable", "Vazirmatn Variable", Tahoma, sans-serif);
   }
   html[data-language="ps"] {
-    --tenant-font: var(--tenant-font-ps, "Bahij TheSansArabic"), "Bahij Nassim", "Bahij Nazanin", "Noto Sans Arabic", Tahoma, Arial, sans-serif;
-    --tenant-heading-font: "Bahij Titr", "Bahij Yekan", var(--tenant-font-ps, "Bahij TheSansArabic"), "Noto Sans Arabic", Tahoma, sans-serif;
+    --tenant-font: var(--tenant-font-ps, "Noto Sans Arabic Variable", "Noto Naskh Arabic Variable", "Vazirmatn Variable", Tahoma, Arial, sans-serif);
+    --tenant-heading-font: var(--tenant-heading-font-ps, "Noto Naskh Arabic Variable", "Noto Sans Arabic Variable", Tahoma, sans-serif);
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
