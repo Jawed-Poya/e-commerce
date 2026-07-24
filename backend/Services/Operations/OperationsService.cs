@@ -5,13 +5,15 @@ using ECommerce.Entities.Operations;
 using ECommerce.Entities.Operations.Contracts;
 using ECommerce.Entities.Products;
 using ECommerce.Services.Customers;
+using ECommerce.Services.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
 namespace ECommerce.Services.Operations;
 
 public sealed class OperationsService(
     ApplicationDbContext context,
-    IDefaultCustomerTypeResolver defaultCustomerTypeResolver) : IOperationsService
+    IDefaultCustomerTypeResolver defaultCustomerTypeResolver,
+    ITenantPlanGuard tenantPlanGuard) : IOperationsService
 {
     public async Task<OperationSummary> GetSummaryAsync(CancellationToken ct)
     {
@@ -196,6 +198,7 @@ public sealed class OperationsService(
 
     public async Task<InventorySaleListItem> CreateSaleAsync(CreateInventorySaleRequest request, string? userId, CancellationToken ct)
     {
+        await tenantPlanGuard.EnsureOrderCapacityAsync(1, ct);
         if (request.Items.Count == 0) throw new ArgumentException("At least one sale item is required.");
         if (request.Items.Any(x => x.ProductId <= 0 || x.Quantity <= 0 || x.UnitPrice < 0)) throw new ArgumentException("Every sale item requires a product, positive quantity, and non-negative price.");
         if (request.Discount < 0 || request.Tax < 0) throw new ArgumentException("Discount and tax cannot be negative.");

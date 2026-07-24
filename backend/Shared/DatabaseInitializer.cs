@@ -23,6 +23,7 @@ public static class DatabaseInitializer
 
         await EnsurePreMigrationSchemaCompatibilityAsync(context);
         await context.Database.MigrateAsync();
+        await EnsurePlatformAndPlansAsync(context);
         var workspace = await EnsureDefaultTenantAsync(context);
         await EnsureRolesAsync(services);
         await EnsureAdminPermissionsAsync(services);
@@ -50,6 +51,75 @@ BEGIN
 END;
 """);
     }
+
+
+    private static async Task EnsurePlatformAndPlansAsync(ApplicationDbContext context)
+    {
+        if (!await context.PlatformSettings.AnyAsync(item => item.Id == 1))
+            context.PlatformSettings.Add(new PlatformSetting());
+
+        var freePermissions = new[]
+        {
+            AppPermissions.DashboardView, AppPermissions.ProductsView, AppPermissions.ProductsManage,
+            AppPermissions.InventoryView, AppPermissions.OrdersView, AppPermissions.OrdersManage,
+            AppPermissions.CustomersView, AppPermissions.CustomersManage, AppPermissions.UsersView,
+            AppPermissions.TenantProfileManage, AppPermissions.TenantSettingsManage, AppPermissions.TenantReportsView
+        };
+        var premiumPermissions = freePermissions.Concat(new[]
+        {
+            AppPermissions.ProductPricingManage, AppPermissions.InventoryManage, AppPermissions.PaymentsManage,
+            AppPermissions.UsersManage, AppPermissions.RolesManage, AppPermissions.TenantBranchesManage,
+            AppPermissions.TenantClaimsManage, AppPermissions.TenantTrashManage, AppPermissions.SystemManage
+        }).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var fullPermissions = AppPermissions.All.Where(item => item != AppPermissions.PlatformTenantsManage).ToArray();
+        var definitions = new[]
+        {
+            new PlanSeed("free", "Free", TenantPlan.Free, 10, 0m, 0m, 3, 1, 100, 500, 1024, freePermissions),
+            new PlanSeed("premium", "Premium", TenantPlan.Premium, 20, 49m, 490m, 20, 5, 10_000, 10_000, 10_240, premiumPermissions),
+            new PlanSeed("full", "Full", TenantPlan.Full, 30, 99m, 990m, 100, 25, 100_000, 100_000, 51_200, fullPermissions),
+            new PlanSeed("enterprise", "Enterprise", TenantPlan.Enterprise, 40, 299m, 2_990m, 10_000, 1_000, 10_000_000, 10_000_000, 1_048_576, fullPermissions)
+        };
+
+        foreach (var definition in definitions)
+        {
+            var plan = await context.SubscriptionPlans.Include(item => item.Permissions)
+                .FirstOrDefaultAsync(item => item.Code == definition.Code);
+            if (plan is null)
+            {
+                plan = new SubscriptionPlan
+                {
+                    Code = definition.Code, Name = definition.Name, LegacyPlan = definition.LegacyPlan,
+                    IsSystem = true, IsActive = true, SortOrder = definition.SortOrder,
+                    MonthlyPrice = definition.MonthlyPrice, YearlyPrice = definition.YearlyPrice,
+                    CurrencyCode = "USD", MaxUsers = definition.MaxUsers, MaxBranches = definition.MaxBranches,
+                    MaxProducts = definition.MaxProducts, MaxOrdersPerMonth = definition.MaxOrdersPerMonth,
+                    MaxStorageMb = definition.MaxStorageMb
+                };
+                context.SubscriptionPlans.Add(plan);
+                await context.SaveChangesAsync();
+            }
+
+            foreach (var permission in AppPermissions.All.Where(item => item != AppPermissions.PlatformTenantsManage))
+            {
+                var row = plan.Permissions.FirstOrDefault(item => string.Equals(item.Permission, permission, StringComparison.OrdinalIgnoreCase));
+                if (row is null)
+                    context.SubscriptionPlanPermissions.Add(new SubscriptionPlanPermission
+                    {
+                        SubscriptionPlanId = plan.Id,
+                        Permission = permission,
+                        IsEnabled = definition.Permissions.Contains(permission, StringComparer.OrdinalIgnoreCase)
+                    });
+
+            }
+        }
+        await context.SaveChangesAsync();
+    }
+
+    private sealed record PlanSeed(
+        string Code, string Name, TenantPlan LegacyPlan, int SortOrder,
+        decimal MonthlyPrice, decimal YearlyPrice, int MaxUsers, int MaxBranches,
+        int MaxProducts, int MaxOrdersPerMonth, int MaxStorageMb,
+        IReadOnlyCollection<string> Permissions);
 
 
     private sealed record DefaultWorkspace(Tenant Tenant, Branch Branch);
@@ -111,17 +181,37 @@ END;
         if (!await context.TenantSettings.AnyAsync(item => item.TenantId == tenant.Id))
             context.TenantSettings.Add(new TenantSetting { TenantId = tenant.Id });
 
-        if (!await context.TenantSubscriptions.AnyAsync(item => item.TenantId == tenant.Id))
+        var subscription = await context.TenantSubscriptions
+            .Where(item => item.TenantId == tenant.Id)
+            .OrderByDescending(item => item.StartsAt)
+            .FirstOrDefaultAsync();
+        var fullPlan = await context.SubscriptionPlans.FirstAsync(item => item.Code == "full");
+        if (subscription is null)
+        {
             context.TenantSubscriptions.Add(new TenantSubscription
             {
                 TenantId = tenant.Id,
-                Plan = TenantPlan.Full,
+                SubscriptionPlanId = fullPlan.Id,
+                PlanName = fullPlan.Name,
+                Plan = fullPlan.LegacyPlan,
                 Status = SubscriptionStatus.Active,
                 StartsAt = DateTime.UtcNow,
                 MaxUsers = 1000,
                 MaxBranches = 100,
-                MaxProducts = 1_000_000
+                MaxProducts = 1_000_000,
+                MaxOrdersPerMonth = 1_000_000,
+                MaxStorageMb = 512_000,
+                MonthlyPrice = fullPlan.MonthlyPrice,
+                BillingCurrencyCode = fullPlan.CurrencyCode
             });
+        }
+        else
+        {
+            subscription.SubscriptionPlanId ??= fullPlan.Id;
+            if (string.IsNullOrWhiteSpace(subscription.PlanName)) subscription.PlanName = fullPlan.Name;
+            if (subscription.MaxOrdersPerMonth < 1) subscription.MaxOrdersPerMonth = fullPlan.MaxOrdersPerMonth;
+            if (subscription.MaxStorageMb < 1) subscription.MaxStorageMb = fullPlan.MaxStorageMb;
+        }
 
         var granted = await context.TenantPermissionGrants
             .Where(item => item.TenantId == tenant.Id)

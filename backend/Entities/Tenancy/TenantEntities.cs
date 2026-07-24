@@ -21,6 +21,13 @@ public enum SubscriptionStatus
     Expired = 6
 }
 
+public enum TenantSiteRoutingMode
+{
+    QueryString = 1,
+    Subdomain = 2,
+    CustomDomain = 3
+}
+
 public sealed class Tenant
 {
     [Key]
@@ -34,6 +41,9 @@ public sealed class Tenant
     [MaxLength(500)] public string? Address { get; set; }
     [MaxLength(2048)] public string? LogoUrl { get; set; }
     [MaxLength(2048)] public string? FaviconUrl { get; set; }
+    [MaxLength(255)] public string? CustomDomain { get; set; }
+    [MaxLength(2048)] public string? StorefrontBaseUrlOverride { get; set; }
+    public TenantSiteRoutingMode SiteRoutingMode { get; set; } = TenantSiteRoutingMode.QueryString;
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
@@ -62,18 +72,67 @@ public sealed class TenantSubscription
 {
     [Key] public long Id { get; set; }
     public long TenantId { get; set; }
+    public long? SubscriptionPlanId { get; set; }
     public TenantPlan Plan { get; set; } = TenantPlan.Free;
+    [MaxLength(120)] public string PlanName { get; set; } = "Free";
     public SubscriptionStatus Status { get; set; } = SubscriptionStatus.Trial;
     public DateTime StartsAt { get; set; } = DateTime.UtcNow;
     public DateTime? EndsAt { get; set; }
     public int MaxUsers { get; set; } = 3;
     public int MaxBranches { get; set; } = 1;
     public int MaxProducts { get; set; } = 100;
+    public int MaxOrdersPerMonth { get; set; } = 500;
+    public int MaxStorageMb { get; set; } = 1024;
     public decimal MonthlyPrice { get; set; }
     [MaxLength(3)] public string BillingCurrencyCode { get; set; } = "USD";
     [MaxLength(500)] public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public Tenant Tenant { get; set; } = null!;
+    public SubscriptionPlan? SubscriptionPlan { get; set; }
+}
+
+public sealed class SubscriptionPlan
+{
+    [Key] public long Id { get; set; }
+    [MaxLength(80)] public string Code { get; set; } = null!;
+    [MaxLength(120)] public string Name { get; set; } = null!;
+    [MaxLength(600)] public string? Description { get; set; }
+    public bool IsSystem { get; set; }
+    public bool IsActive { get; set; } = true;
+    public int SortOrder { get; set; }
+    public TenantPlan LegacyPlan { get; set; } = TenantPlan.Free;
+    public decimal MonthlyPrice { get; set; }
+    public decimal YearlyPrice { get; set; }
+    [MaxLength(3)] public string CurrencyCode { get; set; } = "USD";
+    public int MaxUsers { get; set; } = 3;
+    public int MaxBranches { get; set; } = 1;
+    public int MaxProducts { get; set; } = 100;
+    public int MaxOrdersPerMonth { get; set; } = 500;
+    public int MaxStorageMb { get; set; } = 1024;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    public ICollection<SubscriptionPlanPermission> Permissions { get; set; } = [];
+    public ICollection<TenantSubscription> Subscriptions { get; set; } = [];
+}
+
+public sealed class SubscriptionPlanPermission
+{
+    [Key] public long Id { get; set; }
+    public long SubscriptionPlanId { get; set; }
+    [MaxLength(160)] public string Permission { get; set; } = null!;
+    public bool IsEnabled { get; set; } = true;
+    public SubscriptionPlan SubscriptionPlan { get; set; } = null!;
+}
+
+public sealed class PlatformSetting
+{
+    [Key] public long Id { get; set; } = 1;
+    [MaxLength(2048)] public string StorefrontBaseUrl { get; set; } = "http://localhost:5174";
+    [MaxLength(2048)] public string AdminBaseUrl { get; set; } = "http://localhost:5173";
+    [MaxLength(255)] public string? RootDomain { get; set; }
+    public TenantSiteRoutingMode DefaultRoutingMode { get; set; } = TenantSiteRoutingMode.QueryString;
+    public bool AllowCustomDomains { get; set; } = true;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public sealed class TenantPermissionGrant

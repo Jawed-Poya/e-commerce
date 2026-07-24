@@ -30,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantContext>(provider => provider.GetRequiredService<TenantContext>());
         services.AddScoped<ITenantPermissionService, TenantPermissionService>();
         services.AddScoped<ITenantManagementService, TenantManagementService>();
+        services.AddScoped<IPlatformManagementService, PlatformManagementService>();
         services.AddScoped<ITenantPlanGuard, TenantPlanGuard>();
         services.AddScoped<ITrashService, TrashService>();
         services.AddHostedService<TrashCleanupHostedService>();

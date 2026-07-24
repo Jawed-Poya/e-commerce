@@ -21,13 +21,27 @@ public sealed class TenantPermissionService(
         if (tenantContext.IsPlatformAdmin)
             return AppPermissions.All.OrderBy(value => value).ToArray();
 
-        return await context.TenantPermissionGrants.AsNoTracking()
+        var granted = await context.TenantPermissionGrants.AsNoTracking()
             .Where(item => item.TenantId == tenantContext.TenantId && item.IsEnabled)
             .Select(item => item.Permission)
             .Where(permission => AppPermissions.All.Contains(permission))
             .Distinct()
-            .OrderBy(permission => permission)
             .ToArrayAsync(cancellationToken);
+
+        var planId = await context.TenantSubscriptions.AsNoTracking()
+            .Where(item => item.TenantId == tenantContext.TenantId)
+            .OrderByDescending(item => item.StartsAt)
+            .Select(item => item.SubscriptionPlanId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (!planId.HasValue)
+            return granted.OrderBy(value => value).ToArray();
+
+        var planPermissions = await context.SubscriptionPlanPermissions.AsNoTracking()
+            .Where(item => item.SubscriptionPlanId == planId.Value && item.IsEnabled)
+            .Select(item => item.Permission)
+            .ToArrayAsync(cancellationToken);
+        var allowed = planPermissions.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return granted.Where(allowed.Contains).OrderBy(value => value).ToArray();
     }
 
     public async Task<IReadOnlyCollection<string>> GetAssignablePermissionsAsync(
