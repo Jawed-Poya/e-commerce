@@ -71,9 +71,21 @@ export default function TenantReportsPage() {
     const exportCsv = () => {
         if (!data) return;
         const rows = [
-            ["Source", "Reference", "Date", "Description", "Status", "Amount", "Paid", "Balance", "Currency", "Direction", "Branch"],
+            [
+                t("reports.sourceColumn"),
+                t("reports.reference"),
+                t("reports.date"),
+                t("reports.descriptionColumn"),
+                t("reports.statusColumn"),
+                t("reports.amount"),
+                t("reports.paidAmount"),
+                t("reports.balance"),
+                t("reports.currency"),
+                t("reports.direction"),
+                t("reports.branchColumn"),
+            ],
             ...data.results.map(item => [
-                item.source,
+                reportSourceLabel(item.source, t),
                 item.reference,
                 item.date,
                 item.description,
@@ -82,7 +94,7 @@ export default function TenantReportsPage() {
                 String(item.paidAmount),
                 String(item.balanceAmount),
                 item.currencyCode,
-                item.direction,
+                item.direction === "in" ? t("reports.incoming") : t("reports.outgoing"),
                 item.branchName ?? "",
             ]),
         ];
@@ -311,10 +323,22 @@ export default function TenantReportsPage() {
     );
 }
 
+
+function reportSourceLabel(source: string, t: ReturnType<typeof useI18n>["t"]) {
+    const keys: Record<string, string> = {
+        orders: "reports.onlineOrders",
+        "manual-sales": "reports.manualSales",
+        purchases: "reports.purchases",
+        expenses: "reports.expenses",
+        payroll: "reports.payroll",
+    };
+    return keys[source] ? t(keys[source] as never) : source;
+}
+
 function ReportRow({ item, money, locale, t }: { item: TenantReportLine; money: (value: number) => string; locale: string; t: ReturnType<typeof useI18n>["t"] }) {
     return (
         <TableRow>
-            <TableCell><Badge variant="secondary">{item.source}</Badge></TableCell>
+            <TableCell><Badge variant="secondary">{reportSourceLabel(item.source, t)}</Badge></TableCell>
             <TableCell className="font-medium">{item.reference}</TableCell>
             <TableCell>{new Date(item.date).toLocaleDateString(locale)}</TableCell>
             <TableCell className="max-w-sm"><p className="truncate">{item.description}</p></TableCell>
@@ -331,7 +355,7 @@ function ReportCard({ item, money, locale, t }: { item: TenantReportLine; money:
     return (
         <div className="rounded-xl border bg-card p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0"><Badge variant="secondary">{item.source}</Badge><p className="mt-2 truncate font-semibold">{item.reference}</p></div>
+                <div className="min-w-0"><Badge variant="secondary">{reportSourceLabel(item.source, t)}</Badge><p className="mt-2 truncate font-semibold">{item.reference}</p></div>
                 <p className={`shrink-0 font-bold ${item.direction === "in" ? "text-emerald-600" : "text-destructive"}`}>{item.direction === "in" ? "+" : "−"}{money(item.amount)}</p>
             </div>
             <p className="mt-3 text-sm">{item.description}</p>

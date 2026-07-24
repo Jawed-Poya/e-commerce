@@ -59,7 +59,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     })).filter(group => group.items.length > 0);
 
     return <Sidebar side={language === "en" ? "left" : "right"} dir={language === "en" ? "ltr" : "rtl"} collapsible="icon" {...props}>
-        <SidebarHeader><div className="flex items-center gap-3 border-b p-2"><div className="grid size-10 shrink-0 place-items-center overflow-hidden bg-primary text-primary-foreground">{tenant?.logoUrl ? <img src={tenant.logoUrl} alt="" className="size-full object-cover" /> : (tenant?.name ?? "E").slice(0, 1).toUpperCase()}</div><div className="min-w-0 group-data-[collapsible=icon]:hidden"><span className="block truncate font-bold">{tenant?.name ?? "Ecommerce Admin"}</span><span className="block truncate text-xs text-muted-foreground">{tenant?.slug ?? "Control panel"}</span></div></div></SidebarHeader>
+        <SidebarHeader><div className="flex items-center gap-3 border-b p-2"><div className="grid size-10 shrink-0 place-items-center overflow-hidden bg-primary text-primary-foreground">{tenant?.logoUrl ? <img src={tenant.logoUrl} alt="" className="size-full object-cover" /> : (tenant?.name ?? "E").slice(0, 1).toUpperCase()}</div><div className="min-w-0 group-data-[collapsible=icon]:hidden"><span className="block truncate font-bold">{tenant?.name ?? t("tenant.adminFallback")}</span><span className="block truncate text-xs text-muted-foreground">{tenant?.slug ?? t("tenant.controlPanel")}</span></div></div></SidebarHeader>
         <SidebarContent>{groups.length ? <NavMain groups={groups} /> : <div className="p-4 text-xs text-muted-foreground">{t("nav.noModules")}</div>}</SidebarContent>
         <SidebarFooter><NavUser /></SidebarFooter><SidebarRail />
     </Sidebar>;
