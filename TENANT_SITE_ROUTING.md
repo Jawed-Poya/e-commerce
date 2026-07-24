@@ -34,6 +34,12 @@ The API resolves only an active, subscribed, published tenant whose stored key m
 
 A public storefront URL is a routing identifier, not a password. Anyone who receives a public store link may view that published store, just as with a normal public e-commerce URL.
 
+## Sharing the storefront
+
+Tenant and platform administrators can use **Share store** beside the generated public link. On phones and supported browsers this opens the operating system share sheet, making it easy to send the official store URL through WhatsApp, email, SMS, or another installed application. On desktop browsers without the Web Share API, the same action copies the URL and shows a Sonner confirmation.
+
+Customers can also use the share button in the storefront header. It shares the tenant's canonical `/store/{storefront-key}` URL rather than a mutable tenant query parameter. If the browser cannot open a native share sheet, it copies the official link and briefly confirms the copy in the header.
+
 ## Private storefront and previews
 
 A tenant can set its storefront to **Private** or unpublished. Private/unpublished stores do not have a public URL. An authorized tenant or platform administrator can generate a short-lived preview URL:

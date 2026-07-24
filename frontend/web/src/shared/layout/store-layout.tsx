@@ -1,9 +1,11 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import {
+    Check,
     CircleHelp,
     Heart,
     Menu,
     Search,
+    Share2,
     ShoppingBag,
     UserRound,
     X,
@@ -67,6 +69,7 @@ function Logo() {
 export function StoreLayout() {
     const [query, setQuery] = useState("");
     const [open, setOpen] = useState(false);
+    const [shareConfirmed, setShareConfirmed] = useState(false);
 
     const navigate = useNavigate();
     const location = useLocation();
@@ -82,6 +85,26 @@ export function StoreLayout() {
         navigate(
             `/products${query ? `?search=${encodeURIComponent(query)}` : ""}`,
         );
+    };
+
+    const shareStore = async () => {
+        const url = tenant?.storefrontUrl || window.location.href;
+        const title = tenant?.name ?? "Online store";
+        if (navigator.share) {
+            try {
+                await navigator.share({ title, text: t("common.shareStoreText"), url });
+                return;
+            } catch (error) {
+                if ((error as DOMException)?.name === "AbortError") return;
+            }
+        }
+        try {
+            await navigator.clipboard.writeText(url);
+            setShareConfirmed(true);
+            window.setTimeout(() => setShareConfirmed(false), 1800);
+        } catch {
+            window.prompt(t("common.copyStoreLink"), url);
+        }
     };
 
     return (
@@ -145,6 +168,18 @@ export function StoreLayout() {
                             <PwaInstallButton compact />
                             <ThemeToggle />
                             <NotificationCenter />
+
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="hidden rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary sm:inline-flex"
+                                aria-label={shareConfirmed ? t("common.linkCopied") : t("common.shareStore")}
+                                title={shareConfirmed ? t("common.linkCopied") : t("common.shareStore")}
+                                onClick={() => void shareStore()}
+                            >
+                                {shareConfirmed ? <Check className="size-5 text-emerald-600" /> : <Share2 className="size-5" />}
+                            </Button>
 
                             <Button
                                 asChild
@@ -217,6 +252,15 @@ export function StoreLayout() {
                                             </div>
 
                                             <div className="px-5 py-5">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="mb-4 w-full justify-center rounded-xl"
+                                                    onClick={() => void shareStore()}
+                                                >
+                                                    {shareConfirmed ? <Check className="size-4 text-emerald-600" /> : <Share2 className="size-4" />}
+                                                    {shareConfirmed ? t("common.linkCopied") : t("common.shareStore")}
+                                                </Button>
                                                 <form
                                                     onSubmit={submit}
                                                     className="flex h-12 items-center rounded-2xl border bg-muted/40 px-1 transition-all focus-within:border-primary/60 focus-within:bg-background focus-within:ring-4 focus-within:ring-primary/10"
