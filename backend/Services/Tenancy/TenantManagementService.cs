@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using ECommerce.Data;
 using ECommerce.Dtos.Tenancy;
@@ -175,7 +176,8 @@ public sealed class TenantManagementService(
         var slug = NormalizeSlug(request.Slug);
         if (await context.Tenants.AnyAsync(item => item.Slug == slug, cancellationToken))
             throw new InvalidOperationException("This company slug is already in use.");
-        if (string.IsNullOrWhiteSpace(request.AdminEmail) || !request.AdminEmail.Contains('@'))
+        var email = request.AdminEmail?.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(email) || !new EmailAddressAttribute().IsValid(email))
             throw new ArgumentException("A valid administrator email is required.");
         if (request.AdminPassword?.Length < 6)
             throw new ArgumentException("Administrator password must contain at least 6 characters.");
@@ -228,17 +230,16 @@ public sealed class TenantManagementService(
             }));
             await context.SaveChangesAsync(cancellationToken);
 
-            var email = request.AdminEmail.Trim().ToLowerInvariant();
             var user = new User
             {
                 TenantId = tenant.Id,
                 BranchId = await context.Branches.Where(item => item.TenantId == tenant.Id).Select(item => (long?)item.Id).FirstAsync(cancellationToken),
                 FullName = Required(request.AdminFullName, "Administrator name"),
                 Email = email,
-                UserName = $"{tenant.Id}:{email}",
                 EmailConfirmed = true,
                 IsActive = true
             };
+            user.UserName = TenantUserName.Create(tenant.Id, user.Id);
             var createResult = await userManager.CreateAsync(user, request.AdminPassword);
             EnsureSucceeded(createResult, "Could not create tenant administrator.");
             EnsureSucceeded(await userManager.AddToRoleAsync(user, AppRoles.Admin), "Could not assign tenant administrator role.");

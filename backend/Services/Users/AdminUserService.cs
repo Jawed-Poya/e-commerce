@@ -105,12 +105,12 @@ public sealed class AdminUserService(
             TenantId = tenantContext.TenantId,
             BranchId = request.BranchId,
             FullName = request.FullName.Trim(),
-            UserName = TenantUserName(email),
             Email = email,
             EmailConfirmed = true,
             PhoneNumber = Clean(request.Phone),
             IsActive = request.IsActive
         };
+        user.UserName = TenantUserName.Create(user.TenantId, user.Id);
 
         var createResult = await userManager.CreateAsync(user, request.Password);
         EnsureSucceeded(createResult, "Could not create user.");
@@ -151,7 +151,8 @@ public sealed class AdminUserService(
 
         user.FullName = request.FullName.Trim();
         user.Email = email;
-        user.UserName = TenantUserName(email);
+        if (TenantUserName.RequiresRepair(user.UserName))
+            user.UserName = TenantUserName.Create(user.TenantId, user.Id);
         user.NormalizedEmail = userManager.NormalizeEmail(email);
         user.NormalizedUserName = userManager.NormalizeName(user.UserName);
         user.PhoneNumber = Clean(request.Phone);
@@ -494,9 +495,6 @@ public sealed class AdminUserService(
 
     private ClaimsPrincipal CurrentPrincipal =>
         httpContextAccessor.HttpContext?.User ?? new ClaimsPrincipal(new ClaimsIdentity());
-
-    private string TenantUserName(string email) =>
-        tenantContext.TenantId <= 1 ? email : $"{tenantContext.TenantId}:{email}";
 
     private async Task ValidateBranchAsync(long? branchId, CancellationToken cancellationToken)
     {
