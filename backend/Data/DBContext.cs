@@ -150,6 +150,7 @@ public class ApplicationDbContext
         builder.Entity<Tenant>(entity =>
         {
             entity.HasIndex(item => item.Slug).IsUnique();
+            entity.HasIndex(item => item.StorefrontKey).IsUnique();
             entity.HasIndex(item => item.CustomDomain).IsUnique().HasFilter("[CustomDomain] IS NOT NULL");
             entity.HasOne(item => item.Setting).WithOne(item => item.Tenant)
                 .HasForeignKey<TenantSetting>(item => item.TenantId).OnDelete(DeleteBehavior.Cascade);

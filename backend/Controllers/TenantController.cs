@@ -31,6 +31,21 @@ public sealed class TenantController(ITenantManagementService tenants) : Control
     public async Task<ActionResult<ApiResponse<TenantProfileResponse>>> UpdateSettings(UpdateTenantSettingsRequest request, CancellationToken cancellationToken) =>
         Ok(ApiResponse<TenantProfileResponse>.Ok(await tenants.UpdateSettingsAsync(request, cancellationToken), "Company settings updated."));
 
+    [Authorize(Policy = AppPermissions.TenantSettingsManage)]
+    [HttpPut("storefront")]
+    public async Task<ActionResult<ApiResponse<TenantProfileResponse>>> UpdateStorefront(UpdateTenantStorefrontRequest request, CancellationToken cancellationToken) =>
+        Ok(ApiResponse<TenantProfileResponse>.Ok(await tenants.UpdateStorefrontAsync(request, cancellationToken), "Storefront access updated."));
+
+    [Authorize(Policy = AppPermissions.TenantSettingsManage)]
+    [HttpPost("storefront/rotate-key")]
+    public async Task<ActionResult<ApiResponse<TenantProfileResponse>>> RotateStorefrontKey(CancellationToken cancellationToken) =>
+        Ok(ApiResponse<TenantProfileResponse>.Ok(await tenants.RotateStorefrontKeyAsync(cancellationToken: cancellationToken), "Storefront key rotated."));
+
+    [Authorize(Policy = AppPermissions.TenantSettingsManage)]
+    [HttpPost("storefront/preview-link")]
+    public async Task<ActionResult<ApiResponse<StorefrontPreviewLinkResponse>>> CreatePreviewLink([FromQuery] int lifetimeMinutes = 30, CancellationToken cancellationToken = default) =>
+        Ok(ApiResponse<StorefrontPreviewLinkResponse>.Ok(await tenants.CreatePreviewLinkAsync(lifetimeMinutes: lifetimeMinutes, cancellationToken: cancellationToken)));
+
     [Authorize(Policy = AppPermissions.TenantBranchesManage)]
     [HttpPost("branches")]
     public async Task<ActionResult<ApiResponse<BranchResponse>>> CreateBranch(UpsertBranchRequest request, CancellationToken cancellationToken) =>

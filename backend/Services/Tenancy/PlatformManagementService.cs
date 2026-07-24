@@ -32,13 +32,11 @@ public sealed class PlatformManagementService(
         var settings = await GetOrCreateSettingsAsync(cancellationToken);
         settings.StorefrontBaseUrl = TenantSiteUrlBuilder.NormalizeBaseUrl(request.StorefrontBaseUrl, "Storefront base URL");
         settings.AdminBaseUrl = TenantSiteUrlBuilder.NormalizeBaseUrl(request.AdminBaseUrl, "Admin base URL");
-        settings.RootDomain = TenantSiteUrlBuilder.NormalizeDomain(request.RootDomain);
-        settings.DefaultRoutingMode = request.DefaultRoutingMode;
-        settings.AllowCustomDomains = request.AllowCustomDomains;
-        if (settings.DefaultRoutingMode == TenantSiteRoutingMode.Subdomain && settings.RootDomain is null)
-            throw new ArgumentException("Root domain is required when subdomain routing is the default.");
-        if (settings.DefaultRoutingMode == TenantSiteRoutingMode.CustomDomain && !settings.AllowCustomDomains)
-            throw new ArgumentException("Custom domains must be enabled when custom-domain routing is the default.");
+        // This deployment uses one shared storefront and one shared admin host.
+        // Tenant storefronts are selected by opaque platform paths, not domains.
+        settings.RootDomain = null;
+        settings.DefaultRoutingMode = TenantSiteRoutingMode.PlatformPath;
+        settings.AllowCustomDomains = false;
         settings.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync(cancellationToken);
         return Map(settings);

@@ -8,7 +8,7 @@ import { resolveTenantFontStack, resolveTenantHeadingStack } from "./tenant-font
 export interface TenantSettings {
     mainCurrencyCode: string; currencySymbol: string; currencyPosition: "before" | "after"; currencyDecimalPlaces: number;
     adminPrimaryColor: string; adminSecondaryColor: string; storefrontPrimaryColor: string; storefrontSecondaryColor: string;
-    englishFontFamily: string; dariFontFamily: string; pashtoFontFamily: string; baseFontSize: number; trashRetentionDays: number; allowTenantUserClaimManagement: boolean;
+    englishFontFamily: string; dariFontFamily: string; pashtoFontFamily: string; baseFontSize: number; trashRetentionDays: number; notificationRetentionDays: number; allowTenantUserClaimManagement: boolean;
 }
 export interface PublicTenantProfile { id: number; name: string; slug: string; logoUrl: string | null; faviconUrl: string | null; storefrontUrl: string; settings: TenantSettings }
 

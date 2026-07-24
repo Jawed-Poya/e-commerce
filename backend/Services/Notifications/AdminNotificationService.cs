@@ -104,7 +104,7 @@ public sealed class AdminNotificationService(
 
         try
         {
-            broker.Publish(Map(notification.Entity));
+            broker.Publish(notification.Entity.TenantId, Map(notification.Entity));
         }
         catch (Exception exception)
         {
@@ -123,8 +123,12 @@ public sealed class AdminNotificationService(
         CancellationToken cancellationToken = default)
     {
         var serverTime = DateTime.UtcNow;
+        var retentionDays = await context.TenantSettings.AsNoTracking()
+            .Select(item => (int?)item.NotificationRetentionDays)
+            .FirstOrDefaultAsync(cancellationToken) ?? 30;
+        var earliestAvailable = serverTime.AddDays(-Math.Clamp(retentionDays, 1, 365));
         var threshold = after?.ToUniversalTime() ?? serverTime.AddDays(-2);
-        if (threshold < serverTime.AddDays(-30)) threshold = serverTime.AddDays(-30);
+        if (threshold < earliestAvailable) threshold = earliestAvailable;
 
         var items = await context.Notifications
             .AsNoTracking()
@@ -153,6 +157,55 @@ public sealed class AdminNotificationService(
         return new AdminNotificationsResponse(serverTime, items);
     }
 
+    public async Task DeleteAsync(long id, CancellationToken cancellationToken = default)
+    {
+        var notification = await context.Notifications.FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Notification not found.");
+        notification.IsDeleted = true;
+        notification.DeletedAt = DateTime.UtcNow;
+        notification.UpdatedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task<int> ClearAsync(CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        return context.Notifications
+            .Where(item => !item.IsDeleted && item.UserId == null &&
+                item.EntityType != null && item.EntityType.StartsWith("Admin:"))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.IsDeleted, true)
+                .SetProperty(item => item.DeletedAt, now)
+                .SetProperty(item => item.UpdatedAt, now), cancellationToken);
+    }
+
+    public async Task<int> CleanupExpiredAsync(CancellationToken cancellationToken = default)
+    {
+        var settings = await context.TenantSettings.IgnoreQueryFilters().AsNoTracking()
+            .ToDictionaryAsync(
+                item => item.TenantId,
+                item => Math.Clamp(item.NotificationRetentionDays, 1, 365),
+                cancellationToken);
+        var tenantIds = await context.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .Select(item => item.Id)
+            .ToListAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+        var removed = 0;
+
+        foreach (var tenantId in tenantIds)
+        {
+            var cutoff = now.AddDays(-settings.GetValueOrDefault(tenantId, 30));
+            removed += await context.Notifications.IgnoreQueryFilters()
+                .Where(item => item.TenantId == tenantId &&
+                    item.EntityType != null &&
+                    item.EntityType.StartsWith("Admin:") &&
+                    item.CreatedAt <= cutoff)
+                .ExecuteDeleteAsync(cancellationToken);
+        }
+
+        return removed;
+    }
+
     private static AdminNotificationResponse Map(Notification notification) =>
         new(
             notification.Id,
@@ -166,4 +219,41 @@ public sealed class AdminNotificationService(
                 ? "/reviews"
                 : notification.EntityId.HasValue ? $"/orders/{notification.EntityId.Value}" : "/orders",
             notification.CreatedAt);
+}
+
+
+public sealed class AdminNotificationCleanupHostedService(
+    IServiceScopeFactory scopeFactory,
+    ILogger<AdminNotificationCleanupHostedService> logger) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromHours(6));
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await using var scope = scopeFactory.CreateAsyncScope();
+                var tenantContext = scope.ServiceProvider.GetRequiredService<ECommerce.Services.Tenancy.TenantContext>();
+                tenantContext.Initialize(1, null, "notification-cleanup", true);
+                var service = scope.ServiceProvider.GetRequiredService<IAdminNotificationService>();
+                var count = await service.CleanupExpiredAsync(stoppingToken);
+                if (count > 0) logger.LogInformation("Permanently removed {Count} expired admin notifications.", count);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+            catch (Exception exception)
+            {
+                logger.LogError(exception, "Admin notification cleanup failed.");
+            }
+
+            try
+            {
+                if (!await timer.WaitForNextTickAsync(stoppingToken)) break;
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+        }
+    }
 }

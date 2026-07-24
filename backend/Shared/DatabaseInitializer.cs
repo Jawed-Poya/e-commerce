@@ -55,8 +55,18 @@ END;
 
     private static async Task EnsurePlatformAndPlansAsync(ApplicationDbContext context)
     {
-        if (!await context.PlatformSettings.AnyAsync(item => item.Id == 1))
-            context.PlatformSettings.Add(new PlatformSetting());
+        var platformSettings = await context.PlatformSettings.FirstOrDefaultAsync(item => item.Id == 1);
+        if (platformSettings is null)
+        {
+            platformSettings = new PlatformSetting();
+            context.PlatformSettings.Add(platformSettings);
+        }
+        else
+        {
+            platformSettings.RootDomain = null;
+            platformSettings.DefaultRoutingMode = TenantSiteRoutingMode.PlatformPath;
+            platformSettings.AllowCustomDomains = false;
+        }
 
         var freePermissions = new[]
         {
@@ -142,6 +152,23 @@ END;
             context.Tenants.Add(tenant);
             await context.SaveChangesAsync();
         }
+
+        var tenantChanged = false;
+        if (string.IsNullOrWhiteSpace(tenant.StorefrontKey) || tenant.StorefrontKey.Length < 24)
+        {
+            tenant.StorefrontKey = Guid.NewGuid().ToString("N");
+            tenant.StorefrontKeyRotatedAt = DateTime.UtcNow;
+            tenantChanged = true;
+        }
+        if (tenant.SiteRoutingMode != TenantSiteRoutingMode.PlatformPath ||
+            tenant.CustomDomain is not null || tenant.StorefrontBaseUrlOverride is not null)
+        {
+            tenant.SiteRoutingMode = TenantSiteRoutingMode.PlatformPath;
+            tenant.CustomDomain = null;
+            tenant.StorefrontBaseUrlOverride = null;
+            tenantChanged = true;
+        }
+        if (tenantChanged) await context.SaveChangesAsync();
 
         var branch = await context.Branches
             .Where(item => item.TenantId == tenant.Id)

@@ -47,7 +47,6 @@ axiosInstance.interceptors.request.use(
         const tenantSlug = resolveTenantSlug();
         if (tenantSlug) config.headers["X-Tenant-Slug"] = tenantSlug;
         else delete config.headers["X-Tenant-Slug"];
-        config.headers["X-Tenant-Host"] = window.location.hostname.toLowerCase();
 
         // Remember the exact token used by this request. A late 401 from an old
         // request must not remove a newer token created by a successful login.

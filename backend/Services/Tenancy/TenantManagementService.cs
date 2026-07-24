@@ -21,12 +21,16 @@ public interface ITenantManagementService
     Task<TenantProfileResponse> CreateTenantAsync(CreateTenantRequest request, CancellationToken cancellationToken = default);
     Task<TenantProfileResponse> UpdateTenantAsync(long tenantId, PlatformUpdateTenantRequest request, CancellationToken cancellationToken = default);
     Task<TenantProfileResponse> UpdateSubscriptionAsync(long tenantId, UpdateTenantSubscriptionRequest request, CancellationToken cancellationToken = default);
+    Task<TenantProfileResponse> UpdateStorefrontAsync(UpdateTenantStorefrontRequest request, CancellationToken cancellationToken = default);
+    Task<TenantProfileResponse> RotateStorefrontKeyAsync(long? tenantId = null, CancellationToken cancellationToken = default);
+    Task<StorefrontPreviewLinkResponse> CreatePreviewLinkAsync(long? tenantId = null, int lifetimeMinutes = 30, CancellationToken cancellationToken = default);
 }
 
 public sealed class TenantManagementService(
     ApplicationDbContext context,
     ITenantContext tenantContext,
-    UserManager<User> userManager) : ITenantManagementService
+    UserManager<User> userManager,
+    IStorefrontAccessTokenService previewTokens) : ITenantManagementService
 {
     public async Task<TenantProfileResponse> GetProfileAsync(CancellationToken cancellationToken = default)
     {
@@ -146,19 +150,6 @@ public sealed class TenantManagementService(
         var currencyCode = NormalizeCurrency(request.MainCurrencyCode);
         var plan = await ResolvePlanAsync(request.SubscriptionPlanId, request.Plan, cancellationToken);
         var platform = await GetPlatformSettingsAsync(cancellationToken);
-        var routingMode = request.SiteRoutingMode ?? platform.DefaultRoutingMode;
-        var customDomain = TenantSiteUrlBuilder.NormalizeDomain(request.CustomDomain);
-        if (customDomain is not null && !platform.AllowCustomDomains)
-            throw new InvalidOperationException("Custom domains are disabled in platform settings.");
-        if (customDomain is not null && await context.Tenants.AnyAsync(item => item.CustomDomain == customDomain, cancellationToken))
-            throw new InvalidOperationException("This custom domain is already linked to another company.");
-        if (routingMode == TenantSiteRoutingMode.CustomDomain && customDomain is null)
-            throw new ArgumentException("A custom domain is required for custom-domain routing.");
-        if (routingMode == TenantSiteRoutingMode.Subdomain && string.IsNullOrWhiteSpace(platform.RootDomain))
-            throw new InvalidOperationException("Configure a root domain in Platform Settings before using subdomain routing.");
-        var storefrontOverride = string.IsNullOrWhiteSpace(request.StorefrontBaseUrlOverride)
-            ? null
-            : TenantSiteUrlBuilder.NormalizeBaseUrl(request.StorefrontBaseUrlOverride, "Storefront override URL");
 
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         try
@@ -166,8 +157,12 @@ public sealed class TenantManagementService(
             var tenant = new Tenant
             {
                 Name = Required(request.Name, "Company name"), LegalName = Required(request.Name, "Company name"), Slug = slug,
-                SiteRoutingMode = routingMode, CustomDomain = customDomain,
-                StorefrontBaseUrlOverride = storefrontOverride, IsActive = true
+                SiteRoutingMode = TenantSiteRoutingMode.PlatformPath,
+                StorefrontKey = CreateStorefrontKey(),
+                StorefrontAccessMode = request.StorefrontAccessMode ?? StorefrontAccessMode.Public,
+                IsStorefrontPublished = request.IsStorefrontPublished ?? true,
+                CustomDomain = null,
+                StorefrontBaseUrlOverride = null, IsActive = true
             };
             context.Tenants.Add(tenant);
             await context.SaveChangesAsync(cancellationToken);
@@ -213,16 +208,6 @@ public sealed class TenantManagementService(
         var slug = NormalizeSlug(request.Slug);
         if (await context.Tenants.AnyAsync(item => item.Id != tenantId && item.Slug == slug, cancellationToken))
             throw new InvalidOperationException("This company slug is already in use.");
-        var customDomain = TenantSiteUrlBuilder.NormalizeDomain(request.CustomDomain);
-        if (customDomain is not null && !platform.AllowCustomDomains)
-            throw new InvalidOperationException("Custom domains are disabled in platform settings.");
-        if (customDomain is not null && await context.Tenants.AnyAsync(item => item.Id != tenantId && item.CustomDomain == customDomain, cancellationToken))
-            throw new InvalidOperationException("This custom domain is already linked to another company.");
-        if (request.SiteRoutingMode == TenantSiteRoutingMode.CustomDomain && customDomain is null)
-            throw new ArgumentException("A custom domain is required for custom-domain routing.");
-        if (request.SiteRoutingMode == TenantSiteRoutingMode.Subdomain && string.IsNullOrWhiteSpace(platform.RootDomain))
-            throw new InvalidOperationException("Configure a root domain in Platform Settings before using subdomain routing.");
-
         tenant.Name = Required(request.Name, "Company name");
         tenant.Slug = slug;
         tenant.LegalName = Clean(request.LegalName);
@@ -232,10 +217,11 @@ public sealed class TenantManagementService(
         tenant.Address = Clean(request.Address);
         tenant.LogoUrl = Clean(request.LogoUrl);
         tenant.FaviconUrl = Clean(request.FaviconUrl);
-        tenant.SiteRoutingMode = request.SiteRoutingMode;
-        tenant.CustomDomain = customDomain;
-        tenant.StorefrontBaseUrlOverride = string.IsNullOrWhiteSpace(request.StorefrontBaseUrlOverride)
-            ? null : TenantSiteUrlBuilder.NormalizeBaseUrl(request.StorefrontBaseUrlOverride, "Storefront override URL");
+        tenant.SiteRoutingMode = TenantSiteRoutingMode.PlatformPath;
+        tenant.StorefrontAccessMode = request.StorefrontAccessMode;
+        tenant.IsStorefrontPublished = request.IsStorefrontPublished;
+        tenant.CustomDomain = null;
+        tenant.StorefrontBaseUrlOverride = null;
         tenant.UpdatedAt = DateTime.UtcNow;
 
         var setting = tenant.Setting ?? new TenantSetting { TenantId = tenantId };
@@ -251,6 +237,44 @@ public sealed class TenantManagementService(
         ApplyTenantPermissionGrants(tenantId, tenant.PermissionGrants, requested);
         await context.SaveChangesAsync(cancellationToken);
         return Map((await LoadTenantAsync(tenantId, cancellationToken))!, platform);
+    }
+
+    public async Task<TenantProfileResponse> UpdateStorefrontAsync(UpdateTenantStorefrontRequest request, CancellationToken cancellationToken = default)
+    {
+        var tenant = await context.Tenants.FirstOrDefaultAsync(item => item.Id == tenantContext.TenantId, cancellationToken)
+            ?? throw new KeyNotFoundException("Company not found.");
+        tenant.SiteRoutingMode = TenantSiteRoutingMode.PlatformPath;
+        tenant.StorefrontAccessMode = request.AccessMode;
+        tenant.IsStorefrontPublished = request.IsPublished;
+        tenant.UpdatedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync(cancellationToken);
+        return await GetProfileAsync(cancellationToken);
+    }
+
+    public async Task<TenantProfileResponse> RotateStorefrontKeyAsync(long? tenantId = null, CancellationToken cancellationToken = default)
+    {
+        var targetTenantId = ResolveManagedTenantId(tenantId);
+        var tenant = await context.Tenants.FirstOrDefaultAsync(item => item.Id == targetTenantId, cancellationToken)
+            ?? throw new KeyNotFoundException("Company not found.");
+        tenant.StorefrontKey = CreateStorefrontKey();
+        tenant.StorefrontKeyRotatedAt = DateTime.UtcNow;
+        tenant.UpdatedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync(cancellationToken);
+        return Map((await LoadTenantAsync(targetTenantId, cancellationToken))!, await GetPlatformSettingsAsync(cancellationToken));
+    }
+
+    public async Task<StorefrontPreviewLinkResponse> CreatePreviewLinkAsync(long? tenantId = null, int lifetimeMinutes = 30, CancellationToken cancellationToken = default)
+    {
+        var targetTenantId = ResolveManagedTenantId(tenantId);
+        var tenant = await context.Tenants.AsNoTracking().FirstOrDefaultAsync(item => item.Id == targetTenantId, cancellationToken)
+            ?? throw new KeyNotFoundException("Company not found.");
+        var minutes = Math.Clamp(lifetimeMinutes, 5, 240);
+        var expiresAt = DateTime.UtcNow.AddMinutes(minutes);
+        var token = previewTokens.CreatePreviewToken(tenant.Id, tenant.StorefrontKey, TimeSpan.FromMinutes(minutes));
+        var platform = await GetPlatformSettingsAsync(cancellationToken);
+        return new StorefrontPreviewLinkResponse(
+            TenantSiteUrlBuilder.BuildPreviewUrl(platform.StorefrontBaseUrl, token),
+            expiresAt);
     }
 
     public async Task<TenantProfileResponse> UpdateSubscriptionAsync(long tenantId, UpdateTenantSubscriptionRequest request, CancellationToken cancellationToken = default)
@@ -378,7 +402,8 @@ public sealed class TenantManagementService(
     private static BranchResponse Map(Branch branch) => new(branch.Id, branch.Name, branch.Code, branch.Phone, branch.Address, branch.IsMain, branch.IsActive);
     private static TenantSettingsResponse Map(TenantSetting setting) => new(setting.MainCurrencyCode, setting.CurrencySymbol, setting.CurrencyPosition, setting.CurrencyDecimalPlaces,
         setting.AdminPrimaryColor, setting.AdminSecondaryColor, setting.StorefrontPrimaryColor, setting.StorefrontSecondaryColor,
-        setting.EnglishFontFamily, setting.DariFontFamily, setting.PashtoFontFamily, setting.BaseFontSize, setting.TrashRetentionDays, setting.AllowTenantUserClaimManagement);
+        setting.EnglishFontFamily, setting.DariFontFamily, setting.PashtoFontFamily, setting.BaseFontSize, setting.TrashRetentionDays,
+        setting.NotificationRetentionDays, setting.AllowTenantUserClaimManagement);
 
     private static TenantSubscription CreateSubscription(long tenantId, PlanSelection plan, SubscriptionStatus status, DateTime? endsAt, UpdateTenantSubscriptionRequest? overrides)
     {
@@ -441,6 +466,7 @@ public sealed class TenantManagementService(
         setting.PashtoFontFamily = Required(request.PashtoFontFamily, "Pashto font");
         setting.BaseFontSize = request.BaseFontSize;
         setting.TrashRetentionDays = request.TrashRetentionDays;
+        setting.NotificationRetentionDays = request.NotificationRetentionDays;
         setting.AllowTenantUserClaimManagement = request.AllowTenantUserClaimManagement;
         setting.UpdatedAt = DateTime.UtcNow;
     }
@@ -452,6 +478,7 @@ public sealed class TenantManagementService(
         if (request.CurrencyPosition is not ("before" or "after")) throw new ArgumentException("Currency position must be before or after.");
         if (request.BaseFontSize is < 12 or > 22) throw new ArgumentException("Base font size must be between 12 and 22 pixels.");
         if (request.TrashRetentionDays is < 1 or > 3650) throw new ArgumentException("Trash retention must be between 1 and 3650 days.");
+        if (request.NotificationRetentionDays is < 1 or > 365) throw new ArgumentException("Notification retention must be between 1 and 365 days.");
         _ = NormalizeColor(request.AdminPrimaryColor); _ = NormalizeColor(request.AdminSecondaryColor);
         _ = NormalizeColor(request.StorefrontPrimaryColor); _ = NormalizeColor(request.StorefrontSecondaryColor);
     }
@@ -497,6 +524,16 @@ public sealed class TenantManagementService(
     {
         if (!result.Succeeded) throw new InvalidOperationException(message + " " + string.Join(" ", result.Errors.Select(item => item.Description)));
     }
+    private long ResolveManagedTenantId(long? requestedTenantId)
+    {
+        if (!requestedTenantId.HasValue || requestedTenantId.Value == tenantContext.TenantId)
+            return tenantContext.TenantId;
+        EnsurePlatformAdmin();
+        return requestedTenantId.Value;
+    }
+
+    private static string CreateStorefrontKey() => Guid.NewGuid().ToString("N");
+
     private void EnsurePlatformAdmin() { if (!tenantContext.IsPlatformAdmin) throw new UnauthorizedAccessException(); }
 
     private sealed record PlanSelection(long? Id, string Name, TenantPlan LegacyPlan, int MaxUsers, int MaxBranches, int MaxProducts, int MaxOrdersPerMonth, int MaxStorageMb, decimal MonthlyPrice, string CurrencyCode, IReadOnlyCollection<string> Permissions);

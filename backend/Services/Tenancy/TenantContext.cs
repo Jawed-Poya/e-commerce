@@ -1,4 +1,3 @@
-using System.Net;
 using System.Security.Claims;
 using ECommerce.Data;
 using ECommerce.Entities.Tenancy;
@@ -39,7 +38,8 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
     public async Task InvokeAsync(
         HttpContext httpContext,
         TenantContext tenantContext,
-        ApplicationDbContext dbContext)
+        ApplicationDbContext dbContext,
+        IStorefrontAccessTokenService previewTokens)
     {
         var principal = httpContext.User;
         var isPlatformAdmin = principal.IsInRole(AppRoles.PlatformAdmin) ||
@@ -48,8 +48,42 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
                 "true",
                 StringComparison.OrdinalIgnoreCase);
 
+        // Authenticated admin/customer requests are always isolated by the tenant
+        // claim in the signed JWT. Browser headers and URLs cannot override it.
         if (long.TryParse(principal.FindFirstValue(AuthClaims.TenantId), out var claimTenantId))
         {
+            // Storefront customer sessions must stay on the same storefront that
+            // issued them. Changing /store/{key} or a preview token never switches
+            // an authenticated session into another company's data.
+            var presentedKeyHeader = httpContext.Request.Headers["X-Storefront-Key"].FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(presentedKeyHeader))
+            {
+                var presentedKey = NormalizeStorefrontKey(presentedKeyHeader);
+                var keyMatchesClaim = presentedKey is not null && await dbContext.Tenants.AsNoTracking()
+                    .AnyAsync(item => item.Id == claimTenantId && item.StorefrontKey == presentedKey, httpContext.RequestAborted);
+                if (!keyMatchesClaim)
+                {
+                    await WriteErrorAsync(httpContext, StatusCodes.Status401Unauthorized,
+                        "This customer session belongs to a different storefront. Sign in again from the current store.");
+                    return;
+                }
+            }
+
+            var presentedPreview = httpContext.Request.Headers["X-Storefront-Preview"].FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(presentedPreview))
+            {
+                var previewMatchesClaim = previewTokens.TryValidatePreviewToken(presentedPreview, out var payload) &&
+                    payload is not null && payload.TenantId == claimTenantId &&
+                    await dbContext.Tenants.AsNoTracking().AnyAsync(
+                        item => item.Id == claimTenantId && item.StorefrontKey == payload.StorefrontKey,
+                        httpContext.RequestAborted);
+                if (!previewMatchesClaim)
+                {
+                    await WriteErrorAsync(httpContext, StatusCodes.Status401Unauthorized,
+                        "This customer session does not belong to the current storefront preview.");
+                    return;
+                }
+            }
             long? branchId = long.TryParse(
                 principal.FindFirstValue(AuthClaims.BranchId),
                 out var parsedBranch)
@@ -71,84 +105,92 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             return;
         }
 
-        var requestHost = httpContext.Request.Host.Host;
-        var forwardedTenantHost = NormalizeHost(httpContext.Request.Headers["X-Tenant-Host"].FirstOrDefault());
-        var host = forwardedTenantHost ?? NormalizeHost(requestHost) ?? "localhost";
-        var isLocalHost = string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase);
-        var isIpAddress = IPAddress.TryParse(host, out _);
-        string? customDomainSlug = null;
-        TenantSiteRoutingMode? requiredHostRoutingMode = null;
-        PlatformSetting? platformSettings = null;
-
-        if (!isLocalHost && !isIpAddress)
+        // A preview token is signed, tenant-scoped, store-key-scoped, and expires.
+        // It is the only way to open a private or unpublished storefront preview.
+        var previewToken = httpContext.Request.Headers["X-Storefront-Preview"].FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(previewToken))
         {
-            platformSettings = await dbContext.PlatformSettings.AsNoTracking()
-                .FirstOrDefaultAsync(item => item.Id == 1, httpContext.RequestAborted);
-            if (platformSettings?.AllowCustomDomains != false)
+            if (!previewTokens.TryValidatePreviewToken(previewToken, out var preview) || preview is null)
             {
-                customDomainSlug = await dbContext.Tenants.AsNoTracking()
-                    .Where(item => item.CustomDomain == host && item.SiteRoutingMode == TenantSiteRoutingMode.CustomDomain)
-                    .Select(item => item.Slug)
-                    .FirstOrDefaultAsync(httpContext.RequestAborted);
-                if (customDomainSlug is not null)
-                    requiredHostRoutingMode = TenantSiteRoutingMode.CustomDomain;
+                await WriteErrorAsync(httpContext, StatusCodes.Status401Unauthorized, "The storefront preview link is invalid or expired.");
+                return;
             }
-        }
 
-        // A registered custom domain is authoritative. Query/header selection is
-        // used by shared storefront/admin hosts, and subdomains are resolved only
-        // under the configured root domain (never from an arbitrary hostname).
-        var requestedSlug = customDomainSlug
-            ?? httpContext.Request.Headers["X-Tenant-Slug"].FirstOrDefault()
-            ?? httpContext.Request.Query["tenant"].FirstOrDefault();
-
-        if (string.IsNullOrWhiteSpace(requestedSlug) && !isLocalHost && !isIpAddress)
-        {
-            platformSettings ??= await dbContext.PlatformSettings.AsNoTracking()
-                .FirstOrDefaultAsync(item => item.Id == 1, httpContext.RequestAborted);
-            var rootDomain = platformSettings?.RootDomain?.Trim().TrimEnd('.').ToLowerInvariant();
-            var storefrontHost = TryGetHost(platformSettings?.StorefrontBaseUrl);
-            var adminHost = TryGetHost(platformSettings?.AdminBaseUrl);
-            if (!string.IsNullOrWhiteSpace(rootDomain) &&
-                !string.Equals(host, storefrontHost, StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(host, adminHost, StringComparison.OrdinalIgnoreCase) &&
-                host.EndsWith($".{rootDomain}", StringComparison.OrdinalIgnoreCase))
-            {
-                var prefix = host[..^(rootDomain.Length + 1)];
-                if (!string.IsNullOrWhiteSpace(prefix) && !prefix.Contains('.'))
-                {
-                    requestedSlug = prefix;
-                    requiredHostRoutingMode = TenantSiteRoutingMode.Subdomain;
-                }
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(requestedSlug))
-        {
-            var requestedTenant = await dbContext.Tenants.AsNoTracking()
-                .Where(item => item.Slug == requestedSlug &&
-                    (!requiredHostRoutingMode.HasValue || item.SiteRoutingMode == requiredHostRoutingMode.Value))
+            var previewTenant = await dbContext.Tenants.AsNoTracking()
+                .Where(item => item.Id == preview.TenantId && item.StorefrontKey == preview.StorefrontKey)
                 .Select(item => new { item.Id, item.Slug, item.IsActive })
                 .FirstOrDefaultAsync(httpContext.RequestAborted);
+            if (previewTenant is null || !previewTenant.IsActive ||
+                !await HasUsableSubscriptionAsync(dbContext, previewTenant.Id, httpContext.RequestAborted))
+            {
+                await WriteErrorAsync(httpContext, StatusCodes.Status404NotFound, "The storefront preview is no longer available.");
+                return;
+            }
 
-            if (requestedTenant is null)
+            tenantContext.Initialize(previewTenant.Id, null, previewTenant.Slug, false);
+            await next(httpContext);
+            return;
+        }
+
+        // Public storefront requests use a random opaque key embedded in the path.
+        // The company slug is never accepted as public-site authority.
+        var storefrontKey = NormalizeStorefrontKey(httpContext.Request.Headers["X-Storefront-Key"].FirstOrDefault());
+        if (storefrontKey is not null)
+        {
+            var storefrontTenant = await dbContext.Tenants.AsNoTracking()
+                .Where(item => item.StorefrontKey == storefrontKey && item.IsStorefrontPublished &&
+                    item.StorefrontAccessMode == StorefrontAccessMode.Public)
+                .Select(item => new { item.Id, item.Slug, item.IsActive })
+                .FirstOrDefaultAsync(httpContext.RequestAborted);
+            if (storefrontTenant is null)
+            {
+                await WriteErrorAsync(httpContext, StatusCodes.Status404NotFound, "Storefront not found or not published.");
+                return;
+            }
+            if (!storefrontTenant.IsActive ||
+                !await HasUsableSubscriptionAsync(dbContext, storefrontTenant.Id, httpContext.RequestAborted))
+            {
+                await WriteErrorAsync(httpContext, StatusCodes.Status403Forbidden, "This storefront is currently unavailable.");
+                return;
+            }
+
+            tenantContext.Initialize(storefrontTenant.Id, null, storefrontTenant.Slug, false);
+            await next(httpContext);
+            return;
+        }
+
+        // One shared admin host still needs a workspace code before login because
+        // the JWT does not exist yet. This value is sent in a request header by the
+        // login form, not in the URL, and cannot override an authenticated session.
+        var workspace = IsWorkspaceSelectionRequest(httpContext.Request.Path)
+            ? NormalizeWorkspace(httpContext.Request.Headers["X-Tenant-Slug"].FirstOrDefault())
+            : null;
+        if (workspace is not null)
+        {
+            var workspaceTenant = await dbContext.Tenants.AsNoTracking()
+                .Where(item => item.Slug == workspace)
+                .Select(item => new { item.Id, item.Slug, item.IsActive })
+                .FirstOrDefaultAsync(httpContext.RequestAborted);
+            if (workspaceTenant is null)
             {
                 await WriteErrorAsync(httpContext, StatusCodes.Status404NotFound, "Company workspace not found.");
                 return;
             }
-
-            if (!requestedTenant.IsActive ||
-                !await HasUsableSubscriptionAsync(dbContext, requestedTenant.Id, httpContext.RequestAborted))
+            if (!workspaceTenant.IsActive ||
+                !await HasUsableSubscriptionAsync(dbContext, workspaceTenant.Id, httpContext.RequestAborted))
             {
                 await WriteErrorAsync(httpContext, StatusCodes.Status403Forbidden, "This company workspace is currently unavailable.");
                 return;
             }
 
-            tenantContext.Initialize(requestedTenant.Id, null, requestedTenant.Slug, isPlatformAdmin);
+            tenantContext.Initialize(workspaceTenant.Id, null, workspaceTenant.Slug, false);
             await next(httpContext);
             return;
         }
 
+        // Keep the reserved default workspace for initial setup, health checks,
+        // and backward-compatible root access. Production storefront links should
+        // always use /store/{opaque-key} or /preview/{signed-token}.
         var fallback = await dbContext.Tenants.AsNoTracking()
             .Where(item => item.IsActive && item.Slug == "default")
             .Select(item => new { item.Id, item.Slug })
@@ -167,6 +209,27 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
 
         tenantContext.Initialize(fallback.Id, null, fallback.Slug, isPlatformAdmin);
         await next(httpContext);
+    }
+
+    private static bool IsWorkspaceSelectionRequest(PathString path) =>
+        path.StartsWithSegments("/api/auth/admin/login") ||
+        path.StartsWithSegments("/api/tenant/public-profile");
+
+    private static string? NormalizeStorefrontKey(string? value)
+    {
+        var clean = value?.Trim().ToLowerInvariant();
+        return !string.IsNullOrWhiteSpace(clean) && clean.Length is >= 24 and <= 64 && clean.All(char.IsLetterOrDigit)
+            ? clean
+            : null;
+    }
+
+    private static string? NormalizeWorkspace(string? value)
+    {
+        var clean = value?.Trim().ToLowerInvariant();
+        return !string.IsNullOrWhiteSpace(clean) &&
+            System.Text.RegularExpressions.Regex.IsMatch(clean, "^[a-z0-9]+(?:-[a-z0-9]+)*$")
+                ? clean
+                : null;
     }
 
     private static async Task<bool> CanUseTenantAsync(
@@ -197,21 +260,6 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             return false;
         return !subscription.EndsAt.HasValue || subscription.EndsAt.Value >= DateTime.UtcNow;
     }
-
-    private static string? NormalizeHost(string? value)
-    {
-        var host = value?.Trim().TrimEnd('.').ToLowerInvariant();
-        if (string.IsNullOrWhiteSpace(host)) return null;
-        if (host.StartsWith('[') && host.EndsWith(']')) host = host[1..^1];
-        if (host.Contains('/') || host.Contains('\\')) return null;
-        if (host.Contains(':') && !IPAddress.TryParse(host, out _)) return null;
-        return host;
-    }
-
-    private static string? TryGetHost(string? value) =>
-        Uri.TryCreate(value, UriKind.Absolute, out var uri)
-            ? uri.Host.Trim().TrimEnd('.').ToLowerInvariant()
-            : null;
 
     private static async Task WriteErrorAsync(
         HttpContext context,

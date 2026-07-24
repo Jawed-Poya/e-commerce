@@ -1,6 +1,7 @@
 export type TenantPlan = "Free" | "Premium" | "Full" | "Enterprise";
 export type SubscriptionStatus = "Trial" | "Active" | "PastDue" | "Suspended" | "Cancelled" | "Expired";
-export type TenantSiteRoutingMode = "QueryString" | "Subdomain" | "CustomDomain";
+export type TenantSiteRoutingMode = "QueryString" | "Subdomain" | "CustomDomain" | "PlatformPath";
+export type StorefrontAccessMode = "Public" | "Private";
 
 export interface Branch {
     id: number;
@@ -44,16 +45,24 @@ export interface TenantSettings {
     pashtoFontFamily: string;
     baseFontSize: number;
     trashRetentionDays: number;
+    notificationRetentionDays: number;
     allowTenantUserClaimManagement: boolean;
 }
 
 export interface TenantSiteLink {
     routingMode: TenantSiteRoutingMode;
-    storefrontUrl: string;
+    accessMode: StorefrontAccessMode;
+    isPublished: boolean;
+    storefrontKey: string;
+    storefrontUrl: string | null;
     adminUrl: string;
+    workspaceCode: string;
     customDomain: string | null;
     storefrontBaseUrlOverride: string | null;
 }
+
+export interface StorefrontPreviewLink { url: string; expiresAt: string }
+
 
 export interface PublicTenantProfile {
     id: number;
@@ -61,7 +70,7 @@ export interface PublicTenantProfile {
     slug: string;
     logoUrl: string | null;
     faviconUrl: string | null;
-    storefrontUrl?: string;
+    storefrontUrl: string | null;
     settings: TenantSettings;
 }
 
@@ -88,6 +97,8 @@ export interface CreateTenantRequest {
     plan: TenantPlan | null;
     mainCurrencyCode: string;
     siteRoutingMode: TenantSiteRoutingMode;
+    storefrontAccessMode: StorefrontAccessMode;
+    isStorefrontPublished: boolean;
     customDomain: string | null;
     storefrontBaseUrlOverride: string | null;
     maxUsers: number | null;
@@ -109,6 +120,8 @@ export interface PlatformUpdateTenantRequest {
     logoUrl: string | null;
     faviconUrl: string | null;
     siteRoutingMode: TenantSiteRoutingMode;
+    storefrontAccessMode: StorefrontAccessMode;
+    isStorefrontPublished: boolean;
     customDomain: string | null;
     storefrontBaseUrlOverride: string | null;
     settings: TenantSettings;

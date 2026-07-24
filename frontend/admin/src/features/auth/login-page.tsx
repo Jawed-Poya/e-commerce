@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Eye, EyeOff, LoaderCircle, LockKeyhole, ShieldCheck, ShoppingBag } from "lucide-react";
 import { AxiosError } from "axios";
 
@@ -18,7 +18,9 @@ export default function AdminLoginPage() {
     const { tenant } = useTenant();
     const navigate = useNavigate();
     const location = useLocation();
-    const [tenantSlug, setTenantSlug] = useState(resolveTenantSlug);
+    const { workspaceCode } = useParams<{ workspaceCode?: string }>();
+    const linkedWorkspace = workspaceCode?.trim().toLowerCase() || null;
+    const [tenantSlug, setTenantSlug] = useState(() => linkedWorkspace ?? resolveTenantSlug());
     const [identifier, setIdentifier] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -85,7 +87,7 @@ export default function AdminLoginPage() {
                     <p className="mt-3 text-sm leading-6 text-muted-foreground">{t("auth.description")}</p>
 
                     <div className="mt-8 grid gap-5">
-                        <label className="grid gap-2"><Label htmlFor="tenant">{t("auth.company")}</Label><Input id="tenant" value={tenantSlug} onChange={(event) => { setTenantSlug(event.target.value); setError(null); }} placeholder={t("auth.companyPlaceholder")} required className="h-12 rounded-xl" /><span className="text-xs text-muted-foreground">{t("auth.companyHelp")}</span></label>
+                        <label className="grid gap-2"><Label htmlFor="tenant">{t("auth.company")}</Label><Input id="tenant" value={tenantSlug} onChange={(event) => { setTenantSlug(event.target.value); setError(null); }} placeholder={t("auth.companyPlaceholder")} required readOnly={Boolean(linkedWorkspace)} className="h-12 rounded-xl" /><span className="text-xs text-muted-foreground">{t("auth.companyHelp")}</span></label>
                         <label className="grid gap-2"><Label htmlFor="identifier">{t("auth.identifier")}</Label><Input id="identifier" autoFocus autoComplete="username" value={identifier} onChange={(event) => { setIdentifier(event.target.value); setError(null); }} placeholder={t("auth.identifierPlaceholder")} required className="h-12 rounded-xl" /></label>
                         <label className="grid gap-2"><Label htmlFor="password">{t("auth.password")}</Label><div className="relative"><Input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(event) => { setPassword(event.target.value); setError(null); }} required className="h-12 rounded-xl pe-12" /><button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute end-1 top-1 grid size-10 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}>{showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button></div></label>
                         {error && <div className="rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}

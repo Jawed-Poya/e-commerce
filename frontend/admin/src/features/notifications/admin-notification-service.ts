@@ -10,4 +10,10 @@ export const adminNotificationService = {
             )
         ).data;
     },
+    async delete(id: number) {
+        await apiClient.delete(`/admin/notifications/${id}`);
+    },
+    async clear() {
+        await apiClient.delete("/admin/notifications");
+    },
 };

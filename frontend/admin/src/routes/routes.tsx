@@ -44,6 +44,10 @@ export const router = createBrowserRouter([
         element: <AdminLoginPage />,
     },
     {
+        path: "/workspace/:workspaceCode/login",
+        element: <AdminLoginPage />,
+    },
+    {
         element: <ProtectedRoute />,
         children: [
             {

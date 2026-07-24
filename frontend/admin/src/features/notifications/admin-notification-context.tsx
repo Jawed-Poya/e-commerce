@@ -28,6 +28,8 @@ type AdminNotificationContextValue = {
     unreadCount: number;
     realtimeStatus: RealtimeStatus;
     markAllRead: () => void;
+    remove: (id: number) => Promise<void>;
+    clear: () => Promise<void>;
     refresh: () => Promise<void>;
 };
 
@@ -193,6 +195,26 @@ export function AdminNotificationProvider({ children }: PropsWithChildren) {
         setSeenIds(ids);
     }, [items]);
 
+
+    const remove = useCallback(async (id: number) => {
+        await adminNotificationService.delete(id);
+        setItems((current) => current.filter((item) => item.id !== id));
+        deliveredIds.current.delete(id);
+        setSeenIds((current) => {
+            const next = current.filter((item) => item !== id);
+            localStorage.setItem(seenKey, JSON.stringify(next));
+            return next;
+        });
+    }, []);
+
+    const clear = useCallback(async () => {
+        await adminNotificationService.clear();
+        setItems([]);
+        deliveredIds.current.clear();
+        setSeenIds([]);
+        localStorage.setItem(seenKey, "[]");
+    }, []);
+
     const unreadCount = items.filter(
         (item) => !seenIds.includes(item.id),
     ).length;
@@ -202,9 +224,11 @@ export function AdminNotificationProvider({ children }: PropsWithChildren) {
             unreadCount,
             realtimeStatus,
             markAllRead,
+            remove,
+            clear,
             refresh,
         }),
-        [items, markAllRead, realtimeStatus, refresh, unreadCount],
+        [clear, items, markAllRead, realtimeStatus, refresh, remove, unreadCount],
     );
 
     return (

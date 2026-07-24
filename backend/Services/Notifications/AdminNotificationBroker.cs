@@ -4,12 +4,17 @@ using ECommerce.Entities.Notifications.Contracts;
 
 namespace ECommerce.Services.Notifications;
 
+/// <summary>
+/// In-process real-time broker partitioned by tenant. A subscriber receives only
+/// events published for the tenant in its authenticated JWT context.
+/// </summary>
 public sealed class AdminNotificationBroker
 {
-    private readonly ConcurrentDictionary<Guid, Channel<AdminNotificationResponse>> _subscribers = new();
+    private readonly ConcurrentDictionary<Guid, Subscriber> subscribers = new();
 
-    public Subscription Subscribe()
+    public Subscription Subscribe(long tenantId)
     {
+        if (tenantId <= 0) throw new ArgumentOutOfRangeException(nameof(tenantId));
         var id = Guid.NewGuid();
         var channel = Channel.CreateBounded<AdminNotificationResponse>(
             new BoundedChannelOptions(100)
@@ -18,21 +23,28 @@ public sealed class AdminNotificationBroker
                 SingleReader = true,
                 SingleWriter = false
             });
-        _subscribers[id] = channel;
+        subscribers[id] = new Subscriber(tenantId, channel);
         return new Subscription(id, channel.Reader, this);
     }
 
-    public void Publish(AdminNotificationResponse notification)
+    public void Publish(long tenantId, AdminNotificationResponse notification)
     {
-        foreach (var channel in _subscribers.Values)
-            channel.Writer.TryWrite(notification);
+        foreach (var subscriber in subscribers.Values)
+        {
+            if (subscriber.TenantId == tenantId)
+                subscriber.Channel.Writer.TryWrite(notification);
+        }
     }
 
     private void Unsubscribe(Guid id)
     {
-        if (_subscribers.TryRemove(id, out var channel))
-            channel.Writer.TryComplete();
+        if (subscribers.TryRemove(id, out var subscriber))
+            subscriber.Channel.Writer.TryComplete();
     }
+
+    private sealed record Subscriber(
+        long TenantId,
+        Channel<AdminNotificationResponse> Channel);
 
     public sealed class Subscription(
         Guid id,
