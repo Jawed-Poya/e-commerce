@@ -1,3 +1,5 @@
+using API.Entities.Types;
+using ECommerce.Entities.Common;
 using System.ComponentModel.DataAnnotations;
 using ECommerce.Data;
 using ECommerce.Dtos.Tenancy;
@@ -168,7 +170,17 @@ public sealed class TenantManagementService(
             await context.SaveChangesAsync(cancellationToken);
             var branch = new Branch { TenantId = tenant.Id, Name = "Main Branch", Code = "MAIN", IsMain = true, IsActive = true };
             context.Branches.Add(branch);
+            await context.SaveChangesAsync(cancellationToken);
+
             context.TenantSettings.Add(new TenantSetting { TenantId = tenant.Id, MainCurrencyCode = currencyCode, CurrencySymbol = CurrencySymbol(currencyCode) });
+            context.Types.Add(new GeneralType
+            {
+                TenantId = tenant.Id,
+                BranchId = branch.Id,
+                Name = "General",
+                Group = GeneralTypeEnum.CustomerType,
+                SortOrder = 0
+            });
             var subscriptionOverrides = new UpdateTenantSubscriptionRequest(
                 plan.Id, plan.LegacyPlan, SubscriptionStatus.Active, null,
                 request.MaxUsers, request.MaxBranches, request.MaxProducts,

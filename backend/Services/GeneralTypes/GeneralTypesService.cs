@@ -100,6 +100,14 @@ public class GeneralTypesService : IGeneralTypeService
         }
 
         var originalGroup = entity.Group;
+        var isProtectedGeneral = entity.Group == GeneralTypeEnum.CustomerType &&
+            entity.Name.Equals("General", StringComparison.OrdinalIgnoreCase);
+        if (isProtectedGeneral &&
+            (model.Group != GeneralTypeEnum.CustomerType ||
+             !model.Name.Equals("General", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("The General customer type is required and cannot be renamed or moved to another group.");
+        }
 
         if (model.ParentId == id)
             throw new InvalidOperationException("A type cannot be its own parent.");
@@ -195,6 +203,12 @@ public class GeneralTypesService : IGeneralTypeService
                 "Type not found.");
         }
 
+
+        if (entity.Group == GeneralTypeEnum.CustomerType &&
+            entity.Name.Equals("General", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("The General customer type is required and cannot be deleted.");
+        }
 
         var hasChildren = await _context.Types
             .AnyAsync(x => x.ParentId == id);
