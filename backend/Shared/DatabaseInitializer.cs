@@ -23,12 +23,12 @@ public static class DatabaseInitializer
 
         await EnsurePreMigrationSchemaCompatibilityAsync(context);
         await context.Database.MigrateAsync();
-        await EnsureDefaultTenantAsync(context);
+        var workspace = await EnsureDefaultTenantAsync(context);
         await EnsureRolesAsync(services);
         await EnsureAdminPermissionsAsync(services);
-        await EnsureDefaultCustomerTypeAsync(context);
-        await EnsureOperationDefaultsAsync(context);
-        await EnsureAdminAsync(services);
+        await EnsureDefaultCustomerTypeAsync(context, workspace.Tenant.Id, workspace.Branch.Id);
+        await EnsureOperationDefaultsAsync(context, workspace.Tenant.Id, workspace.Branch.Id);
+        await EnsureAdminAsync(services, workspace.Tenant.Id, workspace.Branch.Id);
     }
 
     private static async Task EnsurePreMigrationSchemaCompatibilityAsync(ApplicationDbContext context)
@@ -51,9 +51,14 @@ END;
     }
 
 
-    private static async Task EnsureDefaultTenantAsync(ApplicationDbContext context)
+    private sealed record DefaultWorkspace(Tenant Tenant, Branch Branch);
+
+    private static async Task<DefaultWorkspace> EnsureDefaultTenantAsync(ApplicationDbContext context)
     {
-        var tenant = await context.Tenants.OrderBy(item => item.Id).FirstOrDefaultAsync();
+        // The reserved default workspace must always exist for localhost and
+        // local-network deployments that do not use tenant subdomains.
+        var tenant = await context.Tenants
+            .FirstOrDefaultAsync(item => item.Slug == "default");
         if (tenant is null)
         {
             tenant = new Tenant
@@ -67,16 +72,39 @@ END;
             await context.SaveChangesAsync();
         }
 
-        if (!await context.Branches.AnyAsync(item => item.TenantId == tenant.Id))
+        var branch = await context.Branches
+            .Where(item => item.TenantId == tenant.Id)
+            .OrderByDescending(item => item.IsMain)
+            .ThenBy(item => item.Id)
+            .FirstOrDefaultAsync();
+        if (branch is null)
         {
-            context.Branches.Add(new Branch
+            branch = new Branch
             {
                 TenantId = tenant.Id,
                 Name = "Main Branch",
                 Code = "MAIN",
                 IsMain = true,
                 IsActive = true
-            });
+            };
+            context.Branches.Add(branch);
+            await context.SaveChangesAsync();
+        }
+        else
+        {
+            var branchChanged = false;
+            if (!branch.IsMain)
+            {
+                branch.IsMain = true;
+                branchChanged = true;
+            }
+            if (!branch.IsActive)
+            {
+                branch.IsActive = true;
+                branchChanged = true;
+            }
+            if (branchChanged)
+                await context.SaveChangesAsync();
         }
 
         if (!await context.TenantSettings.AnyAsync(item => item.TenantId == tenant.Id))
@@ -108,6 +136,7 @@ END;
             }));
 
         await context.SaveChangesAsync();
+        return new DefaultWorkspace(tenant, branch);
     }
 
     private static async Task EnsureRolesAsync(IServiceProvider services)
@@ -161,17 +190,23 @@ END;
         }
     }
 
-    private static async Task EnsureDefaultCustomerTypeAsync(ApplicationDbContext context)
+    private static async Task EnsureDefaultCustomerTypeAsync(ApplicationDbContext context, long tenantId, long branchId)
     {
-        var hasGeneralCustomerType = await context.Types.AnyAsync(type =>
-            type.Group == GeneralTypeEnum.CustomerType &&
-            (type.Name == "General" || type.Name == "Default"));
+        var hasGeneralCustomerType = await context.Types
+            .IgnoreQueryFilters()
+            .AnyAsync(type =>
+                type.TenantId == tenantId &&
+                !type.IsDeleted &&
+                type.Group == GeneralTypeEnum.CustomerType &&
+                (type.Name == "General" || type.Name == "Default"));
 
         if (hasGeneralCustomerType)
             return;
 
         context.Types.Add(new GeneralType
         {
+            TenantId = tenantId,
+            BranchId = branchId,
             Name = "General",
             Group = GeneralTypeEnum.CustomerType,
             SortOrder = 0
@@ -181,18 +216,21 @@ END;
     }
 
 
-    private static async Task EnsureOperationDefaultsAsync(ApplicationDbContext context)
+    private static async Task EnsureOperationDefaultsAsync(ApplicationDbContext context, long tenantId, long branchId)
     {
         var changed = false;
         var expenseCategoryNames = new[] { "Rent", "Utilities", "Transport", "Office", "Other" };
         var existingExpenseCategoryNames = await context.Types
-            .Where(type => type.Group == GeneralTypeEnum.ExpenseCategory)
+            .IgnoreQueryFilters()
+            .Where(type => type.TenantId == tenantId && !type.IsDeleted && type.Group == GeneralTypeEnum.ExpenseCategory)
             .Select(type => type.Name)
             .ToListAsync();
         var missingExpenseCategories = expenseCategoryNames
             .Where(name => !existingExpenseCategoryNames.Contains(name, StringComparer.OrdinalIgnoreCase))
             .Select((name, index) => new GeneralType
             {
+                TenantId = tenantId,
+                BranchId = branchId,
                 Name = name,
                 Group = GeneralTypeEnum.ExpenseCategory,
                 SortOrder = index
@@ -204,10 +242,14 @@ END;
             changed = true;
         }
 
-        if (!await context.Warehouses.AnyAsync())
+        if (!await context.Warehouses
+                .IgnoreQueryFilters()
+                .AnyAsync(item => item.TenantId == tenantId && !item.IsDeleted))
         {
             context.Warehouses.Add(new Warehouse
             {
+                TenantId = tenantId,
+                BranchId = branchId,
                 Name = "Main Warehouse",
                 Code = "MAIN",
                 IsActive = true
@@ -218,7 +260,7 @@ END;
         if (changed) await context.SaveChangesAsync();
     }
 
-    private static async Task EnsureAdminAsync(IServiceProvider services)
+    private static async Task EnsureAdminAsync(IServiceProvider services, long tenantId, long branchId)
     {
         var seed = services.GetRequiredService<IOptions<SeedAdminOptions>>().Value;
         var email = seed.Email?.Trim().ToLowerInvariant();
@@ -231,14 +273,15 @@ END;
         var context = services.GetRequiredService<ApplicationDbContext>();
         var normalizedEmail = userManager.NormalizeEmail(email);
         var admin = await context.Users.FirstOrDefaultAsync(user =>
-            user.TenantId == 1 && user.NormalizedEmail == normalizedEmail);
+            user.TenantId == tenantId && user.NormalizedEmail == normalizedEmail);
 
         if (admin is null)
         {
             admin = new User
             {
-                TenantId = 1,
-                UserName = email,
+                TenantId = tenantId,
+                BranchId = branchId,
+                UserName = tenantId <= 1 ? email : $"{tenantId}:{email}",
                 Email = email,
                 FullName = string.IsNullOrWhiteSpace(seed.FullName)
                     ? "System Administrator"
@@ -258,6 +301,25 @@ END;
         else
         {
             var changed = false;
+
+            if (admin.TenantId != tenantId)
+            {
+                admin.TenantId = tenantId;
+                changed = true;
+            }
+
+            if (!admin.BranchId.HasValue)
+            {
+                admin.BranchId = branchId;
+                changed = true;
+            }
+
+            var expectedUserName = tenantId <= 1 ? email : $"{tenantId}:{email}";
+            if (!string.Equals(admin.UserName, expectedUserName, StringComparison.OrdinalIgnoreCase))
+            {
+                admin.UserName = expectedUserName;
+                changed = true;
+            }
 
             if (!admin.IsActive)
             {
