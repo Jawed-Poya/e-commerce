@@ -31,7 +31,9 @@ export class ApiError extends Error {
 function requestHeaders(includeJson = false) {
     const headers = new Headers();
     if (includeJson) headers.set("Content-Type", "application/json");
-    headers.set("X-Tenant-Slug", resolveTenantSlug());
+    const tenantSlug = resolveTenantSlug();
+    if (tenantSlug) headers.set("X-Tenant-Slug", tenantSlug);
+    headers.set("X-Tenant-Host", window.location.hostname.toLowerCase());
 
     const token = localStorage.getItem(customerTokenKey);
     if (token) headers.set("Authorization", `Bearer ${token}`);

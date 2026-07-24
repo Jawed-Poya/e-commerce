@@ -146,6 +146,8 @@ export function CategoryMegaMenu() {
 }
 
 function ActiveCategory({ category }: { category: CategoryNode }) {
+    const { t } = useI18n();
+
     return (
         <section className="relative min-w-0 overflow-hidden p-7">
             <div className="pointer-events-none absolute -right-24 -top-24 size-64 rounded-full bg-primary/8 blur-3xl dark:bg-primary/10" />
