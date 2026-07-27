@@ -39,7 +39,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
-import { useTenant } from "@/features/tenancy/tenant-context";
+import { useCompany } from "@/features/company/company-context";
 import {
     DocumentLines,
     newDocumentItem,
@@ -77,7 +77,7 @@ const emptySupplier = () => ({
 
 export default function PurchasesPage() {
     const queryClient = useQueryClient();
-    const { formatMoney } = useTenant();
+    const { formatMoney } = useCompany();
     const { user } = useAdminAuth();
     const canManage = hasPermission(user, Permissions.PurchasesManage);
     const { data: purchases, isLoading } = useOperationQuery(

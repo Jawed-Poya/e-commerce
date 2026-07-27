@@ -10,9 +10,10 @@ using ECommerce.Entities.Orders.Filters;
 using ECommerce.Entities.Products;
 using ECommerce.Options;
 using ECommerce.Services.Customers;
+using ECommerce.Services.Inventory;
 using ECommerce.Services.Notifications;
 using ECommerce.Services.Storefront;
-using ECommerce.Services.Tenancy;
+using ECommerce.Services.Company;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OrderEntity = API.Entities.Orders.Order;
@@ -28,7 +29,7 @@ public sealed class OrderService(
     IStoreNotificationService notifications,
     IAdminNotificationService adminNotifications,
     IStorefrontContentService storefrontContent,
-    ITenantPlanGuard tenantPlanGuard) : IOrderService
+    IInventoryCostService inventoryCosts) : IOrderService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -42,7 +43,7 @@ public sealed class OrderService(
     {
         var bankDetails = GetBankDetails();
         var content = await storefrontContent.GetAsync(cancellationToken);
-        var currency = await GetTenantCurrencyAsync(cancellationToken);
+        var currency = await GetCompanyCurrencyAsync(cancellationToken);
 
         return new CheckoutConfigurationResponse(
             currency,
@@ -70,8 +71,7 @@ public sealed class OrderService(
         CancellationToken cancellationToken = default)
     {
         ValidateCheckoutRequest(request);
-        await tenantPlanGuard.EnsureOrderCapacityAsync(1, cancellationToken);
-        var currency = await GetTenantCurrencyAsync(cancellationToken);
+        var currency = await GetCompanyCurrencyAsync(cancellationToken);
 
         var groupedItems = request.Items
             .GroupBy(item => item.ProductId)
@@ -104,6 +104,7 @@ public sealed class OrderService(
 
             var requestByProductId = groupedItems.ToDictionary(item => item.ProductId);
             var orderItems = new List<OrderItem>(products.Count);
+            var productCosts = await inventoryCosts.GetCurrentUnitCostsAsync(productIds, cancellationToken);
             var defaultCustomerTypeId = await defaultCustomerType.GetIdAsync(cancellationToken);
 
             foreach (var product in products)
@@ -126,6 +127,7 @@ public sealed class OrderService(
                     ProductId = product.Id,
                     Quantity = requested.Quantity,
                     UnitPrice = unitPrice,
+                    UnitCost = productCosts.GetValueOrDefault(product.Id),
                     Discount = 0,
                     Tax = 0,
                     ProductName = product.Name,
@@ -1000,10 +1002,10 @@ public sealed class OrderService(
         CleanOptional(value)?.ToLowerInvariant();
 
 
-    private async Task<string> GetTenantCurrencyAsync(CancellationToken cancellationToken)
+    private async Task<string> GetCompanyCurrencyAsync(CancellationToken cancellationToken)
     {
         var currency = await context.TenantSettings.AsNoTracking()
-            .Where(item => item.TenantId == context.CurrentTenantId)
+            .Where(item => item.TenantId == context.CurrentCompanyId)
             .Select(item => item.MainCurrencyCode)
             .FirstOrDefaultAsync(cancellationToken);
         return NormalizeCurrency(currency ?? _options.Currency);

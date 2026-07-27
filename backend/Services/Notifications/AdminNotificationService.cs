@@ -234,8 +234,8 @@ public sealed class AdminNotificationCleanupHostedService(
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
-                var tenantContext = scope.ServiceProvider.GetRequiredService<ECommerce.Services.Tenancy.TenantContext>();
-                tenantContext.Initialize(1, null, "notification-cleanup", true);
+                var companyContext = scope.ServiceProvider.GetRequiredService<ECommerce.Services.Company.CompanyContext>();
+                companyContext.Initialize();
                 var service = scope.ServiceProvider.GetRequiredService<IAdminNotificationService>();
                 var count = await service.CleanupExpiredAsync(stoppingToken);
                 if (count > 0) logger.LogInformation("Permanently removed {Count} expired admin notifications.", count);

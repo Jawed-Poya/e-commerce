@@ -8,7 +8,7 @@ using ECommerce.Entities.Products.Exceptions;
 using ECommerce.Entities.Products.Filters;
 using ECommerce.Entities.Products.Requests;
 using ECommerce.Services.Customers;
-using ECommerce.Services.Tenancy;
+using ECommerce.Services.Company;
 using ECommerce.Shared;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -32,22 +32,19 @@ public class ProductService : IProductService
     private readonly IProductImageStorage _imageStorage;
     private readonly ICurrentCustomerAccessor _currentCustomer;
     private readonly IDefaultCustomerTypeResolver _defaultCustomerType;
-    private readonly ITenantPlanGuard _tenantPlanGuard;
 
     public ProductService(
         ApplicationDbContext context,
         IProductImageStorage imageStorage,
         ILogger<ProductService> logger,
         ICurrentCustomerAccessor currentCustomer,
-        IDefaultCustomerTypeResolver defaultCustomerType,
-        ITenantPlanGuard tenantPlanGuard)
+        IDefaultCustomerTypeResolver defaultCustomerType)
     {
         _context = context;
         _imageStorage = imageStorage;
         _logger = logger;
         _currentCustomer = currentCustomer;
         _defaultCustomerType = defaultCustomerType;
-        _tenantPlanGuard = tenantPlanGuard;
     }
 
     public async Task<PagedResult<ProductListItemResponse>> GetAsync(ProductFilter filter)
@@ -526,7 +523,6 @@ public class ProductService : IProductService
 
     public async Task<long> CreateAsync(Product model)
     {
-        await _tenantPlanGuard.EnsureProductCapacityAsync();
         model.CreatedAt = DateTime.UtcNow;
 
         _context.Products.Add(model);
@@ -605,7 +601,6 @@ public class ProductService : IProductService
     )
     {
         ValidateRequest(request);
-        await _tenantPlanGuard.EnsureProductCapacityAsync(request.Products.Count, cancellationToken);
 
         var items = request.Products
             .Select((item, index) => new NormalizedProductItem(

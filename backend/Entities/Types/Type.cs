@@ -11,7 +11,7 @@ public class GeneralType : BaseEntity
 
     [MaxLength(2048)]
     public string? ImageUrl { get; set; }
-    
+
     public GeneralTypeEnum Group { get; set; } = GeneralTypeEnum.None;
 
     public int? SortOrder { get; set; }

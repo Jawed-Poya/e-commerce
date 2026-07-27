@@ -1,66 +1,23 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-    Building2,
-    CheckCircle2,
-    Copy,
-    Crown,
-    ExternalLink,
-    GitBranch,
-    Globe2,
-    Info,
-    KeyRound,
-    LoaderCircle,
-    Palette,
-    Pencil,
-    Plus,
-    Save,
-    Share2,
-    WalletCards,
-} from "lucide-react";
+import { Building2, LoaderCircle, MapPin, Pencil, Plus, Save, Settings2 } from "lucide-react";
 import { toast } from "sonner";
+
 import { PageHeader } from "@/components/page-header";
 import { SimpleCombobox } from "@/components/simple-combobox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { tenantService } from "@/features/tenancy/tenant-service";
-import { resolveTenantFontStack, tenantFontOptions } from "@/features/tenancy/tenant-fonts";
-import type {
-    Branch,
-    StorefrontAccessMode,
-    StorefrontPreviewLink,
-    TenantSettings,
-} from "@/features/tenancy/tenant-types";
-import { useTenant } from "@/features/tenancy/tenant-context";
-import { useI18n } from "@/i18n/i18n-provider";
+import { companyService, type UpsertCompanyBranch, type UpdateCompanyProfile } from "@/features/company/company-service";
+import type { CompanyBranch, CompanySettings } from "@/features/company/company-types";
+import { useCompany } from "@/features/company/company-context";
 
-const currencies = [
-    ["AFN", "Afghan Afghani", "؋"],
-    ["USD", "US Dollar", "$"],
-    ["EUR", "Euro", "€"],
-    ["GBP", "British Pound", "£"],
-    ["PKR", "Pakistani Rupee", "₨"],
-    ["INR", "Indian Rupee", "₹"],
-] as const;
-
-const fontOptions = tenantFontOptions;
-
-type Tab = "profile" | "site" | "branches" | "appearance" | "subscription";
-
-const blankBranch: Omit<Branch, "id"> = {
+const emptyBranch: UpsertCompanyBranch = {
     name: "",
     code: "",
     phone: null,
@@ -70,1190 +27,218 @@ const blankBranch: Omit<Branch, "id"> = {
 };
 
 export default function CompanySettingsPage() {
-    const client = useQueryClient();
-    const { formatMoney } = useTenant();
-    const { t, language } = useI18n();
-    const [tab, setTab] = useState<Tab>("profile");
-    const query = useQuery({
-        queryKey: ["tenant", "profile"],
-        queryFn: tenantService.profile,
-    });
-    const [profile, setProfile] = useState({
-        name: "",
-        legalName: "",
-        registrationNumber: "",
-        email: "",
-        phone: "",
-        address: "",
-        logoUrl: "",
-        faviconUrl: "",
-    });
-    const [settings, setSettings] = useState<TenantSettings | null>(null);
-    const [branchOpen, setBranchOpen] = useState(false);
-    const [branchId, setBranchId] = useState<number | null>(null);
-    const [branch, setBranch] = useState(blankBranch);
-    const [previewLink, setPreviewLink] = useState<StorefrontPreviewLink | null>(null);
+    const queryClient = useQueryClient();
+    const { formatMoney } = useCompany();
+    const profileQuery = useQuery({ queryKey: ["company", "profile"], queryFn: companyService.profile });
+    const [profile, setProfile] = useState<UpdateCompanyProfile | null>(null);
+    const [settings, setSettings] = useState<CompanySettings | null>(null);
+    const [branchDialog, setBranchDialog] = useState(false);
+    const [editingBranch, setEditingBranch] = useState<CompanyBranch | null>(null);
+    const [branch, setBranch] = useState<UpsertCompanyBranch>(emptyBranch);
 
     useEffect(() => {
-        if (!query.data) return;
-        const item = query.data;
+        if (!profileQuery.data) return;
+        const value = profileQuery.data;
         setProfile({
-            name: item.name,
-            legalName: item.legalName ?? "",
-            registrationNumber: item.registrationNumber ?? "",
-            email: item.email ?? "",
-            phone: item.phone ?? "",
-            address: item.address ?? "",
-            logoUrl: item.logoUrl ?? "",
-            faviconUrl: item.faviconUrl ?? "",
+            name: value.name,
+            legalName: value.legalName,
+            registrationNumber: value.registrationNumber,
+            email: value.email,
+            phone: value.phone,
+            address: value.address,
+            logoUrl: value.logoUrl,
+            faviconUrl: value.faviconUrl,
         });
-        setSettings(item.settings);
-    }, [query.data]);
+        setSettings(value.settings);
+    }, [profileQuery.data]);
 
     const refresh = async () => {
         await Promise.all([
-            client.invalidateQueries({ queryKey: ["tenant"] }),
-            client.invalidateQueries({ queryKey: ["tenant", "profile"] }),
+            queryClient.invalidateQueries({ queryKey: ["company"] }),
+            queryClient.invalidateQueries({ queryKey: ["company", "public-profile"] }),
         ]);
     };
 
     const saveProfile = useMutation({
-        mutationFn: () =>
-            tenantService.updateProfile({
-                ...profile,
-                legalName: profile.legalName || null,
-                registrationNumber: profile.registrationNumber || null,
-                email: profile.email || null,
-                phone: profile.phone || null,
-                address: profile.address || null,
-                logoUrl: profile.logoUrl || null,
-                faviconUrl: profile.faviconUrl || null,
-            }),
+        mutationFn: companyService.updateProfile,
         onSuccess: async () => {
-            toast.success(t("tenant.profileUpdated"));
+            toast.success("Company profile updated.");
             await refresh();
         },
-        onError: (error) => toast.error(message(error, t("tenant.operationFailed"))),
+        onError: (error) => toast.error(message(error)),
     });
-
     const saveSettings = useMutation({
-        mutationFn: () => tenantService.updateSettings(settings!),
+        mutationFn: companyService.updateSettings,
         onSuccess: async () => {
-            toast.success(t("tenant.settingsUpdated"));
+            toast.success("Company settings updated.");
             await refresh();
         },
-        onError: (error) => toast.error(message(error, t("tenant.operationFailed"))),
+        onError: (error) => toast.error(message(error)),
     });
-
-    const saveStorefront = useMutation({
-        mutationFn: (request: { isPublished: boolean; accessMode: StorefrontAccessMode }) =>
-            tenantService.updateStorefront(request),
-        onSuccess: async () => {
-            toast.success(t("platform.storefrontUpdated"));
-            setPreviewLink(null);
-            await refresh();
-        },
-        onError: (error) => toast.error(message(error, t("tenant.operationFailed"))),
-    });
-
-    const rotateStorefrontKey = useMutation({
-        mutationFn: tenantService.rotateStorefrontKey,
-        onSuccess: async () => {
-            toast.success(t("platform.storefrontKeyRotated"));
-            setPreviewLink(null);
-            await refresh();
-        },
-        onError: (error) => toast.error(message(error, t("tenant.operationFailed"))),
-    });
-
-    const createPreviewLink = useMutation({
-        mutationFn: () => tenantService.createPreviewLink(30),
-        onSuccess: (result) => {
-            setPreviewLink(result);
-            toast.success(t("platform.previewGenerated"));
-        },
-        onError: (error) => toast.error(message(error, t("tenant.operationFailed"))),
-    });
-
     const saveBranch = useMutation({
-        mutationFn: () =>
-            branchId
-                ? tenantService.updateBranch(branchId, branch)
-                : tenantService.createBranch(branch),
+        mutationFn: () => editingBranch
+            ? companyService.updateBranch(editingBranch.id, branch)
+            : companyService.createBranch(branch),
         onSuccess: async () => {
-            toast.success(
-                branchId ? t("tenant.branchUpdated") : t("tenant.branchCreated"),
-            );
-            setBranchOpen(false);
+            toast.success(editingBranch ? "Branch updated." : "Branch created.");
+            setBranchDialog(false);
             await refresh();
         },
-        onError: (error) => toast.error(message(error, t("tenant.operationFailed"))),
+        onError: (error) => toast.error(message(error)),
     });
 
-    const openBranch = (item?: Branch) => {
-        setBranchId(item?.id ?? null);
-        setBranch(
-            item
-                ? {
-                      name: item.name,
-                      code: item.code,
-                      phone: item.phone,
-                      address: item.address,
-                      isMain: item.isMain,
-                      isActive: item.isActive,
-                  }
-                : blankBranch,
-        );
-        setBranchOpen(true);
+    const openBranch = (value?: CompanyBranch) => {
+        setEditingBranch(value ?? null);
+        setBranch(value ? {
+            name: value.name,
+            code: value.code,
+            phone: value.phone,
+            address: value.address,
+            isMain: value.isMain,
+            isActive: value.isActive,
+        } : emptyBranch);
+        setBranchDialog(true);
     };
 
-    if (query.isLoading || !settings) {
-        return (
-            <div className="grid min-h-64 place-items-center">
-                <LoaderCircle className="animate-spin" />
-            </div>
-        );
+    if (profileQuery.isLoading || !profile || !settings) {
+        return <div className="grid min-h-[60vh] place-items-center"><LoaderCircle className="size-7 animate-spin text-primary" /></div>;
     }
 
-    if (!query.data) {
-        return (
-            <Card>
-                <CardContent className="p-8 text-center">
-                    {t("tenant.loadError")}
-                </CardContent>
-            </Card>
-        );
+    if (profileQuery.isError) {
+        return <Card><CardContent className="p-8 text-center text-destructive">Could not load the company profile.</CardContent></Card>;
     }
-
-    const tenant = query.data;
-    const locale = language === "en" ? "en-US" : language === "ps" ? "ps-AF" : "fa-AF";
 
     return (
         <div className="space-y-6">
             <PageHeader
-                title={t("tenant.companyTitle")}
-                description={t("tenant.companyDescription")}
-                actions={
-                    tenant.site.storefrontUrl ? (
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                variant="outline"
-                                onClick={async () => {
-                                    await copyWithFeedback(tenant.site.storefrontUrl!, t);
-                                }}
-                            >
-                                <Copy />
-                                {t("platform.copyLink")}
-                            </Button>
-                            <Button
-                                variant="outline"
-                                onClick={() => void shareStorefront(tenant.name, tenant.site.storefrontUrl!, t)}
-                            >
-                                <Share2 />
-                                {t("platform.shareStorefront")}
-                            </Button>
-                            <Button
-                                variant="outline"
-                                render={<a href={tenant.site.storefrontUrl} target="_blank" rel="noreferrer" />}
-                            >
-                                <ExternalLink />
-                                {t("platform.storefrontLink")}
-                            </Button>
-                        </div>
-                    ) : undefined
-                }
+                title="Company settings"
+                description="Manage one company profile, branches, currency, appearance, and operational preferences."
             />
 
-            <div className="flex max-w-full gap-2 overflow-x-auto border-b pb-3">
-                <TabButton
-                    active={tab === "profile"}
-                    onClick={() => setTab("profile")}
-                    icon={<Building2 />}
-                >
-                    {t("tenant.profile")}
-                </TabButton>
-                <TabButton
-                    active={tab === "site"}
-                    onClick={() => setTab("site")}
-                    icon={<Globe2 />}
-                >
-                    {t("platform.tab.site")}
-                </TabButton>
-                <TabButton
-                    active={tab === "branches"}
-                    onClick={() => setTab("branches")}
-                    icon={<GitBranch />}
-                >
-                    {t("tenant.branches")}
-                </TabButton>
-                <TabButton
-                    active={tab === "appearance"}
-                    onClick={() => setTab("appearance")}
-                    icon={<Palette />}
-                >
-                    {t("tenant.appearance")}
-                </TabButton>
-                <TabButton
-                    active={tab === "subscription"}
-                    onClick={() => setTab("subscription")}
-                    icon={<Crown />}
-                >
-                    {t("tenant.subscription")}
-                </TabButton>
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(380px,.8fr)]">
+                <Card className="shadow-none">
+                    <CardHeader className="border-b bg-muted/20">
+                        <CardTitle className="flex items-center gap-2"><Building2 className="size-5 text-primary" /> Company profile</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-5">
+                        <form
+                            className="grid gap-5 sm:grid-cols-2"
+                            onSubmit={(event: FormEvent) => {
+                                event.preventDefault();
+                                saveProfile.mutate(profile);
+                            }}
+                        >
+                            <Field label="Company name"><Input required value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} /></Field>
+                            <Field label="Legal name"><Input value={profile.legalName ?? ""} onChange={(event) => setProfile({ ...profile, legalName: nullable(event.target.value) })} /></Field>
+                            <Field label="Registration number"><Input value={profile.registrationNumber ?? ""} onChange={(event) => setProfile({ ...profile, registrationNumber: nullable(event.target.value) })} /></Field>
+                            <Field label="Email"><Input type="email" value={profile.email ?? ""} onChange={(event) => setProfile({ ...profile, email: nullable(event.target.value) })} /></Field>
+                            <Field label="Phone"><Input value={profile.phone ?? ""} onChange={(event) => setProfile({ ...profile, phone: nullable(event.target.value) })} /></Field>
+                            <Field label="Logo URL"><Input value={profile.logoUrl ?? ""} onChange={(event) => setProfile({ ...profile, logoUrl: nullable(event.target.value) })} /></Field>
+                            <Field label="Favicon URL"><Input value={profile.faviconUrl ?? ""} onChange={(event) => setProfile({ ...profile, faviconUrl: nullable(event.target.value) })} /></Field>
+                            <div className="space-y-2 sm:col-span-2"><Label>Address</Label><Textarea value={profile.address ?? ""} onChange={(event) => setProfile({ ...profile, address: nullable(event.target.value) })} /></div>
+                            <div className="sm:col-span-2 flex justify-end"><Button disabled={saveProfile.isPending}><Save />{saveProfile.isPending ? "Saving…" : "Save profile"}</Button></div>
+                        </form>
+                    </CardContent>
+                </Card>
+
+                <Card className="shadow-none">
+                    <CardHeader className="border-b bg-muted/20">
+                        <div className="flex items-center justify-between gap-3">
+                            <div><CardTitle className="flex items-center gap-2"><MapPin className="size-5 text-primary" /> Branches</CardTitle><p className="mt-1 text-xs text-muted-foreground">Use branches for stock, users, sales, and filtered reports.</p></div>
+                            <Button size="sm" onClick={() => openBranch()}><Plus /> Add</Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3 p-4">
+                        {profileQuery.data?.branches.map((item) => (
+                            <div key={item.id} className="rounded-xl border bg-card p-4">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{item.name}</span><Badge variant="secondary">{item.code}</Badge>{item.isMain && <Badge>Main</Badge>}{!item.isActive && <Badge variant="outline">Inactive</Badge>}</div>
+                                        <p className="mt-2 text-xs text-muted-foreground">{item.phone || "No phone"} · {item.address || "No address"}</p>
+                                    </div>
+                                    <Button variant="ghost" size="icon-sm" onClick={() => openBranch(item)}><Pencil className="size-4" /></Button>
+                                </div>
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
             </div>
 
-            {tab === "profile" && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t("tenant.companyProfile")}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid gap-5 md:grid-cols-2">
-                        <Field label={t("tenant.companyName")}>
-                            <Input
-                                value={profile.name}
-                                onChange={(event) =>
-                                    setProfile((current) => ({
-                                        ...current,
-                                        name: event.target.value,
-                                    }))
-                                }
-                            />
-                        </Field>
-                        <Field label={t("tenant.legalName")}>
-                            <Input
-                                value={profile.legalName}
-                                onChange={(event) =>
-                                    setProfile((current) => ({
-                                        ...current,
-                                        legalName: event.target.value,
-                                    }))
-                                }
-                            />
-                        </Field>
-                        <Field label={t("tenant.registrationNumber")}>
-                            <Input
-                                value={profile.registrationNumber}
-                                onChange={(event) =>
-                                    setProfile((current) => ({
-                                        ...current,
-                                        registrationNumber: event.target.value,
-                                    }))
-                                }
-                            />
-                        </Field>
-                        <Field label={t("tenant.workspaceSlug")}>
-                            <Input value={tenant.slug} disabled />
-                            <p className="text-xs text-muted-foreground">
-                                {t("tenant.slugHelp")}
-                            </p>
-                        </Field>
-                        <Field label={t("tenant.email")}>
-                            <Input
-                                type="email"
-                                value={profile.email}
-                                onChange={(event) =>
-                                    setProfile((current) => ({
-                                        ...current,
-                                        email: event.target.value,
-                                    }))
-                                }
-                            />
-                        </Field>
-                        <Field label={t("tenant.phone")}>
-                            <Input
-                                value={profile.phone}
-                                onChange={(event) =>
-                                    setProfile((current) => ({
-                                        ...current,
-                                        phone: event.target.value,
-                                    }))
-                                }
-                            />
-                        </Field>
-                        <Field label={t("tenant.logoUrl")}>
-                            <Input
-                                value={profile.logoUrl}
-                                onChange={(event) =>
-                                    setProfile((current) => ({
-                                        ...current,
-                                        logoUrl: event.target.value,
-                                    }))
-                                }
-                            />
-                        </Field>
-                        <Field label={t("tenant.faviconUrl")}>
-                            <Input
-                                value={profile.faviconUrl}
-                                onChange={(event) =>
-                                    setProfile((current) => ({
-                                        ...current,
-                                        faviconUrl: event.target.value,
-                                    }))
-                                }
-                            />
-                        </Field>
-                        <div className="space-y-2 md:col-span-2">
-                            <Label>{t("tenant.address")}</Label>
-                            <Textarea
-                                rows={3}
-                                value={profile.address}
-                                onChange={(event) =>
-                                    setProfile((current) => ({
-                                        ...current,
-                                        address: event.target.value,
-                                    }))
-                                }
-                            />
+            <Card className="shadow-none">
+                <CardHeader className="border-b bg-muted/20"><CardTitle className="flex items-center gap-2"><Settings2 className="size-5 text-primary" /> Currency, appearance, and retention</CardTitle></CardHeader>
+                <CardContent className="p-5">
+                    <form
+                        className="space-y-6"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            saveSettings.mutate(settings);
+                        }}
+                    >
+                        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                            <Field label="Main currency"><Input maxLength={3} value={settings.mainCurrencyCode} onChange={(event) => setSettings({ ...settings, mainCurrencyCode: event.target.value.toUpperCase() })} /></Field>
+                            <Field label="Currency symbol"><Input value={settings.currencySymbol} onChange={(event) => setSettings({ ...settings, currencySymbol: event.target.value })} /></Field>
+                            <Field label="Symbol position"><SimpleCombobox value={settings.currencyPosition} onValueChange={(value) => value && setSettings({ ...settings, currencyPosition: value as "before" | "after" })} options={[{ value: "before", label: "Before amount" }, { value: "after", label: "After amount" }]} /></Field>
+                            <Field label="Decimal places"><Input type="number" min={0} max={4} value={settings.currencyDecimalPlaces} onChange={(event) => setSettings({ ...settings, currencyDecimalPlaces: Number(event.target.value) })} /></Field>
                         </div>
-                        <div className="md:col-span-2">
-                            <Button
-                                onClick={() => saveProfile.mutate()}
-                                disabled={saveProfile.isPending || !profile.name.trim()}
-                            >
-                                <Save />
-                                {saveProfile.isPending
-                                    ? t("tenant.saving")
-                                    : t("tenant.saveProfile")}
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
 
-            {tab === "site" && (
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,.85fr)]">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{t("platform.storefrontConnection")}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-5">
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <Field label={t("platform.workspaceCode")}>
-                                    <div className="flex gap-2">
-                                        <Input value={tenant.site.workspaceCode} readOnly dir="ltr" />
-                                        <Button type="button" size="icon" variant="outline" onClick={() => void copyWithFeedback(tenant.site.workspaceCode, t)}><Copy /></Button>
-                                    </div>
-                                </Field>
-                                <Field label={t("platform.storefrontAccess")}>
-                                    <SimpleCombobox<StorefrontAccessMode>
-                                        value={tenant.site.accessMode}
-                                        onValueChange={(value) => value && saveStorefront.mutate({ isPublished: tenant.site.isPublished, accessMode: value })}
-                                        options={[
-                                            { value: "Public", label: t("platform.access.public") },
-                                            { value: "Private", label: t("platform.access.private") },
-                                        ]}
-                                    />
-                                </Field>
-                            </div>
-                            <div className="flex items-center justify-between gap-4 rounded-xl border p-4">
-                                <div>
-                                    <p className="font-medium">{t("platform.publishStorefront")}</p>
-                                    <p className="mt-1 text-xs text-muted-foreground">{t("platform.publishStorefrontHelp")}</p>
-                                </div>
-                                <Switch
-                                    checked={tenant.site.isPublished}
-                                    onCheckedChange={(checked) => saveStorefront.mutate({ isPublished: checked, accessMode: tenant.site.accessMode })}
-                                />
-                            </div>
-                            <div className="rounded-xl border bg-muted/30 p-4">
-                                <p className="text-xs font-medium text-muted-foreground">{t("platform.storefrontKey")}</p>
-                                <p className="mt-2 break-all font-mono text-sm" dir="ltr">{tenant.site.storefrontKey}</p>
-                                <p className="mt-2 text-xs leading-5 text-muted-foreground">{t("platform.rotateStorefrontKeyHelp")}</p>
-                            </div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => rotateStorefrontKey.mutate()}
-                                disabled={rotateStorefrontKey.isPending}
-                            >
-                                <KeyRound />
-                                {t("platform.rotateStorefrontKey")}
-                            </Button>
-                        </CardContent>
-                    </Card>
+                        <div className="rounded-xl border bg-muted/20 p-4"><p className="text-sm font-semibold">Money preview</p><p className="mt-2 text-2xl font-bold tabular-nums text-primary">{formatMoney(123456.78, settings.mainCurrencyCode)}</p></div>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{t("platform.generatedLinks")}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <SiteLinkRow label={t("platform.adminLink")} value={tenant.site.adminUrl} />
-                            <SiteLinkRow
-                                label={t("platform.storefrontLink")}
-                                value={tenant.site.storefrontUrl}
-                                emptyText={t("platform.storefrontPrivateOrUnpublished")}
-                                shareTitle={tenant.name}
-                            />
-                            {previewLink ? (
-                                <SiteLinkRow label={t("platform.previewStorefront")} value={previewLink.url} />
-                            ) : null}
-                            <Button
-                                type="button"
-                                className="w-full"
-                                onClick={() => createPreviewLink.mutate()}
-                                disabled={createPreviewLink.isPending}
-                            >
-                                <ExternalLink />
-                                {t("platform.generatePreview")}
-                            </Button>
-                            {previewLink ? (
-                                <p className="text-xs text-muted-foreground">
-                                    {t("platform.previewExpires")} {new Date(previewLink.expiresAt).toLocaleString(locale)}
-                                </p>
-                            ) : null}
-                            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm leading-6 text-muted-foreground">
-                                {t("platform.singleHostAccessHelp")}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
+                        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                            <ColorField label="Admin primary" value={settings.adminPrimaryColor} onChange={(value) => setSettings({ ...settings, adminPrimaryColor: value })} />
+                            <ColorField label="Admin secondary" value={settings.adminSecondaryColor} onChange={(value) => setSettings({ ...settings, adminSecondaryColor: value })} />
+                            <ColorField label="Store primary" value={settings.storefrontPrimaryColor} onChange={(value) => setSettings({ ...settings, storefrontPrimaryColor: value })} />
+                            <ColorField label="Store secondary" value={settings.storefrontSecondaryColor} onChange={(value) => setSettings({ ...settings, storefrontSecondaryColor: value })} />
+                        </div>
 
-            {tab === "branches" && (
-                <div className="space-y-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h2 className="text-xl font-bold">{t("tenant.branches")}</h2>
-                            <p className="text-sm text-muted-foreground">
-                                {t("tenant.branchHelp")}
-                            </p>
+                        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                            <Field label="English font"><Input value={settings.englishFontFamily} onChange={(event) => setSettings({ ...settings, englishFontFamily: event.target.value })} /></Field>
+                            <Field label="Dari font"><Input value={settings.dariFontFamily} onChange={(event) => setSettings({ ...settings, dariFontFamily: event.target.value })} /></Field>
+                            <Field label="Pashto font"><Input value={settings.pashtoFontFamily} onChange={(event) => setSettings({ ...settings, pashtoFontFamily: event.target.value })} /></Field>
+                            <Field label="Base font size"><Input type="number" min={12} max={22} value={settings.baseFontSize} onChange={(event) => setSettings({ ...settings, baseFontSize: Number(event.target.value) })} /></Field>
+                            <Field label="Trash retention days"><Input type="number" min={1} max={3650} value={settings.trashRetentionDays} onChange={(event) => setSettings({ ...settings, trashRetentionDays: Number(event.target.value) })} /></Field>
+                            <Field label="Notification retention days"><Input type="number" min={1} max={3650} value={settings.notificationRetentionDays} onChange={(event) => setSettings({ ...settings, notificationRetentionDays: Number(event.target.value) })} /></Field>
+                            <div className="flex items-center justify-between gap-4 rounded-xl border p-4 sm:col-span-2"><div><p className="text-sm font-semibold">Allow permission assignment</p><p className="mt-1 text-xs text-muted-foreground">Administrators can assign permissions they already hold.</p></div><Switch checked={settings.allowUserClaimManagement} onCheckedChange={(checked) => setSettings({ ...settings, allowUserClaimManagement: checked })} /></div>
                         </div>
-                        <Button onClick={() => openBranch()}>
-                            <Plus />
-                            {t("tenant.addBranch")}
-                        </Button>
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {tenant.branches.map((item) => (
-                            <Card key={item.id} className="overflow-hidden">
-                                <CardContent className="p-5">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <h3 className="truncate font-bold">{item.name}</h3>
-                                                {item.isMain && <Badge>{t("tenant.main")}</Badge>}
-                                                {!item.isActive && (
-                                                    <Badge variant="outline">
-                                                        {t("tenant.inactive")}
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                {item.code}
-                                            </p>
-                                        </div>
-                                        <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            onClick={() => openBranch(item)}
-                                            aria-label={t("tenant.editBranch")}
-                                        >
-                                            <Pencil />
-                                        </Button>
-                                    </div>
-                                    <div className="mt-5 space-y-2 text-sm">
-                                        <p>{item.phone || t("tenant.noPhone")}</p>
-                                        <p className="text-muted-foreground">
-                                            {item.address || t("tenant.noAddress")}
-                                        </p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                </div>
-            )}
+                        <div className="flex justify-end"><Button disabled={saveSettings.isPending}><Save />{saveSettings.isPending ? "Saving…" : "Save settings"}</Button></div>
+                    </form>
+                </CardContent>
+            </Card>
 
-            {tab === "appearance" && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t("tenant.currencyAppearance")}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                        <Field label={t("tenant.mainCurrency")}>
-                            <SimpleCombobox
-                                value={settings.mainCurrencyCode}
-                                onValueChange={(value) => {
-                                    const currency = currencies.find(
-                                        (item) => item[0] === value,
-                                    );
-                                    if (!currency) return;
-                                    setSettings((current) =>
-                                        current
-                                            ? {
-                                                  ...current,
-                                                  mainCurrencyCode: currency[0],
-                                                  currencySymbol: currency[2],
-                                              }
-                                            : current,
-                                    );
-                                }}
-                                options={currencies.map((item) => ({
-                                    value: item[0],
-                                    label: `${item[0]} · ${item[1]}`,
-                                    description: item[2],
-                                }))}
-                            />
-                        </Field>
-                        <Field label={t("tenant.currencySymbol")}>
-                            <Input
-                                value={settings.currencySymbol}
-                                onChange={(event) =>
-                                    setSettings((current) =>
-                                        current
-                                            ? {
-                                                  ...current,
-                                                  currencySymbol: event.target.value,
-                                              }
-                                            : current,
-                                    )
-                                }
-                            />
-                        </Field>
-                        <Field label={t("tenant.symbolPosition")}>
-                            <SimpleCombobox
-                                value={settings.currencyPosition}
-                                onValueChange={(value) =>
-                                    value &&
-                                    setSettings((current) =>
-                                        current
-                                            ? {
-                                                  ...current,
-                                                  currencyPosition: value as "before" | "after",
-                                              }
-                                            : current,
-                                    )
-                                }
-                                options={[
-                                    {
-                                        value: "before",
-                                        label: t("tenant.beforeAmount"),
-                                    },
-                                    {
-                                        value: "after",
-                                        label: t("tenant.afterAmount"),
-                                    },
-                                ]}
-                            />
-                        </Field>
-                        <Field label={t("tenant.decimalPlaces")}>
-                            <Input
-                                type="number"
-                                min={0}
-                                max={4}
-                                value={settings.currencyDecimalPlaces}
-                                onChange={(event) =>
-                                    setSettings((current) =>
-                                        current
-                                            ? {
-                                                  ...current,
-                                                  currencyDecimalPlaces: Number(
-                                                      event.target.value,
-                                                  ),
-                                              }
-                                            : current,
-                                    )
-                                }
-                            />
-                        </Field>
-                        <Preview
-                            title={t("tenant.mainCurrency")}
-                            value={formatMoney(12345.67, settings.mainCurrencyCode)}
-                            icon={<WalletCards />}
-                        />
-                        <Field label={t("tenant.baseFontSize")}>
-                            <Input
-                                type="number"
-                                min={12}
-                                max={22}
-                                value={settings.baseFontSize}
-                                onChange={(event) =>
-                                    setSettings((current) =>
-                                        current
-                                            ? {
-                                                  ...current,
-                                                  baseFontSize: Number(event.target.value),
-                                              }
-                                            : current,
-                                    )
-                                }
-                            />
-                        </Field>
-                        <ColorField
-                            label={t("tenant.adminPrimary")}
-                            value={settings.adminPrimaryColor}
-                            onChange={(value) =>
-                                setSettings((current) =>
-                                    current
-                                        ? { ...current, adminPrimaryColor: value }
-                                        : current,
-                                )
-                            }
-                        />
-                        <ColorField
-                            label={t("tenant.adminSecondary")}
-                            value={settings.adminSecondaryColor}
-                            onChange={(value) =>
-                                setSettings((current) =>
-                                    current
-                                        ? { ...current, adminSecondaryColor: value }
-                                        : current,
-                                )
-                            }
-                        />
-                        <ColorField
-                            label={t("tenant.storePrimary")}
-                            value={settings.storefrontPrimaryColor}
-                            onChange={(value) =>
-                                setSettings((current) =>
-                                    current
-                                        ? { ...current, storefrontPrimaryColor: value }
-                                        : current,
-                                )
-                            }
-                        />
-                        <ColorField
-                            label={t("tenant.storeSecondary")}
-                            value={settings.storefrontSecondaryColor}
-                            onChange={(value) =>
-                                setSettings((current) =>
-                                    current
-                                        ? { ...current, storefrontSecondaryColor: value }
-                                        : current,
-                                )
-                            }
-                        />
-                        <Field label={t("tenant.englishFont")}>
-                            <FontCombobox
-                                language="en"
-                                value={settings.englishFontFamily}
-                                onValueChange={(value) =>
-                                    setSettings((current) =>
-                                        current
-                                            ? { ...current, englishFontFamily: value }
-                                            : current,
-                                    )
-                                }
-                            />
-                        </Field>
-                        <Field label={t("tenant.dariFont")}>
-                            <FontCombobox
-                                language="dr"
-                                value={settings.dariFontFamily}
-                                onValueChange={(value) =>
-                                    setSettings((current) =>
-                                        current
-                                            ? { ...current, dariFontFamily: value }
-                                            : current,
-                                    )
-                                }
-                            />
-                        </Field>
-                        <Field label={t("tenant.pashtoFont")}>
-                            <FontCombobox
-                                language="ps"
-                                value={settings.pashtoFontFamily}
-                                onValueChange={(value) =>
-                                    setSettings((current) =>
-                                        current
-                                            ? { ...current, pashtoFontFamily: value }
-                                            : current,
-                                    )
-                                }
-                            />
-                        </Field>
-                        <div className="flex gap-3 border border-primary/20 bg-primary/5 p-4 md:col-span-2 xl:col-span-3">
-                            <Info className="mt-0.5 size-5 shrink-0 text-primary" />
-                            <p className="text-sm leading-6 text-muted-foreground">
-                                {t("tenant.fontAvailabilityHelp")}
-                            </p>
-                        </div>
-                        <Field label={t("tenant.trashRetention")}>
-                            <Input
-                                type="number"
-                                min={1}
-                                max={3650}
-                                value={settings.trashRetentionDays}
-                                onChange={(event) =>
-                                    setSettings((current) =>
-                                        current
-                                            ? {
-                                                  ...current,
-                                                  trashRetentionDays: Number(
-                                                      event.target.value,
-                                                  ),
-                                              }
-                                            : current,
-                                    )
-                                }
-                            />
-                        </Field>
-                        <Field label={t("notifications.retentionDays")}>
-                            <Input
-                                type="number"
-                                min={1}
-                                max={365}
-                                value={settings.notificationRetentionDays}
-                                onChange={(event) =>
-                                    setSettings((current) =>
-                                        current
-                                            ? {
-                                                  ...current,
-                                                  notificationRetentionDays: Number(event.target.value),
-                                              }
-                                            : current,
-                                    )
-                                }
-                            />
-                            <p className="text-xs leading-5 text-muted-foreground">
-                                {t("notifications.retentionHelp")}
-                            </p>
-                        </Field>
-                        <div className="flex items-center justify-between gap-3 border p-4 md:col-span-2">
-                            <div>
-                                <p className="font-medium">
-                                    {t("tenant.claimManagement")}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    {t("tenant.claimManagementHelp")}
-                                </p>
-                            </div>
-                            <Switch
-                                checked={settings.allowTenantUserClaimManagement}
-                                onCheckedChange={(checked) =>
-                                    setSettings((current) =>
-                                        current
-                                            ? {
-                                                  ...current,
-                                                  allowTenantUserClaimManagement: checked,
-                                              }
-                                            : current,
-                                    )
-                                }
-                            />
-                        </div>
-                        <div className="flex gap-3 border border-primary/20 bg-primary/5 p-4 md:col-span-2 xl:col-span-3">
-                            <Info className="mt-0.5 size-5 shrink-0 text-primary" />
-                            <p className="text-sm leading-6 text-muted-foreground">
-                                {t("tenant.currencyHistoryHelp")}
-                            </p>
-                        </div>
-                        <div className="md:col-span-2 xl:col-span-3">
-                            <Button
-                                onClick={() => saveSettings.mutate()}
-                                disabled={saveSettings.isPending}
-                            >
-                                <Save />
-                                {saveSettings.isPending
-                                    ? t("tenant.saving")
-                                    : t("tenant.saveSettings")}
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {tab === "subscription" && (
-                <div className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]">
-                    <Card className="tenant-gradient overflow-hidden">
-                        <CardContent className="p-6">
-                            <div className="flex items-start justify-between gap-4">
-                                <div>
-                                    <p className="text-xs font-bold uppercase tracking-widest text-primary">
-                                        {t("tenant.currentPlan")}
-                                    </p>
-                                    <h2 className="mt-2 text-3xl font-black">
-                                        {tenant.subscription?.planName ?? "—"}
-                                    </h2>
-                                    <p className="mt-2 text-sm text-muted-foreground">
-                                        {t("tenant.status")}: {tenant.subscription?.status ?? "—"}
-                                    </p>
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        {t("tenant.validUntil")}: {tenant.subscription?.endsAt
-                                            ? new Intl.DateTimeFormat(locale, {
-                                                  dateStyle: "medium",
-                                              }).format(
-                                                  new Date(tenant.subscription.endsAt),
-                                              )
-                                            : t("tenant.noExpiry")}
-                                    </p>
-                                </div>
-                                <Crown className="size-10 shrink-0 text-primary" />
-                            </div>
-                            <div className="mt-7 grid gap-3 sm:grid-cols-3">
-                                <Limit
-                                    label={t("tenant.usersLimit")}
-                                    value={tenant.subscription?.maxUsers ?? 0}
-                                    locale={locale}
-                                />
-                                <Limit
-                                    label={t("tenant.branchesLimit")}
-                                    value={tenant.subscription?.maxBranches ?? 0}
-                                    locale={locale}
-                                />
-                                <Limit
-                                    label={t("tenant.productsLimit")}
-                                    value={tenant.subscription?.maxProducts ?? 0}
-                                    locale={locale}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{t("tenant.enabledCapabilities")}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="max-h-80 space-y-2 overflow-y-auto">
-                            {tenant.enabledPermissions.map((permission) => (
-                                <div
-                                    key={permission}
-                                    className="flex items-center gap-2 text-sm"
-                                >
-                                    <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
-                                    <span className="break-all">{permission}</span>
-                                </div>
-                            ))}
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-
-            <Dialog open={branchOpen} onOpenChange={setBranchOpen}>
-                <DialogContent className="max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>
-                            {branchId ? t("tenant.editBranch") : t("tenant.addBranch")}
-                        </DialogTitle>
-                        <DialogDescription>{t("tenant.branchHelp")}</DialogDescription>
-                    </DialogHeader>
+            <Dialog open={branchDialog} onOpenChange={setBranchDialog}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader><DialogTitle>{editingBranch ? "Edit branch" : "Add branch"}</DialogTitle><DialogDescription>Branches are optional operational locations inside this company.</DialogDescription></DialogHeader>
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label={t("tenant.branchName")}>
-                            <Input
-                                value={branch.name}
-                                onChange={(event) =>
-                                    setBranch((current) => ({
-                                        ...current,
-                                        name: event.target.value,
-                                    }))
-                                }
-                            />
-                        </Field>
-                        <Field label={t("tenant.branchCode")}>
-                            <Input
-                                value={branch.code}
-                                onChange={(event) =>
-                                    setBranch((current) => ({
-                                        ...current,
-                                        code: event.target.value.toUpperCase(),
-                                    }))
-                                }
-                            />
-                        </Field>
-                        <Field label={t("tenant.phone")}>
-                            <Input
-                                value={branch.phone ?? ""}
-                                onChange={(event) =>
-                                    setBranch((current) => ({
-                                        ...current,
-                                        phone: event.target.value || null,
-                                    }))
-                                }
-                            />
-                        </Field>
-                        <div className="space-y-3 rounded-lg border p-3">
-                            <Toggle
-                                label={t("tenant.activeBranch")}
-                                checked={branch.isActive}
-                                disabled={branch.isMain}
-                                onChange={(checked) =>
-                                    setBranch((current) => ({
-                                        ...current,
-                                        isActive: checked,
-                                    }))
-                                }
-                            />
-                            <Toggle
-                                label={t("tenant.mainBranch")}
-                                checked={branch.isMain}
-                                onChange={(checked) =>
-                                    setBranch((current) => ({
-                                        ...current,
-                                        isMain: checked,
-                                        isActive: checked ? true : current.isActive,
-                                    }))
-                                }
-                            />
-                        </div>
-                        <div className="space-y-2 sm:col-span-2">
-                            <Label>{t("tenant.address")}</Label>
-                            <Textarea
-                                value={branch.address ?? ""}
-                                onChange={(event) =>
-                                    setBranch((current) => ({
-                                        ...current,
-                                        address: event.target.value || null,
-                                    }))
-                                }
-                            />
-                        </div>
+                        <Field label="Branch name"><Input value={branch.name} onChange={(event) => setBranch({ ...branch, name: event.target.value })} /></Field>
+                        <Field label="Code"><Input value={branch.code} onChange={(event) => setBranch({ ...branch, code: event.target.value.toUpperCase() })} /></Field>
+                        <Field label="Phone"><Input value={branch.phone ?? ""} onChange={(event) => setBranch({ ...branch, phone: nullable(event.target.value) })} /></Field>
+                        <Field label="Address"><Input value={branch.address ?? ""} onChange={(event) => setBranch({ ...branch, address: nullable(event.target.value) })} /></Field>
+                        <Toggle label="Main branch" description="Use this as the default location." checked={branch.isMain} onCheckedChange={(checked) => setBranch({ ...branch, isMain: checked, isActive: checked ? true : branch.isActive })} />
+                        <Toggle label="Active" description="Allow operations in this branch." checked={branch.isActive} onCheckedChange={(checked) => setBranch({ ...branch, isActive: checked })} />
                     </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setBranchOpen(false)}>
-                            {t("tenant.cancel")}
-                        </Button>
-                        <Button
-                            onClick={() => saveBranch.mutate()}
-                            disabled={
-                                saveBranch.isPending ||
-                                !branch.name.trim() ||
-                                !branch.code.trim()
-                            }
-                        >
-                            {saveBranch.isPending && (
-                                <LoaderCircle className="animate-spin" />
-                            )}
-                            {t("tenant.save")}
-                        </Button>
-                    </DialogFooter>
+                    <DialogFooter><Button variant="outline" onClick={() => setBranchDialog(false)}>Cancel</Button><Button disabled={saveBranch.isPending || !branch.name.trim() || !branch.code.trim()} onClick={() => saveBranch.mutate()}>{saveBranch.isPending ? <LoaderCircle className="animate-spin" /> : <Save />} Save branch</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>
     );
 }
 
-function TabButton({
-    active,
-    onClick,
-    icon,
-    children,
-}: {
-    active: boolean;
-    onClick: () => void;
-    icon: ReactNode;
-    children: ReactNode;
-}) {
-    return (
-        <Button
-            className="shrink-0"
-            variant={active ? "default" : "ghost"}
-            onClick={onClick}
-        >
-            {icon}
-            {children}
-        </Button>
-    );
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+    return <div className="space-y-2"><Label>{label}</Label>{children}</div>;
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-    return (
-        <div className="min-w-0 space-y-2">
-            <Label>{label}</Label>
-            {children}
-        </div>
-    );
+function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+    return <Field label={label}><div className="flex gap-2"><Input type="color" className="w-14 px-1" value={value} onChange={(event) => onChange(event.target.value)} /><Input value={value} onChange={(event) => onChange(event.target.value)} /></div></Field>;
 }
 
-function Toggle({
-    label,
-    checked,
-    disabled = false,
-    onChange,
-}: {
-    label: string;
-    checked: boolean;
-    disabled?: boolean;
-    onChange: (value: boolean) => void;
-}) {
-    return (
-        <div className="flex items-center justify-between gap-3">
-            <Label>{label}</Label>
-            <Switch
-                checked={checked}
-                disabled={disabled}
-                onCheckedChange={onChange}
-            />
-        </div>
-    );
+function Toggle({ label, description, checked, onCheckedChange }: { label: string; description: string; checked: boolean; onCheckedChange: (value: boolean) => void }) {
+    return <div className="flex items-center justify-between gap-4 rounded-xl border p-4"><div><p className="text-sm font-semibold">{label}</p><p className="mt-1 text-xs text-muted-foreground">{description}</p></div><Switch checked={checked} onCheckedChange={onCheckedChange} /></div>;
 }
 
-function ColorField({
-    label,
-    value,
-    onChange,
-}: {
-    label: string;
-    value: string;
-    onChange: (value: string) => void;
-}) {
-    return (
-        <Field label={label}>
-            <div className="flex gap-2">
-                <Input
-                    type="color"
-                    value={value}
-                    onChange={(event) => onChange(event.target.value)}
-                    className="w-14 shrink-0 p-1"
-                />
-                <Input value={value} onChange={(event) => onChange(event.target.value)} />
-            </div>
-        </Field>
-    );
+function nullable(value: string) {
+    const clean = value.trim();
+    return clean || null;
 }
 
-function FontCombobox({
-    language,
-    value,
-    onValueChange,
-}: {
-    language: keyof typeof fontOptions;
-    value: string;
-    onValueChange: (value: string) => void;
-}) {
-    const preview = language === "en"
-        ? "The quick brown fox · English preview"
-        : language === "dr"
-          ? "نمونهٔ زندهٔ فونت دری برای فروشگاه و مدیریت"
-          : "د پښتو لیکدود ژوندۍ بېلګه د پلورنځي او مدیریت لپاره";
-    return (
-        <div className="space-y-2">
-            <SimpleCombobox
-                value={value}
-                onValueChange={(next) => next && onValueChange(next)}
-                options={fontOptions[language]}
-            />
-            <p
-                dir={language === "en" ? "ltr" : "rtl"}
-                lang={language === "en" ? "en" : language === "dr" ? "fa-AF" : "ps"}
-                className="rounded-lg border bg-muted/30 px-3 py-2 text-sm"
-                style={{ fontFamily: resolveTenantFontStack(language, value) }}
-            >
-                {preview}
-            </p>
-        </div>
-    );
-}
-
-function Preview({
-    title,
-    value,
-    icon,
-}: {
-    title: string;
-    value: string;
-    icon: ReactNode;
-}) {
-    return (
-        <div className="border bg-muted/30 p-4">
-            <div className="flex items-center gap-2 text-muted-foreground">
-                {icon}
-                <span className="text-xs">{title}</span>
-            </div>
-            <p className="mt-2 break-words text-xl font-bold">{value}</p>
-        </div>
-    );
-}
-
-function Limit({
-    label,
-    value,
-    locale,
-}: {
-    label: string;
-    value: number;
-    locale: string;
-}) {
-    return (
-        <div className="border bg-background/70 p-4">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="mt-1 text-xl font-bold">
-                {value.toLocaleString(locale)}
-            </p>
-        </div>
-    );
-}
-
-function SiteLinkRow({
-    label,
-    value,
-    emptyText,
-    shareTitle,
-}: {
-    label: string;
-    value: string | null;
-    emptyText?: string;
-    shareTitle?: string;
-}) {
-    const { t } = useI18n();
-    return (
-        <div className="rounded-xl border p-4">
-            <p className="text-xs font-medium text-muted-foreground">{label}</p>
-            <p className="mt-2 break-all text-sm" dir={value ? "ltr" : undefined}>
-                {value ?? emptyText ?? "—"}
-            </p>
-            {value ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                    <Button type="button" size="sm" variant="outline" onClick={() => void copyWithFeedback(value, t)}>
-                        <Copy />{t("platform.copyLink")}
-                    </Button>
-                    {shareTitle ? (
-                        <Button type="button" size="sm" variant="outline" onClick={() => void shareStorefront(shareTitle, value, t)}>
-                            <Share2 />{t("platform.shareStorefront")}
-                        </Button>
-                    ) : null}
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        render={<a href={value} target="_blank" rel="noreferrer" />}
-                    >
-                        <ExternalLink />{t("platform.openLink")}
-                    </Button>
-                </div>
-            ) : null}
-        </div>
-    );
-}
-
-async function copyText(value: string) {
-    if (navigator.clipboard?.writeText) {
-        try {
-            await navigator.clipboard.writeText(value);
-            return true;
-        } catch {
-            // Fallback for non-HTTPS local-network deployments.
-        }
-    }
-    const textarea = document.createElement("textarea");
-    textarea.value = value;
-    textarea.style.position = "fixed";
-    textarea.style.opacity = "0";
-    document.body.appendChild(textarea);
-    textarea.select();
-    const copied = document.execCommand("copy");
-    textarea.remove();
-    return copied;
-}
-
-async function copyWithFeedback(value: string, t: ReturnType<typeof useI18n>["t"]) {
-    const copied = await copyText(value);
-    copied ? toast.success(t("platform.linkCopied")) : toast.error(t("platform.linkCopyFailed"));
-}
-
-async function shareStorefront(name: string, url: string, t: ReturnType<typeof useI18n>["t"]) {
-    if (navigator.share) {
-        try {
-            await navigator.share({ title: name, text: t("platform.shareStorefrontText"), url });
-            return;
-        } catch (error) {
-            if ((error as DOMException)?.name === "AbortError") return;
-        }
-    }
-    await copyWithFeedback(url, t);
-}
-
-function message(error: unknown, fallback: string) {
-    return (
-        (error as { response?: { data?: { message?: string } } })?.response?.data
-            ?.message || (error instanceof Error ? error.message : fallback)
-    );
+function message(error: unknown) {
+    return (error as { response?: { data?: { message?: string } }; message?: string }).response?.data?.message ?? (error as Error).message ?? "The operation failed.";
 }

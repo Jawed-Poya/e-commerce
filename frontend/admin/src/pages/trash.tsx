@@ -32,8 +32,8 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { tenantService } from "@/features/tenancy/tenant-service";
-import type { TrashItem } from "@/features/tenancy/tenant-types";
+import { companyService } from "@/features/company/company-service";
+import type { TrashItem } from "@/features/company/company-types";
 import { useI18n } from "@/i18n/i18n-provider";
 
 export default function TrashPage() {
@@ -44,9 +44,9 @@ export default function TrashPage() {
     const [branchId, setBranchId] = useState("");
     const [selected, setSelected] = useState<TrashItem | null>(null);
     const query = useQuery({
-        queryKey: ["tenant-trash", search, type, branchId],
+        queryKey: ["company-trash", search, type, branchId],
         queryFn: () =>
-            tenantService.trash({
+            companyService.trash({
                 search: search || undefined,
                 entityType: type || undefined,
                 branchId: branchId ? Number(branchId) : undefined,
@@ -66,24 +66,24 @@ export default function TrashPage() {
         [query.data],
     );
     const refresh = () =>
-        client.invalidateQueries({ queryKey: ["tenant-trash"] });
+        client.invalidateQueries({ queryKey: ["company-trash"] });
     const restore = useMutation({
-        mutationFn: tenantService.restoreTrash,
+        mutationFn: companyService.restoreTrash,
         onSuccess: async () => {
             toast.success(t("trash.restored"));
             setSelected(null);
             await refresh();
         },
-        onError: (error) => toast.error(message(error, t("tenant.operationFailed"))),
+        onError: (error) => toast.error(message(error, "The operation failed.")),
     });
     const purge = useMutation({
-        mutationFn: tenantService.purgeTrash,
+        mutationFn: companyService.purgeTrash,
         onSuccess: async () => {
             toast.success(t("trash.purged"));
             setSelected(null);
             await refresh();
         },
-        onError: (error) => toast.error(message(error, t("tenant.operationFailed"))),
+        onError: (error) => toast.error(message(error, "The operation failed.")),
     });
 
     const locale = language === "en" ? "en-US" : language === "ps" ? "ps-AF" : "fa-AF";

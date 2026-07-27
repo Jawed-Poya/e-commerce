@@ -1,7 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
 import { StoreLayout } from "../shared/layout/store-layout";
 import { NotFoundPage } from "../shared/components/not-found-page";
-import { storefrontRouterBasename } from "../features/tenancy/tenant-storage";
 
 export const router = createBrowserRouter([
   {
@@ -78,4 +77,4 @@ export const router = createBrowserRouter([
       { path: "*", element: <NotFoundPage /> },
     ],
   },
-], { basename: storefrontRouterBasename() });
+]);

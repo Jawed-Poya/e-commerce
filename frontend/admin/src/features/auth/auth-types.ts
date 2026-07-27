@@ -9,10 +9,7 @@ export interface AuthUser {
     customerTypeId: number | null;
     customerTypeName: string | null;
     isAdmin: boolean;
-    tenantId: number;
     branchId: number | null;
-    tenantSlug: string;
-    isPlatformAdmin: boolean;
 }
 
 export interface AuthResponse {

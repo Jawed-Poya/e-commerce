@@ -2,7 +2,7 @@ using API.Entities.Types;
 using ECommerce.Data;
 using ECommerce.Entities.Common;
 using ECommerce.Options;
-using ECommerce.Services.Tenancy;
+using ECommerce.Services.Company;
 using ECommerce.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -12,7 +12,7 @@ namespace ECommerce.Services.Customers;
 
 public sealed class DefaultCustomerTypeResolver(
     ApplicationDbContext context,
-    ITenantContext tenantContext,
+    ICompanyContext companyContext,
     IOptions<CommerceOptions> options,
     IMemoryCache cache) : IDefaultCustomerTypeResolver
 {
@@ -22,7 +22,7 @@ public sealed class DefaultCustomerTypeResolver(
 
     public async Task<GeneralType> GetAsync(CancellationToken cancellationToken = default)
     {
-        var tenantId = tenantContext.TenantId;
+        var tenantId = companyContext.CompanyId;
         if (tenantId <= 0)
             throw new InvalidOperationException("A company workspace must be resolved before customer pricing can be loaded.");
 
@@ -117,8 +117,8 @@ public sealed class DefaultCustomerTypeResolver(
 
     public void Invalidate()
     {
-        if (tenantContext.TenantId > 0)
-            cache.Remove(CacheKey(tenantContext.TenantId));
+        if (companyContext.CompanyId > 0)
+            cache.Remove(CacheKey(companyContext.CompanyId));
     }
 
     private static string CacheKey(long tenantId) => $"{CacheKeyPrefix}:{tenantId}";

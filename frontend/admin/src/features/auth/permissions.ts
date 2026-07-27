@@ -27,37 +27,31 @@ export const Permissions = {
     ExpensesView: "expenses.view",
     ExpensesManage: "expenses.manage",
     SystemManage: "system.manage",
-    TenantProfileManage: "tenant.profile.manage",
-    TenantBranchesManage: "tenant.branches.manage",
-    TenantClaimsManage: "tenant.claims.manage",
-    TenantReportsView: "tenant.reports.view",
-    TenantTrashManage: "tenant.trash.manage",
-    TenantSettingsManage: "tenant.settings.manage",
-    PlatformTenantsManage: "platform.tenants.manage",
+    CompanyProfileManage: "company.profile.manage",
+    CompanyBranchesManage: "company.branches.manage",
+    CompanyClaimsManage: "company.claims.manage",
+    FinancialReportsView: "company.reports.view",
+    CompanyTrashManage: "company.trash.manage",
+    CompanySettingsManage: "company.settings.manage",
 } as const;
 
 export function isSystemAdministrator(
-    user: Pick<AuthUser, "roles" | "isPlatformAdmin"> | null | undefined,
+    user: Pick<AuthUser, "roles"> | null | undefined,
 ) {
-    return Boolean(user?.isPlatformAdmin || user?.roles.some((role) => role.toLowerCase() === "platformadmin"));
+    return Boolean(user?.roles.some((role) => role.toLowerCase() === "admin"));
 }
 
 export function hasPermission(
-    user: Pick<AuthUser, "roles" | "permissions" | "isPlatformAdmin"> | null | undefined,
+    user: Pick<AuthUser, "roles" | "permissions"> | null | undefined,
     permission: string,
 ) {
-    return Boolean(
-        user &&
-            (isSystemAdministrator(user) ||
-                user.permissions.includes(permission)),
-    );
+    return Boolean(user?.permissions.includes(permission));
 }
 
 export function getDefaultAdminRoute(
     permissions: string[],
-    roles: string[] = [],
+    _roles: string[] = [],
 ) {
-    if (roles.some((role) => role.toLowerCase() === "platformadmin")) return "/platform/tenants";
     const set = new Set(permissions);
     if (set.has(Permissions.DashboardView)) return "/dashboard";
     if (set.has(Permissions.ProductsView)) return "/products";
@@ -71,8 +65,8 @@ export function getDefaultAdminRoute(
     if (set.has(Permissions.CustomersView)) return "/customers";
     if (set.has(Permissions.UsersView)) return "/system/users";
     if (set.has(Permissions.RolesManage)) return "/system/roles";
-    if (set.has(Permissions.TenantReportsView)) return "/reports";
-    if (set.has(Permissions.TenantProfileManage)) return "/company";
+    if (set.has(Permissions.FinancialReportsView)) return "/reports";
+    if (set.has(Permissions.CompanyProfileManage)) return "/company";
     if (set.has(Permissions.SystemManage)) return "/system/general-types";
     return "/dashboard";
 }

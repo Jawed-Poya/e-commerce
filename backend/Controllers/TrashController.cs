@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using ECommerce.Entities;
-using ECommerce.Services.Tenancy;
+using ECommerce.Services.Company;
 using ECommerce.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +9,7 @@ namespace ECommerce.Controllers;
 
 [ApiController]
 [Route("api/admin/trash")]
-[Authorize(Policy = AppPermissions.TenantTrashManage)]
+[Authorize(Policy = AppPermissions.CompanyTrashManage)]
 public sealed class TrashController(ITrashService trash) : ControllerBase
 {
     [HttpGet]

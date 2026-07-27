@@ -1,4 +1,3 @@
-import { resolveStorefrontAccess } from "../../features/tenancy/tenant-storage";
 const API_URL =
     import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5188/api";
 
@@ -31,10 +30,6 @@ export class ApiError extends Error {
 function requestHeaders(includeJson = false) {
     const headers = new Headers();
     if (includeJson) headers.set("Content-Type", "application/json");
-    const storefront = resolveStorefrontAccess();
-    if (storefront.mode === "store") headers.set("X-Storefront-Key", storefront.value);
-    if (storefront.mode === "preview") headers.set("X-Storefront-Preview", storefront.value);
-
     const token = localStorage.getItem(customerTokenKey);
     if (token) headers.set("Authorization", `Bearer ${token}`);
     return headers;

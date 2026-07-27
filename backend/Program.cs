@@ -4,13 +4,14 @@ using System.Security.Claims;
 using ECommerce.Options;
 using ECommerce.Shared;
 using ECommerce.Services.Notifications;
-using ECommerce.Services.Tenancy;
+using ECommerce.Services.Company;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
@@ -37,10 +38,6 @@ builder.Services.AddCors(options =>
             .AllowCredentials();
     });
 });
-
-// Replace the static provider with a tenant-aware policy after AddCors has
-// registered its defaults. This supports custom domains without allowing every origin.
-builder.Services.AddSingleton<ICorsPolicyProvider, TenantCorsPolicyProvider>();
 
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("JWT configuration is missing.");
@@ -99,7 +96,6 @@ builder.Services.AddAuthorization(options =>
     {
         options.AddPolicy(permission, policy =>
             policy.RequireAssertion(context =>
-                context.User.IsInRole(AppRoles.PlatformAdmin) ||
                 context.User.HasClaim(AuthClaims.Permission, permission)));
     }
 });
@@ -121,7 +117,7 @@ app.UseStaticFiles();
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseCors("CorsPolicy");
 app.UseAuthentication();
-app.UseMiddleware<TenantResolutionMiddleware>();
+app.UseMiddleware<CompanyContextMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<StoreNotificationHub>("/hubs/store-notifications");

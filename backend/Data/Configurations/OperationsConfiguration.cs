@@ -75,6 +75,7 @@ public sealed class InventorySaleItemConfiguration : IEntityTypeConfiguration<In
     {
         b.Property(x => x.Quantity).HasPrecision(18, 3);
         b.Property(x => x.UnitPrice).HasPrecision(18, 2);
+        b.Property(x => x.UnitCost).HasPrecision(18, 4);
         b.Property(x => x.LineTotal).HasPrecision(18, 2);
         b.HasOne(x => x.InventorySale).WithMany(x => x.Items).HasForeignKey(x => x.InventorySaleId).OnDelete(DeleteBehavior.Cascade);
         b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);

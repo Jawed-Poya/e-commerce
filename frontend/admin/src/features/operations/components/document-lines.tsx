@@ -19,7 +19,7 @@ import type {
     DocumentItem,
     OperationProduct,
 } from "@/features/operations/operations-types";
-import { useTenant } from "@/features/tenancy/tenant-context";
+import { useCompany } from "@/features/company/company-context";
 
 interface DocumentLinesProps {
     items: DocumentItem[];
@@ -37,7 +37,7 @@ const emptyItem = (): DocumentItem => ({
 });
 
 export function DocumentLines({ items, setItems, mode }: DocumentLinesProps) {
-    const { formatMoney } = useTenant();
+    const { formatMoney } = useCompany();
     const update = (index: number, patch: Partial<DocumentItem>) =>
         setItems((current) =>
             current.map((item, itemIndex) =>

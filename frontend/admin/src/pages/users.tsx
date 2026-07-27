@@ -42,8 +42,8 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { PermissionChecklist } from "@/features/users/components/permission-checklist";
-import { tenantService } from "@/features/tenancy/tenant-service";
-import type { Branch } from "@/features/tenancy/tenant-types";
+import { companyService } from "@/features/company/company-service";
+import type { CompanyBranch as Branch } from "@/features/company/company-types";
 import { userService } from "@/features/users/user-service";
 import { useI18n } from "@/i18n/i18n-provider";
 import type {
@@ -99,9 +99,9 @@ export default function UsersPage() {
         queryKey: ["admin-permissions"],
         queryFn: userService.getPermissions,
     });
-    const tenantProfile = useQuery({
-        queryKey: ["tenant", "profile"],
-        queryFn: tenantService.profile,
+    const companyProfile = useQuery({
+        queryKey: ["company", "profile"],
+        queryFn: companyService.profile,
     });
 
     const save = useMutation({
@@ -408,7 +408,7 @@ export default function UsersPage() {
                 setForm={setForm}
                 roles={roles.data ?? []}
                 permissionGroups={permissions.data ?? []}
-                branches={tenantProfile.data?.branches ?? []}
+                branches={companyProfile.data?.branches ?? []}
                 saving={save.isPending}
                 onSave={() => save.mutate()}
             />

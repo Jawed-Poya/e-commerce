@@ -10,7 +10,7 @@ using ECommerce.Entities.Operations;
 using ECommerce.Entities.Products;
 using ECommerce.Entities.Storefront;
 using ECommerce.Entities.Tenancy;
-using ECommerce.Services.Tenancy;
+using ECommerce.Services.Company;
 using System.Linq.Expressions;
 using System.Security.Claims;
 using System.Text.Json;
@@ -21,7 +21,7 @@ using Microsoft.EntityFrameworkCore;
 public class ApplicationDbContext
     : IdentityDbContext<User, Role, string>
 {
-    private readonly ITenantContext _tenantContext;
+    private readonly ICompanyContext _companyContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     private static readonly HashSet<string> TrashRootTypes = new(StringComparer.Ordinal)
@@ -44,16 +44,16 @@ public class ApplicationDbContext
 
     public ApplicationDbContext(
         DbContextOptions<ApplicationDbContext> options,
-        ITenantContext tenantContext,
+        ICompanyContext companyContext,
         IHttpContextAccessor httpContextAccessor)
         : base(options)
     {
-        _tenantContext = tenantContext;
+        _companyContext = companyContext;
         _httpContextAccessor = httpContextAccessor;
     }
 
-    public long CurrentTenantId => _tenantContext.TenantId;
-    public bool BypassTenantFilter => false;
+    public long CurrentCompanyId => _companyContext.CompanyId;
+    public bool BypassCompanyFilter => false;
 
     #region Catalog
 
@@ -251,7 +251,7 @@ public class ApplicationDbContext
         builder.Entity<Payment>().HasQueryFilter(x => !x.IsDeleted && !x.Order.IsDeleted);
         builder.Entity<OrderStatusHistory>().HasQueryFilter(x => !x.IsDeleted && !x.Order.IsDeleted);
 
-        ApplyTenantQueryFilters(builder);
+        ApplyCompanyQueryFilters(builder);
     }
 
     public override int SaveChanges()
@@ -279,8 +279,8 @@ public class ApplicationDbContext
             if (entry.State == EntityState.Added)
             {
                 if (entry.Entity.CreatedAt == default) entry.Entity.CreatedAt = now;
-                if (entry.Entity.TenantId <= 0) entry.Entity.TenantId = _tenantContext.TenantId;
-                entry.Entity.BranchId ??= _tenantContext.BranchId;
+                if (entry.Entity.TenantId <= 0) entry.Entity.TenantId = _companyContext.CompanyId;
+                entry.Entity.BranchId ??= _companyContext.BranchId;
             }
 
             var isDeleteTransition = entry.State == EntityState.Deleted ||
@@ -325,7 +325,7 @@ public class ApplicationDbContext
             ?? principal?.Identity?.Name;
         return new TrashRecord
         {
-            TenantId = entity.TenantId <= 0 ? _tenantContext.TenantId : entity.TenantId,
+            TenantId = entity.TenantId <= 0 ? _companyContext.CompanyId : entity.TenantId,
             BranchId = entity.BranchId,
             EntityType = type,
             EntityId = entity.Id.ToString(),
@@ -340,15 +340,15 @@ public class ApplicationDbContext
         };
     }
 
-    private void ApplyTenantQueryFilters(ModelBuilder builder)
+    private void ApplyCompanyQueryFilters(ModelBuilder builder)
     {
         foreach (var entityType in builder.Model.GetEntityTypes()
                      .Where(item => typeof(API.Entities.Common.BaseEntity).IsAssignableFrom(item.ClrType)))
         {
             var parameter = Expression.Parameter(entityType.ClrType, "entity");
             var tenantProperty = Expression.Property(parameter, nameof(API.Entities.Common.BaseEntity.TenantId));
-            var currentTenant = Expression.Property(Expression.Constant(this), nameof(CurrentTenantId));
-            var bypass = Expression.Property(Expression.Constant(this), nameof(BypassTenantFilter));
+            var currentTenant = Expression.Property(Expression.Constant(this), nameof(CurrentCompanyId));
+            var bypass = Expression.Property(Expression.Constant(this), nameof(BypassCompanyFilter));
             Expression tenantBody = Expression.OrElse(bypass, Expression.Equal(tenantProperty, currentTenant));
 
             var existing = entityType.GetQueryFilter();

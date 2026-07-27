@@ -1,19 +1,21 @@
-﻿namespace ECommerce.Shared;
+namespace ECommerce.Shared;
 
 using ECommerce.Data;
 using ECommerce.Entities.Users;
 using ECommerce.Options;
 using ECommerce.Services.Auth;
 using ECommerce.Services.Customers;
+using ECommerce.Services.Company;
 using ECommerce.Services.Dashboard;
+using ECommerce.Services.Documents;
 using ECommerce.Services.GeneralTypes;
 using ECommerce.Services.Inventory;
 using ECommerce.Services.Notifications;
 using ECommerce.Services.Orders;
 using ECommerce.Services.Operations;
 using ECommerce.Services.Products;
+using ECommerce.Services.Reports;
 using ECommerce.Services.Storefront;
-using ECommerce.Services.Tenancy;
 using ECommerce.Services.Reviews;
 using ECommerce.Services.Users;
 using Microsoft.AspNetCore.Identity;
@@ -26,13 +28,10 @@ public static class DependencyInjection
     {
         services.AddHttpContextAccessor();
         services.AddMemoryCache();
-        services.AddScoped<TenantContext>();
-        services.AddScoped<ITenantContext>(provider => provider.GetRequiredService<TenantContext>());
-        services.AddScoped<ITenantPermissionService, TenantPermissionService>();
-        services.AddScoped<ITenantManagementService, TenantManagementService>();
-        services.AddScoped<IPlatformManagementService, PlatformManagementService>();
-        services.AddScoped<ITenantPlanGuard, TenantPlanGuard>();
-        services.AddSingleton<IStorefrontAccessTokenService, StorefrontAccessTokenService>();
+        services.AddScoped<CompanyContext>();
+        services.AddScoped<ICompanyContext>(provider => provider.GetRequiredService<CompanyContext>());
+        services.AddScoped<ICompanyPermissionService, CompanyPermissionService>();
+        services.AddScoped<ICompanyService, CompanyService>();
         services.AddScoped<ITrashService, TrashService>();
         services.AddHostedService<TrashCleanupHostedService>();
         services.AddScoped<IProductService, ProductService>();
@@ -40,6 +39,9 @@ public static class DependencyInjection
         services.AddScoped<IGeneralTypeService, GeneralTypesService>();
         services.AddScoped<IProductImageStorage, LocalProductImageStorage>();
         services.AddScoped<IInventoryService, InventoryService>();
+        services.AddScoped<IInventoryCostService, InventoryCostService>();
+        services.AddScoped<IFinancialReportService, FinancialReportService>();
+        services.AddScoped<IFinancialDocumentService, FinancialDocumentService>();
         services.AddScoped<IOrderService, OrderService>();
         services.AddScoped<ICustomerService, CustomerService>();
         services.AddScoped<ICurrentCustomerAccessor, CurrentCustomerAccessor>();
@@ -69,7 +71,7 @@ public static class DependencyInjection
 
         services.AddDbContext<ApplicationDbContext>(options =>
         {
-            // Tenant migrations are intentionally hand-authored and idempotent so
+            // Compatibility migrations are intentionally hand-authored and idempotent so
             // existing single-company databases can be upgraded safely. EF Core 10
             // otherwise treats the stale design-time snapshot as a startup error
             // before those compatibility migrations can run.

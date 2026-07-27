@@ -3,7 +3,7 @@ using ECommerce.Data;
 using ECommerce.Entities.Users;
 using ECommerce.Entities.Users.Contracts;
 using ECommerce.Shared;
-using ECommerce.Services.Tenancy;
+using ECommerce.Services.Company;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,9 +13,8 @@ public sealed class AdminUserService(
     ApplicationDbContext context,
     UserManager<User> userManager,
     RoleManager<Role> roleManager,
-    ITenantContext tenantContext,
-    ITenantPermissionService tenantPermissions,
-    ITenantPlanGuard tenantPlanGuard,
+    ICompanyContext companyContext,
+    ICompanyPermissionService companyPermissions,
     IHttpContextAccessor httpContextAccessor) : IAdminUserService
 {
     public async Task<IReadOnlyCollection<AdminUserListItemResponse>> GetUsersAsync(
@@ -25,7 +24,7 @@ public sealed class AdminUserService(
         CancellationToken cancellationToken = default)
     {
         var query = context.Users.AsNoTracking()
-            .Where(user => user.TenantId == tenantContext.TenantId);
+            .Where(user => user.TenantId == companyContext.CompanyId);
         var cleanSearch = Clean(search);
         if (cleanSearch is not null)
         {
@@ -82,7 +81,7 @@ public sealed class AdminUserService(
         CancellationToken cancellationToken = default)
     {
         var user = await context.Users.FirstOrDefaultAsync(item =>
-            item.Id == id && item.TenantId == tenantContext.TenantId,
+            item.Id == id && item.TenantId == companyContext.CompanyId,
             cancellationToken);
         return user is null ? null : await MapUserAsync(user, cancellationToken);
     }
@@ -92,17 +91,16 @@ public sealed class AdminUserService(
         CancellationToken cancellationToken = default)
     {
         ValidateUser(request.FullName, request.Email, request.Password);
-        await tenantPlanGuard.EnsureUserCapacityAsync(1, cancellationToken);
         var email = request.Email.Trim().ToLowerInvariant();
         if (await context.Users.AnyAsync(user =>
-                user.TenantId == tenantContext.TenantId && user.Email == email,
+                user.TenantId == companyContext.CompanyId && user.Email == email,
                 cancellationToken))
             throw new InvalidOperationException("A user with this email already exists in this company.");
         await ValidateBranchAsync(request.BranchId, cancellationToken);
 
         var user = new User
         {
-            TenantId = tenantContext.TenantId,
+            TenantId = companyContext.CompanyId,
             BranchId = request.BranchId,
             FullName = request.FullName.Trim(),
             Email = email,
@@ -110,7 +108,7 @@ public sealed class AdminUserService(
             PhoneNumber = Clean(request.Phone),
             IsActive = request.IsActive
         };
-        user.UserName = TenantUserName.Create(user.TenantId, user.Id);
+        user.UserName = CompanyUserName.Create(user.TenantId, user.Id);
 
         var createResult = await userManager.CreateAsync(user, request.Password);
         EnsureSucceeded(createResult, "Could not create user.");
@@ -136,7 +134,7 @@ public sealed class AdminUserService(
     {
         ValidateUser(request.FullName, request.Email, null);
         var user = await context.Users.FirstOrDefaultAsync(item =>
-            item.Id == id && item.TenantId == tenantContext.TenantId,
+            item.Id == id && item.TenantId == companyContext.CompanyId,
             cancellationToken) ?? throw new KeyNotFoundException("User not found.");
 
         if (id == currentUserId && !request.IsActive)
@@ -151,8 +149,8 @@ public sealed class AdminUserService(
 
         user.FullName = request.FullName.Trim();
         user.Email = email;
-        if (TenantUserName.RequiresRepair(user.UserName))
-            user.UserName = TenantUserName.Create(user.TenantId, user.Id);
+        if (CompanyUserName.RequiresRepair(user.UserName))
+            user.UserName = CompanyUserName.Create(user.TenantId, user.Id);
         user.NormalizedEmail = userManager.NormalizeEmail(email);
         user.NormalizedUserName = userManager.NormalizeName(user.UserName);
         user.PhoneNumber = Clean(request.Phone);
@@ -174,7 +172,7 @@ public sealed class AdminUserService(
             throw new ArgumentException("Password must contain at least 6 characters.");
 
         var user = await context.Users.FirstOrDefaultAsync(item =>
-            item.Id == id && item.TenantId == tenantContext.TenantId,
+            item.Id == id && item.TenantId == companyContext.CompanyId,
             cancellationToken) ?? throw new KeyNotFoundException("User not found.");
         var token = await userManager.GeneratePasswordResetTokenAsync(user);
         EnsureSucceeded(
@@ -191,7 +189,7 @@ public sealed class AdminUserService(
             throw new InvalidOperationException("You cannot deactivate your own account.");
 
         var user = await context.Users.FirstOrDefaultAsync(item =>
-            item.Id == id && item.TenantId == tenantContext.TenantId,
+            item.Id == id && item.TenantId == companyContext.CompanyId,
             cancellationToken) ?? throw new KeyNotFoundException("User not found.");
         user.IsActive = false;
         EnsureSucceeded(await userManager.UpdateAsync(user), "Could not deactivate user.");
@@ -202,14 +200,13 @@ public sealed class AdminUserService(
     {
         var roles = await roleManager.Roles
             .AsNoTracking()
-            .Where(role => (role.TenantId == null || role.TenantId == tenantContext.TenantId) &&
-                role.Name != AppRoles.PlatformAdmin)
+            .Where(role => role.TenantId == null || role.TenantId == companyContext.CompanyId)
             .OrderBy(role => role.Name)
             .ToListAsync(cancellationToken);
         var userRoleCounts = context.UserRoles.AsNoTracking()
             .Join(context.Users.AsNoTracking(), userRole => userRole.UserId, user => user.Id,
                 (userRole, user) => new { userRole.RoleId, user.TenantId });
-        userRoleCounts = userRoleCounts.Where(item => item.TenantId == tenantContext.TenantId);
+        userRoleCounts = userRoleCounts.Where(item => item.TenantId == companyContext.CompanyId);
         var userCounts = await userRoleCounts
             .GroupBy(item => item.RoleId)
             .Select(group => new { RoleId = group.Key, Count = group.Count() })
@@ -241,12 +238,12 @@ public sealed class AdminUserService(
         if (await roleManager.RoleExistsAsync(name))
             throw new InvalidOperationException("A role with this name already exists in this company.");
 
-        await tenantPermissions.ValidateAssignableAsync(CurrentPrincipal, request.Permissions ?? [], cancellationToken);
+        await companyPermissions.ValidateAssignableAsync(CurrentPrincipal, request.Permissions ?? [], cancellationToken);
         var role = new Role
         {
             Name = name,
             Description = Clean(request.Description),
-            TenantId = tenantContext.TenantId
+            TenantId = companyContext.CompanyId
         };
         EnsureSucceeded(await roleManager.CreateAsync(role), "Could not create role.");
         await ReplaceRolePermissionsAsync(role, request.Permissions ?? []);
@@ -287,14 +284,14 @@ public sealed class AdminUserService(
         var permissions = string.Equals(DisplayRoleName(role.Name), AppRoles.Customer, StringComparison.OrdinalIgnoreCase)
             ? []
             : request.Permissions ?? [];
-        await tenantPermissions.ValidateAssignableAsync(CurrentPrincipal, permissions, cancellationToken);
+        await companyPermissions.ValidateAssignableAsync(CurrentPrincipal, permissions, cancellationToken);
         await ReplaceRolePermissionsAsync(role, permissions);
 
         var userCount = await context.UserRoles
             .Join(context.Users, userRole => userRole.UserId, user => user.Id,
                 (userRole, user) => new { userRole.RoleId, user.TenantId })
             .CountAsync(item => item.RoleId == role.Id &&
-                item.TenantId == tenantContext.TenantId, cancellationToken);
+                item.TenantId == companyContext.CompanyId, cancellationToken);
         return new RoleListItemResponse(
             role.Id,
             DisplayRoleName(role.Name),
@@ -315,7 +312,7 @@ public sealed class AdminUserService(
             .Join(context.Users, userRole => userRole.UserId, user => user.Id,
                 (userRole, user) => new { userRole.RoleId, user.TenantId })
             .AnyAsync(item => item.RoleId == id &&
-                item.TenantId == tenantContext.TenantId, cancellationToken);
+                item.TenantId == companyContext.CompanyId, cancellationToken);
         if (isAssigned)
             throw new InvalidOperationException("Remove this role from its users before deleting it.");
 
@@ -325,7 +322,7 @@ public sealed class AdminUserService(
     public async Task<IReadOnlyCollection<PermissionGroupResponse>> GetPermissionGroupsAsync(
         CancellationToken cancellationToken = default)
     {
-        var assignable = (await tenantPermissions.GetAssignablePermissionsAsync(CurrentPrincipal, cancellationToken))
+        var assignable = (await companyPermissions.GetAssignablePermissionsAsync(CurrentPrincipal, cancellationToken))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         return AppPermissions.Groups
             .Select(group => new PermissionGroupResponse(
@@ -385,9 +382,9 @@ public sealed class AdminUserService(
                 permissions.Add(permission);
         }
 
-        var tenantEnabled = (await tenantPermissions.GetTenantPermissionsAsync())
+        var companyEnabled = (await companyPermissions.GetCompanyPermissionsAsync())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return permissions.Where(tenantEnabled.Contains).OrderBy(value => value).ToArray();
+        return permissions.Where(companyEnabled.Contains).OrderBy(value => value).ToArray();
     }
 
     private async Task<IReadOnlyCollection<string>> GetRolePermissionsAsync(Role role) =>
@@ -409,33 +406,27 @@ public sealed class AdminUserService(
             .OfType<string>()
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        if (displayRoles.Any(role => string.Equals(role, AppRoles.PlatformAdmin, StringComparison.OrdinalIgnoreCase)))
-            throw new UnauthorizedAccessException("Platform administrator access cannot be assigned from a company workspace.");
-
         var requestedInternalRoles = displayRoles
             .Select(role => IsSystemRole(role) ? role : InternalRoleName(role))
             .ToArray();
         var availableRoles = await roleManager.Roles
             .Where(item => requestedInternalRoles.Contains(item.Name!) &&
-                (item.TenantId == null || item.TenantId == tenantContext.TenantId))
+                (item.TenantId == null || item.TenantId == companyContext.CompanyId))
             .ToListAsync(cancellationToken);
         if (availableRoles.Count != requestedInternalRoles.Length)
             throw new ArgumentException("One or more selected roles are not available for this company.");
 
-        var assignable = (await tenantPermissions.GetAssignablePermissionsAsync(CurrentPrincipal, cancellationToken))
+        var assignable = (await companyPermissions.GetAssignablePermissionsAsync(CurrentPrincipal, cancellationToken))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var enabledForTenant = (await tenantPermissions.GetTenantPermissionsAsync(cancellationToken))
+        var enabledForCompany = (await companyPermissions.GetCompanyPermissionsAsync(cancellationToken))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (!tenantContext.IsPlatformAdmin)
+        foreach (var role in availableRoles)
         {
-            foreach (var role in availableRoles)
-            {
-                var rolePermissions = (await GetRolePermissionsAsync(role))
-                    .Where(enabledForTenant.Contains);
-                var blocked = rolePermissions.Where(permission => !assignable.Contains(permission)).ToArray();
-                if (blocked.Length > 0)
-                    throw new UnauthorizedAccessException($"You cannot assign role '{DisplayRoleName(role.Name)}' because it grants permissions you do not hold.");
-            }
+            var rolePermissions = (await GetRolePermissionsAsync(role))
+                .Where(enabledForCompany.Contains);
+            var blocked = rolePermissions.Where(permission => !assignable.Contains(permission)).ToArray();
+            if (blocked.Length > 0)
+                throw new UnauthorizedAccessException($"You cannot assign role '{DisplayRoleName(role.Name)}' because it grants permissions you do not hold.");
         }
 
         var current = (await userManager.GetRolesAsync(user)).ToArray();
@@ -453,7 +444,7 @@ public sealed class AdminUserService(
         CancellationToken cancellationToken)
     {
         var permissions = ValidatePermissions(requested);
-        await tenantPermissions.ValidateAssignableAsync(CurrentPrincipal, permissions, cancellationToken);
+        await companyPermissions.ValidateAssignableAsync(CurrentPrincipal, permissions, cancellationToken);
         var existing = (await userManager.GetClaimsAsync(user))
             .Where(claim => claim.Type == AuthClaims.Permission)
             .ToArray();
@@ -500,7 +491,7 @@ public sealed class AdminUserService(
     {
         if (!branchId.HasValue) return;
         if (!await context.Branches.AnyAsync(item =>
-                item.Id == branchId.Value && item.TenantId == tenantContext.TenantId && item.IsActive,
+                item.Id == branchId.Value && item.TenantId == companyContext.CompanyId && item.IsActive,
                 cancellationToken))
             throw new ArgumentException("The selected branch is not available for this company.");
     }
@@ -509,14 +500,14 @@ public sealed class AdminUserService(
     {
         if (!branchId.HasValue) return null;
         return await context.Branches.AsNoTracking()
-            .Where(item => item.Id == branchId.Value && item.TenantId == tenantContext.TenantId)
+            .Where(item => item.Id == branchId.Value && item.TenantId == companyContext.CompanyId)
             .Select(item => item.Name)
             .FirstOrDefaultAsync(cancellationToken);
     }
 
     private void EnsureRoleTenant(Role role)
     {
-        if (role.TenantId.HasValue && role.TenantId != tenantContext.TenantId)
+        if (role.TenantId.HasValue && role.TenantId != companyContext.CompanyId)
             throw new KeyNotFoundException("Role not found.");
     }
 
@@ -539,19 +530,19 @@ public sealed class AdminUserService(
     }
 
     private string InternalRoleName(string displayName) =>
-        $"tenant-{tenantContext.TenantId}:{displayName.Trim()}";
+        $"company:{displayName.Trim()}";
 
     private static string DisplayRoleName(string? roleName)
     {
         if (string.IsNullOrWhiteSpace(roleName)) return string.Empty;
         var separator = roleName.IndexOf(':');
-        return roleName.StartsWith("tenant-", StringComparison.OrdinalIgnoreCase) && separator >= 0
+        return (roleName.StartsWith("company:", StringComparison.OrdinalIgnoreCase) ||
+                roleName.StartsWith("tenant-", StringComparison.OrdinalIgnoreCase)) && separator >= 0
             ? roleName[(separator + 1)..]
             : roleName;
     }
 
     private static bool IsSystemRole(string? roleName) =>
-        string.Equals(roleName, AppRoles.PlatformAdmin, StringComparison.OrdinalIgnoreCase) ||
         string.Equals(roleName, AppRoles.Admin, StringComparison.OrdinalIgnoreCase) ||
         string.Equals(roleName, AppRoles.Customer, StringComparison.OrdinalIgnoreCase);
 

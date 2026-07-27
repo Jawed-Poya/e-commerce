@@ -27,7 +27,7 @@ import { useI18n } from "../../i18n/i18n-provider";
 import { PwaInstallButton } from "../../features/pwa/pwa-install-button";
 import { Button } from "../components/ui/button";
 import { cn } from "../lib/utils";
-import { useTenant } from "../../features/tenancy/tenant-context";
+import { useCompany } from "../../features/company/company-context";
 
 type StoreNavItem = {
     to: string;
@@ -53,12 +53,12 @@ function isStoreNavItemActive(item: StoreNavItem, pathname: string, search: stri
 }
 
 function Logo() {
-    const { tenant } = useTenant();
-    const name = tenant?.name ?? "EasyCart";
+    const { company } = useCompany();
+    const name = company?.name ?? "EasyCart";
     return (
         <Link to="/" className="group flex min-w-0 shrink-0 items-center gap-2.5 font-black tracking-tight">
             <span className="relative grid size-10 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-brand-orange text-xs text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-300 group-hover:-rotate-3 group-hover:scale-105">
-                {tenant?.logoUrl ? <img src={tenant.logoUrl} alt="" className="size-full object-cover" /> : <span className="relative z-10">{name.split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase()}</span>}
+                {company?.logoUrl ? <img src={company.logoUrl} alt="" className="size-full object-cover" /> : <span className="relative z-10">{name.split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase()}</span>}
                 <span className="absolute -right-2 -top-2 size-6 rounded-full bg-white/20" />
             </span>
             <span className="max-w-36 truncate text-xl tracking-[-0.04em] text-foreground sm:max-w-48">{name}</span>
@@ -76,7 +76,7 @@ export function StoreLayout() {
     const cart = useCart();
     const auth = useAuth();
     const { language, direction, t } = useI18n();
-    const { tenant } = useTenant();
+    const { company } = useCompany();
     const accountPath = auth.isAuthenticated ? "/account" : "/account/login";
 
     const submit = (e: FormEvent) => {
@@ -88,8 +88,8 @@ export function StoreLayout() {
     };
 
     const shareStore = async () => {
-        const url = tenant?.storefrontUrl || window.location.href;
-        const title = tenant?.name ?? "Online store";
+        const url = window.location.href;
+        const title = company?.name ?? "Online store";
         if (navigator.share) {
             try {
                 await navigator.share({ title, text: t("common.shareStoreText"), url });
@@ -523,7 +523,7 @@ export function StoreLayout() {
                 <div className="relative border-t border-border/70 dark:border-white/10">
                     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3 px-4 py-5 text-xs text-muted-foreground sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8 dark:text-slate-500">
                         <span>
-                            © {new Date().getFullYear()} {tenant?.name ?? "EasyCart"}. {t("footer.rights")}
+                            © {new Date().getFullYear()} {company?.name ?? "EasyCart"}. {t("footer.rights")}
                         </span>
 
                         <span>
