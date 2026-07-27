@@ -1,0 +1,64 @@
+import apiClient from "@/api/api-client";
+import type {
+    CompanyBranch,
+    CompanyProfile,
+    CompanySettings,
+    CompanyWorth,
+    CustomerLedger,
+    FinancialReport,
+    FinancialReportFilters,
+    PublicCompanyProfile,
+    TrashItem,
+} from "./company-types";
+
+export type UpdateCompanyProfile = Pick<
+    CompanyProfile,
+    "name" | "legalName" | "registrationNumber" | "email" | "phone" | "address" | "logoUrl" | "faviconUrl"
+>;
+export type UpsertCompanyBranch = Omit<CompanyBranch, "id">;
+
+export const companyService = {
+    publicProfile: async () =>
+        (await apiClient.get<PublicCompanyProfile>("/company/public-profile")).data,
+    profile: async () =>
+        (await apiClient.get<CompanyProfile>("/company/profile")).data,
+    updateProfile: async (request: UpdateCompanyProfile) =>
+        (await apiClient.put<CompanyProfile>("/company/profile", request)).data,
+    updateSettings: async (request: CompanySettings) =>
+        (await apiClient.put<CompanyProfile>("/company/settings", request)).data,
+    createBranch: async (request: UpsertCompanyBranch) =>
+        (await apiClient.post<CompanyBranch>("/company/branches", request)).data,
+    updateBranch: async (id: number, request: UpsertCompanyBranch) =>
+        (await apiClient.put<CompanyBranch>(`/company/branches/${id}`, request)).data,
+
+    financialReport: async (filters: FinancialReportFilters) =>
+        (await apiClient.get<FinancialReport>("/admin/reports", filters)).data,
+    companyWorth: async (params: {
+        asOfDate?: string;
+        periodStartDate?: string;
+        branchId?: string | number;
+        currencyCode?: string;
+    }) => (await apiClient.get<CompanyWorth>("/admin/reports/company-worth", params)).data,
+    customerLedger: async (
+        customerId: number,
+        params: { startDate?: string; endDate?: string; currencyCode?: string },
+    ) =>
+        (await apiClient.get<CustomerLedger>(`/admin/reports/customers/${customerId}/ledger`, params)).data,
+
+    exportFinancialReport: (format: "excel" | "pdf", filters: FinancialReportFilters) =>
+        apiClient.download(`/admin/reports/export/${format}`, filters),
+    exportCustomerLedger: (
+        customerId: number,
+        format: "excel" | "pdf",
+        params: { startDate?: string; endDate?: string; currencyCode?: string },
+    ) => apiClient.download(`/admin/reports/customers/${customerId}/ledger/export/${format}`, params),
+    trash: async (params?: Record<string, unknown>) =>
+        (await apiClient.get<TrashItem[]>("/admin/trash", params)).data,
+    restoreTrash: async (id: number) => apiClient.post(`/admin/trash/${id}/restore`),
+    purgeTrash: async (id: number) => apiClient.delete(`/admin/trash/${id}`),
+
+    downloadReceipt: (source: "orders" | "manual-sales", id: number, format: "pdf" | "image", thermal = false) =>
+        apiClient.download(`/admin/receipts/${source}/${id}/${format}`, { thermal }),
+    receiptPreviewUrl: (source: "orders" | "manual-sales", id: number) =>
+        apiClient.createObjectUrl(`/admin/receipts/${source}/${id}/pdf`),
+};

@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ReceiptActions } from "@/features/company/receipt-actions";
 import { orderService } from "@/features/orders/order-service";
 import type { OrderDetails, OrderStatus, PaymentStatus } from "@/features/orders/order-types";
 import { formatMoney, StatusBadge } from "./orders";
@@ -33,7 +34,7 @@ export default function OrderDetailsPage() {
     const payment = order.payments[0];
 
     return <div className="space-y-5">
-        <PageHeader title={order.orderNumber} description={`Created ${new Date(order.createdAt).toLocaleString()}`} actions={<Link to="/orders" className="inline-flex h-8 items-center gap-1 border px-2.5 text-xs hover:bg-muted"><ArrowLeft className="size-4" />Back</Link>} />
+        <PageHeader title={order.orderNumber} description={`Created ${new Date(order.createdAt).toLocaleString()}`} actions={<><ReceiptActions source="orders" id={order.id} /><Link to="/orders" className="inline-flex h-8 items-center gap-1 border px-2.5 text-xs hover:bg-muted"><ArrowLeft className="size-4" />Back</Link></>} />
 
         <div className="grid gap-3 md:grid-cols-4">
             <SummaryCard icon={<Clock3 />} label="Order status" value={<StatusBadge value={order.status} />} />

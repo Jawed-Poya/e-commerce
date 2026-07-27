@@ -34,7 +34,8 @@ import {
 } from "@/components/ui/table";
 import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
-import { useTenant } from "@/features/tenancy/tenant-context";
+import { useCompany } from "@/features/company/company-context";
+import { ReceiptActions } from "@/features/company/receipt-actions";
 import { useI18n } from "@/i18n/i18n-provider";
 import {
     DocumentLines,
@@ -64,7 +65,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export default function ManualSalesPage() {
     const queryClient = useQueryClient();
-    const { formatMoney } = useTenant();
+    const { formatMoney } = useCompany();
     const { tr } = useI18n();
     const { user } = useAdminAuth();
     const canManage = hasPermission(user, Permissions.ManualSalesManage);
@@ -236,14 +237,17 @@ export default function ManualSalesPage() {
                                             <PaymentBadge status={sale.paymentStatus} />
                                         </TableCell>
                                         <TableCell>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => setSelectedSale(sale)}
-                                            >
-                                                <CreditCard className="me-2 size-4" />
-                                                Payments
-                                            </Button>
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => setSelectedSale(sale)}
+                                                >
+                                                    <CreditCard className="me-2 size-4" />
+                                                    Payments
+                                                </Button>
+                                                <ReceiptActions source="manual-sales" id={sale.id} compact />
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))

@@ -14,6 +14,8 @@ public class OrderItem : ProductEntity
 
     public decimal UnitPrice { get; set; }
 
+    public decimal UnitCost { get; set; }
+
     public decimal Discount { get; set; }
 
     public string ProductName { get; set; } = null!;
@@ -27,4 +29,6 @@ public class OrderItem : ProductEntity
     public string Currency { get; set; } = "AFN";
 
     public decimal Total => (Quantity * UnitPrice) - Discount + Tax;
+
+    public decimal CostTotal => Quantity * UnitCost;
 }

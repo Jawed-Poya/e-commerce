@@ -24,11 +24,8 @@ import ManualSalesPage from "@/pages/manual-sales";
 import StaffPage from "@/pages/staff";
 import ExpensesPage from "@/pages/expenses";
 import CompanySettingsPage from "@/pages/company-settings";
-import TenantReportsPage from "@/pages/tenant-reports";
+import FinancialReportsPage from "@/pages/financial-reports";
 import TrashPage from "@/pages/trash";
-import PlatformTenantsPage from "@/pages/platform-tenants";
-import PlatformSettingsPage from "@/pages/platform-settings";
-import SubscriptionPlansPage from "@/pages/subscription-plans";
 
 import { ProtectedRoute } from "@/features/auth/protected-route";
 import { PermissionRoute } from "@/features/auth/permission-route";
@@ -41,10 +38,6 @@ const allowed = (permission: string, element: React.ReactNode) => (
 export const router = createBrowserRouter([
     {
         path: "/login",
-        element: <AdminLoginPage />,
-    },
-    {
-        path: "/workspace/:workspaceCode/login",
         element: <AdminLoginPage />,
     },
     {
@@ -170,27 +163,15 @@ export const router = createBrowserRouter([
                     },
                     {
                         path: "company",
-                        element: allowed(Permissions.TenantProfileManage, <CompanySettingsPage />),
+                        element: allowed(Permissions.CompanyProfileManage, <CompanySettingsPage />),
                     },
                     {
                         path: "reports",
-                        element: allowed(Permissions.TenantReportsView, <TenantReportsPage />),
+                        element: allowed(Permissions.FinancialReportsView, <FinancialReportsPage />),
                     },
                     {
                         path: "trash",
-                        element: allowed(Permissions.TenantTrashManage, <TrashPage />),
-                    },
-                    {
-                        path: "platform/tenants",
-                        element: allowed(Permissions.PlatformTenantsManage, <PlatformTenantsPage />),
-                    },
-                    {
-                        path: "platform/plans",
-                        element: allowed(Permissions.PlatformTenantsManage, <SubscriptionPlansPage />),
-                    },
-                    {
-                        path: "platform/settings",
-                        element: allowed(Permissions.PlatformTenantsManage, <PlatformSettingsPage />),
+                        element: allowed(Permissions.CompanyTrashManage, <TrashPage />),
                     },
                     {
                         path: "system/general-types",

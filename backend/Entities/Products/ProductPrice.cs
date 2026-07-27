@@ -9,7 +9,7 @@ public class ProductPrice : ProductEntity
     public long CustomerTypeId { get; set; }
 
     public GeneralType CustomerType { get; set; } = null!;
-    
+
     public DateOnly? StartDate { get; set; }
 
     public DateOnly? EndDate { get; set; }

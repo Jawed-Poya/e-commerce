@@ -285,6 +285,10 @@ namespace ECommerce.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal>("UnitCost")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<decimal>("UnitPrice")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -1156,6 +1160,7 @@ namespace ECommerce.Migrations
                     b.Property<decimal>("LineTotal").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
                     b.Property<long>("ProductId").HasColumnType("bigint");
                     b.Property<decimal>("Quantity").HasPrecision(18, 3).HasColumnType("decimal(18,3)");
+                    b.Property<decimal>("UnitCost").HasPrecision(18, 4).HasColumnType("decimal(18,4)");
                     b.Property<decimal>("UnitPrice").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
                     b.Property<DateTime?>("UpdatedAt").HasColumnType("datetime2");
                     b.HasKey("Id");

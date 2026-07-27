@@ -5,7 +5,8 @@ using ECommerce.Entities.Operations;
 using ECommerce.Entities.Operations.Contracts;
 using ECommerce.Entities.Products;
 using ECommerce.Services.Customers;
-using ECommerce.Services.Tenancy;
+using ECommerce.Services.Inventory;
+using ECommerce.Services.Company;
 using Microsoft.EntityFrameworkCore;
 
 namespace ECommerce.Services.Operations;
@@ -13,7 +14,7 @@ namespace ECommerce.Services.Operations;
 public sealed class OperationsService(
     ApplicationDbContext context,
     IDefaultCustomerTypeResolver defaultCustomerTypeResolver,
-    ITenantPlanGuard tenantPlanGuard) : IOperationsService
+    IInventoryCostService inventoryCosts) : IOperationsService
 {
     public async Task<OperationSummary> GetSummaryAsync(CancellationToken ct)
     {
@@ -119,6 +120,7 @@ public sealed class OperationsService(
         }).ToList();
         await EnsureProductsExist(items.Select(x => x.ProductId), ct);
 
+
         string? supplierName = null;
         if (request.SupplierId.HasValue)
         {
@@ -198,7 +200,6 @@ public sealed class OperationsService(
 
     public async Task<InventorySaleListItem> CreateSaleAsync(CreateInventorySaleRequest request, string? userId, CancellationToken ct)
     {
-        await tenantPlanGuard.EnsureOrderCapacityAsync(1, ct);
         if (request.Items.Count == 0) throw new ArgumentException("At least one sale item is required.");
         if (request.Items.Any(x => x.ProductId <= 0 || x.Quantity <= 0 || x.UnitPrice < 0)) throw new ArgumentException("Every sale item requires a product, positive quantity, and non-negative price.");
         if (request.Discount < 0 || request.Tax < 0) throw new ArgumentException("Discount and tax cannot be negative.");
@@ -208,6 +209,7 @@ public sealed class OperationsService(
             return new InventorySaleItemRequest { ProductId = group.Key, Quantity = group.Sum(item => item.Quantity), UnitPrice = group.First().UnitPrice };
         }).ToList();
         await EnsureProductsExist(items.Select(x => x.ProductId), ct);
+        var productCosts = await inventoryCosts.GetCurrentUnitCostsAsync(items.Select(x => x.ProductId), ct);
 
         string? registeredCustomerName = null;
         string? registeredCustomerPhone = null;
@@ -243,7 +245,7 @@ public sealed class OperationsService(
             CreatedByUserId = userId
         };
         foreach (var item in items)
-            sale.Items.Add(new InventorySaleItem { ProductId = item.ProductId, Quantity = item.Quantity, UnitPrice = item.UnitPrice, LineTotal = item.Quantity * item.UnitPrice });
+            sale.Items.Add(new InventorySaleItem { ProductId = item.ProductId, Quantity = item.Quantity, UnitPrice = item.UnitPrice, UnitCost = productCosts.GetValueOrDefault(item.ProductId), LineTotal = item.Quantity * item.UnitPrice });
         if (request.PaidAmount > 0)
             sale.Payments.Add(NewSalePayment(request.PaidAmount, saleDate, request.PaymentMethod, request.PaymentReferenceNumber, "Initial sale payment", userId));
 
@@ -438,7 +440,7 @@ public sealed class OperationsService(
 
     private async Task<string> GetCurrencyCodeAsync(CancellationToken ct) =>
         await context.TenantSettings.AsNoTracking()
-            .Where(item => item.TenantId == context.CurrentTenantId)
+            .Where(item => item.TenantId == context.CurrentCompanyId)
             .Select(item => item.MainCurrencyCode)
             .FirstOrDefaultAsync(ct) ?? "USD";
 

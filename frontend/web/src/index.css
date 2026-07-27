@@ -97,33 +97,33 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: var(--tenant-font, Inter, "Segoe UI", sans-serif);
+  --font-sans: var(--company-font, Inter, "Segoe UI", sans-serif);
 }
 * {
   @apply border-border;
 }
 html {
   @apply scroll-smooth;
-  font-size: var(--tenant-base-font-size, 16px);
+  font-size: var(--company-base-font-size, 16px);
 }
 html[data-language="en"] {
-  --tenant-font: var(--tenant-font-en, "Inter Variable", "Manrope Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif);
-  --tenant-heading-font: var(--tenant-heading-font-en, "Manrope Variable", "Inter Variable", "Segoe UI", ui-sans-serif, sans-serif);
+  --company-font: var(--company-font-en, "Inter Variable", "Manrope Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif);
+  --company-heading-font: var(--company-heading-font-en, "Manrope Variable", "Inter Variable", "Segoe UI", ui-sans-serif, sans-serif);
 }
 html[data-language="dr"] {
-  --tenant-font: var(--tenant-font-dr, "Vazirmatn Variable", "Noto Naskh Arabic Variable", "Noto Sans Arabic Variable", Tahoma, Arial, sans-serif);
-  --tenant-heading-font: var(--tenant-heading-font-dr, "Noto Naskh Arabic Variable", "Vazirmatn Variable", Tahoma, sans-serif);
+  --company-font: var(--company-font-dr, "Vazirmatn Variable", "Noto Naskh Arabic Variable", "Noto Sans Arabic Variable", Tahoma, Arial, sans-serif);
+  --company-heading-font: var(--company-heading-font-dr, "Noto Naskh Arabic Variable", "Vazirmatn Variable", Tahoma, sans-serif);
 }
 html[data-language="ps"] {
-  --tenant-font: var(--tenant-font-ps, "Noto Sans Arabic Variable", "Noto Naskh Arabic Variable", "Vazirmatn Variable", Tahoma, Arial, sans-serif);
-  --tenant-heading-font: var(--tenant-heading-font-ps, "Noto Naskh Arabic Variable", "Noto Sans Arabic Variable", Tahoma, sans-serif);
+  --company-font: var(--company-font-ps, "Noto Sans Arabic Variable", "Noto Naskh Arabic Variable", "Vazirmatn Variable", Tahoma, Arial, sans-serif);
+  --company-heading-font: var(--company-heading-font-ps, "Noto Naskh Arabic Variable", "Noto Sans Arabic Variable", Tahoma, sans-serif);
 }
 body {
   @apply m-0 min-w-80 bg-background font-sans text-foreground antialiased;
   overflow-x: clip;
 }
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--tenant-heading-font, var(--tenant-font));
+  font-family: var(--company-heading-font, var(--company-font));
 }
 button, input, textarea, select { font-family: inherit; }
 main { min-width: 0; }

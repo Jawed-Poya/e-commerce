@@ -97,7 +97,9 @@ public sealed class InventorySaleItem : BaseEntity
     public Product Product { get; set; } = null!;
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
+    public decimal UnitCost { get; set; }
     public decimal LineTotal { get; set; }
+    public decimal CostTotal => Quantity * UnitCost;
 }
 
 public sealed class InventorySalePayment : BaseEntity

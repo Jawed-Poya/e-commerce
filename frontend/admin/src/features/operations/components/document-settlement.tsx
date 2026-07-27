@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useTenant } from "@/features/tenancy/tenant-context";
+import { useCompany } from "@/features/company/company-context";
 
 export function DocumentSettlementLayout({
     notes,
@@ -86,7 +86,7 @@ export function MoneySummaryRow({
     emphasis?: boolean;
     muted?: boolean;
 }) {
-    const { formatMoney } = useTenant();
+    const { formatMoney } = useCompany();
     return (
         <div
             className={`flex items-center justify-between gap-4 tabular-nums ${

@@ -23,13 +23,12 @@ public static class DatabaseInitializer
 
         await EnsurePreMigrationSchemaCompatibilityAsync(context);
         await context.Database.MigrateAsync();
-        await EnsurePlatformAndPlansAsync(context);
-        var workspace = await EnsureDefaultTenantAsync(context);
+        var company = await EnsureCompanyAsync(context);
         await EnsureRolesAsync(services);
         await EnsureAdminPermissionsAsync(services);
-        await EnsureDefaultCustomerTypesAsync(context);
-        await EnsureOperationDefaultsAsync(context, workspace.Tenant.Id, workspace.Branch.Id);
-        await EnsureAdminAsync(services, workspace.Tenant.Id, workspace.Branch.Id);
+        await EnsureDefaultCustomerTypesAsync(context, company.Company.Id, company.MainBranch.Id);
+        await EnsureOperationDefaultsAsync(context, company.Company.Id, company.MainBranch.Id);
+        await EnsureAdminAsync(services, company.Company.Id, company.MainBranch.Id);
         await EnsureSafeIdentityUserNamesAsync(services);
     }
 
@@ -49,219 +48,148 @@ BEGIN
     ALTER TABLE [dbo].[Expenses]
         ADD [GeneralTypeCategoryId] bigint NULL;
 END;
+
+-- Repair a partially-applied cost-snapshot migration. A normal pending
+-- migration is intentionally left to EF Core; this block only runs when the
+-- migration history says it was applied but one of its physical columns is
+-- missing.
+IF OBJECT_ID(N'[dbo].[__EFMigrationsHistory]', N'U') IS NOT NULL
+   AND EXISTS
+   (
+       SELECT 1
+       FROM [dbo].[__EFMigrationsHistory]
+       WHERE [MigrationId] = N'20260727110000_AddCostSnapshotsForProfitReporting'
+   )
+BEGIN
+    IF OBJECT_ID(N'[dbo].[OrderItems]', N'U') IS NOT NULL
+       AND COL_LENGTH(N'dbo.OrderItems', N'UnitCost') IS NULL
+    BEGIN
+        ALTER TABLE [dbo].[OrderItems]
+            ADD [UnitCost] decimal(18,4) NOT NULL DEFAULT (0);
+
+        UPDATE item
+        SET item.UnitCost = COALESCE(cost.UnitCost, 0)
+        FROM [dbo].[OrderItems] item
+        OUTER APPLY
+        (
+            SELECT TOP (1) purchaseItem.UnitCost
+            FROM [dbo].[PurchaseItems] purchaseItem
+            INNER JOIN [dbo].[Purchases] purchase ON purchase.Id = purchaseItem.PurchaseId
+            WHERE purchaseItem.ProductId = item.ProductId
+              AND purchase.IsDeleted = 0
+              AND purchase.Status <> 3
+              AND purchase.CreatedAt <= item.CreatedAt
+            ORDER BY purchase.PurchaseDate DESC, purchaseItem.Id DESC
+        ) cost;
+    END;
+
+    IF OBJECT_ID(N'[dbo].[InventorySaleItems]', N'U') IS NOT NULL
+       AND COL_LENGTH(N'dbo.InventorySaleItems', N'UnitCost') IS NULL
+    BEGIN
+        ALTER TABLE [dbo].[InventorySaleItems]
+            ADD [UnitCost] decimal(18,4) NOT NULL DEFAULT (0);
+
+        UPDATE item
+        SET item.UnitCost = COALESCE(cost.UnitCost, 0)
+        FROM [dbo].[InventorySaleItems] item
+        INNER JOIN [dbo].[InventorySales] sale ON sale.Id = item.InventorySaleId
+        OUTER APPLY
+        (
+            SELECT TOP (1) purchaseItem.UnitCost
+            FROM [dbo].[PurchaseItems] purchaseItem
+            INNER JOIN [dbo].[Purchases] purchase ON purchase.Id = purchaseItem.PurchaseId
+            WHERE purchaseItem.ProductId = item.ProductId
+              AND purchase.IsDeleted = 0
+              AND purchase.Status <> 3
+              AND purchase.PurchaseDate <= sale.SaleDate
+            ORDER BY purchase.PurchaseDate DESC, purchaseItem.Id DESC
+        ) cost;
+    END;
+END;
 """);
     }
 
 
-    private static async Task EnsurePlatformAndPlansAsync(ApplicationDbContext context)
+    private sealed record DefaultCompany(Tenant Company, Branch MainBranch);
+
+    private static async Task<DefaultCompany> EnsureCompanyAsync(ApplicationDbContext context)
     {
-        var platformSettings = await context.PlatformSettings.FirstOrDefaultAsync(item => item.Id == 1);
-        if (platformSettings is null)
+        // Tenant is the retained legacy table name. Runtime behavior is strictly
+        // single-company and always uses the reserved row with id 1.
+        var company = await context.Tenants
+            .OrderBy(item => item.Id)
+            .FirstOrDefaultAsync();
+
+        if (company is null)
         {
-            platformSettings = new PlatformSetting();
-            context.PlatformSettings.Add(platformSettings);
-        }
-        else
-        {
-            platformSettings.RootDomain = null;
-            platformSettings.DefaultRoutingMode = TenantSiteRoutingMode.PlatformPath;
-            platformSettings.AllowCustomDomains = false;
-        }
-
-        var freePermissions = new[]
-        {
-            AppPermissions.DashboardView, AppPermissions.ProductsView, AppPermissions.ProductsManage,
-            AppPermissions.InventoryView, AppPermissions.OrdersView, AppPermissions.OrdersManage,
-            AppPermissions.CustomersView, AppPermissions.CustomersManage, AppPermissions.UsersView,
-            AppPermissions.TenantProfileManage, AppPermissions.TenantSettingsManage, AppPermissions.TenantReportsView
-        };
-        var premiumPermissions = freePermissions.Concat(new[]
-        {
-            AppPermissions.ProductPricingManage, AppPermissions.InventoryManage, AppPermissions.PaymentsManage,
-            AppPermissions.UsersManage, AppPermissions.RolesManage, AppPermissions.TenantBranchesManage,
-            AppPermissions.TenantClaimsManage, AppPermissions.TenantTrashManage, AppPermissions.SystemManage
-        }).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        var fullPermissions = AppPermissions.All.Where(item => item != AppPermissions.PlatformTenantsManage).ToArray();
-        var definitions = new[]
-        {
-            new PlanSeed("free", "Free", TenantPlan.Free, 10, 0m, 0m, 3, 1, 100, 500, 1024, freePermissions),
-            new PlanSeed("premium", "Premium", TenantPlan.Premium, 20, 49m, 490m, 20, 5, 10_000, 10_000, 10_240, premiumPermissions),
-            new PlanSeed("full", "Full", TenantPlan.Full, 30, 99m, 990m, 100, 25, 100_000, 100_000, 51_200, fullPermissions),
-            new PlanSeed("enterprise", "Enterprise", TenantPlan.Enterprise, 40, 299m, 2_990m, 10_000, 1_000, 10_000_000, 10_000_000, 1_048_576, fullPermissions)
-        };
-
-        foreach (var definition in definitions)
-        {
-            var plan = await context.SubscriptionPlans.Include(item => item.Permissions)
-                .FirstOrDefaultAsync(item => item.Code == definition.Code);
-            if (plan is null)
-            {
-                plan = new SubscriptionPlan
-                {
-                    Code = definition.Code, Name = definition.Name, LegacyPlan = definition.LegacyPlan,
-                    IsSystem = true, IsActive = true, SortOrder = definition.SortOrder,
-                    MonthlyPrice = definition.MonthlyPrice, YearlyPrice = definition.YearlyPrice,
-                    CurrencyCode = "USD", MaxUsers = definition.MaxUsers, MaxBranches = definition.MaxBranches,
-                    MaxProducts = definition.MaxProducts, MaxOrdersPerMonth = definition.MaxOrdersPerMonth,
-                    MaxStorageMb = definition.MaxStorageMb
-                };
-                context.SubscriptionPlans.Add(plan);
-                await context.SaveChangesAsync();
-            }
-
-            foreach (var permission in AppPermissions.All.Where(item => item != AppPermissions.PlatformTenantsManage))
-            {
-                var row = plan.Permissions.FirstOrDefault(item => string.Equals(item.Permission, permission, StringComparison.OrdinalIgnoreCase));
-                if (row is null)
-                    context.SubscriptionPlanPermissions.Add(new SubscriptionPlanPermission
-                    {
-                        SubscriptionPlanId = plan.Id,
-                        Permission = permission,
-                        IsEnabled = definition.Permissions.Contains(permission, StringComparer.OrdinalIgnoreCase)
-                    });
-
-            }
-        }
-        await context.SaveChangesAsync();
-    }
-
-    private sealed record PlanSeed(
-        string Code, string Name, TenantPlan LegacyPlan, int SortOrder,
-        decimal MonthlyPrice, decimal YearlyPrice, int MaxUsers, int MaxBranches,
-        int MaxProducts, int MaxOrdersPerMonth, int MaxStorageMb,
-        IReadOnlyCollection<string> Permissions);
-
-
-    private sealed record DefaultWorkspace(Tenant Tenant, Branch Branch);
-
-    private static async Task<DefaultWorkspace> EnsureDefaultTenantAsync(ApplicationDbContext context)
-    {
-        // The reserved default workspace must always exist for localhost and
-        // local-network deployments that do not use tenant subdomains.
-        var tenant = await context.Tenants
-            .FirstOrDefaultAsync(item => item.Slug == "default");
-        if (tenant is null)
-        {
-            tenant = new Tenant
+            company = new Tenant
             {
                 Name = "Default Company",
-                Slug = "default",
+                Slug = "company",
                 LegalName = "Default Company",
                 IsActive = true
             };
-            context.Tenants.Add(tenant);
+            context.Tenants.Add(company);
+            await context.SaveChangesAsync();
+        }
+        else
+        {
+            company.IsActive = true;
+            company.Slug = "company";
             await context.SaveChangesAsync();
         }
 
-        var tenantChanged = false;
-        if (string.IsNullOrWhiteSpace(tenant.StorefrontKey) || tenant.StorefrontKey.Length < 24)
-        {
-            tenant.StorefrontKey = Guid.NewGuid().ToString("N");
-            tenant.StorefrontKeyRotatedAt = DateTime.UtcNow;
-            tenantChanged = true;
-        }
-        if (tenant.SiteRoutingMode != TenantSiteRoutingMode.PlatformPath ||
-            tenant.CustomDomain is not null || tenant.StorefrontBaseUrlOverride is not null)
-        {
-            tenant.SiteRoutingMode = TenantSiteRoutingMode.PlatformPath;
-            tenant.CustomDomain = null;
-            tenant.StorefrontBaseUrlOverride = null;
-            tenantChanged = true;
-        }
-        if (tenantChanged) await context.SaveChangesAsync();
+        if (company.Id != ECommerce.Services.Company.CompanyContext.SingleCompanyId)
+            throw new InvalidOperationException(
+                "The single-company compatibility row must use id 1. Back up and normalize the legacy company row before starting the API.");
+
+        // Preserve old portal records for recovery, but prevent them from behaving
+        // as active companies in the refactored single-company application.
+        await context.Tenants
+            .Where(item => item.Id != company.Id && item.IsActive)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.IsActive, false)
+                .SetProperty(item => item.UpdatedAt, DateTime.UtcNow));
 
         var branch = await context.Branches
-            .Where(item => item.TenantId == tenant.Id)
+            .Where(item => item.TenantId == company.Id)
             .OrderByDescending(item => item.IsMain)
             .ThenBy(item => item.Id)
             .FirstOrDefaultAsync();
+
         if (branch is null)
         {
             branch = new Branch
             {
-                TenantId = tenant.Id,
+                TenantId = company.Id,
                 Name = "Main Branch",
                 Code = "MAIN",
                 IsMain = true,
                 IsActive = true
             };
             context.Branches.Add(branch);
-            await context.SaveChangesAsync();
         }
         else
         {
-            var branchChanged = false;
-            if (!branch.IsMain)
-            {
-                branch.IsMain = true;
-                branchChanged = true;
-            }
-            if (!branch.IsActive)
-            {
-                branch.IsActive = true;
-                branchChanged = true;
-            }
-            if (branchChanged)
-                await context.SaveChangesAsync();
+            branch.IsMain = true;
+            branch.IsActive = true;
+            await context.Branches
+                .Where(item => item.TenantId == company.Id && item.Id != branch.Id && item.IsMain)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.IsMain, false));
         }
 
-        if (!await context.TenantSettings.AnyAsync(item => item.TenantId == tenant.Id))
-            context.TenantSettings.Add(new TenantSetting { TenantId = tenant.Id });
-
-        var subscription = await context.TenantSubscriptions
-            .Where(item => item.TenantId == tenant.Id)
-            .OrderByDescending(item => item.StartsAt)
-            .FirstOrDefaultAsync();
-        var fullPlan = await context.SubscriptionPlans.FirstAsync(item => item.Code == "full");
-        if (subscription is null)
-        {
-            context.TenantSubscriptions.Add(new TenantSubscription
-            {
-                TenantId = tenant.Id,
-                SubscriptionPlanId = fullPlan.Id,
-                PlanName = fullPlan.Name,
-                Plan = fullPlan.LegacyPlan,
-                Status = SubscriptionStatus.Active,
-                StartsAt = DateTime.UtcNow,
-                MaxUsers = 1000,
-                MaxBranches = 100,
-                MaxProducts = 1_000_000,
-                MaxOrdersPerMonth = 1_000_000,
-                MaxStorageMb = 512_000,
-                MonthlyPrice = fullPlan.MonthlyPrice,
-                BillingCurrencyCode = fullPlan.CurrencyCode
-            });
-        }
-        else
-        {
-            subscription.SubscriptionPlanId ??= fullPlan.Id;
-            if (string.IsNullOrWhiteSpace(subscription.PlanName)) subscription.PlanName = fullPlan.Name;
-            if (subscription.MaxOrdersPerMonth < 1) subscription.MaxOrdersPerMonth = fullPlan.MaxOrdersPerMonth;
-            if (subscription.MaxStorageMb < 1) subscription.MaxStorageMb = fullPlan.MaxStorageMb;
-        }
-
-        var granted = await context.TenantPermissionGrants
-            .Where(item => item.TenantId == tenant.Id)
-            .Select(item => item.Permission)
-            .ToListAsync();
-        context.TenantPermissionGrants.AddRange(AppPermissions.All
-            .Where(permission => !granted.Contains(permission, StringComparer.OrdinalIgnoreCase))
-            .Select(permission => new TenantPermissionGrant
-            {
-                TenantId = tenant.Id,
-                Permission = permission,
-                IsEnabled = true
-            }));
+        if (!await context.TenantSettings.AnyAsync(item => item.TenantId == company.Id))
+            context.TenantSettings.Add(new TenantSetting { TenantId = company.Id });
 
         await context.SaveChangesAsync();
-        return new DefaultWorkspace(tenant, branch);
+        return new DefaultCompany(company, branch);
     }
 
     private static async Task EnsureRolesAsync(IServiceProvider services)
     {
         var roleManager = services.GetRequiredService<RoleManager<Role>>();
 
-        foreach (var roleName in new[] { AppRoles.PlatformAdmin, AppRoles.Admin, AppRoles.Customer })
+        foreach (var roleName in new[] { AppRoles.Admin, AppRoles.Customer })
         {
             var existingRole = await roleManager.FindByNameAsync(roleName);
             if (existingRole is not null)
@@ -308,72 +236,59 @@ END;
         }
     }
 
-    private static async Task EnsureDefaultCustomerTypesAsync(ApplicationDbContext context)
+    private static async Task EnsureDefaultCustomerTypesAsync(
+        ApplicationDbContext context,
+        long companyId,
+        long mainBranchId)
     {
-        var tenants = await context.Tenants
+        var general = await context.Types
             .IgnoreQueryFilters()
-            .Where(tenant => tenant.IsActive)
-            .Select(tenant => tenant.Id)
-            .ToListAsync();
+            .FirstOrDefaultAsync(type =>
+                type.TenantId == companyId &&
+                type.Group == GeneralTypeEnum.CustomerType &&
+                type.Name == "General");
 
-        foreach (var tenantId in tenants)
+        if (general is not null)
         {
-            var general = await context.Types
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(type =>
-                    type.TenantId == tenantId &&
-                    type.Group == GeneralTypeEnum.CustomerType &&
-                    type.Name == "General");
-            if (general is not null && !general.IsDeleted)
-                continue;
+            if (!general.IsDeleted && general.BranchId.HasValue)
+                return;
 
-            var branchId = await context.Branches
-                .IgnoreQueryFilters()
-                .Where(branch => branch.TenantId == tenantId && branch.IsActive)
-                .OrderByDescending(branch => branch.IsMain)
-                .ThenBy(branch => branch.Id)
-                .Select(branch => (long?)branch.Id)
-                .FirstOrDefaultAsync();
-
-            if (general is not null)
+            general.IsDeleted = false;
+            general.DeletedAt = null;
+            general.BranchId ??= mainBranchId;
+            general.SortOrder ??= 0;
+            general.UpdatedAt = DateTime.UtcNow;
+        }
+        else
+        {
+            context.Types.Add(new GeneralType
             {
-                general.IsDeleted = false;
-                general.DeletedAt = null;
-                general.BranchId ??= branchId;
-                general.SortOrder ??= 0;
-                general.UpdatedAt = DateTime.UtcNow;
-            }
-            else
-            {
-                context.Types.Add(new GeneralType
-                {
-                    TenantId = tenantId,
-                    BranchId = branchId,
-                    Name = "General",
-                    Group = GeneralTypeEnum.CustomerType,
-                    SortOrder = 0
-                });
-            }
+                TenantId = companyId,
+                BranchId = mainBranchId,
+                Name = "General",
+                Group = GeneralTypeEnum.CustomerType,
+                SortOrder = 0
+            });
         }
 
         await context.SaveChangesAsync();
     }
 
 
-    private static async Task EnsureOperationDefaultsAsync(ApplicationDbContext context, long tenantId, long branchId)
+    private static async Task EnsureOperationDefaultsAsync(ApplicationDbContext context, long companyId, long branchId)
     {
         var changed = false;
         var expenseCategoryNames = new[] { "Rent", "Utilities", "Transport", "Office", "Other" };
         var existingExpenseCategoryNames = await context.Types
             .IgnoreQueryFilters()
-            .Where(type => type.TenantId == tenantId && !type.IsDeleted && type.Group == GeneralTypeEnum.ExpenseCategory)
+            .Where(type => type.TenantId == companyId && !type.IsDeleted && type.Group == GeneralTypeEnum.ExpenseCategory)
             .Select(type => type.Name)
             .ToListAsync();
         var missingExpenseCategories = expenseCategoryNames
             .Where(name => !existingExpenseCategoryNames.Contains(name, StringComparer.OrdinalIgnoreCase))
             .Select((name, index) => new GeneralType
             {
-                TenantId = tenantId,
+                TenantId = companyId,
                 BranchId = branchId,
                 Name = name,
                 Group = GeneralTypeEnum.ExpenseCategory,
@@ -388,11 +303,11 @@ END;
 
         if (!await context.Warehouses
                 .IgnoreQueryFilters()
-                .AnyAsync(item => item.TenantId == tenantId && !item.IsDeleted))
+                .AnyAsync(item => item.TenantId == companyId && !item.IsDeleted))
         {
             context.Warehouses.Add(new Warehouse
             {
-                TenantId = tenantId,
+                TenantId = companyId,
                 BranchId = branchId,
                 Name = "Main Warehouse",
                 Code = "MAIN",
@@ -404,7 +319,7 @@ END;
         if (changed) await context.SaveChangesAsync();
     }
 
-    private static async Task EnsureAdminAsync(IServiceProvider services, long tenantId, long branchId)
+    private static async Task EnsureAdminAsync(IServiceProvider services, long companyId, long branchId)
     {
         var seed = services.GetRequiredService<IOptions<SeedAdminOptions>>().Value;
         var email = seed.Email?.Trim().ToLowerInvariant();
@@ -417,13 +332,13 @@ END;
         var context = services.GetRequiredService<ApplicationDbContext>();
         var normalizedEmail = userManager.NormalizeEmail(email);
         var admin = await context.Users.FirstOrDefaultAsync(user =>
-            user.TenantId == tenantId && user.NormalizedEmail == normalizedEmail);
+            user.TenantId == companyId && user.NormalizedEmail == normalizedEmail);
 
         if (admin is null)
         {
             admin = new User
             {
-                TenantId = tenantId,
+                TenantId = companyId,
                 BranchId = branchId,
                 Email = email,
                 FullName = string.IsNullOrWhiteSpace(seed.FullName)
@@ -432,7 +347,7 @@ END;
                 IsActive = true,
                 EmailConfirmed = true
             };
-            admin.UserName = TenantUserName.Create(tenantId, admin.Id);
+            admin.UserName = CompanyUserName.Create(companyId, admin.Id);
 
             var createResult = await userManager.CreateAsync(admin, seed.Password);
             if (!createResult.Succeeded)
@@ -446,9 +361,9 @@ END;
         {
             var changed = false;
 
-            if (admin.TenantId != tenantId)
+            if (admin.TenantId != companyId)
             {
-                admin.TenantId = tenantId;
+                admin.TenantId = companyId;
                 changed = true;
             }
 
@@ -458,9 +373,9 @@ END;
                 changed = true;
             }
 
-            if (TenantUserName.RequiresRepair(admin.UserName))
+            if (CompanyUserName.RequiresRepair(admin.UserName))
             {
-                admin.UserName = TenantUserName.Create(tenantId, admin.Id);
+                admin.UserName = CompanyUserName.Create(companyId, admin.Id);
                 changed = true;
             }
 
@@ -496,14 +411,13 @@ END;
             }
         }
 
-        foreach (var role in new[] { AppRoles.Admin, AppRoles.PlatformAdmin })
+        if (!await userManager.IsInRoleAsync(admin, AppRoles.Admin))
         {
-            if (await userManager.IsInRoleAsync(admin, role)) continue;
-            var addRoleResult = await userManager.AddToRoleAsync(admin, role);
+            var addRoleResult = await userManager.AddToRoleAsync(admin, AppRoles.Admin);
             if (!addRoleResult.Succeeded)
             {
                 throw new InvalidOperationException(
-                    $"Could not assign the {role} role: " +
+                    "Could not assign the Admin role: " +
                     string.Join(" ", addRoleResult.Errors.Select(error => error.Description)));
             }
         }
@@ -519,7 +433,7 @@ END;
 
         foreach (var user in users)
         {
-            user.UserName = TenantUserName.Create(user.TenantId, user.Id);
+            user.UserName = CompanyUserName.Create(user.TenantId, user.Id);
             var result = await userManager.UpdateAsync(user);
             if (!result.Succeeded)
             {

@@ -7,7 +7,7 @@ using ECommerce.Entities.Users;
 using ECommerce.Entities.Users.Contracts;
 using ECommerce.Options;
 using ECommerce.Services.Customers;
-using ECommerce.Services.Tenancy;
+using ECommerce.Services.Company;
 using ECommerce.Shared;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -22,8 +22,8 @@ public sealed class AuthService(
     ApplicationDbContext context,
     IDefaultCustomerTypeResolver defaultCustomerType,
     ICurrentCustomerAccessor currentCustomer,
-    ITenantContext tenantContext,
-    ITenantPermissionService tenantPermissions,
+    ICompanyContext companyContext,
+    ICompanyPermissionService companyPermissions,
     IOptions<JwtOptions> jwtOptions) : IAuthService
 {
     private readonly JwtOptions _jwt = jwtOptions.Value;
@@ -106,10 +106,10 @@ public sealed class AuthService(
             PhoneNumber = phone,
             FullName = string.Join(' ', new[] { firstName, lastName }.Where(value => !string.IsNullOrWhiteSpace(value))),
             IsActive = true,
-            TenantId = tenantContext.TenantId,
-            BranchId = tenantContext.BranchId
+            TenantId = companyContext.CompanyId,
+            BranchId = companyContext.BranchId
         };
-        user.UserName = TenantUserName.Create(user.TenantId, user.Id);
+        user.UserName = CompanyUserName.Create(user.TenantId, user.Id);
 
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         try
@@ -216,14 +216,23 @@ public sealed class AuthService(
         if (phone.Length > 0 && phone.Length < 6)
             throw new ArgumentException("Enter a valid phone number.");
 
-        if (await context.Users.AnyAsync(
+        var emailChanged = !string.Equals(
+            NormalizeEmail(user.Email),
+            email,
+            StringComparison.OrdinalIgnoreCase);
+        var phoneChanged = !string.Equals(
+            NormalizePhone(user.PhoneNumber),
+            phone,
+            StringComparison.Ordinal);
+
+        if (emailChanged && await context.Users.AnyAsync(
                 item => item.Id != user.Id &&
                     item.TenantId == user.TenantId &&
                     item.Email == email,
                 cancellationToken))
             throw new InvalidOperationException("This email address is already in use.");
 
-        if (phone.Length > 0 && await context.Users.AnyAsync(
+        if (phoneChanged && phone.Length > 0 && await context.Users.AnyAsync(
                 item => item.Id != user.Id &&
                     item.TenantId == user.TenantId &&
                     item.PhoneNumber == phone,
@@ -232,8 +241,8 @@ public sealed class AuthService(
 
         user.FullName = fullName;
         user.Email = email;
-        if (TenantUserName.RequiresRepair(user.UserName))
-            user.UserName = TenantUserName.Create(user.TenantId, user.Id);
+        if (CompanyUserName.RequiresRepair(user.UserName))
+            user.UserName = CompanyUserName.Create(user.TenantId, user.Id);
         user.PhoneNumber = phone.Length == 0 ? null : phone;
 
         var result = await userManager.UpdateAsync(user);
@@ -282,7 +291,7 @@ public sealed class AuthService(
         var normalized = value.ToUpperInvariant();
         var phone = NormalizePhone(value);
         return await context.Users.FirstOrDefaultAsync(user =>
-            user.TenantId == tenantContext.TenantId &&
+            user.TenantId == companyContext.CompanyId &&
             (user.NormalizedUserName == normalized ||
              user.NormalizedEmail == normalized ||
              user.PhoneNumber == phone));
@@ -310,11 +319,7 @@ public sealed class AuthService(
             claims.Add(new Claim(AuthClaims.Permission, permission));
         if (authUser.CustomerId.HasValue) claims.Add(new Claim(AuthClaims.CustomerId, authUser.CustomerId.Value.ToString()));
         if (authUser.CustomerTypeId.HasValue) claims.Add(new Claim(AuthClaims.CustomerTypeId, authUser.CustomerTypeId.Value.ToString()));
-        claims.Add(new Claim(AuthClaims.TenantId, user.TenantId.ToString()));
-        claims.Add(new Claim(AuthClaims.TenantSlug, authUser.TenantSlug));
         if (user.BranchId.HasValue) claims.Add(new Claim(AuthClaims.BranchId, user.BranchId.Value.ToString()));
-        if (roles.Contains(AppRoles.PlatformAdmin, StringComparer.OrdinalIgnoreCase))
-            claims.Add(new Claim(AuthClaims.PlatformAdmin, "true"));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Key));
         var token = new JwtSecurityToken(
@@ -334,12 +339,6 @@ public sealed class AuthService(
     {
         var identityClaims = await userManager.GetClaimsAsync(user);
         var permissions = await GetPermissionsAsync(user, roles);
-        var tenantSlug = await context.Tenants
-            .AsNoTracking()
-            .Where(item => item.Id == user.TenantId)
-            .Select(item => item.Slug)
-            .FirstOrDefaultAsync(cancellationToken)
-            ?? tenantContext.TenantSlug;
         var linkedCustomerId = long.TryParse(
             identityClaims.FirstOrDefault(claim => claim.Type == AuthClaims.CustomerId)?.Value,
             out var parsedCustomerId)
@@ -369,21 +368,14 @@ public sealed class AuthService(
             customer?.Id,
             customer?.CustomerTypeId,
             customer?.CustomerType?.Name,
-            roles.Contains(AppRoles.Admin, StringComparer.OrdinalIgnoreCase) ||
-                roles.Contains(AppRoles.PlatformAdmin, StringComparer.OrdinalIgnoreCase) || permissions.Count > 0,
-            user.TenantId,
-            user.BranchId,
-            tenantSlug,
-            roles.Contains(AppRoles.PlatformAdmin, StringComparer.OrdinalIgnoreCase));
+            roles.Contains(AppRoles.Admin, StringComparer.OrdinalIgnoreCase) || permissions.Count > 0,
+            user.BranchId);
     }
 
     private async Task<IReadOnlyCollection<string>> GetPermissionsAsync(
         User user,
         IReadOnlyCollection<string> roles)
     {
-        if (roles.Contains(AppRoles.PlatformAdmin, StringComparer.OrdinalIgnoreCase))
-            return AppPermissions.All.OrderBy(value => value).ToArray();
-
         var permissions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var claim in await userManager.GetClaimsAsync(user))
@@ -404,10 +396,10 @@ public sealed class AuthService(
             }
         }
 
-        var enabledForTenant = (await tenantPermissions.GetTenantPermissionsAsync())
+        var enabledForCompany = (await companyPermissions.GetCompanyPermissionsAsync())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         return permissions
-            .Where(enabledForTenant.Contains)
+            .Where(enabledForCompany.Contains)
             .OrderBy(value => value)
             .ToArray();
     }
@@ -415,7 +407,7 @@ public sealed class AuthService(
     private static string DisplayRoleName(string roleName)
     {
         var separator = roleName.IndexOf(':');
-        return roleName.StartsWith("tenant-", StringComparison.OrdinalIgnoreCase) && separator >= 0
+        return (roleName.StartsWith("company:", StringComparison.OrdinalIgnoreCase) || roleName.StartsWith("tenant-", StringComparison.OrdinalIgnoreCase)) && separator >= 0
             ? roleName[(separator + 1)..]
             : roleName;
     }

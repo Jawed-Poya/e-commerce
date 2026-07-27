@@ -78,6 +78,7 @@ public sealed class OrderItemConfiguration : IEntityTypeConfiguration<OrderItem>
         b.Property(x => x.Currency).HasMaxLength(3).IsRequired();
         b.Property(x => x.Quantity).HasPrecision(18, 3);
         b.Property(x => x.UnitPrice).HasPrecision(18, 2);
+        b.Property(x => x.UnitCost).HasPrecision(18, 4);
         b.Property(x => x.Discount).HasPrecision(18, 2);
         b.Property(x => x.Tax).HasPrecision(18, 2);
         b.ToTable(t => t.HasCheckConstraint("CK_OrderItem_Values", "[Quantity] > 0 AND [UnitPrice] >= 0 AND [Discount] >= 0 AND [Tax] >= 0"));

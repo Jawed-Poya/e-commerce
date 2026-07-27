@@ -122,7 +122,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
             if (applying) return;
             for (const mutation of mutations) {
                 if (mutation.type === "characterData") translateNode(mutation.target);
-                for (const node of mutation.addedNodes) translateNode(node);
+                mutation.addedNodes.forEach((node) => translateNode(node));
                 if (mutation.type === "attributes" && mutation.target instanceof Element) {
                     translateElement(mutation.target);
                 }
