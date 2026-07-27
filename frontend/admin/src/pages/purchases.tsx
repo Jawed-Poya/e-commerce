@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
     CreditCard,
     LoaderCircle,
-    PackagePlus,
+    FileText, PackagePlus,
     Pencil,
     Save,
     Truck,
@@ -58,6 +58,7 @@ import {
     useOperationQuery,
 } from "@/features/operations/operations-hooks";
 import { operationsService } from "@/features/operations/operations-service";
+import { companyService } from "@/features/company/company-service";
 import type {
     DocumentItem,
     Purchase,
@@ -96,6 +97,7 @@ export default function PurchasesPage() {
     const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
     const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
     const [saving, setSaving] = useState(false);
+    const [exportingPdf, setExportingPdf] = useState(false);
     const [items, setItems] = useState<DocumentItem[]>([newDocumentItem()]);
     const [form, setForm] = useState({
         purchaseDate: today(),
@@ -226,14 +228,27 @@ export default function PurchasesPage() {
         }
     };
 
+    const exportPdf = async () => {
+        setExportingPdf(true);
+        try {
+            await companyService.exportOperationalPdf("purchases");
+            toast.success("Purchase PDF generated.");
+        } catch (error) {
+            toast.error(message(error));
+        } finally {
+            setExportingPdf(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <PageHeader
                 title="Purchases"
                 description="Receive inventory, track supplier credit, and settle balances with an auditable payment history."
                 actions={
-                    canManage ? (
-                        <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2">
+                            <Button variant="outline" disabled={exportingPdf} onClick={() => void exportPdf()}>{exportingPdf ? <LoaderCircle className="me-2 size-4 animate-spin" /> : <FileText className="me-2 size-4" />}Export PDF</Button>
+                            {canManage ? <>
                             <Button variant="outline" onClick={() => openSupplier()}>
                                 <Truck className="me-2 size-4" />
                                 New supplier
@@ -242,8 +257,8 @@ export default function PurchasesPage() {
                                 <PackagePlus className="me-2 size-4" />
                                 New purchase
                             </Button>
+                            </> : null}
                         </div>
-                    ) : undefined
                 }
             />
 

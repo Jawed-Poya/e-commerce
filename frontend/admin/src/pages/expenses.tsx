@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { FolderPlus, LoaderCircle, Pencil, Plus, ReceiptText, Save, Tags } from "lucide-react";
+import { FileText, FolderPlus, LoaderCircle, Pencil, Plus, ReceiptText, Save, Tags } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/page-header";
@@ -19,6 +19,7 @@ import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
 import { operationKeys, useOperationQuery } from "@/features/operations/operations-hooks";
 import { operationsService } from "@/features/operations/operations-service";
+import { companyService } from "@/features/company/company-service";
 import type { ExpenseCategory } from "@/features/operations/operations-types";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -33,6 +34,7 @@ export default function ExpensesPage() {
     const [expenseOpen, setExpenseOpen] = useState(false);
     const [categoryOpen, setCategoryOpen] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [exportingPdf, setExportingPdf] = useState(false);
     const [editingCategory, setEditingCategory] = useState<ExpenseCategory | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory | null>(null);
     const [expense, setExpense] = useState({ expenseDate: today(), amount: 0, vendor: "", paymentMethod: "Cash", referenceNumber: "", description: "" });
@@ -58,8 +60,20 @@ export default function ExpensesPage() {
         } catch (error) { toast.error(message(error)); } finally { setSaving(false); }
     };
 
+    const exportPdf = async () => {
+        setExportingPdf(true);
+        try {
+            await companyService.exportOperationalPdf("expenses");
+            toast.success("Expense PDF generated.");
+        } catch (error) {
+            toast.error(message(error));
+        } finally {
+            setExportingPdf(false);
+        }
+    };
+
     return <div className="space-y-6">
-        <PageHeader title="Expenses" description="Expense categories are stored in the shared General Types table under the ExpenseCategory group." actions={canManage ? <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => openCategory()}><FolderPlus className="me-2 size-4" />New category</Button><Button onClick={() => setExpenseOpen(true)}><ReceiptText className="me-2 size-4" />New expense</Button></div> : undefined} />
+        <PageHeader title="Expenses" description="Expense categories are stored in the shared General Types table under the ExpenseCategory group." actions={<div className="flex flex-wrap gap-2"><Button variant="outline" disabled={exportingPdf} onClick={() => void exportPdf()}>{exportingPdf ? <LoaderCircle className="me-2 size-4 animate-spin" /> : <FileText className="me-2 size-4" />}Export PDF</Button>{canManage ? <><Button variant="outline" onClick={() => openCategory()}><FolderPlus className="me-2 size-4" />New category</Button><Button onClick={() => setExpenseOpen(true)}><ReceiptText className="me-2 size-4" />New expense</Button></> : null}</div>} />
         <div className="inline-flex rounded-lg border bg-muted/40 p-1"><Button size="sm" variant={tab === "expenses" ? "default" : "ghost"} onClick={() => setTab("expenses")}><ReceiptText className="me-2 size-4" />Expenses</Button><Button size="sm" variant={tab === "categories" ? "default" : "ghost"} onClick={() => setTab("categories")}><Tags className="me-2 size-4" />Categories</Button></div>
         {tab === "expenses" ? <Card><CardContent className="p-0"><Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Category</TableHead><TableHead>Description</TableHead><TableHead>Vendor</TableHead><TableHead>Method</TableHead><TableHead>Reference</TableHead><TableHead className="text-end">Amount</TableHead></TableRow></TableHeader><TableBody>{isLoading ? <Loading colSpan={7} /> : expenses?.length ? expenses.map((item) => <TableRow key={item.id}><TableCell>{date(item.expenseDate)}</TableCell><TableCell><Badge variant="outline">{item.categoryName}</Badge></TableCell><TableCell className="max-w-md"><p className="truncate">{item.description}</p></TableCell><TableCell>{item.vendor ?? "—"}</TableCell><TableCell>{item.paymentMethod}</TableCell><TableCell>{item.referenceNumber ?? "—"}</TableCell><TableCell className="text-end font-semibold">{money(item.amount)}</TableCell></TableRow>) : <Empty colSpan={7} text="No expenses have been recorded." />}</TableBody></Table></CardContent></Card> : <Card><CardContent className="p-0"><Table><TableHeader><TableRow><TableHead>Category</TableHead><TableHead>Group</TableHead><TableHead>Description</TableHead><TableHead>Status</TableHead><TableHead /></TableRow></TableHeader><TableBody>{categoriesLoading ? <Loading colSpan={5} /> : categories?.length ? categories.map((item) => <TableRow key={item.id}><TableCell className="font-medium">{item.name}</TableCell><TableCell><Badge variant="secondary">ExpenseCategory</Badge></TableCell><TableCell>{item.description ?? "—"}</TableCell><TableCell><Badge variant={item.isActive ? "default" : "outline"}>{item.isActive ? "Active" : "Inactive"}</Badge></TableCell><TableCell>{canManage ? <Button size="icon" variant="ghost" onClick={() => openCategory(item)}><Pencil className="size-4" /></Button> : null}</TableCell></TableRow>) : <Empty colSpan={5} text="No expense categories exist." />}</TableBody></Table></CardContent></Card>}
         <Dialog open={expenseOpen} onOpenChange={setExpenseOpen}><DialogContent className="sm:max-w-2xl"><DialogHeader><DialogTitle>Record expense</DialogTitle><DialogDescription>Add a categorized business cost to the operational ledger.</DialogDescription></DialogHeader><div className="grid gap-4 sm:grid-cols-2"><Field label="Expense date"><Input type="date" value={expense.expenseDate} onChange={(event) => setExpense((x) => ({ ...x, expenseDate: event.target.value }))} /></Field><div className="space-y-2"><Label>Expense category *</Label><Combobox items={categories?.filter((item) => item.isActive) ?? []} value={selectedCategory} onValueChange={(value) => setSelectedCategory((value as ExpenseCategory | null) ?? null)} itemToStringLabel={(item) => item ? (item as ExpenseCategory).name : ""}><ComboboxInput className="w-full" placeholder="Search category…" showClear={Boolean(selectedCategory)} /><ComboboxContent><ComboboxList>{categories?.filter((item) => item.isActive).map((item) => <ComboboxItem key={item.id} value={item}>{item.name}</ComboboxItem>)}</ComboboxList><ComboboxEmpty>No expense category found.</ComboboxEmpty></ComboboxContent></Combobox></div><Field label="Amount *"><Input type="number" min={0.01} step="0.01" value={expense.amount} onChange={(event) => setExpense((x) => ({ ...x, amount: Number(event.target.value) }))} /></Field><Field label="Vendor / paid to"><Input value={expense.vendor} onChange={(event) => setExpense((x) => ({ ...x, vendor: event.target.value }))} /></Field><Field label="Payment method"><SimpleCombobox value={expense.paymentMethod} onValueChange={(value) => setExpense((x) => ({ ...x, paymentMethod: value ?? "Cash" }))} options={["Cash", "Card", "Bank transfer", "Mobile money", "Other"].map((value) => ({ value, label: value }))} placeholder="Select payment method" /></Field><Field label="Reference"><Input value={expense.referenceNumber} onChange={(event) => setExpense((x) => ({ ...x, referenceNumber: event.target.value }))} /></Field><div className="space-y-2 sm:col-span-2"><Label>Description *</Label><Textarea rows={4} value={expense.description} onChange={(event) => setExpense((x) => ({ ...x, description: event.target.value }))} /></div></div><DialogFooter><Button variant="outline" onClick={() => setExpenseOpen(false)}>Cancel</Button><Button onClick={() => void saveExpense()} disabled={saving}>{saving ? <LoaderCircle className="me-2 size-4 animate-spin" /> : <Save className="me-2 size-4" />}Save expense</Button></DialogFooter></DialogContent></Dialog>

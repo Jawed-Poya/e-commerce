@@ -63,12 +63,19 @@ export default function ProfilePage() {
                 email: details.email.trim(),
                 phone: details.phone.trim() || null,
             }),
-        onSuccess: async () => {
-            toast.success("Profile updated successfully.");
-            await queryClient.invalidateQueries({
-                queryKey: ["admin-profile"],
+        onSuccess: (updated) => {
+            queryClient.setQueryData(["admin-profile"], updated);
+            auth.updateUser({
+                fullName: updated.fullName,
+                email: updated.email,
+                phone: updated.phone,
             });
-            await auth.refresh();
+            setDetails({
+                fullName: updated.fullName,
+                email: updated.email ?? "",
+                phone: updated.phone ?? "",
+            });
+            toast.success("Profile updated successfully.");
         },
         onError: (error) => toast.error(errorMessage(error)),
     });
@@ -95,6 +102,14 @@ export default function ProfilePage() {
         },
         onError: (error) => toast.error(errorMessage(error)),
     });
+
+    const profileChanged = Boolean(
+        profile.data &&
+            (details.fullName.trim() !== profile.data.fullName ||
+                details.email.trim().toLowerCase() !== (profile.data.email ?? "").trim().toLowerCase() ||
+                details.phone.trim() !== (profile.data.phone ?? "").trim()),
+    );
+    const profileValid = details.fullName.trim().length > 0 && details.email.trim().includes("@");
 
     const initials = useMemo(
         () =>
@@ -247,7 +262,7 @@ export default function ProfilePage() {
                             <div className="flex justify-end md:col-span-2">
                                 <Button
                                     onClick={() => saveProfile.mutate()}
-                                    disabled={saveProfile.isPending}
+                                    disabled={saveProfile.isPending || !profileChanged || !profileValid}
                                 >
                                     {saveProfile.isPending && (
                                         <LoaderCircle className="animate-spin" />

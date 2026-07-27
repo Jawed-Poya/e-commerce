@@ -25,8 +25,7 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
         UpdateCompanyProfileRequest request,
         CancellationToken cancellationToken = default)
     {
-        var company = await context.Tenants.SingleOrDefaultAsync(item => item.Id == companyContext.CompanyId, cancellationToken)
-            ?? throw new KeyNotFoundException("Company profile was not found.");
+        var company = await LoadTrackedAsync(cancellationToken);
 
         company.Name = Required(request.Name, "Company name");
         company.LegalName = Clean(request.LegalName);
@@ -38,7 +37,7 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
         company.FaviconUrl = Clean(request.FaviconUrl);
         company.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync(cancellationToken);
-        return await GetProfileAsync(cancellationToken);
+        return Map(company);
     }
 
     public async Task<CompanyProfileResponse> UpdateSettingsAsync(
@@ -46,23 +45,23 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
         CancellationToken cancellationToken = default)
     {
         ValidateSettings(request);
-        var settings = await context.TenantSettings.SingleOrDefaultAsync(
-            item => item.TenantId == companyContext.CompanyId,
-            cancellationToken);
+        var company = await LoadTrackedAsync(cancellationToken);
+        var settings = company.Setting;
         if (settings is null)
         {
-            settings = DefaultSettings(companyContext.CompanyId);
+            settings = DefaultSettings(company.Id);
+            company.Setting = settings;
             context.TenantSettings.Add(settings);
         }
 
-        settings.MainCurrencyCode = request.MainCurrencyCode.Trim().ToUpperInvariant();
-        settings.CurrencySymbol = request.CurrencySymbol.Trim();
-        settings.CurrencyPosition = request.CurrencyPosition.Trim().ToLowerInvariant();
+        settings.MainCurrencyCode = Required(request.MainCurrencyCode, "Currency code").ToUpperInvariant();
+        settings.CurrencySymbol = Clean(request.CurrencySymbol) ?? settings.MainCurrencyCode;
+        settings.CurrencyPosition = Required(request.CurrencyPosition, "Currency position").ToLowerInvariant();
         settings.CurrencyDecimalPlaces = request.CurrencyDecimalPlaces;
-        settings.AdminPrimaryColor = request.AdminPrimaryColor.Trim();
-        settings.AdminSecondaryColor = request.AdminSecondaryColor.Trim();
-        settings.StorefrontPrimaryColor = request.StorefrontPrimaryColor.Trim();
-        settings.StorefrontSecondaryColor = request.StorefrontSecondaryColor.Trim();
+        settings.AdminPrimaryColor = Required(request.AdminPrimaryColor, "Admin primary color");
+        settings.AdminSecondaryColor = Required(request.AdminSecondaryColor, "Admin secondary color");
+        settings.StorefrontPrimaryColor = Required(request.StorefrontPrimaryColor, "Storefront primary color");
+        settings.StorefrontSecondaryColor = Required(request.StorefrontSecondaryColor, "Storefront secondary color");
         settings.EnglishFontFamily = Required(request.EnglishFontFamily, "English font");
         settings.DariFontFamily = Required(request.DariFontFamily, "Dari font");
         settings.PashtoFontFamily = Required(request.PashtoFontFamily, "Pashto font");
@@ -72,7 +71,7 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
         settings.AllowTenantUserClaimManagement = request.AllowUserClaimManagement;
         settings.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync(cancellationToken);
-        return await GetProfileAsync(cancellationToken);
+        return Map(company);
     }
 
     public async Task<CompanyBranchResponse> CreateBranchAsync(
@@ -133,6 +132,13 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
 
     private async Task<Tenant> LoadAsync(CancellationToken cancellationToken) =>
         await context.Tenants.AsNoTracking()
+            .Include(item => item.Setting)
+            .Include(item => item.Branches)
+            .SingleOrDefaultAsync(item => item.Id == companyContext.CompanyId, cancellationToken)
+            ?? throw new KeyNotFoundException("Company profile was not found.");
+
+    private async Task<Tenant> LoadTrackedAsync(CancellationToken cancellationToken) =>
+        await context.Tenants
             .Include(item => item.Setting)
             .Include(item => item.Branches)
             .SingleOrDefaultAsync(item => item.Id == companyContext.CompanyId, cancellationToken)

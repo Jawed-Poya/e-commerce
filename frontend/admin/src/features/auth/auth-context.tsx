@@ -29,6 +29,7 @@ type AuthContextValue = {
     login: (request: LoginRequest) => Promise<void>;
     logout: () => void;
     refresh: () => Promise<void>;
+    updateUser: (changes: Partial<Pick<AuthUser, "fullName" | "email" | "phone">>) => void;
 };
 
 type ValidateSessionOptions = {
@@ -179,6 +180,19 @@ export function AdminAuthProvider({ children }: PropsWithChildren) {
             );
     }, [validateSession]);
 
+
+    const updateUser = useCallback(
+        (changes: Partial<Pick<AuthUser, "fullName" | "email" | "phone">>) => {
+            setUser((current) => {
+                if (!current) return current;
+                const updated = { ...current, ...changes };
+                localStorage.setItem(adminSessionKey, JSON.stringify(updated));
+                return updated;
+            });
+        },
+        [],
+    );
+
     const login = useCallback(
         async (request: LoginRequest) => {
             const response = await authService.login(request);
@@ -227,8 +241,9 @@ export function AdminAuthProvider({ children }: PropsWithChildren) {
             login,
             logout,
             refresh,
+            updateUser,
         }),
-        [loading, login, logout, refresh, user],
+        [loading, login, logout, refresh, updateUser, user],
     );
 
     return (

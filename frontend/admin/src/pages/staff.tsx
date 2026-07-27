@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Banknote, CreditCard, LoaderCircle, Pencil, Save, Trash2, UserRoundPlus, UsersRound } from "lucide-react";
+import { Banknote, CreditCard, FileText, LoaderCircle, Pencil, Save, Trash2, UserRoundPlus, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConfirmActionDialog } from "@/components/confirm-action-dialog";
@@ -20,6 +20,7 @@ import { hasPermission, Permissions } from "@/features/auth/permissions";
 import { PaymentBadge, PaymentLedgerDialog } from "@/features/operations/components/payment-ledger-dialog";
 import { operationKeys, useOperationQuery } from "@/features/operations/operations-hooks";
 import { operationsService } from "@/features/operations/operations-service";
+import { companyService } from "@/features/company/company-service";
 import type { SalaryPayment, Staff } from "@/features/operations/operations-types";
 
 import { useI18n } from "@/i18n/i18n-provider";
@@ -42,6 +43,7 @@ export default function StaffPage() {
     const [staffOpen, setStaffOpen] = useState(false);
     const [salaryOpen, setSalaryOpen] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [exportingPdf, setExportingPdf] = useState(false);
     const [deleting, setDeleting] = useState<number | null>(null);
     const [editing, setEditing] = useState<Staff | null>(null);
     const [selectedSalary, setSelectedSalary] = useState<SalaryPayment | null>(null);
@@ -74,8 +76,20 @@ export default function StaffPage() {
         } catch (error) { toast.error(message(error)); } finally { setSaving(false); }
     };
 
+    const exportPayrollPdf = async () => {
+        setExportingPdf(true);
+        try {
+            await companyService.exportOperationalPdf("payroll");
+            toast.success("Payroll PDF generated.");
+        } catch (error) {
+            toast.error(message(error));
+        } finally {
+            setExportingPdf(false);
+        }
+    };
+
     return <div className="space-y-6">
-        <PageHeader title="Staff and payroll" description="Maintain staff profiles and monthly salary obligations with partial-payment history." actions={canManagePayroll || canManageStaff ? <div className="flex flex-wrap gap-2">{canManagePayroll ? <Button variant="outline" onClick={() => setSalaryOpen(true)}><Banknote className="me-2 size-4" />Create salary</Button> : null}{canManageStaff ? <Button onClick={openCreate}><UserRoundPlus className="me-2 size-4" />New staff</Button> : null}</div> : undefined} />
+        <PageHeader title="Staff and payroll" description="Maintain staff profiles and monthly salary obligations with partial-payment history." actions={<div className="flex flex-wrap gap-2">{canViewPayroll ? <Button variant="outline" disabled={exportingPdf} onClick={() => void exportPayrollPdf()}>{exportingPdf ? <LoaderCircle className="me-2 size-4 animate-spin" /> : <FileText className="me-2 size-4" />}Export payroll PDF</Button> : null}{canManagePayroll ? <Button variant="outline" onClick={() => setSalaryOpen(true)}><Banknote className="me-2 size-4" />Create salary</Button> : null}{canManageStaff ? <Button onClick={openCreate}><UserRoundPlus className="me-2 size-4" />New staff</Button> : null}</div>} />
         <div className="inline-flex rounded-lg border bg-muted/40 p-1"><Button size="sm" variant={tab === "staff" ? "default" : "ghost"} onClick={() => setTab("staff")}><UsersRound className="me-2 size-4" />Staff</Button>{canViewPayroll ? <Button size="sm" variant={tab === "salary" ? "default" : "ghost"} onClick={() => setTab("salary")}><Banknote className="me-2 size-4" />Payroll</Button> : null}</div>
         {tab === "staff" ? <Card><CardContent className="p-0"><Table><TableHeader><TableRow><TableHead>Employee</TableHead><TableHead>Position</TableHead><TableHead>Department</TableHead><TableHead>Contact</TableHead><TableHead className="text-end">Base salary</TableHead><TableHead>Status</TableHead><TableHead /></TableRow></TableHeader><TableBody>{isLoading ? <Loading colSpan={7} /> : staff?.length ? staff.map((item) => <TableRow key={item.id}><TableCell><p className="font-medium">{item.fullName}</p><p className="text-xs text-muted-foreground">{item.employeeNumber}</p></TableCell><TableCell>{item.position ?? "—"}</TableCell><TableCell>{item.department ?? "—"}</TableCell><TableCell>{item.phone ?? "—"}<p className="text-xs text-muted-foreground">{item.email}</p></TableCell><TableCell className="text-end">{money(item.baseSalary)}</TableCell><TableCell><Badge variant={item.isActive ? "default" : "outline"}>{item.isActive ? "Active" : "Inactive"}</Badge></TableCell><TableCell>{canManageStaff ? <div className="flex justify-end"><Button size="icon" variant="ghost" onClick={() => openEdit(item)}><Pencil className="size-4" /></Button><ConfirmActionDialog trigger={<Button size="icon" variant="ghost"><Trash2 className="size-4 text-destructive" /></Button>} title="Archive staff member?" description="The profile becomes inactive while salary history remains available." confirmLabel="Archive staff" destructive pending={deleting === item.id} onConfirm={() => remove(item.id)} /></div> : null}</TableCell></TableRow>) : <Empty colSpan={7} text="No staff members have been added." />}</TableBody></Table></CardContent></Card> : <Card><CardContent className="p-0"><Table><TableHeader><TableRow><TableHead>Staff</TableHead><TableHead>Period</TableHead><TableHead className="text-end">Net salary</TableHead><TableHead className="text-end">Paid</TableHead><TableHead className="text-end">Balance</TableHead><TableHead>Status</TableHead><TableHead>Opening date</TableHead><TableHead /></TableRow></TableHeader><TableBody>{salariesLoading ? <Loading colSpan={8} /> : salaries?.length ? salaries.map((item) => <TableRow key={item.id}><TableCell className="font-medium">{item.staffName}</TableCell><TableCell>{monthName(item.periodMonth, locale)} {item.periodYear}</TableCell><TableCell className="text-end">{money(item.netAmount)}</TableCell><TableCell className="text-end">{money(item.paidAmount)}</TableCell><TableCell className="text-end">{money(item.remainingAmount)}</TableCell><TableCell><PaymentBadge status={item.paymentStatus} /></TableCell><TableCell>{date(item.paidDate)}</TableCell><TableCell><Button size="sm" variant="outline" onClick={() => setSelectedSalary(item)}><CreditCard className="me-2 size-4" />Payments</Button></TableCell></TableRow>) : <Empty colSpan={8} text="No salary obligations have been created." />}</TableBody></Table></CardContent></Card>}
 

@@ -92,10 +92,15 @@ public sealed class AdminUserService(
     {
         ValidateUser(request.FullName, request.Email, request.Password);
         var email = request.Email.Trim().ToLowerInvariant();
+        var phone = Clean(request.Phone);
         if (await context.Users.AnyAsync(user =>
                 user.TenantId == companyContext.CompanyId && user.Email == email,
                 cancellationToken))
             throw new InvalidOperationException("A user with this email already exists in this company.");
+        if (phone is not null && await context.Users.AnyAsync(user =>
+                user.TenantId == companyContext.CompanyId && user.PhoneNumber == phone,
+                cancellationToken))
+            throw new InvalidOperationException("A user with this phone number already exists in this company.");
         await ValidateBranchAsync(request.BranchId, cancellationToken);
 
         var user = new User
@@ -105,7 +110,7 @@ public sealed class AdminUserService(
             FullName = request.FullName.Trim(),
             Email = email,
             EmailConfirmed = true,
-            PhoneNumber = Clean(request.Phone),
+            PhoneNumber = phone,
             IsActive = request.IsActive
         };
         user.UserName = CompanyUserName.Create(user.TenantId, user.Id);
@@ -141,10 +146,17 @@ public sealed class AdminUserService(
             throw new InvalidOperationException("You cannot deactivate your own account.");
 
         var email = request.Email.Trim().ToLowerInvariant();
-        if (await context.Users.AnyAsync(item =>
+        var phone = Clean(request.Phone);
+        var emailChanged = !string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase);
+        var phoneChanged = !string.Equals(user.PhoneNumber, phone, StringComparison.Ordinal);
+        if (emailChanged && await context.Users.AnyAsync(item =>
                 item.Id != id && item.TenantId == user.TenantId && item.Email == email,
                 cancellationToken))
             throw new InvalidOperationException("A user with this email already exists in this company.");
+        if (phoneChanged && phone is not null && await context.Users.AnyAsync(item =>
+                item.Id != id && item.TenantId == user.TenantId && item.PhoneNumber == phone,
+                cancellationToken))
+            throw new InvalidOperationException("A user with this phone number already exists in this company.");
         await ValidateBranchAsync(request.BranchId, cancellationToken);
 
         user.FullName = request.FullName.Trim();
@@ -153,7 +165,7 @@ public sealed class AdminUserService(
             user.UserName = CompanyUserName.Create(user.TenantId, user.Id);
         user.NormalizedEmail = userManager.NormalizeEmail(email);
         user.NormalizedUserName = userManager.NormalizeName(user.UserName);
-        user.PhoneNumber = Clean(request.Phone);
+        user.PhoneNumber = phone;
         user.IsActive = request.IsActive;
         user.BranchId = request.BranchId;
 

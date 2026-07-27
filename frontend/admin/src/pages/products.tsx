@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Eye, ImagePlus, LoaderCircle, Pencil, Plus, Search, SlidersHorizontal, X } from "lucide-react";
+import { Eye, FileText, ImagePlus, LoaderCircle, Pencil, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -19,6 +19,7 @@ import { productService, resolveProductImageUrl, type BulkUpdateProduct, type Pr
 import { productKeys } from "@/keys/product-keys";
 import { useI18n } from "@/i18n/i18n-provider";
 import { PageHeader } from "@/components/page-header";
+import { companyService } from "@/features/company/company-service";
 import { ProductSectionNavigation } from "@/features/products/components/product-section-navigation";
 import { ProductFiltersDialog, type AppliedProductFilters } from "@/features/products/components/product-filters-dialog";
 import { ProductPagination } from "@/features/products/components/product-pagination";
@@ -62,6 +63,7 @@ export default function ProductsPage() {
     const [drafts, setDrafts] = useState<BulkUpdateProduct[]>([]);
     const [open, setOpen] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [exportingPdf, setExportingPdf] = useState(false);
     const [activeEditor, setActiveEditor] = useState(0);
     const { data, isLoading, isError, isFetching } = useProducts({ ...filters, search: search || undefined, page, pageSize });
     const { data: lookups } = useProductLookupsQuery();
@@ -128,6 +130,18 @@ export default function ProductsPage() {
         } finally { setSaving(false); }
     };
 
+    const exportPdf = async () => {
+        setExportingPdf(true);
+        try {
+            await companyService.exportOperationalPdf("products", { search: search || undefined });
+            toast.success("Product PDF generated.");
+        } catch (error) {
+            toast.error(getUpdateErrorMessage(error, { connection: "Could not connect to the PDF service.", endpoint: "The product PDF endpoint is unavailable.", failed: "Product PDF could not be generated." }));
+        } finally {
+            setExportingPdf(false);
+        }
+    };
+
     const deleteSelected = async () => {
         try {
             await productService.deleteMany(selected);
@@ -144,6 +158,7 @@ export default function ProductsPage() {
 
     return <div className="space-y-6">
         <PageHeader title={t("products.title")} description={t("products.subtitle")} actions={<>
+                <Button variant="outline" disabled={exportingPdf} onClick={() => void exportPdf()}>{exportingPdf ? <LoaderCircle className="me-2 size-4 animate-spin" /> : <FileText className="me-2 size-4" />}Export PDF</Button>
                 {selected.length > 0 && <Button variant="outline" onClick={() => void editProducts(selectedProducts)}><Pencil className="me-2 size-4" />{t("products.updateSelected")} ({selected.length})</Button>}
                 {selected.length > 0 && <DeleteButton id="selected-products" onDelete={deleteSelected} triggerLabel={`${t("products.deleteSelected")} (${selected.length})`} title={t("products.deleteTitle")} description={t("products.deleteDescription")} cancelLabel={t("form.cancel")} confirmLabel={t("products.confirmDelete")} loadingLabel={t("products.deleting")} />}
                 <Button onClick={() => navigate("/products/new")}><Plus className="me-2 size-4" />New product</Button>

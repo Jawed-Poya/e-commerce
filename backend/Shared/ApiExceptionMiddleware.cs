@@ -23,6 +23,7 @@ public sealed class ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExce
                 KeyNotFoundException => (StatusCodes.Status404NotFound, exception.Message, LogLevel.Information),
                 ArgumentException => (StatusCodes.Status400BadRequest, exception.Message, LogLevel.Information),
                 DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "The record changed while you were editing it. Refresh and try again.", LogLevel.Warning),
+                OperationCanceledException => (StatusCodes.Status408RequestTimeout, "The request took too long and was cancelled. Please try again.", LogLevel.Warning),
                 InvalidOperationException => (StatusCodes.Status409Conflict, exception.Message, LogLevel.Warning),
                 _ => (StatusCodes.Status500InternalServerError, "An unexpected server error occurred.", LogLevel.Error)
             };
@@ -33,7 +34,7 @@ public sealed class ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExce
             context.Response.Clear();
             context.Response.StatusCode = status;
             context.Response.ContentType = "application/json";
-            await context.Response.WriteAsJsonAsync(ApiResponse<object>.Fail(message), context.RequestAborted);
+            await context.Response.WriteAsJsonAsync(ApiResponse<object>.Fail(message), CancellationToken.None);
         }
     }
 }

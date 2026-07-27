@@ -10,12 +10,13 @@ export function PermissionRoute({
     permission,
     children,
 }: {
-    permission: string;
+    permission: string | readonly string[];
     children: React.ReactNode;
 }) {
     const { user } = useAdminAuth();
     const { t } = useI18n();
-    if (hasPermission(user, permission)) return children;
+    const permissions = typeof permission === "string" ? [permission] : permission;
+    if (permissions.some((value) => hasPermission(user, value))) return children;
 
     return (
         <div className="grid min-h-[65vh] place-items-center p-6 text-center">
@@ -25,7 +26,7 @@ export function PermissionRoute({
                 </span>
                 <h1 className="mt-5 text-2xl font-bold">{t("access.required")}</h1>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {t("access.descriptionBefore")} <code>{permission}</code>. {t("access.descriptionAfter")}
+                    {t("access.descriptionBefore")} <code>{permissions.join(" / ")}</code>. {t("access.descriptionAfter")}
                 </p>
                 <Link
                     to={getDefaultAdminRoute(

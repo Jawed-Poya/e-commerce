@@ -74,7 +74,8 @@ public sealed class ReceiptsController(IFinancialDocumentService documents) : Co
             _ => null
         };
 
-        return permission is not null && User.HasClaim(AuthClaims.Permission, permission);
+        return permission is not null &&
+            (User.IsInRole(AppRoles.Admin) || User.HasClaim(AuthClaims.Permission, permission));
     }
 
     private static string SafeFileName(string value)

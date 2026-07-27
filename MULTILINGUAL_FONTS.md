@@ -1,6 +1,6 @@
 # Multilingual UI fonts
 
-The admin application and storefront apply a language-specific font stack automatically from the active language and the tenant's **Company Settings → Appearance** preferences.
+The admin application and storefront apply a language-specific font stack automatically from the active language and the company's **Company Settings → Appearance** preferences.
 
 ## Bundled fonts
 
