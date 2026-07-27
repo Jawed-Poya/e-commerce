@@ -52,6 +52,10 @@ export const companyService = {
         format: "excel" | "pdf",
         params: { startDate?: string; endDate?: string; currencyCode?: string },
     ) => apiClient.download(`/admin/reports/customers/${customerId}/ledger/export/${format}`, params),
+    exportOperationalPdf: (
+        document: "products" | "sales" | "purchases" | "payroll" | "expenses",
+        params?: { startDate?: string; endDate?: string; branchId?: string | number; currencyCode?: string; search?: string },
+    ) => apiClient.download(`/admin/documents/${document}/pdf`, params),
     trash: async (params?: Record<string, unknown>) =>
         (await apiClient.get<TrashItem[]>("/admin/trash", params)).data,
     restoreTrash: async (id: number) => apiClient.post(`/admin/trash/${id}/restore`),

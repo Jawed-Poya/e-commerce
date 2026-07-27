@@ -16,6 +16,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { companyService, type UpsertCompanyBranch, type UpdateCompanyProfile } from "@/features/company/company-service";
 import type { CompanyBranch, CompanySettings } from "@/features/company/company-types";
 import { useCompany } from "@/features/company/company-context";
+import { useAdminAuth } from "@/features/auth/auth-context";
+import { hasPermission, Permissions } from "@/features/auth/permissions";
 
 const emptyBranch: UpsertCompanyBranch = {
     name: "",
@@ -28,7 +30,11 @@ const emptyBranch: UpsertCompanyBranch = {
 
 export default function CompanySettingsPage() {
     const queryClient = useQueryClient();
+    const { user } = useAdminAuth();
     const { formatMoney } = useCompany();
+    const canManageProfile = hasPermission(user, Permissions.CompanyProfileManage);
+    const canManageSettings = hasPermission(user, Permissions.CompanySettingsManage);
+    const canManageBranches = hasPermission(user, Permissions.CompanyBranchesManage);
     const profileQuery = useQuery({ queryKey: ["company", "profile"], queryFn: companyService.profile });
     const [profile, setProfile] = useState<UpdateCompanyProfile | null>(null);
     const [settings, setSettings] = useState<CompanySettings | null>(null);
@@ -52,26 +58,42 @@ export default function CompanySettingsPage() {
         setSettings(value.settings);
     }, [profileQuery.data]);
 
-    const refresh = async () => {
+    const applyCompany = (updated: NonNullable<typeof profileQuery.data>) => {
+        queryClient.setQueryData(["company", "profile"], updated);
+        setProfile({
+            name: updated.name,
+            legalName: updated.legalName,
+            registrationNumber: updated.registrationNumber,
+            email: updated.email,
+            phone: updated.phone,
+            address: updated.address,
+            logoUrl: updated.logoUrl,
+            faviconUrl: updated.faviconUrl,
+        });
+        setSettings(updated.settings);
+        void queryClient.invalidateQueries({ queryKey: ["company", "public-profile"] });
+    };
+
+    const refreshCompany = async () => {
         await Promise.all([
-            queryClient.invalidateQueries({ queryKey: ["company"] }),
+            queryClient.invalidateQueries({ queryKey: ["company", "profile"] }),
             queryClient.invalidateQueries({ queryKey: ["company", "public-profile"] }),
         ]);
     };
 
     const saveProfile = useMutation({
         mutationFn: companyService.updateProfile,
-        onSuccess: async () => {
+        onSuccess: (updated) => {
+            applyCompany(updated);
             toast.success("Company profile updated.");
-            await refresh();
         },
         onError: (error) => toast.error(message(error)),
     });
     const saveSettings = useMutation({
         mutationFn: companyService.updateSettings,
-        onSuccess: async () => {
+        onSuccess: (updated) => {
+            applyCompany(updated);
             toast.success("Company settings updated.");
-            await refresh();
         },
         onError: (error) => toast.error(message(error)),
     });
@@ -82,7 +104,7 @@ export default function CompanySettingsPage() {
         onSuccess: async () => {
             toast.success(editingBranch ? "Branch updated." : "Branch created.");
             setBranchDialog(false);
-            await refresh();
+            await refreshCompany();
         },
         onError: (error) => toast.error(message(error)),
     });
@@ -99,6 +121,30 @@ export default function CompanySettingsPage() {
         } : emptyBranch);
         setBranchDialog(true);
     };
+
+    const savedProfile = profileQuery.data
+        ? {
+              name: profileQuery.data.name,
+              legalName: profileQuery.data.legalName,
+              registrationNumber: profileQuery.data.registrationNumber,
+              email: profileQuery.data.email,
+              phone: profileQuery.data.phone,
+              address: profileQuery.data.address,
+              logoUrl: profileQuery.data.logoUrl,
+              faviconUrl: profileQuery.data.faviconUrl,
+          }
+        : null;
+    const profileChanged = Boolean(savedProfile && JSON.stringify(profile) !== JSON.stringify(savedProfile));
+    const settingsChanged = Boolean(profileQuery.data && JSON.stringify(settings) !== JSON.stringify(profileQuery.data.settings));
+    const previewMoney = new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: settings?.currencyDecimalPlaces ?? 2,
+        maximumFractionDigits: settings?.currencyDecimalPlaces ?? 2,
+    }).format(123456.78);
+    const moneyPreview = settings
+        ? settings.currencyPosition === "after"
+            ? `${previewMoney} ${settings.currencySymbol || settings.mainCurrencyCode}`
+            : `${settings.currencySymbol || settings.mainCurrencyCode} ${previewMoney}`
+        : formatMoney(123456.78);
 
     if (profileQuery.isLoading || !profile || !settings) {
         return <div className="grid min-h-[60vh] place-items-center"><LoaderCircle className="size-7 animate-spin text-primary" /></div>;
@@ -128,6 +174,7 @@ export default function CompanySettingsPage() {
                                 saveProfile.mutate(profile);
                             }}
                         >
+                            <fieldset disabled={!canManageProfile} className="contents">
                             <Field label="Company name"><Input required value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} /></Field>
                             <Field label="Legal name"><Input value={profile.legalName ?? ""} onChange={(event) => setProfile({ ...profile, legalName: nullable(event.target.value) })} /></Field>
                             <Field label="Registration number"><Input value={profile.registrationNumber ?? ""} onChange={(event) => setProfile({ ...profile, registrationNumber: nullable(event.target.value) })} /></Field>
@@ -136,7 +183,11 @@ export default function CompanySettingsPage() {
                             <Field label="Logo URL"><Input value={profile.logoUrl ?? ""} onChange={(event) => setProfile({ ...profile, logoUrl: nullable(event.target.value) })} /></Field>
                             <Field label="Favicon URL"><Input value={profile.faviconUrl ?? ""} onChange={(event) => setProfile({ ...profile, faviconUrl: nullable(event.target.value) })} /></Field>
                             <div className="space-y-2 sm:col-span-2"><Label>Address</Label><Textarea value={profile.address ?? ""} onChange={(event) => setProfile({ ...profile, address: nullable(event.target.value) })} /></div>
-                            <div className="sm:col-span-2 flex justify-end"><Button disabled={saveProfile.isPending}><Save />{saveProfile.isPending ? "Saving…" : "Save profile"}</Button></div>
+                            <div className="sm:col-span-2 flex items-center justify-between gap-3">
+                                {!canManageProfile && <p className="text-xs text-muted-foreground">You can view this profile but cannot edit it.</p>}
+                                <Button className="ms-auto" disabled={saveProfile.isPending || !profileChanged || !profile.name.trim()}><Save />{saveProfile.isPending ? "Saving…" : "Save profile"}</Button>
+                            </div>
+                            </fieldset>
                         </form>
                     </CardContent>
                 </Card>
@@ -145,7 +196,7 @@ export default function CompanySettingsPage() {
                     <CardHeader className="border-b bg-muted/20">
                         <div className="flex items-center justify-between gap-3">
                             <div><CardTitle className="flex items-center gap-2"><MapPin className="size-5 text-primary" /> Branches</CardTitle><p className="mt-1 text-xs text-muted-foreground">Use branches for stock, users, sales, and filtered reports.</p></div>
-                            <Button size="sm" onClick={() => openBranch()}><Plus /> Add</Button>
+                            <Button size="sm" disabled={!canManageBranches} onClick={() => openBranch()}><Plus /> Add</Button>
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-3 p-4">
@@ -156,7 +207,7 @@ export default function CompanySettingsPage() {
                                         <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{item.name}</span><Badge variant="secondary">{item.code}</Badge>{item.isMain && <Badge>Main</Badge>}{!item.isActive && <Badge variant="outline">Inactive</Badge>}</div>
                                         <p className="mt-2 text-xs text-muted-foreground">{item.phone || "No phone"} · {item.address || "No address"}</p>
                                     </div>
-                                    <Button variant="ghost" size="icon-sm" onClick={() => openBranch(item)}><Pencil className="size-4" /></Button>
+                                    <Button variant="ghost" size="icon-sm" disabled={!canManageBranches} onClick={() => openBranch(item)}><Pencil className="size-4" /></Button>
                                 </div>
                             </div>
                         ))}
@@ -174,6 +225,7 @@ export default function CompanySettingsPage() {
                             saveSettings.mutate(settings);
                         }}
                     >
+                        <fieldset disabled={!canManageSettings} className="space-y-6">
                         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
                             <Field label="Main currency"><Input maxLength={3} value={settings.mainCurrencyCode} onChange={(event) => setSettings({ ...settings, mainCurrencyCode: event.target.value.toUpperCase() })} /></Field>
                             <Field label="Currency symbol"><Input value={settings.currencySymbol} onChange={(event) => setSettings({ ...settings, currencySymbol: event.target.value })} /></Field>
@@ -181,7 +233,7 @@ export default function CompanySettingsPage() {
                             <Field label="Decimal places"><Input type="number" min={0} max={4} value={settings.currencyDecimalPlaces} onChange={(event) => setSettings({ ...settings, currencyDecimalPlaces: Number(event.target.value) })} /></Field>
                         </div>
 
-                        <div className="rounded-xl border bg-muted/20 p-4"><p className="text-sm font-semibold">Money preview</p><p className="mt-2 text-2xl font-bold tabular-nums text-primary">{formatMoney(123456.78, settings.mainCurrencyCode)}</p></div>
+                        <div className="rounded-xl border bg-muted/20 p-4"><p className="text-sm font-semibold">Money preview</p><p className="mt-2 text-2xl font-bold tabular-nums text-primary">{moneyPreview}</p></div>
 
                         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
                             <ColorField label="Admin primary" value={settings.adminPrimaryColor} onChange={(value) => setSettings({ ...settings, adminPrimaryColor: value })} />
@@ -199,7 +251,11 @@ export default function CompanySettingsPage() {
                             <Field label="Notification retention days"><Input type="number" min={1} max={3650} value={settings.notificationRetentionDays} onChange={(event) => setSettings({ ...settings, notificationRetentionDays: Number(event.target.value) })} /></Field>
                             <div className="flex items-center justify-between gap-4 rounded-xl border p-4 sm:col-span-2"><div><p className="text-sm font-semibold">Allow permission assignment</p><p className="mt-1 text-xs text-muted-foreground">Administrators can assign permissions they already hold.</p></div><Switch checked={settings.allowUserClaimManagement} onCheckedChange={(checked) => setSettings({ ...settings, allowUserClaimManagement: checked })} /></div>
                         </div>
-                        <div className="flex justify-end"><Button disabled={saveSettings.isPending}><Save />{saveSettings.isPending ? "Saving…" : "Save settings"}</Button></div>
+                        <div className="flex items-center justify-between gap-3">
+                            {!canManageSettings && <p className="text-xs text-muted-foreground">You can view these settings but cannot edit them.</p>}
+                            <Button className="ms-auto" disabled={saveSettings.isPending || !settingsChanged}><Save />{saveSettings.isPending ? "Saving…" : "Save settings"}</Button>
+                        </div>
+                        </fieldset>
                     </form>
                 </CardContent>
             </Card>
@@ -215,7 +271,7 @@ export default function CompanySettingsPage() {
                         <Toggle label="Main branch" description="Use this as the default location." checked={branch.isMain} onCheckedChange={(checked) => setBranch({ ...branch, isMain: checked, isActive: checked ? true : branch.isActive })} />
                         <Toggle label="Active" description="Allow operations in this branch." checked={branch.isActive} onCheckedChange={(checked) => setBranch({ ...branch, isActive: checked })} />
                     </div>
-                    <DialogFooter><Button variant="outline" onClick={() => setBranchDialog(false)}>Cancel</Button><Button disabled={saveBranch.isPending || !branch.name.trim() || !branch.code.trim()} onClick={() => saveBranch.mutate()}>{saveBranch.isPending ? <LoaderCircle className="animate-spin" /> : <Save />} Save branch</Button></DialogFooter>
+                    <DialogFooter><Button variant="outline" onClick={() => setBranchDialog(false)}>Cancel</Button><Button disabled={!canManageBranches || saveBranch.isPending || !branch.name.trim() || !branch.code.trim()} onClick={() => saveBranch.mutate()}>{saveBranch.isPending ? <LoaderCircle className="animate-spin" /> : <Save />} Save branch</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>

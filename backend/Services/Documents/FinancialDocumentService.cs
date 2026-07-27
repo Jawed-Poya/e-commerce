@@ -1,8 +1,10 @@
+using System.Globalization;
 using ClosedXML.Excel;
 using ECommerce.Data;
 using ECommerce.Dtos.Documents;
 using ECommerce.Dtos.Reports;
 using ECommerce.Entities.Operations;
+using ECommerce.Services.Company;
 using Microsoft.EntityFrameworkCore;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -12,7 +14,7 @@ using PaymentStatus = API.Entities.Orders.PaymentStatus;
 
 namespace ECommerce.Services.Documents;
 
-public sealed class FinancialDocumentService(ApplicationDbContext context) : IFinancialDocumentService
+public sealed class FinancialDocumentService(ApplicationDbContext context, ICompanyContext companyContext) : IFinancialDocumentService
 {
     private const string Navy = "#0F172A";
     private const string Slate = "#475569";
@@ -22,9 +24,10 @@ public sealed class FinancialDocumentService(ApplicationDbContext context) : IFi
     private const string Red = "#B91C1C";
 
     public async Task<string> GetCompanyNameAsync(CancellationToken cancellationToken = default) =>
-        await context.Tenants.AsNoTracking().OrderBy(item => item.Id)
+        await context.Tenants.AsNoTracking()
+            .Where(item => item.Id == companyContext.CompanyId)
             .Select(item => item.Name)
-            .FirstOrDefaultAsync(cancellationToken) ?? "Company";
+            .SingleOrDefaultAsync(cancellationToken) ?? "Company";
 
     public byte[] CreateFinancialReportExcel(FinancialReportSummaryResponse report, string companyName)
     {
@@ -243,11 +246,418 @@ public sealed class FinancialDocumentService(ApplicationDbContext context) : IFi
             });
         }).GeneratePdf();
 
+    public async Task<byte[]> CreateProductsPdfAsync(
+        OperationalDocumentFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        var company = await GetDocumentCompanyAsync(cancellationToken);
+        var search = CleanSearch(filter.Search);
+        var productsQuery = context.Products.AsNoTracking();
+        if (search is not null)
+            productsQuery = productsQuery.Where(item =>
+                item.Name.Contains(search) ||
+                (item.Barcode != null && item.Barcode.Contains(search)) ||
+                item.Category.Name.Contains(search));
+
+        var products = await productsQuery
+            .OrderBy(item => item.Name)
+            .Select(item => new ProductDocumentRow(
+                item.Name,
+                item.Barcode,
+                item.Category.Name,
+                item.Brand != null ? item.Brand.Name : null,
+                item.Unit != null ? item.Unit.Name : null,
+                context.ProductInventories
+                    .Where(stock => stock.ProductId == item.Id &&
+                        (!filter.BranchId.HasValue || stock.BranchId == filter.BranchId.Value))
+                    .Sum(stock => (decimal?)(stock.Quantity - stock.ReservedQuantity)) ?? 0,
+                context.ProductInventories
+                    .Where(stock => stock.ProductId == item.Id &&
+                        (!filter.BranchId.HasValue || stock.BranchId == filter.BranchId.Value))
+                    .Max(stock => (decimal?)stock.MinimumQuantity) ?? 0,
+                context.ProductPrices
+                    .Where(price => price.ProductId == item.Id)
+                    .OrderBy(price => price.CustomerTypeId)
+                    .Select(price => (decimal?)(price.SalePrice ?? price.RegularPrice))
+                    .FirstOrDefault(),
+                item.IsActive,
+                item.IsFeatured))
+            .ToArrayAsync(cancellationToken);
+
+        var currency = company.CurrencyCode;
+        var lowStock = products.Count(item => item.Stock <= item.MinimumStock);
+        var model = new OperationalPdfModel(
+            company,
+            "Product catalog and stock report",
+            filter.BranchId.HasValue ? $"Branch stock view · Branch #{filter.BranchId.Value}" : "Company-wide catalog and available stock",
+            null,
+            [
+                new("Products", products.Length.ToString("N0"), Navy),
+                new("Active", products.Count(item => item.IsActive).ToString("N0"), Green),
+                new("Low stock", lowStock.ToString("N0"), lowStock > 0 ? Red : Green),
+                new("Available units", products.Sum(item => item.Stock).ToString("N2"), Slate),
+                new("Catalog value", Money(products.Sum(item => item.Stock * (item.Price ?? 0)), currency), Navy)
+            ],
+            ["Product", "Barcode", "Category", "Brand / unit", "Stock", "Minimum", "Price", "Status"],
+            products.Select(item => new[]
+            {
+                item.Name,
+                item.Barcode ?? "—",
+                item.Category,
+                JoinNonEmpty(item.Brand, item.Unit),
+                item.Stock.ToString("N2"),
+                item.MinimumStock.ToString("N2"),
+                item.Price.HasValue ? Money(item.Price.Value, currency) : "Not priced",
+                item.IsActive ? item.IsFeatured ? "Active · Featured" : "Active" : "Inactive"
+            }).ToArray(),
+            [2.3f, 1.1f, 1.25f, 1.15f, .75f, .75f, 1f, 1f],
+            [4, 5, 6]);
+
+        return CreateOperationalPdf(model);
+    }
+
+    public async Task<byte[]> CreateSalesPdfAsync(
+        OperationalDocumentFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        var company = await GetDocumentCompanyAsync(cancellationToken);
+        var (start, end) = ResolvePeriod(filter, 30);
+        var startDateTime = start.ToDateTime(TimeOnly.MinValue);
+        var endExclusive = end.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        var currency = ResolveCurrency(filter.CurrencyCode, company.CurrencyCode);
+        var search = CleanSearch(filter.Search);
+
+        var onlineQuery = context.Orders.AsNoTracking()
+            .Where(item => item.CreatedAt >= startDateTime && item.CreatedAt < endExclusive &&
+                item.Status != OrderStatus.Cancelled && item.Currency == currency &&
+                (!filter.BranchId.HasValue || item.BranchId == filter.BranchId.Value));
+        if (search is not null)
+            onlineQuery = onlineQuery.Where(item =>
+                item.OrderNumber.Contains(search) ||
+                item.Customer.FirstName.Contains(search) ||
+                (item.Customer.LastName != null && item.Customer.LastName.Contains(search)) ||
+                item.Customer.Phone.Contains(search));
+
+        var onlineProjection = await onlineQuery
+            .Select(item => new
+            {
+                item.CreatedAt,
+                item.OrderNumber,
+                Customer = (item.Customer.FirstName + " " + (item.Customer.LastName ?? "")).Trim(),
+                item.Total,
+                item.PaymentStatus,
+                PaymentSum = item.Payments
+                    .Where(payment => payment.Status == PaymentStatus.Paid || payment.Status == PaymentStatus.PartiallyRefunded)
+                    .Sum(payment => (decimal?)payment.Amount),
+                Cost = item.Items.Sum(line => (decimal?)(line.Quantity * line.UnitCost)) ?? 0,
+                Branch = context.Branches.Where(branch => branch.Id == item.BranchId).Select(branch => branch.Name).FirstOrDefault()
+            })
+            .ToArrayAsync(cancellationToken);
+
+        var online = onlineProjection
+            .Select(item => new SalesDocumentRow(
+                item.CreatedAt,
+                item.OrderNumber,
+                "Online order",
+                item.Customer,
+                item.Total,
+                item.PaymentSum ?? (item.PaymentStatus == PaymentStatus.Paid ? item.Total : 0),
+                item.Cost,
+                item.PaymentStatus.ToString(),
+                item.Branch))
+            .ToArray();
+
+        var manualQuery = context.InventorySales.AsNoTracking()
+            .Where(item => item.SaleDate >= start && item.SaleDate <= end &&
+                item.CurrencyCode == currency &&
+                (!filter.BranchId.HasValue || item.BranchId == filter.BranchId.Value));
+        if (search is not null)
+            manualQuery = manualQuery.Where(item =>
+                item.SaleNumber.Contains(search) ||
+                (item.CustomerName != null && item.CustomerName.Contains(search)) ||
+                (item.CustomerPhone != null && item.CustomerPhone.Contains(search)) ||
+                (item.Customer != null &&
+                    (item.Customer.FirstName.Contains(search) ||
+                     (item.Customer.LastName != null && item.Customer.LastName.Contains(search)) ||
+                     item.Customer.Phone.Contains(search))));
+
+        var manualProjection = await manualQuery
+            .Select(item => new
+            {
+                item.SaleDate,
+                item.SaleNumber,
+                Customer = item.Customer != null
+                    ? (item.Customer.FirstName + " " + (item.Customer.LastName ?? "")).Trim()
+                    : item.CustomerName ?? "Walk-in customer",
+                item.Total,
+                item.PaidAmount,
+                Cost = item.Items.Sum(line => (decimal?)(line.Quantity * line.UnitCost)) ?? 0,
+                item.PaymentStatus,
+                Branch = context.Branches.Where(branch => branch.Id == item.BranchId).Select(branch => branch.Name).FirstOrDefault()
+            })
+            .ToArrayAsync(cancellationToken);
+
+        var manual = manualProjection
+            .Select(item => new SalesDocumentRow(
+                item.SaleDate.ToDateTime(TimeOnly.MinValue),
+                item.SaleNumber,
+                "Counter sale",
+                item.Customer,
+                item.Total,
+                item.PaidAmount,
+                item.Cost,
+                item.PaymentStatus.ToString(),
+                item.Branch))
+            .ToArray();
+
+        var rows = online.Concat(manual).OrderByDescending(item => item.Date).ToArray();
+        var revenue = rows.Sum(item => item.Total);
+        var paid = rows.Sum(item => item.Paid);
+        var cost = rows.Sum(item => item.Cost);
+        var profit = revenue - cost;
+        var model = new OperationalPdfModel(
+            company,
+            "Sales performance report",
+            "Online orders and counter sales in one audited view",
+            (start, end),
+            [
+                new("Sales", rows.Length.ToString("N0"), Navy),
+                new("Revenue", Money(revenue, currency), Green),
+                new("Paid", Money(paid, currency), Green),
+                new("Outstanding", Money(Math.Max(0, revenue - paid), currency), revenue > paid ? Red : Green),
+                new("Gross profit", Money(profit, currency), profit >= 0 ? Green : Red)
+            ],
+            ["Date", "Reference", "Channel", "Customer", "Total", "Paid", "Balance", "Status", "Branch"],
+            rows.Select(item => new[]
+            {
+                item.Date.ToString("yyyy-MM-dd"),
+                item.Reference,
+                item.Channel,
+                item.Customer,
+                Money(item.Total, currency),
+                Money(item.Paid, currency),
+                Money(Math.Max(0, item.Total - item.Paid), currency),
+                item.Status,
+                item.Branch ?? "Company"
+            }).ToArray(),
+            [.75f, 1f, .9f, 1.65f, 1f, 1f, 1f, .9f, 1f],
+            [4, 5, 6]);
+
+        return CreateOperationalPdf(model);
+    }
+
+    public async Task<byte[]> CreatePurchasesPdfAsync(
+        OperationalDocumentFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        var company = await GetDocumentCompanyAsync(cancellationToken);
+        var (start, end) = ResolvePeriod(filter, 30);
+        var currency = ResolveCurrency(filter.CurrencyCode, company.CurrencyCode);
+        var search = CleanSearch(filter.Search);
+        var query = context.Purchases.AsNoTracking()
+            .Where(item => item.PurchaseDate >= start && item.PurchaseDate <= end &&
+                item.CurrencyCode == currency && item.Status != PurchaseStatus.Cancelled &&
+                (!filter.BranchId.HasValue || item.BranchId == filter.BranchId.Value));
+        if (search is not null)
+            query = query.Where(item =>
+                item.PurchaseNumber.Contains(search) ||
+                (item.ReferenceNumber != null && item.ReferenceNumber.Contains(search)) ||
+                (item.Supplier != null && item.Supplier.Name.Contains(search)));
+
+        var purchases = await query
+            .OrderByDescending(item => item.PurchaseDate)
+            .Select(item => new PurchaseDocumentRow(
+                item.PurchaseDate,
+                item.PurchaseNumber,
+                item.Supplier != null ? item.Supplier.Name : "Direct purchase",
+                item.Items.Count,
+                item.Total,
+                item.PaidAmount,
+                item.PaymentStatus.ToString(),
+                item.Status.ToString(),
+                context.Branches.Where(branch => branch.Id == item.BranchId).Select(branch => branch.Name).FirstOrDefault()))
+            .ToArrayAsync(cancellationToken);
+
+        var total = purchases.Sum(item => item.Total);
+        var paid = purchases.Sum(item => item.Paid);
+        var model = new OperationalPdfModel(
+            company,
+            "Purchases and supplier payables",
+            "Received inventory, supplier balances, and payment status",
+            (start, end),
+            [
+                new("Purchases", purchases.Length.ToString("N0"), Navy),
+                new("Purchased", Money(total, currency), Navy),
+                new("Paid", Money(paid, currency), Green),
+                new("Supplier balance", Money(Math.Max(0, total - paid), currency), total > paid ? Red : Green),
+                new("Items received", purchases.Sum(item => item.ItemCount).ToString("N0"), Slate)
+            ],
+            ["Date", "Purchase", "Supplier", "Items", "Total", "Paid", "Balance", "Payment", "Status", "Branch"],
+            purchases.Select(item => new[]
+            {
+                item.Date.ToString("yyyy-MM-dd"),
+                item.Reference,
+                item.Supplier,
+                item.ItemCount.ToString("N0"),
+                Money(item.Total, currency),
+                Money(item.Paid, currency),
+                Money(Math.Max(0, item.Total - item.Paid), currency),
+                item.PaymentStatus,
+                item.Status,
+                item.Branch ?? "Company"
+            }).ToArray(),
+            [.75f, 1f, 1.5f, .55f, 1f, 1f, 1f, .85f, .75f, 1f],
+            [3, 4, 5, 6]);
+
+        return CreateOperationalPdf(model);
+    }
+
+    public async Task<byte[]> CreatePayrollPdfAsync(
+        OperationalDocumentFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        var company = await GetDocumentCompanyAsync(cancellationToken);
+        var (start, end) = ResolvePeriod(filter, 90);
+        var currency = ResolveCurrency(filter.CurrencyCode, company.CurrencyCode);
+        var search = CleanSearch(filter.Search);
+        var query = context.StaffSalaryPayments.AsNoTracking()
+            .Where(item => item.PaidDate >= start && item.PaidDate <= end &&
+                item.CurrencyCode == currency &&
+                (!filter.BranchId.HasValue || item.BranchId == filter.BranchId.Value));
+        if (search is not null)
+            query = query.Where(item =>
+                item.Staff.FullName.Contains(search) ||
+                item.Staff.EmployeeNumber.Contains(search) ||
+                (item.Staff.Department != null && item.Staff.Department.Contains(search)) ||
+                (item.Staff.Position != null && item.Staff.Position.Contains(search)));
+
+        var salaries = await query
+            .OrderByDescending(item => item.PeriodYear)
+            .ThenByDescending(item => item.PeriodMonth)
+            .ThenBy(item => item.Staff.FullName)
+            .Select(item => new PayrollDocumentRow(
+                item.Staff.EmployeeNumber,
+                item.Staff.FullName,
+                item.Staff.Department,
+                item.Staff.Position,
+                item.PeriodYear,
+                item.PeriodMonth,
+                item.BaseSalary,
+                item.Bonus,
+                item.Deduction,
+                item.NetAmount,
+                item.PaidAmount,
+                item.PaymentStatus.ToString()))
+            .ToArrayAsync(cancellationToken);
+
+        var net = salaries.Sum(item => item.Net);
+        var paid = salaries.Sum(item => item.Paid);
+        var model = new OperationalPdfModel(
+            company,
+            "Employee payroll report",
+            "Salary obligations, adjustments, paid amounts, and outstanding payroll",
+            (start, end),
+            [
+                new("Salary records", salaries.Length.ToString("N0"), Navy),
+                new("Net payroll", Money(net, currency), Navy),
+                new("Paid", Money(paid, currency), Green),
+                new("Outstanding", Money(Math.Max(0, net - paid), currency), net > paid ? Red : Green),
+                new("Bonuses", Money(salaries.Sum(item => item.Bonus), currency), Slate),
+                new("Deductions", Money(salaries.Sum(item => item.Deduction), currency), Slate)
+            ],
+            ["Employee", "Name", "Department / position", "Period", "Base", "Bonus", "Deduction", "Net", "Paid", "Balance", "Status"],
+            salaries.Select(item => new[]
+            {
+                item.EmployeeNumber,
+                item.Name,
+                JoinNonEmpty(item.Department, item.Position),
+                $"{item.Year:D4}-{item.Month:D2}",
+                Money(item.BaseSalary, currency),
+                Money(item.Bonus, currency),
+                Money(item.Deduction, currency),
+                Money(item.Net, currency),
+                Money(item.Paid, currency),
+                Money(Math.Max(0, item.Net - item.Paid), currency),
+                item.Status
+            }).ToArray(),
+            [.7f, 1.35f, 1.35f, .65f, .9f, .8f, .8f, .9f, .9f, .9f, .8f],
+            [4, 5, 6, 7, 8, 9]);
+
+        return CreateOperationalPdf(model);
+    }
+
+    public async Task<byte[]> CreateExpensesPdfAsync(
+        OperationalDocumentFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        var company = await GetDocumentCompanyAsync(cancellationToken);
+        var (start, end) = ResolvePeriod(filter, 30);
+        var currency = ResolveCurrency(filter.CurrencyCode, company.CurrencyCode);
+        var search = CleanSearch(filter.Search);
+        var query = context.Expenses.AsNoTracking()
+            .Where(item => item.ExpenseDate >= start && item.ExpenseDate <= end &&
+                item.CurrencyCode == currency &&
+                (!filter.BranchId.HasValue || item.BranchId == filter.BranchId.Value));
+        if (search is not null)
+            query = query.Where(item =>
+                item.Description.Contains(search) ||
+                (item.Vendor != null && item.Vendor.Contains(search)) ||
+                (item.ReferenceNumber != null && item.ReferenceNumber.Contains(search)) ||
+                (item.GeneralTypeCategory != null && item.GeneralTypeCategory.Name.Contains(search)) ||
+                (item.Category != null && item.Category.Name.Contains(search)));
+
+        var expenses = await query
+            .OrderByDescending(item => item.ExpenseDate)
+            .Select(item => new ExpenseDocumentRow(
+                item.ExpenseDate,
+                item.GeneralTypeCategory != null
+                    ? item.GeneralTypeCategory.Name
+                    : item.Category != null ? item.Category.Name : "Uncategorized",
+                item.Description,
+                item.Vendor,
+                item.PaymentMethod,
+                item.ReferenceNumber,
+                item.Amount,
+                context.Branches.Where(branch => branch.Id == item.BranchId).Select(branch => branch.Name).FirstOrDefault()))
+            .ToArrayAsync(cancellationToken);
+
+        var total = expenses.Sum(item => item.Amount);
+        var byCategory = expenses.GroupBy(item => item.Category).OrderByDescending(group => group.Sum(item => item.Amount)).FirstOrDefault();
+        var model = new OperationalPdfModel(
+            company,
+            "Operating expenses report",
+            "Categorized business costs and payment audit trail",
+            (start, end),
+            [
+                new("Expense records", expenses.Length.ToString("N0"), Navy),
+                new("Total expenses", Money(total, currency), Red),
+                new("Average expense", Money(expenses.Length == 0 ? 0 : total / expenses.Length, currency), Slate),
+                new("Largest category", byCategory is null ? "—" : $"{byCategory.Key} · {Money(byCategory.Sum(item => item.Amount), currency)}", Navy)
+            ],
+            ["Date", "Category", "Description", "Vendor", "Method", "Reference", "Amount", "Branch"],
+            expenses.Select(item => new[]
+            {
+                item.Date.ToString("yyyy-MM-dd"),
+                item.Category,
+                item.Description,
+                item.Vendor ?? "—",
+                item.PaymentMethod,
+                item.Reference ?? "—",
+                Money(item.Amount, currency),
+                item.Branch ?? "Company"
+            }).ToArray(),
+            [.75f, 1.1f, 2.2f, 1.1f, .85f, 1f, 1f, 1f],
+            [6]);
+
+        return CreateOperationalPdf(model);
+    }
+
     public async Task<ReceiptResponse> GetReceiptAsync(string source, long id, CancellationToken cancellationToken = default)
     {
-        var company = await context.Tenants.AsNoTracking().OrderBy(item => item.Id)
+        var company = await context.Tenants.AsNoTracking()
+            .Where(item => item.Id == companyContext.CompanyId)
             .Select(item => new { item.Name, item.LegalName, item.Phone, item.Email, item.Address, item.LogoUrl })
-            .FirstOrDefaultAsync(cancellationToken)
+            .SingleOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException("Company profile has not been configured.");
 
         if (source.Equals("orders", StringComparison.OrdinalIgnoreCase) || source.Equals("order", StringComparison.OrdinalIgnoreCase))
@@ -310,15 +720,18 @@ public sealed class FinancialDocumentService(ApplicationDbContext context) : IFi
 
     public byte[] CreateReceiptImage(ReceiptResponse receipt, bool thermal = false)
     {
-        // A continuous 80 mm layout produces one complete, shareable image instead of
-        // returning only the first page of a potentially multi-page A4 document.
-        _ = thermal;
-        return ReceiptDocument(receipt, thermal: true).GenerateImages(new ImageGenerationSettings
+        // Images use a continuous page so the complete receipt is returned as one PNG.
+        // A slightly wider non-thermal image is easier to share while the thermal mode
+        // remains exactly 80 mm for receipt printers.
+        var document = ReceiptImageDocument(receipt, thermal);
+        var image = document.GenerateImages(new ImageGenerationSettings
         {
             ImageFormat = ImageFormat.Png,
             ImageCompressionQuality = ImageCompressionQuality.Best,
             RasterDpi = 144
-        }).First();
+        }).FirstOrDefault();
+
+        return image ?? throw new InvalidOperationException("The receipt image could not be generated.");
     }
 
     private static IDocument ReceiptDocument(ReceiptResponse receipt, bool thermal) => Document.Create(document =>
@@ -326,91 +739,420 @@ public sealed class FinancialDocumentService(ApplicationDbContext context) : IFi
         document.Page(page =>
         {
             if (thermal)
-                page.ContinuousSize(80, Unit.Millimetre);
-            else
-                page.Size(PageSizes.A4);
-            page.Margin(thermal ? 7 : 28, Unit.Millimetre);
-            page.DefaultTextStyle(text => text.FontFamily(Fonts.Arial).FontSize(thermal ? 8 : 10).FontColor(Navy));
-            page.Content().Column(column =>
             {
-                column.Spacing(thermal ? 7 : 12);
-                column.Item().AlignCenter().Text(receipt.CompanyName).FontSize(thermal ? 15 : 22).Bold();
-                if (!string.IsNullOrWhiteSpace(receipt.LegalName) && receipt.LegalName != receipt.CompanyName)
-                    column.Item().AlignCenter().Text(receipt.LegalName).FontSize(8).FontColor(Slate);
-                column.Item().AlignCenter().Text("SALES RECEIPT").FontSize(9).SemiBold().LetterSpacing(0.08f).FontColor(Slate);
-                column.Item().LineHorizontal(1).LineColor(Border);
-                column.Item().Row(row =>
-                {
-                    row.RelativeItem().Text(text => { text.Span("Receipt\n").FontColor(Slate); text.Span(receipt.Reference).SemiBold(); });
-                    row.RelativeItem().AlignRight().Text(text => { text.Span("Date\n").FontColor(Slate); text.Span(receipt.Date.ToString("yyyy-MM-dd HH:mm")).SemiBold(); });
-                });
-                column.Item().Text(text =>
-                {
-                    text.Span("Customer: ").FontColor(Slate);
-                    text.Span(receipt.CustomerName).SemiBold();
-                    if (!string.IsNullOrWhiteSpace(receipt.CustomerPhone)) text.Span($" · {receipt.CustomerPhone}");
-                });
-                if (!string.IsNullOrWhiteSpace(receipt.CustomerAddress))
-                    column.Item().Text($"Customer address: {receipt.CustomerAddress}").FontSize(8).FontColor(Slate);
-                if (!string.IsNullOrWhiteSpace(receipt.BranchName))
-                    column.Item().Text($"Branch: {receipt.BranchName}").FontSize(8).FontColor(Slate);
-                column.Item().Table(table =>
-                {
-                    table.ColumnsDefinition(columns =>
-                    {
-                        columns.RelativeColumn(4);
-                        columns.RelativeColumn(1);
-                        columns.RelativeColumn(2);
-                        columns.RelativeColumn(2);
-                    });
-                    table.Header(header =>
-                    {
-                        HeaderCell(header.Cell(), "Item");
-                        HeaderCell(header.Cell().AlignRight(), "Qty");
-                        HeaderCell(header.Cell().AlignRight(), "Price");
-                        HeaderCell(header.Cell().AlignRight(), "Total");
-                    });
-                    foreach (var item in receipt.Items)
-                    {
-                        BodyCell(table.Cell(), item.Name);
-                        BodyCell(table.Cell().AlignRight(), item.Quantity.ToString("N2"));
-                        BodyCell(table.Cell().AlignRight(), item.UnitPrice.ToString("N2"));
-                        BodyCell(table.Cell().AlignRight(), item.Total.ToString("N2"));
-                    }
-                });
-                column.Item().LineHorizontal(1).LineColor(Border);
-                column.Item().AlignRight().Width(thermal ? 210 : 240).Column(total =>
-                {
-                    total.Spacing(4);
-                    TotalRow(total, "Subtotal", receipt.Subtotal, receipt.CurrencyCode);
-                    if (receipt.Discount != 0) TotalRow(total, "Discount", -receipt.Discount, receipt.CurrencyCode);
-                    if (receipt.Tax != 0) TotalRow(total, "Tax", receipt.Tax, receipt.CurrencyCode);
-                    if (receipt.Shipping != 0) TotalRow(total, "Shipping", receipt.Shipping, receipt.CurrencyCode);
-                    total.Item().PaddingTop(5).BorderTop(1).BorderColor(Border).Row(row =>
-                    {
-                        row.RelativeItem().Text("TOTAL").Bold();
-                        row.AutoItem().Text(Money(receipt.Total, receipt.CurrencyCode)).FontSize(thermal ? 11 : 14).Bold();
-                    });
-                    TotalRow(total, "Paid", receipt.PaidAmount, receipt.CurrencyCode);
-                    TotalRow(total, "Balance", receipt.BalanceAmount, receipt.CurrencyCode);
-                });
-                column.Item().Background(Light).Padding(10).Row(row =>
-                {
-                    row.RelativeItem().Text($"Payment: {receipt.PaymentStatus}").SemiBold();
-                    if (!string.IsNullOrWhiteSpace(receipt.PaymentMethod)) row.AutoItem().Text(receipt.PaymentMethod).FontColor(Slate);
-                });
-                if (!string.IsNullOrWhiteSpace(receipt.Notes))
-                    column.Item().Text(text =>
-                    {
-                        text.Span("Note: ").FontColor(Slate);
-                        text.Span(receipt.Notes);
-                    });
-                column.Item().AlignCenter().Text("Thank you for your business").SemiBold();
-                var contact = string.Join(" · ", new[] { receipt.CompanyPhone, receipt.CompanyEmail, receipt.CompanyAddress }.Where(value => !string.IsNullOrWhiteSpace(value)));
-                if (!string.IsNullOrWhiteSpace(contact)) column.Item().AlignCenter().Text(contact).FontSize(7).FontColor(Slate);
+                ConfigureThermalPage(page, 80);
+                page.Content().Element(container => ComposeThermalReceipt(container, receipt));
+                return;
+            }
+
+            page.Size(PageSizes.A4);
+            page.Margin(22, Unit.Millimetre);
+            page.DefaultTextStyle(text => text.FontFamily(Fonts.Arial).FontSize(9).FontColor(Navy));
+            page.Content().Element(container => ComposeA4Receipt(container, receipt));
+            page.Footer().AlignCenter().Text(text =>
+            {
+                text.DefaultTextStyle(style => style.FontSize(8).FontColor(Slate));
+                text.Span("Receipt · ");
+                text.CurrentPageNumber();
+                text.Span(" / ");
+                text.TotalPages();
             });
         });
     });
+
+    private static IDocument ReceiptImageDocument(ReceiptResponse receipt, bool thermal) => Document.Create(document =>
+    {
+        document.Page(page =>
+        {
+            ConfigureThermalPage(page, thermal ? 80 : 110);
+            page.Content().Element(container => ComposeThermalReceipt(container, receipt));
+        });
+    });
+
+    private static void ConfigureThermalPage(PageDescriptor page, float widthMillimetres)
+    {
+        page.ContinuousSize(widthMillimetres, Unit.Millimetre);
+        page.MarginHorizontal(4, Unit.Millimetre);
+        page.MarginVertical(5, Unit.Millimetre);
+        page.DefaultTextStyle(text => text.FontFamily(Fonts.Arial).FontSize(8).FontColor(Navy));
+    }
+
+    private static void ComposeA4Receipt(IContainer container, ReceiptResponse receipt)
+    {
+        container.Column(column =>
+        {
+            column.Spacing(12);
+            column.Item().Element(header => ReceiptIdentity(header, receipt, 22, 9));
+            column.Item().LineHorizontal(1).LineColor(Border);
+            column.Item().Element(details => ReceiptDetails(details, receipt, compact: false));
+            column.Item().Element(table => ReceiptItemsTable(table, receipt, compact: false));
+            column.Item().LineHorizontal(1).LineColor(Border);
+            column.Item().AlignRight().MaxWidth(260).Element(total => ReceiptTotals(total, receipt, compact: false));
+            column.Item().Element(payment => ReceiptPayment(payment, receipt, compact: false));
+            column.Item().Element(footer => ReceiptNotesAndFooter(footer, receipt, compact: false));
+        });
+    }
+
+    private static void ComposeThermalReceipt(IContainer container, ReceiptResponse receipt)
+    {
+        container.Column(column =>
+        {
+            column.Spacing(7);
+            column.Item().Element(header => ReceiptIdentity(header, receipt, 15, 8));
+            column.Item().LineHorizontal(1).LineColor(Border);
+            column.Item().Element(details => ReceiptDetails(details, receipt, compact: true));
+            column.Item().Element(table => ReceiptItemsTable(table, receipt, compact: true));
+            column.Item().LineHorizontal(1).LineColor(Border);
+            column.Item().Element(total => ReceiptTotals(total, receipt, compact: true));
+            column.Item().Element(payment => ReceiptPayment(payment, receipt, compact: true));
+            column.Item().Element(footer => ReceiptNotesAndFooter(footer, receipt, compact: true));
+        });
+    }
+
+    private static void ReceiptIdentity(IContainer container, ReceiptResponse receipt, float companyFontSize, float subtitleFontSize)
+    {
+        container.AlignCenter().Column(column =>
+        {
+            column.Spacing(2);
+            column.Item().AlignCenter().Text(receipt.CompanyName).FontSize(companyFontSize).Bold();
+            if (!string.IsNullOrWhiteSpace(receipt.LegalName) &&
+                !string.Equals(receipt.LegalName, receipt.CompanyName, StringComparison.OrdinalIgnoreCase))
+                column.Item().AlignCenter().Text(receipt.LegalName).FontSize(8).FontColor(Slate);
+            column.Item().AlignCenter().Text("SALES RECEIPT")
+                .FontSize(subtitleFontSize).SemiBold().LetterSpacing(0.08f).FontColor(Slate);
+        });
+    }
+
+    private static void ReceiptDetails(IContainer container, ReceiptResponse receipt, bool compact)
+    {
+        container.Column(column =>
+        {
+            column.Spacing(4);
+            if (compact)
+            {
+                ReceiptLabelValue(column, "Receipt", receipt.Reference);
+                ReceiptLabelValue(column, "Date", receipt.Date.ToString("yyyy-MM-dd HH:mm"));
+            }
+            else
+            {
+                column.Item().Row(row =>
+                {
+                    row.RelativeItem().Text(text =>
+                    {
+                        text.Span("Receipt\n").FontColor(Slate);
+                        text.Span(receipt.Reference).SemiBold();
+                    });
+                    row.RelativeItem().AlignRight().Text(text =>
+                    {
+                        text.Span("Date\n").FontColor(Slate);
+                        text.Span(receipt.Date.ToString("yyyy-MM-dd HH:mm")).SemiBold();
+                    });
+                });
+            }
+
+            ReceiptLabelValue(column, "Customer", JoinNonEmpty(receipt.CustomerName, receipt.CustomerPhone));
+            if (!string.IsNullOrWhiteSpace(receipt.CustomerAddress))
+                ReceiptLabelValue(column, "Customer address", receipt.CustomerAddress!);
+            if (!string.IsNullOrWhiteSpace(receipt.BranchName))
+                ReceiptLabelValue(column, "Branch", receipt.BranchName!);
+        });
+    }
+
+    private static void ReceiptItemsTable(IContainer container, ReceiptResponse receipt, bool compact)
+    {
+        if (compact)
+        {
+            container.Column(column =>
+            {
+                column.Spacing(0);
+                column.Item().Background(Navy).PaddingVertical(4).PaddingHorizontal(3).Row(row =>
+                {
+                    row.RelativeItem(2).Text("Item").FontSize(7).SemiBold().FontColor(Colors.White);
+                    row.RelativeItem().AlignRight().Text("Total").FontSize(7).SemiBold().FontColor(Colors.White);
+                });
+
+                foreach (var item in receipt.Items)
+                {
+                    column.Item().BorderBottom(1).BorderColor(Border).PaddingVertical(5).PaddingHorizontal(3).Column(itemColumn =>
+                    {
+                        itemColumn.Spacing(2);
+                        itemColumn.Item().Text(item.Name).FontSize(7.5f).SemiBold();
+                        itemColumn.Item().Row(row =>
+                        {
+                            row.RelativeItem(2).Text($"{item.Quantity:N2} × {Money(item.UnitPrice, receipt.CurrencyCode)}")
+                                .FontSize(6.5f).FontColor(Slate);
+                            row.RelativeItem().AlignRight().ScaleToFit()
+                                .Text(Money(item.Total, receipt.CurrencyCode)).FontSize(7.5f).SemiBold();
+                        });
+                    });
+                }
+            });
+            return;
+        }
+
+        container.Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.RelativeColumn(4);
+                columns.ConstantColumn(46);
+                columns.ConstantColumn(78);
+                columns.ConstantColumn(82);
+            });
+
+            table.Header(header =>
+            {
+                ReceiptHeaderCell(header.Cell(), "Item", compact: false);
+                ReceiptHeaderCell(header.Cell().AlignRight(), "Qty", compact: false);
+                ReceiptHeaderCell(header.Cell().AlignRight(), "Price", compact: false);
+                ReceiptHeaderCell(header.Cell().AlignRight(), "Total", compact: false);
+            });
+
+            foreach (var item in receipt.Items)
+            {
+                table.Cell().BorderBottom(1).BorderColor(Border).PaddingVertical(6).PaddingHorizontal(5)
+                    .Text(item.Name).FontSize(8).SemiBold();
+                ReceiptBodyCell(table.Cell().AlignRight(), item.Quantity.ToString("N2"), compact: false);
+                ReceiptBodyCell(table.Cell().AlignRight(), Money(item.UnitPrice, receipt.CurrencyCode), compact: false);
+                ReceiptBodyCell(table.Cell().AlignRight(), Money(item.Total, receipt.CurrencyCode), compact: false, semiBold: true);
+            }
+        });
+    }
+
+    private static void ReceiptTotals(IContainer container, ReceiptResponse receipt, bool compact)
+    {
+        container.Column(total =>
+        {
+            total.Spacing(compact ? 3 : 4);
+            TotalRow(total, "Subtotal", receipt.Subtotal, receipt.CurrencyCode, compact);
+            if (receipt.Discount != 0) TotalRow(total, "Discount", -receipt.Discount, receipt.CurrencyCode, compact);
+            if (receipt.Tax != 0) TotalRow(total, "Tax", receipt.Tax, receipt.CurrencyCode, compact);
+            if (receipt.Shipping != 0) TotalRow(total, "Shipping", receipt.Shipping, receipt.CurrencyCode, compact);
+            total.Item().PaddingTop(5).BorderTop(1).BorderColor(Border).Row(row =>
+            {
+                row.RelativeItem().Text("TOTAL").Bold();
+                row.RelativeItem(compact ? 1.5f : 1f).AlignRight().ScaleToFit()
+                    .Text(Money(receipt.Total, receipt.CurrencyCode)).FontSize(compact ? 10 : 14).Bold();
+            });
+            TotalRow(total, "Paid", receipt.PaidAmount, receipt.CurrencyCode, compact);
+            TotalRow(total, "Balance", receipt.BalanceAmount, receipt.CurrencyCode, compact);
+        });
+    }
+
+    private static void ReceiptPayment(IContainer container, ReceiptResponse receipt, bool compact)
+    {
+        container.Background(Light).Padding(compact ? 7 : 10).Column(column =>
+        {
+            column.Spacing(2);
+            column.Item().Text($"Payment status: {receipt.PaymentStatus}").SemiBold();
+            if (!string.IsNullOrWhiteSpace(receipt.PaymentMethod))
+                column.Item().Text($"Method: {receipt.PaymentMethod}").FontSize(compact ? 7 : 8).FontColor(Slate);
+        });
+    }
+
+    private static void ReceiptNotesAndFooter(IContainer container, ReceiptResponse receipt, bool compact)
+    {
+        container.Column(column =>
+        {
+            column.Spacing(5);
+            if (!string.IsNullOrWhiteSpace(receipt.Notes))
+                column.Item().Text(text =>
+                {
+                    text.Span("Note: ").FontColor(Slate);
+                    text.Span(receipt.Notes);
+                });
+            column.Item().AlignCenter().Text("Thank you for your business").SemiBold();
+            var contact = JoinNonEmpty(receipt.CompanyPhone, receipt.CompanyEmail, receipt.CompanyAddress);
+            if (!string.IsNullOrWhiteSpace(contact))
+                column.Item().AlignCenter().Text(contact).FontSize(compact ? 6.5f : 7).FontColor(Slate);
+        });
+    }
+
+    private static void ReceiptLabelValue(ColumnDescriptor column, string label, string value) =>
+        column.Item().Text(text =>
+        {
+            text.Span($"{label}: ").FontColor(Slate);
+            text.Span(value).SemiBold();
+        });
+
+    private static void ReceiptHeaderCell(IContainer container, string text, bool compact) =>
+        container.Background(Navy).PaddingVertical(compact ? 4 : 6).PaddingHorizontal(compact ? 2 : 5)
+            .Text(text).FontSize(compact ? 7 : 8).SemiBold().FontColor(Colors.White);
+
+    private static void ReceiptBodyCell(IContainer container, string text, bool compact, bool semiBold = false)
+    {
+        var descriptor = container.BorderBottom(1).BorderColor(Border)
+            .PaddingVertical(compact ? 4 : 6).PaddingHorizontal(compact ? 2 : 5)
+            .Text(text).FontSize(compact ? 7 : 8);
+        if (semiBold) descriptor.SemiBold();
+    }
+
+    private static string JoinNonEmpty(params string?[] values) =>
+        string.Join(" · ", values.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value!.Trim()));
+
+    private async Task<DocumentCompanyProfile> GetDocumentCompanyAsync(CancellationToken cancellationToken)
+    {
+        var company = await context.Tenants.AsNoTracking()
+            .Where(item => item.Id == companyContext.CompanyId)
+            .Select(item => new DocumentCompanyProfile(
+                item.Name,
+                item.LegalName,
+                item.Phone,
+                item.Email,
+                item.Address,
+                item.Setting != null ? item.Setting.MainCurrencyCode : "USD"))
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return company ?? throw new InvalidOperationException("Company profile has not been configured.");
+    }
+
+    private static byte[] CreateOperationalPdf(OperationalPdfModel model) =>
+        Document.Create(document =>
+        {
+            document.Page(page =>
+            {
+                page.Size(PageSizes.A4.Landscape());
+                page.Margin(14, Unit.Millimetre);
+                page.DefaultTextStyle(text => text.FontFamily(Fonts.Arial).FontSize(8).FontColor(Navy));
+                page.Header().Element(container => OperationalHeader(container, model));
+                page.Content().PaddingVertical(10).Column(column =>
+                {
+                    column.Spacing(10);
+                    column.Item().Element(container => OperationalMetricGrid(container, model.Metrics));
+                    column.Item().Element(container => OperationalTable(container, model));
+                });
+                page.Footer().Row(row =>
+                {
+                    row.RelativeItem().Text("Generated by the company commerce system").FontSize(7).FontColor(Slate);
+                    row.AutoItem().Text(text =>
+                    {
+                        text.DefaultTextStyle(style => style.FontSize(7).FontColor(Slate));
+                        text.Span("Page ");
+                        text.CurrentPageNumber();
+                        text.Span(" / ");
+                        text.TotalPages();
+                    });
+                });
+            });
+        }).GeneratePdf();
+
+    private static void OperationalHeader(IContainer container, OperationalPdfModel model)
+    {
+        container.BorderBottom(1).BorderColor(Border).PaddingBottom(9).Row(row =>
+        {
+            row.RelativeItem().Column(column =>
+            {
+                column.Spacing(2);
+                column.Item().Text(model.Company.Name).FontSize(17).Bold().FontColor(Navy);
+                if (!string.IsNullOrWhiteSpace(model.Company.LegalName) &&
+                    !string.Equals(model.Company.LegalName, model.Company.Name, StringComparison.OrdinalIgnoreCase))
+                    column.Item().Text(model.Company.LegalName).FontSize(8).FontColor(Slate);
+                column.Item().Text(model.Title).FontSize(11).SemiBold().FontColor(Navy);
+                column.Item().Text(model.Subtitle).FontSize(8).FontColor(Slate);
+            });
+            row.ConstantItem(255).AlignRight().Column(column =>
+            {
+                column.Spacing(2);
+                var period = model.Period.HasValue
+                    ? $"Period: {model.Period.Value.Start:yyyy-MM-dd} — {model.Period.Value.End:yyyy-MM-dd}"
+                    : "Current catalog snapshot";
+                column.Item().AlignRight().Text(period).SemiBold();
+                column.Item().AlignRight().Text($"Generated: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC").FontSize(7).FontColor(Slate);
+                var contact = JoinNonEmpty(model.Company.Phone, model.Company.Email, model.Company.Address);
+                if (!string.IsNullOrWhiteSpace(contact))
+                    column.Item().AlignRight().Text(contact).FontSize(7).FontColor(Slate);
+            });
+        });
+    }
+
+    private static void OperationalMetricGrid(IContainer container, IReadOnlyCollection<ReportMetric> metrics)
+    {
+        container.Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.RelativeColumn();
+                columns.RelativeColumn();
+                columns.RelativeColumn();
+                columns.RelativeColumn();
+            });
+            foreach (var metric in metrics)
+            {
+                table.Cell().Padding(3).Element(cell =>
+                    cell.Border(1).BorderColor(Border).Background(Light).Padding(8).Column(column =>
+                    {
+                        column.Item().Text(metric.Label).FontSize(7).FontColor(Slate);
+                        column.Item().Text(metric.Value).FontSize(11).SemiBold().FontColor(metric.Color);
+                    }));
+            }
+        });
+    }
+
+    private static void OperationalTable(IContainer container, OperationalPdfModel model)
+    {
+        if (model.Rows.Count == 0)
+        {
+            container.Border(1).BorderColor(Border).Background(Light).Padding(24)
+                .AlignCenter().Text("No records match the selected filters.").FontColor(Slate);
+            return;
+        }
+
+        var rightAligned = model.RightAlignedColumns.ToHashSet();
+        container.Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                foreach (var width in model.ColumnWidths)
+                    columns.RelativeColumn(width);
+            });
+            table.Header(header =>
+            {
+                foreach (var title in model.Headers)
+                    header.Cell().Background(Navy).PaddingVertical(6).PaddingHorizontal(4)
+                        .Text(title).FontSize(7).SemiBold().FontColor(Colors.White);
+            });
+
+            for (var rowIndex = 0; rowIndex < model.Rows.Count; rowIndex++)
+            {
+                var row = model.Rows[rowIndex];
+                for (var columnIndex = 0; columnIndex < model.Headers.Count; columnIndex++)
+                {
+                    var value = columnIndex < row.Length ? row[columnIndex] : string.Empty;
+                    var cell = table.Cell()
+                        .Background(rowIndex % 2 == 0 ? Colors.White : Light)
+                        .BorderBottom(1).BorderColor(Border)
+                        .PaddingVertical(5).PaddingHorizontal(4);
+                    if (rightAligned.Contains(columnIndex)) cell = cell.AlignRight();
+                    cell.Text(value).FontSize(7);
+                }
+            }
+        });
+    }
+
+    private static (DateOnly Start, DateOnly End) ResolvePeriod(OperationalDocumentFilter filter, int defaultDays)
+    {
+        var end = filter.EndDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var start = filter.StartDate ?? end.AddDays(-(Math.Max(1, defaultDays) - 1));
+        if (start > end)
+            throw new ArgumentException("Start date cannot be after end date.");
+        if (end.DayNumber - start.DayNumber > 3660)
+            throw new ArgumentException("The report range cannot exceed ten years.");
+        return (start, end);
+    }
+
+    private static string ResolveCurrency(string? requested, string fallback)
+    {
+        var currency = string.IsNullOrWhiteSpace(requested) ? fallback : requested.Trim().ToUpperInvariant();
+        if (currency.Length != 3 || !currency.All(char.IsLetter))
+            throw new ArgumentException("Currency code must contain exactly three letters.");
+        return currency;
+    }
+
+    private static string? CleanSearch(string? search)
+    {
+        var value = search?.Trim();
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
 
     private static void ConfigurePage(PageDescriptor page)
     {
@@ -508,10 +1250,17 @@ public sealed class FinancialDocumentService(ApplicationDbContext context) : IFi
     private static void BodyCell(IContainer container, string text) =>
         container.BorderBottom(1).BorderColor(Border).PaddingVertical(6).PaddingHorizontal(5).Text(text).FontSize(8);
 
-    private static void TotalRow(ColumnDescriptor column, string label, decimal value, string currency) =>
-        column.Item().Row(row => { row.RelativeItem().Text(label).FontColor(Slate); row.AutoItem().Text(Money(value, currency)).SemiBold(); });
+    private static void TotalRow(ColumnDescriptor column, string label, decimal value, string currency, bool compact = false) =>
+        column.Item().Row(row =>
+        {
+            row.RelativeItem().Text(label).FontSize(compact ? 7.5f : 9).FontColor(Slate);
+            row.RelativeItem(compact ? 1.5f : 1f).AlignRight().ScaleToFit()
+                .Text(Money(value, currency)).FontSize(compact ? 7.5f : 9).SemiBold();
+        });
 
-    private static string Money(decimal value, string currency) => $"{currency} {value:N2}";
+    private static readonly CultureInfo MoneyCulture = CultureInfo.GetCultureInfo("en-US");
+
+    private static string Money(decimal value, string currency) => $"{currency} {value.ToString("N2", MoneyCulture)}";
 
     private static void WriteTitle(IXLWorksheet sheet, string title, DateTime start, DateTime end, string currency)
     {
@@ -546,4 +1295,84 @@ public sealed class FinancialDocumentService(ApplicationDbContext context) : IFi
             column.AdjustToContents(headerRow, Math.Max(headerRow, lastRow), 8, 48);
         sheet.Rows(headerRow, Math.Max(headerRow, lastRow)).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
     }
+
+    private sealed record DocumentCompanyProfile(
+        string Name,
+        string? LegalName,
+        string? Phone,
+        string? Email,
+        string? Address,
+        string CurrencyCode);
+
+    private sealed record ReportMetric(string Label, string Value, string Color);
+
+    private sealed record OperationalPdfModel(
+        DocumentCompanyProfile Company,
+        string Title,
+        string Subtitle,
+        (DateOnly Start, DateOnly End)? Period,
+        IReadOnlyCollection<ReportMetric> Metrics,
+        IReadOnlyList<string> Headers,
+        IReadOnlyList<string[]> Rows,
+        IReadOnlyList<float> ColumnWidths,
+        IReadOnlyCollection<int> RightAlignedColumns);
+
+    private sealed record ProductDocumentRow(
+        string Name,
+        string? Barcode,
+        string Category,
+        string? Brand,
+        string? Unit,
+        decimal Stock,
+        decimal MinimumStock,
+        decimal? Price,
+        bool IsActive,
+        bool IsFeatured);
+
+    private sealed record SalesDocumentRow(
+        DateTime Date,
+        string Reference,
+        string Channel,
+        string Customer,
+        decimal Total,
+        decimal Paid,
+        decimal Cost,
+        string Status,
+        string? Branch);
+
+    private sealed record PurchaseDocumentRow(
+        DateOnly Date,
+        string Reference,
+        string Supplier,
+        int ItemCount,
+        decimal Total,
+        decimal Paid,
+        string PaymentStatus,
+        string Status,
+        string? Branch);
+
+    private sealed record PayrollDocumentRow(
+        string EmployeeNumber,
+        string Name,
+        string? Department,
+        string? Position,
+        int Year,
+        int Month,
+        decimal BaseSalary,
+        decimal Bonus,
+        decimal Deduction,
+        decimal Net,
+        decimal Paid,
+        string Status);
+
+    private sealed record ExpenseDocumentRow(
+        DateOnly Date,
+        string Category,
+        string Description,
+        string? Vendor,
+        string PaymentMethod,
+        string? Reference,
+        decimal Amount,
+        string? Branch);
+
 }

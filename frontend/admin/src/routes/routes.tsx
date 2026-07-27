@@ -31,7 +31,7 @@ import { ProtectedRoute } from "@/features/auth/protected-route";
 import { PermissionRoute } from "@/features/auth/permission-route";
 import { Permissions } from "@/features/auth/permissions";
 
-const allowed = (permission: string, element: React.ReactNode) => (
+const allowed = (permission: string | readonly string[], element: React.ReactNode) => (
     <PermissionRoute permission={permission}>{element}</PermissionRoute>
 );
 
@@ -163,7 +163,14 @@ export const router = createBrowserRouter([
                     },
                     {
                         path: "company",
-                        element: allowed(Permissions.CompanyProfileManage, <CompanySettingsPage />),
+                        element: allowed(
+                            [
+                                Permissions.CompanyProfileManage,
+                                Permissions.CompanySettingsManage,
+                                Permissions.CompanyBranchesManage,
+                            ],
+                            <CompanySettingsPage />,
+                        ),
                     },
                     {
                         path: "reports",

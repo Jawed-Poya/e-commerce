@@ -58,7 +58,7 @@ public sealed class AuthService(
             throw new InvalidOperationException("Invalid credentials.");
 
         var roles = (await userManager.GetRolesAsync(user)).ToArray();
-        var permissions = await GetPermissionsAsync(user, roles);
+        var permissions = await GetPermissionsAsync(user, roles, cancellationToken);
         if (!roles.Contains(AppRoles.Admin, StringComparer.OrdinalIgnoreCase) && permissions.Count == 0)
             throw new UnauthorizedAccessException("This account cannot access the admin panel.");
 
@@ -185,7 +185,7 @@ public sealed class AuthService(
         if (user is null) return null;
 
         var roles = (await userManager.GetRolesAsync(user)).ToArray();
-        var permissions = await GetPermissionsAsync(user, roles);
+        var permissions = await GetPermissionsAsync(user, roles, cancellationToken);
         return new UserProfileResponse(
             user.Id,
             user.FullName,
@@ -239,6 +239,13 @@ public sealed class AuthService(
                 cancellationToken))
             throw new InvalidOperationException("This phone number is already in use.");
 
+        // Resolve unchanged authorization data before committing the profile. Nothing
+        // after UpdateAsync should be able to turn a successful database write into an
+        // apparent failure because the browser cancelled a follow-up query.
+        var roles = (await userManager.GetRolesAsync(user)).ToArray();
+        var permissions = await GetPermissionsAsync(user, roles, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
         user.FullName = fullName;
         user.Email = email;
         if (CompanyUserName.RequiresRepair(user.UserName))
@@ -251,7 +258,17 @@ public sealed class AuthService(
                 " ",
                 result.Errors.Select(error => error.Description)));
 
-        return (await GetProfileAsync(cancellationToken))!;
+        return new UserProfileResponse(
+            user.Id,
+            user.FullName,
+            user.Email,
+            user.PhoneNumber,
+            user.AvatarUrl,
+            user.IsActive,
+            roles.Select(DisplayRoleName).ToArray(),
+            permissions,
+            user.LastLoginAt,
+            user.CreatedAt);
     }
 
     public async Task ChangePasswordAsync(
@@ -337,26 +354,42 @@ public sealed class AuthService(
         IReadOnlyCollection<string> roles,
         CancellationToken cancellationToken)
     {
-        var identityClaims = await userManager.GetClaimsAsync(user);
-        var permissions = await GetPermissionsAsync(user, roles);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Read Identity claims once. The old implementation loaded user claims twice and
+        // resolved role claims one role at a time, which made /auth/me and profile saves
+        // unnecessarily slow and prone to client timeout/cancellation.
+        var identityClaims = await context.UserClaims
+            .AsNoTracking()
+            .Where(claim => claim.UserId == user.Id)
+            .Select(claim => new IdentityClaimProjection(claim.ClaimType, claim.ClaimValue))
+            .ToArrayAsync(cancellationToken);
+
+        var permissions = await GetPermissionsAsync(identityClaims, roles, cancellationToken);
         var linkedCustomerId = long.TryParse(
             identityClaims.FirstOrDefault(claim => claim.Type == AuthClaims.CustomerId)?.Value,
             out var parsedCustomerId)
             ? parsedCustomerId
             : (long?)null;
 
-        var customer = linkedCustomerId.HasValue
-            ? await context.Customers
+        Customer? customer = null;
+        var isCustomerAccount = roles.Contains(AppRoles.Customer, StringComparer.OrdinalIgnoreCase);
+        if (linkedCustomerId.HasValue || isCustomerAccount)
+        {
+            var customers = context.Customers
                 .AsNoTracking()
-                .Include(item => item.CustomerType)
-                .FirstOrDefaultAsync(item => item.Id == linkedCustomerId.Value, cancellationToken)
-            : await context.Customers
-                .AsNoTracking()
-                .Include(item => item.CustomerType)
-                .FirstOrDefaultAsync(item =>
-                    (user.PhoneNumber != null && item.Phone == user.PhoneNumber) ||
-                    (user.Email != null && item.Email == user.Email),
+                .Include(item => item.CustomerType);
+
+            customer = linkedCustomerId.HasValue
+                ? await customers.FirstOrDefaultAsync(
+                    item => item.Id == linkedCustomerId.Value,
+                    cancellationToken)
+                : await customers.FirstOrDefaultAsync(
+                    item =>
+                        (user.PhoneNumber != null && item.Phone == user.PhoneNumber) ||
+                        (user.Email != null && item.Email == user.Email),
                     cancellationToken);
+        }
 
         return new AuthUserResponse(
             user.Id,
@@ -374,32 +407,49 @@ public sealed class AuthService(
 
     private async Task<IReadOnlyCollection<string>> GetPermissionsAsync(
         User user,
-        IReadOnlyCollection<string> roles)
+        IReadOnlyCollection<string> roles,
+        CancellationToken cancellationToken)
     {
-        var permissions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var identityClaims = await context.UserClaims
+            .AsNoTracking()
+            .Where(claim => claim.UserId == user.Id)
+            .Select(claim => new IdentityClaimProjection(claim.ClaimType, claim.ClaimValue))
+            .ToArrayAsync(cancellationToken);
 
-        foreach (var claim in await userManager.GetClaimsAsync(user))
-        {
-            if (claim.Type == AuthClaims.Permission && AppPermissions.All.Contains(claim.Value))
-                permissions.Add(claim.Value);
-        }
+        return await GetPermissionsAsync(identityClaims, roles, cancellationToken);
+    }
 
-        foreach (var roleName in roles)
-        {
-            var role = await roleManager.FindByNameAsync(roleName);
-            if (role is null) continue;
+    private async Task<IReadOnlyCollection<string>> GetPermissionsAsync(
+        IReadOnlyCollection<IdentityClaimProjection> identityClaims,
+        IReadOnlyCollection<string> roles,
+        CancellationToken cancellationToken)
+    {
+        var userPermissions = identityClaims
+            .Where(claim => claim.Type == AuthClaims.Permission && claim.Value is not null)
+            .Select(claim => claim.Value!)
+            .Where(AppPermissions.All.Contains)
+            .ToArray();
 
-            foreach (var claim in await roleManager.GetClaimsAsync(role))
-            {
-                if (claim.Type == AuthClaims.Permission && AppPermissions.All.Contains(claim.Value))
-                    permissions.Add(claim.Value);
-            }
-        }
+        var roleNames = roles.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var rolePermissions = roleNames.Length == 0
+            ? Array.Empty<string>()
+            : await (
+                from role in context.Roles.AsNoTracking()
+                join claim in context.RoleClaims.AsNoTracking() on role.Id equals claim.RoleId
+                where role.Name != null && roleNames.Contains(role.Name) &&
+                      claim.ClaimType == AuthClaims.Permission && claim.ClaimValue != null
+                select claim.ClaimValue!)
+                .Distinct()
+                .ToArrayAsync(cancellationToken);
 
-        var enabledForCompany = (await companyPermissions.GetCompanyPermissionsAsync())
+        var enabledForCompany = (await companyPermissions.GetCompanyPermissionsAsync(cancellationToken))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return permissions
+
+        return userPermissions
+            .Concat(rolePermissions)
+            .Where(AppPermissions.All.Contains)
             .Where(enabledForCompany.Contains)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(value => value)
             .ToArray();
     }
@@ -428,4 +478,6 @@ public sealed class AuthService(
         var clean = value?.Trim();
         return string.IsNullOrWhiteSpace(clean) ? null : clean;
     }
+
+    private sealed record IdentityClaimProjection(string? Type, string? Value);
 }

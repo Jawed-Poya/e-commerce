@@ -16,7 +16,7 @@ public sealed class CompanyController(ICompanyService company) : ControllerBase
     public async Task<ActionResult<ApiResponse<PublicCompanyProfileResponse>>> GetPublic(CancellationToken cancellationToken) =>
         Ok(ApiResponse<PublicCompanyProfileResponse>.Ok(await company.GetPublicProfileAsync(cancellationToken)));
 
-    [Authorize(Policy = AppPermissions.CompanyProfileManage)]
+    [Authorize]
     [HttpGet("profile")]
     public async Task<ActionResult<ApiResponse<CompanyProfileResponse>>> GetProfile(CancellationToken cancellationToken) =>
         Ok(ApiResponse<CompanyProfileResponse>.Ok(await company.GetProfileAsync(cancellationToken)));

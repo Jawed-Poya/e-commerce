@@ -45,13 +45,16 @@ export function hasPermission(
     user: Pick<AuthUser, "roles" | "permissions"> | null | undefined,
     permission: string,
 ) {
-    return Boolean(user?.permissions.includes(permission));
+    return Boolean(
+        isSystemAdministrator(user) || user?.permissions.includes(permission),
+    );
 }
 
 export function getDefaultAdminRoute(
     permissions: string[],
-    _roles: string[] = [],
+    roles: string[] = [],
 ) {
+    if (roles.some((role) => role.toLowerCase() === "admin")) return "/dashboard";
     const set = new Set(permissions);
     if (set.has(Permissions.DashboardView)) return "/dashboard";
     if (set.has(Permissions.ProductsView)) return "/products";

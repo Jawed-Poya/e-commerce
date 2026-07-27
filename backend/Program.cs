@@ -96,6 +96,7 @@ builder.Services.AddAuthorization(options =>
     {
         options.AddPolicy(permission, policy =>
             policy.RequireAssertion(context =>
+                context.User.IsInRole(AppRoles.Admin) ||
                 context.User.HasClaim(AuthClaims.Permission, permission)));
     }
 });

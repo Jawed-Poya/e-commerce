@@ -69,6 +69,18 @@ export default function FinancialReportsPage() {
         onError: (error) => toast.error(message(error)),
     });
 
+    const salesPdf = useMutation({
+        mutationFn: () => companyService.exportOperationalPdf("sales", {
+            startDate: filters.startDate,
+            endDate: filters.endDate,
+            branchId: filters.branchId || undefined,
+            currencyCode: filters.currencyCode || undefined,
+            search: filters.search || undefined,
+        }),
+        onSuccess: () => toast.success("Sales PDF generated."),
+        onError: (error) => toast.error(message(error)),
+    });
+
     const data = report.data;
     const currency = data?.currencyCode;
     const money = (value: number) => formatMoney(value, currency);
@@ -92,7 +104,8 @@ export default function FinancialReportsPage() {
                 actions={<div className="flex flex-wrap gap-2">
                     <Button variant="outline" onClick={() => report.refetch()} disabled={report.isFetching}><RefreshCw className={report.isFetching ? "animate-spin" : ""} /> Refresh</Button>
                     <Button variant="outline" disabled={!data || exportFile.isPending} onClick={() => exportFile.mutate("excel")}><FileSpreadsheet /> Excel</Button>
-                    <Button disabled={!data || exportFile.isPending} onClick={() => exportFile.mutate("pdf")}><FileText /> PDF</Button>
+                    <Button variant="outline" disabled={salesPdf.isPending} onClick={() => salesPdf.mutate()}><FileText /> Sales PDF</Button>
+                    <Button disabled={!data || exportFile.isPending} onClick={() => exportFile.mutate("pdf")}><FileText /> Financial PDF</Button>
                 </div>}
             />
 
