@@ -7,6 +7,7 @@ import {
     dispatchAdminUnauthorized,
     getAdminToken,
 } from "@/features/auth/auth-storage";
+import { literalTranslations } from "@/i18n/literal-translations";
 
 export const apiBaseUrl = (
     import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5188/api"
@@ -22,7 +23,7 @@ const axiosInstance = axios.create({
     headers: {
         "Content-Type": "application/json",
     },
-    timeout: 30000,
+    timeout: 240_000,
 });
 
 function normalizedRequestPath(config: InternalAxiosRequestConfig | undefined) {
@@ -37,6 +38,23 @@ function isSessionValidationRequest(
     config: InternalAxiosRequestConfig | undefined,
 ) {
     return normalizedRequestPath(config) === "auth/me";
+}
+
+function localizeApiMessage(data: unknown, useFallback: boolean) {
+    if (!data || typeof data !== "object" || !("message" in data)) return;
+
+    const response = data as { message?: unknown };
+    if (typeof response.message !== "string" || !response.message.trim()) return;
+
+    const language = localStorage.getItem("language");
+    if (language !== "dr" && language !== "ps") return;
+
+    const translations = literalTranslations[language];
+    response.message =
+        translations[response.message] ??
+        (useFallback
+            ? translations["The request could not be completed."]
+            : response.message);
 }
 
 axiosInstance.interceptors.request.use(
@@ -66,8 +84,12 @@ axiosInstance.interceptors.request.use(
 );
 
 axiosInstance.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        localizeApiMessage(response.data, false);
+        return response;
+    },
     (error: AxiosError) => {
+        localizeApiMessage(error.response?.data, true);
         const config = error.config as AdminRequestConfig | undefined;
         const failedToken = config?.adminAccessToken;
 

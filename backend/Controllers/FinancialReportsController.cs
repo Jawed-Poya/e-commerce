@@ -17,13 +17,15 @@ public sealed class FinancialReportsController(
 {
     [HttpGet]
     public async Task<ActionResult<ApiResponse<FinancialReportSummaryResponse>>> Get(
-        [FromQuery] FinancialReportRequest request,
-        CancellationToken cancellationToken)
+        [FromQuery] FinancialReportRequest request)
     {
         try
         {
+            using var operation = ServerOperation.CreateReadScope();
             return Ok(ApiResponse<FinancialReportSummaryResponse>.Ok(
-                await reports.GetReportAsync(request, cancellationToken: cancellationToken)));
+                await TransientSqlRetry.ExecuteAsync(
+                    token => reports.GetReportAsync(request, cancellationToken: token),
+                    operation.Token)));
         }
         catch (ArgumentException exception)
         {
@@ -36,13 +38,15 @@ public sealed class FinancialReportsController(
         [FromQuery] DateTime? asOfDate,
         [FromQuery] DateTime? periodStartDate,
         [FromQuery] long? branchId,
-        [FromQuery] string? currencyCode,
-        CancellationToken cancellationToken)
+        [FromQuery] string? currencyCode)
     {
         try
         {
-            return Ok(ApiResponse<CompanyWorthResponse>.Ok(await reports.GetCompanyWorthAsync(
-                asOfDate, periodStartDate, branchId, currencyCode, cancellationToken)));
+            using var operation = ServerOperation.CreateReadScope();
+            return Ok(ApiResponse<CompanyWorthResponse>.Ok(await TransientSqlRetry.ExecuteAsync(
+                token => reports.GetCompanyWorthAsync(
+                    asOfDate, periodStartDate, branchId, currencyCode, token),
+                operation.Token)));
         }
         catch (ArgumentException exception)
         {
@@ -55,13 +59,15 @@ public sealed class FinancialReportsController(
         long customerId,
         [FromQuery] DateTime? startDate,
         [FromQuery] DateTime? endDate,
-        [FromQuery] string? currencyCode,
-        CancellationToken cancellationToken)
+        [FromQuery] string? currencyCode)
     {
         try
         {
-            return Ok(ApiResponse<CustomerLedgerResponse>.Ok(await reports.GetCustomerLedgerAsync(
-                customerId, startDate, endDate, currencyCode, cancellationToken)));
+            using var operation = ServerOperation.CreateReadScope();
+            return Ok(ApiResponse<CustomerLedgerResponse>.Ok(await TransientSqlRetry.ExecuteAsync(
+                token => reports.GetCustomerLedgerAsync(
+                    customerId, startDate, endDate, currencyCode, token),
+                operation.Token)));
         }
         catch (ArgumentException exception)
         {
@@ -74,14 +80,15 @@ public sealed class FinancialReportsController(
     }
 
     [HttpGet("export/excel")]
-    public async Task<IActionResult> ExportExcel(
-        [FromQuery] FinancialReportRequest request,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> ExportExcel([FromQuery] FinancialReportRequest request)
     {
         try
         {
-            var report = await reports.GetReportAsync(request, includeAllResults: true, cancellationToken: cancellationToken);
-            var companyName = await documents.GetCompanyNameAsync(cancellationToken);
+            using var operation = ServerOperation.CreateDocumentScope();
+            var report = await TransientSqlRetry.ExecuteAsync(
+                token => reports.GetReportAsync(request, includeAllResults: true, cancellationToken: token),
+                operation.Token);
+            var companyName = await documents.GetCompanyNameAsync(operation.Token);
             var content = documents.CreateFinancialReportExcel(report, companyName);
             return File(content,
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -94,14 +101,15 @@ public sealed class FinancialReportsController(
     }
 
     [HttpGet("export/pdf")]
-    public async Task<IActionResult> ExportPdf(
-        [FromQuery] FinancialReportRequest request,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> ExportPdf([FromQuery] FinancialReportRequest request)
     {
         try
         {
-            var report = await reports.GetReportAsync(request, includeAllResults: true, cancellationToken: cancellationToken);
-            var companyName = await documents.GetCompanyNameAsync(cancellationToken);
+            using var operation = ServerOperation.CreateDocumentScope();
+            var report = await TransientSqlRetry.ExecuteAsync(
+                token => reports.GetReportAsync(request, includeAllResults: true, cancellationToken: token),
+                operation.Token);
+            var companyName = await documents.GetCompanyNameAsync(operation.Token);
             var content = documents.CreateFinancialReportPdf(report, companyName);
             return File(content, "application/pdf",
                 $"financial-report-{report.StartDate:yyyyMMdd}-{report.EndDate:yyyyMMdd}.pdf");
@@ -117,13 +125,15 @@ public sealed class FinancialReportsController(
         long customerId,
         [FromQuery] DateTime? startDate,
         [FromQuery] DateTime? endDate,
-        [FromQuery] string? currencyCode,
-        CancellationToken cancellationToken)
+        [FromQuery] string? currencyCode)
     {
         try
         {
-            var ledger = await reports.GetCustomerLedgerAsync(customerId, startDate, endDate, currencyCode, cancellationToken);
-            var companyName = await documents.GetCompanyNameAsync(cancellationToken);
+            using var operation = ServerOperation.CreateDocumentScope();
+            var ledger = await TransientSqlRetry.ExecuteAsync(
+                token => reports.GetCustomerLedgerAsync(customerId, startDate, endDate, currencyCode, token),
+                operation.Token);
+            var companyName = await documents.GetCompanyNameAsync(operation.Token);
             var content = documents.CreateCustomerLedgerExcel(ledger, companyName);
             return File(content,
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -144,13 +154,15 @@ public sealed class FinancialReportsController(
         long customerId,
         [FromQuery] DateTime? startDate,
         [FromQuery] DateTime? endDate,
-        [FromQuery] string? currencyCode,
-        CancellationToken cancellationToken)
+        [FromQuery] string? currencyCode)
     {
         try
         {
-            var ledger = await reports.GetCustomerLedgerAsync(customerId, startDate, endDate, currencyCode, cancellationToken);
-            var companyName = await documents.GetCompanyNameAsync(cancellationToken);
+            using var operation = ServerOperation.CreateDocumentScope();
+            var ledger = await TransientSqlRetry.ExecuteAsync(
+                token => reports.GetCustomerLedgerAsync(customerId, startDate, endDate, currencyCode, token),
+                operation.Token);
+            var companyName = await documents.GetCompanyNameAsync(operation.Token);
             var content = documents.CreateCustomerLedgerPdf(ledger, companyName);
             return File(content, "application/pdf",
                 $"customer-ledger-{customerId}-{ledger.StartDate:yyyyMMdd}-{ledger.EndDate:yyyyMMdd}.pdf");

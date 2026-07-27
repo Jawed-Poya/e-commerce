@@ -1,9 +1,13 @@
+using ECommerce.Data;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace ECommerce.Migrations;
 
+[DbContext(typeof(ApplicationDbContext))]
+[Migration("20260724170000_UpdateMultilingualFontDefaults")]
 public partial class UpdateMultilingualFontDefaults : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)

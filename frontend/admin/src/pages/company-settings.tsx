@@ -18,6 +18,7 @@ import type { CompanyBranch, CompanySettings } from "@/features/company/company-
 import { useCompany } from "@/features/company/company-context";
 import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
+import { useI18n } from "@/i18n/i18n-provider";
 
 const emptyBranch: UpsertCompanyBranch = {
     name: "",
@@ -32,6 +33,7 @@ export default function CompanySettingsPage() {
     const queryClient = useQueryClient();
     const { user } = useAdminAuth();
     const { formatMoney } = useCompany();
+    const { tr } = useI18n();
     const canManageProfile = hasPermission(user, Permissions.CompanyProfileManage);
     const canManageSettings = hasPermission(user, Permissions.CompanySettingsManage);
     const canManageBranches = hasPermission(user, Permissions.CompanyBranchesManage);
@@ -85,28 +87,28 @@ export default function CompanySettingsPage() {
         mutationFn: companyService.updateProfile,
         onSuccess: (updated) => {
             applyCompany(updated);
-            toast.success("Company profile updated.");
+            toast.success(tr("Company profile updated."));
         },
-        onError: (error) => toast.error(message(error)),
+        onError: (error) => toast.error(tr(message(error))),
     });
     const saveSettings = useMutation({
         mutationFn: companyService.updateSettings,
         onSuccess: (updated) => {
             applyCompany(updated);
-            toast.success("Company settings updated.");
+            toast.success(tr("Company settings updated."));
         },
-        onError: (error) => toast.error(message(error)),
+        onError: (error) => toast.error(tr(message(error))),
     });
     const saveBranch = useMutation({
         mutationFn: () => editingBranch
             ? companyService.updateBranch(editingBranch.id, branch)
             : companyService.createBranch(branch),
         onSuccess: async () => {
-            toast.success(editingBranch ? "Branch updated." : "Branch created.");
+            toast.success(tr(editingBranch ? "Branch updated." : "Branch created."));
             setBranchDialog(false);
             await refreshCompany();
         },
-        onError: (error) => toast.error(message(error)),
+        onError: (error) => toast.error(tr(message(error))),
     });
 
     const openBranch = (value?: CompanyBranch) => {
@@ -146,12 +148,27 @@ export default function CompanySettingsPage() {
             : `${settings.currencySymbol || settings.mainCurrencyCode} ${previewMoney}`
         : formatMoney(123456.78);
 
-    if (profileQuery.isLoading || !profile || !settings) {
+    if (profileQuery.isLoading || (profileQuery.isSuccess && (!profile || !settings))) {
         return <div className="grid min-h-[60vh] place-items-center"><LoaderCircle className="size-7 animate-spin text-primary" /></div>;
     }
 
-    if (profileQuery.isError) {
-        return <Card><CardContent className="p-8 text-center text-destructive">Could not load the company profile.</CardContent></Card>;
+    if (profileQuery.isError || !profileQuery.data || !profile || !settings) {
+        return (
+            <Card className="mx-auto mt-10 max-w-lg shadow-none">
+                <CardContent className="space-y-4 p-8 text-center">
+                    <p className="text-sm font-medium text-destructive">
+                        Could not load the company profile.
+                    </p>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => void profileQuery.refetch()}
+                    >
+                        Try again
+                    </Button>
+                </CardContent>
+            </Card>
+        );
     }
 
     return (
@@ -185,7 +202,7 @@ export default function CompanySettingsPage() {
                             <div className="space-y-2 sm:col-span-2"><Label>Address</Label><Textarea value={profile.address ?? ""} onChange={(event) => setProfile({ ...profile, address: nullable(event.target.value) })} /></div>
                             <div className="sm:col-span-2 flex items-center justify-between gap-3">
                                 {!canManageProfile && <p className="text-xs text-muted-foreground">You can view this profile but cannot edit it.</p>}
-                                <Button className="ms-auto" disabled={saveProfile.isPending || !profileChanged || !profile.name.trim()}><Save />{saveProfile.isPending ? "Saving…" : "Save profile"}</Button>
+                                <Button type="submit" className="ms-auto" disabled={saveProfile.isPending || !profileChanged || !profile.name.trim()}><Save />{saveProfile.isPending ? "Saving…" : "Save profile"}</Button>
                             </div>
                             </fieldset>
                         </form>
@@ -253,7 +270,7 @@ export default function CompanySettingsPage() {
                         </div>
                         <div className="flex items-center justify-between gap-3">
                             {!canManageSettings && <p className="text-xs text-muted-foreground">You can view these settings but cannot edit them.</p>}
-                            <Button className="ms-auto" disabled={saveSettings.isPending || !settingsChanged}><Save />{saveSettings.isPending ? "Saving…" : "Save settings"}</Button>
+                            <Button type="submit" className="ms-auto" disabled={saveSettings.isPending || !settingsChanged}><Save />{saveSettings.isPending ? "Saving…" : "Save settings"}</Button>
                         </div>
                         </fieldset>
                     </form>
@@ -271,7 +288,7 @@ export default function CompanySettingsPage() {
                         <Toggle label="Main branch" description="Use this as the default location." checked={branch.isMain} onCheckedChange={(checked) => setBranch({ ...branch, isMain: checked, isActive: checked ? true : branch.isActive })} />
                         <Toggle label="Active" description="Allow operations in this branch." checked={branch.isActive} onCheckedChange={(checked) => setBranch({ ...branch, isActive: checked })} />
                     </div>
-                    <DialogFooter><Button variant="outline" onClick={() => setBranchDialog(false)}>Cancel</Button><Button disabled={!canManageBranches || saveBranch.isPending || !branch.name.trim() || !branch.code.trim()} onClick={() => saveBranch.mutate()}>{saveBranch.isPending ? <LoaderCircle className="animate-spin" /> : <Save />} Save branch</Button></DialogFooter>
+                    <DialogFooter><Button type="button" variant="outline" onClick={() => setBranchDialog(false)}>Cancel</Button><Button type="button" disabled={!canManageBranches || saveBranch.isPending || !branch.name.trim() || !branch.code.trim()} onClick={() => saveBranch.mutate()}>{saveBranch.isPending ? <LoaderCircle className="animate-spin" /> : <Save />} Save branch</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>
