@@ -81,7 +81,7 @@ public static class DependencyInjection
                 configuration.GetConnectionString("DefaultConnection"),
                 sqlOptions =>
                 {
-                    sqlOptions.CommandTimeout(60);
+                    sqlOptions.CommandTimeout(180);
                 });
         });
 

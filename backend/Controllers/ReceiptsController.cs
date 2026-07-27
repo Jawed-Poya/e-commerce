@@ -15,14 +15,16 @@ public sealed class ReceiptsController(IFinancialDocumentService documents) : Co
     public async Task<IActionResult> Pdf(
         string source,
         long id,
-        [FromQuery] bool thermal = false,
-        CancellationToken cancellationToken = default)
+        [FromQuery] bool thermal = false)
     {
         if (!CanViewSource(source)) return Forbid();
 
         try
         {
-            var receipt = await documents.GetReceiptAsync(source, id, cancellationToken);
+            using var operation = ServerOperation.CreateDocumentScope();
+            var receipt = await TransientSqlRetry.ExecuteAsync(
+                token => documents.GetReceiptAsync(source, id, token),
+                operation.Token);
             return File(
                 documents.CreateReceiptPdf(receipt, thermal),
                 "application/pdf",
@@ -42,14 +44,16 @@ public sealed class ReceiptsController(IFinancialDocumentService documents) : Co
     public async Task<IActionResult> Image(
         string source,
         long id,
-        [FromQuery] bool thermal = false,
-        CancellationToken cancellationToken = default)
+        [FromQuery] bool thermal = false)
     {
         if (!CanViewSource(source)) return Forbid();
 
         try
         {
-            var receipt = await documents.GetReceiptAsync(source, id, cancellationToken);
+            using var operation = ServerOperation.CreateDocumentScope();
+            var receipt = await TransientSqlRetry.ExecuteAsync(
+                token => documents.GetReceiptAsync(source, id, token),
+                operation.Token);
             return File(
                 documents.CreateReceiptImage(receipt, thermal),
                 "image/png",

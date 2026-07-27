@@ -54,7 +54,7 @@ class ApiClient {
         const response = await axiosInstance.get<Blob>(url, {
             params,
             responseType: "blob",
-            timeout: 120_000,
+            timeout: 600_000,
         });
         const disposition = response.headers["content-disposition"] as string | undefined;
         const encoded = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];

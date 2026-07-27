@@ -5,6 +5,7 @@ using ECommerce.Dtos.Documents;
 using ECommerce.Dtos.Reports;
 using ECommerce.Entities.Operations;
 using ECommerce.Services.Company;
+using ECommerce.Shared;
 using Microsoft.EntityFrameworkCore;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -24,10 +25,12 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
     private const string Red = "#B91C1C";
 
     public async Task<string> GetCompanyNameAsync(CancellationToken cancellationToken = default) =>
-        await context.Tenants.AsNoTracking()
-            .Where(item => item.Id == companyContext.CompanyId)
-            .Select(item => item.Name)
-            .SingleOrDefaultAsync(cancellationToken) ?? "Company";
+        await TransientSqlRetry.ExecuteAsync(
+            token => context.Tenants.AsNoTracking()
+                .Where(item => item.Id == companyContext.CompanyId)
+                .Select(item => item.Name)
+                .SingleOrDefaultAsync(token),
+            cancellationToken) ?? "Company";
 
     public byte[] CreateFinancialReportExcel(FinancialReportSummaryResponse report, string companyName)
     {
@@ -654,10 +657,12 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
 
     public async Task<ReceiptResponse> GetReceiptAsync(string source, long id, CancellationToken cancellationToken = default)
     {
-        var company = await context.Tenants.AsNoTracking()
-            .Where(item => item.Id == companyContext.CompanyId)
-            .Select(item => new { item.Name, item.LegalName, item.Phone, item.Email, item.Address, item.LogoUrl })
-            .SingleOrDefaultAsync(cancellationToken)
+        var company = await TransientSqlRetry.ExecuteAsync(
+            token => context.Tenants.AsNoTracking()
+                .Where(item => item.Id == companyContext.CompanyId)
+                .Select(item => new { item.Name, item.LegalName, item.Phone, item.Email, item.Address, item.LogoUrl })
+                .SingleOrDefaultAsync(token),
+            cancellationToken)
             ?? throw new InvalidOperationException("Company profile has not been configured.");
 
         if (source.Equals("orders", StringComparison.OrdinalIgnoreCase) || source.Equals("order", StringComparison.OrdinalIgnoreCase))
@@ -992,16 +997,18 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
 
     private async Task<DocumentCompanyProfile> GetDocumentCompanyAsync(CancellationToken cancellationToken)
     {
-        var company = await context.Tenants.AsNoTracking()
-            .Where(item => item.Id == companyContext.CompanyId)
-            .Select(item => new DocumentCompanyProfile(
-                item.Name,
-                item.LegalName,
-                item.Phone,
-                item.Email,
-                item.Address,
-                item.Setting != null ? item.Setting.MainCurrencyCode : "USD"))
-            .SingleOrDefaultAsync(cancellationToken);
+        var company = await TransientSqlRetry.ExecuteAsync(
+            token => context.Tenants.AsNoTracking()
+                .Where(item => item.Id == companyContext.CompanyId)
+                .Select(item => new DocumentCompanyProfile(
+                    item.Name,
+                    item.LegalName,
+                    item.Phone,
+                    item.Email,
+                    item.Address,
+                    item.Setting != null ? item.Setting.MainCurrencyCode : "USD"))
+                .SingleOrDefaultAsync(token),
+            cancellationToken);
 
         return company ?? throw new InvalidOperationException("Company profile has not been configured.");
     }

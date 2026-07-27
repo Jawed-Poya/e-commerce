@@ -1,6 +1,7 @@
 using ECommerce.Entities;
 using ECommerce.Entities.Users.Contracts;
 using ECommerce.Services.Auth;
+using ECommerce.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,12 +13,12 @@ public sealed class AuthController(IAuthService auth) : ControllerBase
 {
     [HttpPost("customer/register")]
     public async Task<ActionResult<ApiResponse<AuthResponse>>> RegisterCustomer(
-        RegisterCustomerRequest request,
-        CancellationToken cancellationToken)
+        RegisterCustomerRequest request)
     {
         try
         {
-            var response = await auth.RegisterCustomerAsync(request, cancellationToken);
+            using var operation = ServerOperation.CreateWriteScope();
+            var response = await auth.RegisterCustomerAsync(request, operation.Token);
             return StatusCode(StatusCodes.Status201Created,
                 ApiResponse<AuthResponse>.Ok(response, "Customer account created successfully."));
         }
@@ -33,13 +34,13 @@ public sealed class AuthController(IAuthService auth) : ControllerBase
 
     [HttpPost("customer/login")]
     public async Task<ActionResult<ApiResponse<AuthResponse>>> LoginCustomer(
-        LoginRequest request,
-        CancellationToken cancellationToken)
+        LoginRequest request)
     {
         try
         {
+            using var operation = ServerOperation.CreateReadScope();
             return Ok(ApiResponse<AuthResponse>.Ok(
-                await auth.LoginCustomerAsync(request, cancellationToken),
+                await auth.LoginCustomerAsync(request, operation.Token),
                 "Welcome back."));
         }
         catch (InvalidOperationException exception)
@@ -50,13 +51,13 @@ public sealed class AuthController(IAuthService auth) : ControllerBase
 
     [HttpPost("admin/login")]
     public async Task<ActionResult<ApiResponse<AuthResponse>>> LoginAdmin(
-        LoginRequest request,
-        CancellationToken cancellationToken)
+        LoginRequest request)
     {
         try
         {
+            using var operation = ServerOperation.CreateReadScope();
             return Ok(ApiResponse<AuthResponse>.Ok(
-                await auth.LoginAdminAsync(request, cancellationToken),
+                await auth.LoginAdminAsync(request, operation.Token),
                 "Admin login successful."));
         }
         catch (UnauthorizedAccessException exception)
@@ -71,9 +72,12 @@ public sealed class AuthController(IAuthService auth) : ControllerBase
 
     [Authorize]
     [HttpGet("me")]
-    public async Task<ActionResult<ApiResponse<AuthUserResponse>>> Me(CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResponse<AuthUserResponse>>> Me()
     {
-        var user = await auth.GetCurrentAsync(cancellationToken);
+        using var operation = ServerOperation.CreateReadScope();
+        var user = await TransientSqlRetry.ExecuteAsync(
+            token => auth.GetCurrentAsync(token),
+            operation.Token);
         return user is null
             ? Unauthorized(ApiResponse<object>.Fail("Authentication is required."))
             : Ok(ApiResponse<AuthUserResponse>.Ok(user));
@@ -81,10 +85,12 @@ public sealed class AuthController(IAuthService auth) : ControllerBase
 
     [Authorize]
     [HttpGet("profile")]
-    public async Task<ActionResult<ApiResponse<UserProfileResponse>>> Profile(
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResponse<UserProfileResponse>>> Profile()
     {
-        var profile = await auth.GetProfileAsync(cancellationToken);
+        using var operation = ServerOperation.CreateReadScope();
+        var profile = await TransientSqlRetry.ExecuteAsync(
+            token => auth.GetProfileAsync(token),
+            operation.Token);
         return profile is null
             ? Unauthorized(ApiResponse<object>.Fail("Authentication is required."))
             : Ok(ApiResponse<UserProfileResponse>.Ok(profile));
@@ -93,12 +99,12 @@ public sealed class AuthController(IAuthService auth) : ControllerBase
     [Authorize]
     [HttpPut("profile")]
     public async Task<ActionResult<ApiResponse<UserProfileResponse>>> UpdateProfile(
-        UpdateUserProfileRequest request,
-        CancellationToken cancellationToken)
+        UpdateUserProfileRequest request)
     {
         try
         {
-            var profile = await auth.UpdateProfileAsync(request, cancellationToken);
+            using var operation = ServerOperation.CreateWriteScope();
+            var profile = await auth.UpdateProfileAsync(request, operation.Token);
             return Ok(ApiResponse<UserProfileResponse>.Ok(profile, "Profile updated successfully."));
         }
         catch (ArgumentException exception)
@@ -114,12 +120,12 @@ public sealed class AuthController(IAuthService auth) : ControllerBase
     [Authorize]
     [HttpPost("change-password")]
     public async Task<ActionResult<ApiResponse<object>>> ChangePassword(
-        ChangePasswordRequest request,
-        CancellationToken cancellationToken)
+        ChangePasswordRequest request)
     {
         try
         {
-            await auth.ChangePasswordAsync(request, cancellationToken);
+            using var operation = ServerOperation.CreateWriteScope();
+            await auth.ChangePasswordAsync(request, operation.Token);
             return Ok(ApiResponse<object>.Ok(new { }, "Password changed successfully."));
         }
         catch (ArgumentException exception)

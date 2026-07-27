@@ -28,10 +28,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAdminAuth } from "@/features/auth/auth-context";
 import { profileService } from "@/features/profile/profile-service";
+import { useI18n } from "@/i18n/i18n-provider";
 
 export default function ProfilePage() {
     const auth = useAdminAuth();
     const queryClient = useQueryClient();
+    const { language, tr } = useI18n();
     const profile = useQuery({
         queryKey: ["admin-profile"],
         queryFn: profileService.get,
@@ -75,17 +77,17 @@ export default function ProfilePage() {
                 email: updated.email ?? "",
                 phone: updated.phone ?? "",
             });
-            toast.success("Profile updated successfully.");
+            toast.success(tr("Profile updated successfully."));
         },
-        onError: (error) => toast.error(errorMessage(error)),
+        onError: (error) => toast.error(tr(errorMessage(error))),
     });
 
     const changePassword = useMutation({
         mutationFn: async () => {
             if (passwords.newPassword !== passwords.confirmPassword)
-                throw new Error("New passwords do not match.");
+                throw new Error(tr("New passwords do not match."));
             if (passwords.newPassword.length < 6)
-                throw new Error("The new password must be at least 6 characters.");
+                throw new Error(tr("The new password must be at least 6 characters."));
 
             return profileService.changePassword({
                 currentPassword: passwords.currentPassword,
@@ -93,14 +95,14 @@ export default function ProfilePage() {
             });
         },
         onSuccess: () => {
-            toast.success("Password changed successfully.");
+            toast.success(tr("Password changed successfully."));
             setPasswords({
                 currentPassword: "",
                 newPassword: "",
                 confirmPassword: "",
             });
         },
-        onError: (error) => toast.error(errorMessage(error)),
+        onError: (error) => toast.error(tr(errorMessage(error))),
     });
 
     const profileChanged = Boolean(
@@ -181,7 +183,7 @@ export default function ProfilePage() {
                                 label="Member since"
                                 value={new Date(
                                     profile.data.createdAt,
-                                ).toLocaleDateString()}
+                                ).toLocaleDateString(language === "en" ? "en-US" : "fa-AF")}
                             />
                             <ProfileMeta
                                 icon={<UserRound />}
@@ -190,7 +192,7 @@ export default function ProfilePage() {
                                     profile.data.lastLoginAt
                                         ? new Date(
                                               profile.data.lastLoginAt,
-                                          ).toLocaleString()
+                                          ).toLocaleString(language === "en" ? "en-US" : "fa-AF")
                                         : "Not recorded"
                                 }
                             />
@@ -206,7 +208,14 @@ export default function ProfilePage() {
                                 Update the details used to identify your administrator account.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="grid gap-5 md:grid-cols-2">
+                        <CardContent>
+                            <form
+                                className="grid gap-5 md:grid-cols-2"
+                                onSubmit={(event) => {
+                                    event.preventDefault();
+                                    saveProfile.mutate();
+                                }}
+                            >
                             <div className="space-y-2 md:col-span-2">
                                 <Label htmlFor="profile-name">Full name</Label>
                                 <div className="relative">
@@ -261,7 +270,7 @@ export default function ProfilePage() {
                             </div>
                             <div className="flex justify-end md:col-span-2">
                                 <Button
-                                    onClick={() => saveProfile.mutate()}
+                                    type="submit"
                                     disabled={saveProfile.isPending || !profileChanged || !profileValid}
                                 >
                                     {saveProfile.isPending && (
@@ -270,6 +279,7 @@ export default function ProfilePage() {
                                     Save profile
                                 </Button>
                             </div>
+                            </form>
                         </CardContent>
                     </Card>
 
@@ -280,7 +290,14 @@ export default function ProfilePage() {
                                 Change your password using your current password for verification.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="grid gap-5 md:grid-cols-3">
+                        <CardContent>
+                            <form
+                                className="grid gap-5 md:grid-cols-3"
+                                onSubmit={(event) => {
+                                    event.preventDefault();
+                                    changePassword.mutate();
+                                }}
+                            >
                             <PasswordField
                                 id="current-password"
                                 label="Current password"
@@ -316,8 +333,8 @@ export default function ProfilePage() {
                             />
                             <div className="flex justify-end md:col-span-3">
                                 <Button
+                                    type="submit"
                                     variant="outline"
-                                    onClick={() => changePassword.mutate()}
                                     disabled={
                                         changePassword.isPending ||
                                         !passwords.currentPassword ||
@@ -333,6 +350,7 @@ export default function ProfilePage() {
                                     Change password
                                 </Button>
                             </div>
+                            </form>
                         </CardContent>
                     </Card>
 

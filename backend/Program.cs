@@ -13,10 +13,15 @@ var builder = WebApplication.CreateBuilder(args);
 
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
-builder.Services.AddControllers().AddJsonOptions(options =>
-{
-    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-});
+builder.Services
+    .AddControllers(options =>
+    {
+        options.ModelBinderProviders.Insert(0, new StableCancellationTokenModelBinderProvider());
+    })
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
 builder.Services.AddCatalog();
 builder.Services.AddInfrastructure(builder.Configuration);

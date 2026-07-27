@@ -1,9 +1,13 @@
+using ECommerce.Data;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace ECommerce.Migrations;
 
+[DbContext(typeof(ApplicationDbContext))]
+[Migration("20260724150000_FixProductPrimaryImageReplacement")]
 public partial class FixProductPrimaryImageReplacement : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
