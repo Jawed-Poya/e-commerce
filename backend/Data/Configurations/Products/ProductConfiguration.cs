@@ -35,6 +35,13 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(x => x.ViewCount)
             .HasDefaultValue(0L);
 
+        builder.Property(x => x.DisplayStockQuantity)
+            .HasPrecision(18, 3);
+
+        builder.ToTable(table => table.HasCheckConstraint(
+            "CK_Product_DisplayStockQuantity",
+            "[DisplayStockQuantity] IS NULL OR [DisplayStockQuantity] >= 0"));
+
         builder.HasIndex(x => new { x.TenantId, x.Barcode })
             .IsUnique()
             .HasFilter("[Barcode] IS NOT NULL");

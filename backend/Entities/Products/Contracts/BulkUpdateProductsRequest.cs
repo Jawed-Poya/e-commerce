@@ -43,6 +43,8 @@ public sealed class BulkUpdateProductItemRequest
     public long? UnitId { get; set; }
     public int? MinimumValue { get; set; }
     public int? MaximumValue { get; set; }
+    public bool UsesDisplayStock { get; set; }
+    public decimal? DisplayStockQuantity { get; set; }
     public bool IsFeatured { get; set; }
     public bool IsActive { get; set; }
     public List<ProductPriceItemRequest> Prices { get; set; } = [];

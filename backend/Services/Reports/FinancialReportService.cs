@@ -150,7 +150,9 @@ public sealed class FinancialReportService(ApplicationDbContext context) : IFina
             .SumAsync(item => (decimal?)(item.NetAmount > item.PaidAmount ? item.NetAmount - item.PaidAmount : 0), cancellationToken) ?? 0;
 
         var customerQuery = context.Customers.AsNoTracking().AsQueryable();
-        var inventoryQuery = context.ProductInventories.AsNoTracking().AsQueryable();
+        var inventoryQuery = context.ProductInventories.AsNoTracking()
+            .Where(item => !item.Product.UsesDisplayStock)
+            .AsQueryable();
         if (request.BranchId.HasValue)
         {
             customerQuery = customerQuery.Where(item => item.BranchId == request.BranchId.Value);
@@ -158,7 +160,8 @@ public sealed class FinancialReportService(ApplicationDbContext context) : IFina
         }
 
         var customerCount = await customerQuery.CountAsync(cancellationToken);
-        var productCount = await context.Products.CountAsync(cancellationToken);
+        var productCount = await context.Products
+            .CountAsync(item => !item.UsesDisplayStock, cancellationToken);
         var healthyInventoryProducts = await inventoryQuery
             .GroupBy(item => item.ProductId)
             .Where(group => group.Sum(item => item.Quantity - item.ReservedQuantity) >
@@ -926,14 +929,16 @@ public sealed class FinancialReportService(ApplicationDbContext context) : IFina
         if (asOf >= todayEnd.Date)
         {
             return await context.InventoryLots.AsNoTracking()
-                .Where(item => item.Quantity > 0 && item.UnitCost.HasValue &&
+                .Where(item => !item.Product.UsesDisplayStock &&
+                    item.Quantity > 0 && item.UnitCost.HasValue &&
                     (!branchId.HasValue || item.BranchId == branchId.Value))
                 .SumAsync(item => (decimal?)(item.Quantity * item.UnitCost!.Value), cancellationToken) ?? 0;
         }
 
         var asOfOnly = DateOnly.FromDateTime(asOf);
         var purchases = await context.PurchaseItems.AsNoTracking()
-            .Where(item => item.Purchase.PurchaseDate <= asOfOnly &&
+            .Where(item => !item.Product.UsesDisplayStock &&
+                item.Purchase.PurchaseDate <= asOfOnly &&
                 item.Purchase.Status != PurchaseStatus.Cancelled &&
                 (!branchId.HasValue || item.Purchase.BranchId == branchId.Value))
             .GroupBy(item => item.ProductId)
@@ -945,13 +950,15 @@ public sealed class FinancialReportService(ApplicationDbContext context) : IFina
             })
             .ToListAsync(cancellationToken);
         var onlineSold = await context.OrderItems.AsNoTracking()
-            .Where(item => item.Order.CreatedAt <= asOf && item.Order.Status != OrderStatus.Cancelled &&
+            .Where(item => item.AffectsInventory &&
+                item.Order.CreatedAt <= asOf && item.Order.Status != OrderStatus.Cancelled &&
                 (!branchId.HasValue || item.Order.BranchId == branchId.Value))
             .GroupBy(item => item.ProductId)
             .Select(group => new { ProductId = group.Key, Quantity = group.Sum(item => item.Quantity) })
             .ToDictionaryAsync(item => item.ProductId, item => item.Quantity, cancellationToken);
         var manualSold = await context.InventorySaleItems.AsNoTracking()
-            .Where(item => item.InventorySale.SaleDate <= asOfOnly &&
+            .Where(item => !item.Product.UsesDisplayStock &&
+                item.InventorySale.SaleDate <= asOfOnly &&
                 (!branchId.HasValue || item.InventorySale.BranchId == branchId.Value))
             .GroupBy(item => item.ProductId)
             .Select(group => new { ProductId = group.Key, Quantity = group.Sum(item => item.Quantity) })

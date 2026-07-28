@@ -20,6 +20,9 @@ export interface ProductListItem {
     unitId: number | null;
     minimumValue: number | null;
     maximumValue: number | null;
+    usesDisplayStock: boolean;
+    displayStockQuantity: number | null;
+    inventoryStock: number;
     isFeatured: boolean;
     isActive: boolean;
     stock: number;
@@ -41,7 +44,7 @@ export interface ProductListImage {
     sortOrder: number;
 }
 
-export interface ProductDetails extends Omit<ProductListItem, "stock" | "price" | "primaryImageUrl" | "images"> {
+export interface ProductDetails extends Omit<ProductListItem, "price" | "primaryImageUrl" | "images"> {
     brandName: string | null;
     unitName: string | null;
     priceCustomerTypeId: number | null;
@@ -104,6 +107,8 @@ export interface CreateSingleProductInput {
     unitId?: number | null;
     minimumValue?: number | null;
     maximumValue?: number | null;
+    usesDisplayStock: boolean;
+    displayStockQuantity?: number | null;
     isFeatured: boolean;
     isActive: boolean;
     prices: ProductPriceInput[];
@@ -117,7 +122,7 @@ export interface CreateSingleProductResult {
 export type BulkUpdateProduct = Pick<ProductListItem,
     "id" | "name" | "barcode" | "categoryId" | "brandId" | "unitId" |
     "shortDescription" | "description" | "slug" | "minimumValue" |
-    "maximumValue" | "isFeatured" | "isActive" | "primaryImageUrl" | "images"> & { image?: File; galleryImages?: File[]; removedImageIds?: number[]; prices: ProductPriceInput[] };
+    "maximumValue" | "usesDisplayStock" | "displayStockQuantity" | "isFeatured" | "isActive" | "primaryImageUrl" | "images"> & { image?: File; galleryImages?: File[]; removedImageIds?: number[]; prices: ProductPriceInput[] };
 
 function append(formData: FormData, key: string, value: string | number | boolean | null | undefined) {
     if (value !== null && value !== undefined) formData.append(key, String(value));
@@ -142,6 +147,8 @@ export const productService = {
         append(formData, `${prefix}.UnitId`, product.unitId);
         append(formData, `${prefix}.MinimumValue`, product.minimumValue);
         append(formData, `${prefix}.MaximumValue`, product.maximumValue);
+        append(formData, `${prefix}.UsesDisplayStock`, product.usesDisplayStock);
+        append(formData, `${prefix}.DisplayStockQuantity`, product.usesDisplayStock ? product.displayStockQuantity ?? 0 : null);
         append(formData, `${prefix}.IsFeatured`, product.isFeatured);
         append(formData, `${prefix}.IsActive`, product.isActive);
         product.prices.forEach((price, index) => {
@@ -169,6 +176,8 @@ export const productService = {
             append(formData, `${prefix}.UnitId`, product.unitId);
             append(formData, `${prefix}.MinimumValue`, product.minimumValue);
             append(formData, `${prefix}.MaximumValue`, product.maximumValue);
+            append(formData, `${prefix}.UsesDisplayStock`, product.usesDisplayStock);
+            append(formData, `${prefix}.DisplayStockQuantity`, product.usesDisplayStock ? product.displayStockQuantity ?? 0 : null);
             append(formData, `${prefix}.IsFeatured`, product.isFeatured);
             append(formData, `${prefix}.IsActive`, product.isActive);
             if (product.image) formData.append(`${prefix}.Image`, product.image, product.image.name);

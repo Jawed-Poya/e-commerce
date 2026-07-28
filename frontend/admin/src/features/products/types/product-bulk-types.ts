@@ -37,6 +37,8 @@ export interface ProductBulkItemFormValues {
 
     minimumValue: number | null;
     maximumValue: number | null;
+    usesDisplayStock: boolean;
+    displayStockQuantity: number | null;
 
     categoryId: number;
     brandId: number | null;

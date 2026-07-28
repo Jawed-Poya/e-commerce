@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ImagePlus, LoaderCircle, PackagePlus, Save, X } from "lucide-react";
+import { ArrowLeft, Eye, ImagePlus, LoaderCircle, PackagePlus, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { SimpleCombobox } from "@/components/simple-combobox";
@@ -19,7 +19,7 @@ import { productService, resolveProductImageUrl } from "@/services/product.servi
 import { IMAGE_FILE_ACCEPT, isSupportedImageFile, MAXIMUM_IMAGE_FILE_SIZE } from "@/lib/image-files";
 import { CustomerPricingFields, activePriceInputs, createCustomerPriceDrafts, validatePriceDrafts, type CustomerPriceDraft } from "./customer-pricing-fields";
 
-const empty = { name: "", barcode: "", shortDescription: "", description: "", slug: "", categoryId: 0, brandId: null as number | null, unitId: null as number | null, minimumValue: null as number | null, maximumValue: null as number | null, isFeatured: false, isActive: true };
+const empty = { name: "", barcode: "", shortDescription: "", description: "", slug: "", categoryId: 0, brandId: null as number | null, unitId: null as number | null, minimumValue: null as number | null, maximumValue: null as number | null, usesDisplayStock: false, displayStockQuantity: null as number | null, isFeatured: false, isActive: true };
 
 export function ProductEditorPage() {
   const params = useParams();
@@ -38,7 +38,7 @@ export function ProductEditorPage() {
 
   useEffect(() => {
     if (!product) return;
-    setForm({ name: product.name, barcode: product.barcode ?? "", shortDescription: product.shortDescription ?? "", description: product.description ?? "", slug: product.slug ?? "", categoryId: product.categoryId, brandId: product.brandId, unitId: product.unitId, minimumValue: product.minimumValue, maximumValue: product.maximumValue, isFeatured: product.isFeatured, isActive: product.isActive });
+    setForm({ name: product.name, barcode: product.barcode ?? "", shortDescription: product.shortDescription ?? "", description: product.description ?? "", slug: product.slug ?? "", categoryId: product.categoryId, brandId: product.brandId, unitId: product.unitId, minimumValue: product.minimumValue, maximumValue: product.maximumValue, usesDisplayStock: product.usesDisplayStock, displayStockQuantity: product.displayStockQuantity, isFeatured: product.isFeatured, isActive: product.isActive });
   }, [product]);
 
   useEffect(() => {
@@ -71,6 +71,8 @@ export function ProductEditorPage() {
     if (form.minimumValue != null && form.minimumValue < 0) return toast.error("Minimum value cannot be negative.");
     if (form.maximumValue != null && form.maximumValue < 0) return toast.error("Maximum value cannot be negative.");
     if (form.minimumValue != null && form.maximumValue != null && form.minimumValue > form.maximumValue) return toast.error("Maximum value must be at least the minimum value.");
+    if (form.usesDisplayStock && form.displayStockQuantity == null) return toast.error("Enter the quantity customers should see.");
+    if (form.displayStockQuantity != null && form.displayStockQuantity < 0) return toast.error("Display quantity cannot be negative.");
     const activePrices = activePriceInputs(prices);
     const pricingError = canManagePricing ? validatePriceDrafts(prices) : null;
     if (pricingError) return toast.error(pricingError);
@@ -112,6 +114,19 @@ export function ProductEditorPage() {
           <Field label="Slug"><Input value={form.slug} onChange={e => setForm(x => ({ ...x, slug: e.target.value }))} placeholder="Generated automatically when empty" /></Field>
           <Field label="Minimum value"><Input type="number" min={0} value={form.minimumValue ?? ""} onChange={e => setForm(x => ({ ...x, minimumValue: e.target.value ? Number(e.target.value) : null }))} /></Field>
           <Field label="Maximum value"><Input type="number" min={0} value={form.maximumValue ?? ""} onChange={e => setForm(x => ({ ...x, maximumValue: e.target.value ? Number(e.target.value) : null }))} /></Field>
+          <div className="md:col-span-2 rounded-xl border border-primary/20 bg-primary/[0.035] p-4">
+            <label className="flex cursor-pointer items-start justify-between gap-4">
+              <span className="flex min-w-0 gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Eye className="size-5" /></span>
+                <span><strong className="block text-sm">Display stock</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">Show a customer-facing quantity without reserving or reducing physical inventory.</span></span>
+              </span>
+              <Checkbox checked={form.usesDisplayStock} onCheckedChange={value => setForm(current => ({ ...current, usesDisplayStock: value === true, displayStockQuantity: value === true ? current.displayStockQuantity : null }))} />
+            </label>
+            {form.usesDisplayStock ? <div className="mt-4 grid gap-2 border-t border-primary/10 pt-4 sm:grid-cols-[minmax(0,260px)_1fr] sm:items-end">
+              <Field label="Customer-visible quantity *"><Input type="number" min={0} step="any" value={form.displayStockQuantity ?? ""} onChange={event => setForm(current => ({ ...current, displayStockQuantity: event.target.value === "" ? null : Number(event.target.value) }))} placeholder="For example: 250" /></Field>
+              <p className="pb-2 text-xs leading-5 text-muted-foreground">Customers can order up to this amount. Orders stay in the normal order workflow, but stock reservations and inventory valuation are not changed.</p>
+            </div> : null}
+          </div>
           <div className="md:col-span-2"><Field label="Short description"><Textarea value={form.shortDescription} onChange={e => setForm(x => ({ ...x, shortDescription: e.target.value }))} rows={2} /></Field></div>
           <div className="md:col-span-2"><Field label="Full description"><Textarea value={form.description} onChange={e => setForm(x => ({ ...x, description: e.target.value }))} rows={6} /></Field></div>
           <label className="flex items-center gap-3 rounded-lg border p-3"><Checkbox checked={form.isActive} onCheckedChange={v => setForm(x => ({ ...x, isActive: v === true }))} /><span><strong className="block text-sm">Active product</strong><span className="text-xs text-muted-foreground">Visible and available for sale.</span></span></label>

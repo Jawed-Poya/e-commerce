@@ -85,8 +85,12 @@ public class ProductService : IProductService
         if (filter.InStock.HasValue)
         {
             products = filter.InStock.Value
-                ? products.Where(product => product.Inventory != null && product.Inventory.Quantity - product.Inventory.ReservedQuantity > 0)
-                : products.Where(product => product.Inventory == null || product.Inventory.Quantity - product.Inventory.ReservedQuantity <= 0);
+                ? products.Where(product => product.UsesDisplayStock
+                    ? (product.DisplayStockQuantity ?? 0) > 0
+                    : product.Inventory != null && product.Inventory.Quantity - product.Inventory.ReservedQuantity > 0)
+                : products.Where(product => product.UsesDisplayStock
+                    ? (product.DisplayStockQuantity ?? 0) <= 0
+                    : product.Inventory == null || product.Inventory.Quantity - product.Inventory.ReservedQuantity <= 0);
         }
 
         var query = products.Select(product => new ProductListProjection
@@ -103,9 +107,14 @@ public class ProductService : IProductService
             UnitId = product.UnitId,
             MinimumValue = product.MinimumValue,
             MaximumValue = product.MaximumValue,
+            UsesDisplayStock = product.UsesDisplayStock,
+            DisplayStockQuantity = product.DisplayStockQuantity,
             IsFeatured = product.IsFeatured,
             IsActive = product.IsActive,
-            Stock = product.Inventory == null ? 0 : product.Inventory.Quantity - product.Inventory.ReservedQuantity,
+            InventoryStock = product.Inventory == null ? 0 : product.Inventory.Quantity - product.Inventory.ReservedQuantity,
+            Stock = product.UsesDisplayStock
+                ? product.DisplayStockQuantity ?? 0
+                : product.Inventory == null ? 0 : product.Inventory.Quantity - product.Inventory.ReservedQuantity,
             HasRequestedPrice = product.Prices.Any(price => price.CustomerTypeId == effectiveTypeId),
             Price = product.Prices
                 .Where(price => price.CustomerTypeId == effectiveTypeId)
@@ -199,9 +208,12 @@ public class ProductService : IProductService
                 product.UnitId,
                 product.MinimumValue,
                 product.MaximumValue,
+                product.UsesDisplayStock,
+                product.DisplayStockQuantity,
                 product.IsFeatured,
                 product.IsActive,
                 product.Stock,
+                product.InventoryStock,
                 product.Price,
                 product.OldPrice,
                 product.PriceCustomerTypeName,
@@ -295,8 +307,14 @@ public class ProductService : IProductService
         {
             foreach (var item in request.Products)
             {
-                if (string.IsNullOrWhiteSpace(item.Name) || (item.MinimumValue.HasValue && item.MaximumValue.HasValue && item.MinimumValue > item.MaximumValue))
-                    throw new ProductValidationException(new Dictionary<string, string[]> { ["Products"] = ["Names are required and maximum value must be at least minimum value."] });
+                if (string.IsNullOrWhiteSpace(item.Name) ||
+                    (item.MinimumValue.HasValue && item.MaximumValue.HasValue && item.MinimumValue > item.MaximumValue) ||
+                    (item.UsesDisplayStock && !item.DisplayStockQuantity.HasValue) ||
+                    (item.DisplayStockQuantity.HasValue && item.DisplayStockQuantity < 0))
+                    throw new ProductValidationException(new Dictionary<string, string[]>
+                    {
+                        ["Products"] = ["Names are required, maximum value must be at least minimum value, and display stock requires a non-negative customer-visible quantity."]
+                    });
 
                 var product = products[item.Id];
                 product.Name = item.Name.Trim();
@@ -309,6 +327,10 @@ public class ProductService : IProductService
                 product.UnitId = item.UnitId;
                 product.MinimumValue = item.MinimumValue;
                 product.MaximumValue = item.MaximumValue;
+                product.UsesDisplayStock = item.UsesDisplayStock;
+                product.DisplayStockQuantity = item.UsesDisplayStock
+                    ? item.DisplayStockQuantity ?? 0
+                    : null;
                 product.IsFeatured = item.IsFeatured;
                 product.IsActive = item.IsActive;
                 product.UpdatedAt = DateTime.UtcNow;
@@ -445,6 +467,16 @@ public class ProductService : IProductService
             Slug = product.Slug,
             MinimumValue = product.MinimumValue,
             MaximumValue = product.MaximumValue,
+            UsesDisplayStock = product.UsesDisplayStock,
+            DisplayStockQuantity = product.DisplayStockQuantity,
+            InventoryStock = product.Inventory is null
+                ? 0
+                : Math.Max(0, product.Inventory.Quantity - product.Inventory.ReservedQuantity),
+            Stock = product.UsesDisplayStock
+                ? Math.Max(0, product.DisplayStockQuantity ?? 0)
+                : product.Inventory is null
+                    ? 0
+                    : Math.Max(0, product.Inventory.Quantity - product.Inventory.ReservedQuantity),
             CategoryId = product.CategoryId,
             CategoryName = product.Category.Name,
             BrandId = product.BrandId,
@@ -558,6 +590,10 @@ public class ProductService : IProductService
 
         entity.MinimumValue = model.MinimumValue;
         entity.MaximumValue = model.MaximumValue;
+        entity.UsesDisplayStock = model.UsesDisplayStock;
+        entity.DisplayStockQuantity = model.UsesDisplayStock
+            ? model.DisplayStockQuantity ?? 0
+            : null;
 
         entity.UpdatedAt = DateTime.UtcNow;
 
@@ -697,6 +733,10 @@ public class ProductService : IProductService
                         item.Request.MinimumValue,
                     MaximumValue =
                         item.Request.MaximumValue,
+                    UsesDisplayStock = item.Request.UsesDisplayStock,
+                    DisplayStockQuantity = item.Request.UsesDisplayStock
+                        ? item.Request.DisplayStockQuantity ?? 0
+                        : null,
 
                     CategoryId =
                         item.Request.CategoryId,
@@ -1115,9 +1155,12 @@ public class ProductService : IProductService
         public long? UnitId { get; init; }
         public int? MinimumValue { get; init; }
         public int? MaximumValue { get; init; }
+        public bool UsesDisplayStock { get; init; }
+        public decimal? DisplayStockQuantity { get; init; }
         public bool IsFeatured { get; init; }
         public bool IsActive { get; init; }
         public decimal Stock { get; init; }
+        public decimal InventoryStock { get; init; }
         public bool HasRequestedPrice { get; init; }
         public decimal? Price { get; init; }
         public decimal? OldPrice { get; init; }
@@ -1197,6 +1240,24 @@ public class ProductService : IProductService
                     errors,
                     $"Products[{index}].MaximumValue",
                     "Maximum value must be greater than or equal to minimum value."
+                );
+            }
+
+            if (product.UsesDisplayStock && !product.DisplayStockQuantity.HasValue)
+            {
+                AddError(
+                    errors,
+                    $"Products[{index}].DisplayStockQuantity",
+                    "Enter the quantity customers should see."
+                );
+            }
+
+            if (product.DisplayStockQuantity.HasValue && product.DisplayStockQuantity.Value < 0)
+            {
+                AddError(
+                    errors,
+                    $"Products[{index}].DisplayStockQuantity",
+                    "Display quantity cannot be negative."
                 );
             }
 

@@ -112,8 +112,17 @@ public sealed class OrderService(
                 var requested = requestByProductId[product.Id];
                 ValidateRequestedQuantity(product, requested.Quantity);
 
-                if (product.Inventory is null || product.Inventory.AvailableQuantity < requested.Quantity)
+                if (product.UsesDisplayStock)
+                {
+                    var displayQuantity = Math.Max(0, product.DisplayStockQuantity ?? 0);
+                    if (displayQuantity < requested.Quantity)
+                        throw new InvalidOperationException(
+                            $"Only {displayQuantity:N3} unit(s) of '{product.Name}' are currently available to order.");
+                }
+                else if (product.Inventory is null || product.Inventory.AvailableQuantity < requested.Quantity)
+                {
                     throw new InvalidOperationException($"Insufficient stock for '{product.Name}'.");
+                }
 
                 var unitPrice = ResolveEffectivePrice(
                     product,
@@ -128,6 +137,7 @@ public sealed class OrderService(
                     Quantity = requested.Quantity,
                     UnitPrice = unitPrice,
                     UnitCost = productCosts.GetValueOrDefault(product.Id),
+                    AffectsInventory = !product.UsesDisplayStock,
                     Discount = 0,
                     Tax = 0,
                     ProductName = product.Name,
@@ -191,10 +201,11 @@ public sealed class OrderService(
             context.Orders.Add(order);
             await context.SaveChangesAsync(cancellationToken);
 
-            foreach (var product in products)
+            foreach (var product in products.Where(item => !item.UsesDisplayStock))
             {
                 var quantity = requestByProductId[product.Id].Quantity;
-                var inventory = product.Inventory;
+                var inventory = product.Inventory
+                    ?? throw new InvalidOperationException($"Inventory is not configured for '{product.Name}'.");
                 var quantityBefore = inventory.Quantity;
                 var reservedBefore = inventory.ReservedQuantity;
 
@@ -710,13 +721,16 @@ public sealed class OrderService(
 
     private IReadOnlyCollection<RestockedProduct> ReleaseReservedStock(OrderEntity order)
     {
-        var productIds = order.Items.Select(item => item.ProductId).Distinct().ToArray();
+        var inventoryItems = order.Items.Where(item => item.AffectsInventory).ToArray();
+        if (inventoryItems.Length == 0) return [];
+
+        var productIds = inventoryItems.Select(item => item.ProductId).Distinct().ToArray();
         var inventories = context.ProductInventories
             .Where(item => productIds.Contains(item.ProductId))
             .ToDictionary(item => item.ProductId);
         var restockedProducts = new List<RestockedProduct>();
 
-        foreach (var item in order.Items)
+        foreach (var item in inventoryItems)
         {
             if (!inventories.TryGetValue(item.ProductId, out var inventory) ||
                 inventory.ReservedQuantity < item.Quantity)
@@ -754,12 +768,15 @@ public sealed class OrderService(
 
     private void CommitReservedStock(OrderEntity order)
     {
-        var productIds = order.Items.Select(item => item.ProductId).Distinct().ToArray();
+        var inventoryItems = order.Items.Where(item => item.AffectsInventory).ToArray();
+        if (inventoryItems.Length == 0) return;
+
+        var productIds = inventoryItems.Select(item => item.ProductId).Distinct().ToArray();
         var inventories = context.ProductInventories
             .Where(item => productIds.Contains(item.ProductId))
             .ToDictionary(item => item.ProductId);
 
-        foreach (var item in order.Items)
+        foreach (var item in inventoryItems)
         {
             if (!inventories.TryGetValue(item.ProductId, out var inventory) ||
                 inventory.ReservedQuantity < item.Quantity ||

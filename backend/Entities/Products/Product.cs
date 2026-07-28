@@ -1,4 +1,4 @@
-﻿using API.Entities.Common;
+using API.Entities.Common;
 using API.Entities.Types;
 
 namespace API.Entities.Products;
@@ -16,6 +16,14 @@ public class Product : BaseEntity
     public int? MinimumValue { get; set; }
 
     public int? MaximumValue { get; set; }
+
+    /// <summary>
+    /// Uses a storefront-only quantity that never reserves or reduces physical inventory.
+    /// Useful for supplier-backed, made-to-order, or display catalog products.
+    /// </summary>
+    public bool UsesDisplayStock { get; set; }
+
+    public decimal? DisplayStockQuantity { get; set; }
 
     public long CategoryId { get; set; }
 

@@ -270,6 +270,8 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
                 item.Category.Name,
                 item.Brand != null ? item.Brand.Name : null,
                 item.Unit != null ? item.Unit.Name : null,
+                item.UsesDisplayStock,
+                item.DisplayStockQuantity,
                 context.ProductInventories
                     .Where(stock => stock.ProductId == item.Id &&
                         (!filter.BranchId.HasValue || stock.BranchId == filter.BranchId.Value))
@@ -288,7 +290,8 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
             .ToArrayAsync(cancellationToken);
 
         var currency = company.CurrencyCode;
-        var lowStock = products.Count(item => item.Stock <= item.MinimumStock);
+        var inventoryProducts = products.Where(item => !item.UsesDisplayStock).ToArray();
+        var lowStock = inventoryProducts.Count(item => item.Stock <= item.MinimumStock);
         var model = new OperationalPdfModel(
             company,
             "Product catalog and stock report",
@@ -298,8 +301,8 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
                 new("Products", products.Length.ToString("N0"), Navy),
                 new("Active", products.Count(item => item.IsActive).ToString("N0"), Green),
                 new("Low stock", lowStock.ToString("N0"), lowStock > 0 ? Red : Green),
-                new("Available units", products.Sum(item => item.Stock).ToString("N2"), Slate),
-                new("Catalog value", Money(products.Sum(item => item.Stock * (item.Price ?? 0)), currency), Navy)
+                new("Physical units", inventoryProducts.Sum(item => item.Stock).ToString("N2"), Slate),
+                new("Inventory value", Money(inventoryProducts.Sum(item => item.Stock * (item.Price ?? 0)), currency), Navy)
             ],
             ["Product", "Barcode", "Category", "Brand / unit", "Stock", "Minimum", "Price", "Status"],
             products.Select(item => new[]
@@ -308,10 +311,12 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
                 item.Barcode ?? "—",
                 item.Category,
                 JoinNonEmpty(item.Brand, item.Unit),
-                item.Stock.ToString("N2"),
-                item.MinimumStock.ToString("N2"),
+                item.UsesDisplayStock ? $"{(item.DisplayStockQuantity ?? 0):N2} display" : item.Stock.ToString("N2"),
+                item.UsesDisplayStock ? "—" : item.MinimumStock.ToString("N2"),
                 item.Price.HasValue ? Money(item.Price.Value, currency) : "Not priced",
-                item.IsActive ? item.IsFeatured ? "Active · Featured" : "Active" : "Inactive"
+                item.UsesDisplayStock
+                    ? item.IsActive ? "Display stock · Active" : "Display stock · Inactive"
+                    : item.IsActive ? item.IsFeatured ? "Active · Featured" : "Active" : "Inactive"
             }).ToArray(),
             [2.3f, 1.1f, 1.25f, 1.15f, .75f, .75f, 1f, 1f],
             [4, 5, 6]);
@@ -1330,6 +1335,8 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
         string Category,
         string? Brand,
         string? Unit,
+        bool UsesDisplayStock,
+        decimal? DisplayStockQuantity,
         decimal Stock,
         decimal MinimumStock,
         decimal? Price,

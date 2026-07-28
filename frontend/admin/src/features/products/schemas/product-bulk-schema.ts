@@ -62,6 +62,13 @@ export const ProductBulkItemSchema = z
             .nonnegative("Maximum value cannot be negative.")
             .nullable(),
 
+        usesDisplayStock: z.boolean(),
+
+        displayStockQuantity: z
+            .number()
+            .nonnegative("Display quantity cannot be negative.")
+            .nullable(),
+
         categoryId: z.number().int().positive("Please select a category."),
 
         brandId: z.number().int().positive().nullable(),
@@ -95,6 +102,14 @@ export const ProductBulkItemSchema = z
                 path: ["maximumValue"],
                 message:
                     "Maximum value must be greater than or equal to minimum value.",
+            });
+        }
+
+        if (product.usesDisplayStock && product.displayStockQuantity === null) {
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["displayStockQuantity"],
+                message: "Enter the quantity customers should see.",
             });
         }
 
