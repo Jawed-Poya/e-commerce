@@ -262,8 +262,12 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
                 (item.Barcode != null && item.Barcode.Contains(search)) ||
                 item.Category.Name.Contains(search));
 
-        var products = await productsQuery
-            .OrderBy(item => item.Name)
+        IQueryable<API.Entities.Products.Product> orderedProducts = productsQuery.OrderBy(item => item.Name);
+        var maxRows = NormalizeDocumentRowLimit(filter.MaxRows);
+        if (maxRows.HasValue)
+            orderedProducts = orderedProducts.Take(maxRows.Value);
+
+        var products = await orderedProducts
             .Select(item => new ProductDocumentRow(
                 item.Name,
                 item.Barcode,
@@ -1158,6 +1162,12 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
         if (currency.Length != 3 || !currency.All(char.IsLetter))
             throw new ArgumentException("Currency code must contain exactly three letters.");
         return currency;
+    }
+
+    private static int? NormalizeDocumentRowLimit(int? value)
+    {
+        if (!value.HasValue) return null;
+        return Math.Clamp(value.Value, 1, 50_000);
     }
 
     private static string? CleanSearch(string? search)

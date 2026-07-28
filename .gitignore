@@ -8,3 +8,6 @@ backend/wwwroot/uploads/
 .agents/
 .codex/
 AGENTS.md
+
+# Local performance-test output
+performance-results/
