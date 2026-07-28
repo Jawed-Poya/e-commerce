@@ -13,8 +13,18 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
         return new PublicCompanyProfileResponse(
             company.Id,
             company.Name,
+            company.LegalName,
+            company.Email,
+            company.Phone,
+            company.Address,
             company.LogoUrl,
             company.FaviconUrl,
+            company.Branches
+                .Where(item => item.IsActive)
+                .OrderByDescending(item => item.IsMain)
+                .ThenBy(item => item.Name)
+                .Select(Map)
+                .ToArray(),
             Map(company.Setting ?? DefaultSettings(company.Id)));
     }
 
@@ -80,10 +90,16 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
     {
         ValidateBranch(request);
         var code = request.Code.Trim().ToUpperInvariant();
-        if (await context.Branches.AnyAsync(item => item.Code == code, cancellationToken))
+        if (await context.Branches.AnyAsync(
+                item => item.TenantId == companyContext.CompanyId && item.Code == code,
+                cancellationToken))
             throw new InvalidOperationException("A branch with this code already exists.");
         if (request.IsMain)
-            await context.Branches.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.IsMain, false), cancellationToken);
+            await context.Branches
+                .Where(item => item.TenantId == companyContext.CompanyId)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(item => item.IsMain, false),
+                    cancellationToken);
 
         var branch = new Branch
         {
@@ -106,18 +122,26 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
         CancellationToken cancellationToken = default)
     {
         ValidateBranch(request);
-        var branch = await context.Branches.SingleOrDefaultAsync(item => item.Id == id, cancellationToken)
+        var branch = await context.Branches.SingleOrDefaultAsync(
+                item => item.Id == id && item.TenantId == companyContext.CompanyId,
+                cancellationToken)
             ?? throw new KeyNotFoundException("Branch was not found.");
         var code = request.Code.Trim().ToUpperInvariant();
-        if (await context.Branches.AnyAsync(item => item.Id != id && item.Code == code, cancellationToken))
+        if (await context.Branches.AnyAsync(
+                item => item.TenantId == companyContext.CompanyId &&
+                    item.Id != id && item.Code == code,
+                cancellationToken))
             throw new InvalidOperationException("A branch with this code already exists.");
         if (branch.IsMain && !request.IsActive)
             throw new ArgumentException("The main branch must remain active.");
         if (branch.IsMain && !request.IsMain)
             throw new ArgumentException("Assign another branch as main before changing the current main branch.");
         if (request.IsMain)
-            await context.Branches.Where(item => item.Id != id)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.IsMain, false), cancellationToken);
+            await context.Branches
+                .Where(item => item.TenantId == companyContext.CompanyId && item.Id != id)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(item => item.IsMain, false),
+                    cancellationToken);
 
         branch.Name = request.Name.Trim();
         branch.Code = code;

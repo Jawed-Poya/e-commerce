@@ -23,6 +23,7 @@ import {
     SelectValue,
 } from "../../shared/components/ui/select";
 import { Skeleton } from "../../shared/components/ui/skeleton";
+import { formatMoney } from "../../shared/lib/money";
 import type { CategoryLookup } from "../../shared/types/product";
 import { useI18n } from "../../i18n/i18n-provider";
 
@@ -137,6 +138,10 @@ export function CatalogPage() {
 
     const unit = lookups.data?.units.find(
         (item) => String(item.id) === params.get("unitId"),
+    );
+
+    const rootCategories = (lookups.data?.categories ?? []).filter(
+        (item) => item.parentId == null,
     );
 
     const activeFilters = [
@@ -270,13 +275,56 @@ export function CatalogPage() {
                 </div>
             </section>
 
-            <div className="grid items-start gap-7 lg:grid-cols-[290px_minmax(0,1fr)]">
-                <aside className="sticky top-32 hidden overflow-hidden rounded-2xl border bg-card shadow-sm lg:block">
+            {rootCategories.length > 0 ? (
+                <div className="mb-7 overflow-x-auto rounded-2xl border bg-card/80 p-2 shadow-sm backdrop-blur">
+                    <div className="flex min-w-max items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => update("categoryId")}
+                            className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${
+                                !params.get("categoryId")
+                                    ? "bg-primary text-primary-foreground shadow-sm"
+                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                            }`}
+                        >
+                            {t("catalog.allCategories")}
+                        </button>
+                        {rootCategories.map((item) => (
+                            <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => update("categoryId", String(item.id))}
+                                className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${
+                                    params.get("categoryId") === String(item.id)
+                                        ? "bg-primary text-primary-foreground shadow-sm"
+                                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                }`}
+                            >
+                                {item.name}
+                                <span className="ms-2 rounded-full bg-foreground/8 px-1.5 py-0.5 text-[10px]">
+                                    {item.productCount}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
+
+            <div className="grid items-start gap-8 lg:grid-cols-[310px_minmax(0,1fr)]">
+                <aside className="sticky top-36 hidden overflow-hidden rounded-[24px] border border-border/70 bg-card shadow-[0_24px_60px_-42px_rgba(15,23,42,.55)] lg:block">
+                    <div className="border-b bg-gradient-to-br from-primary/8 to-transparent p-5">
+                        <p className="text-xs font-black uppercase tracking-[0.14em] text-primary">
+                            {t("catalog.filterProducts")}
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            {t("catalog.filterDescription")}
+                        </p>
+                    </div>
                     <div className="p-5">{filterPanel}</div>
                 </aside>
 
                 <section className="min-w-0">
-                    <div className="mb-5 rounded-2xl border bg-card p-3 shadow-sm">
+                    <div className="mb-6 rounded-[22px] border border-border/70 bg-card/90 p-3 shadow-[0_18px_48px_-38px_rgba(15,23,42,.55)] backdrop-blur">
                         <div className="flex flex-col gap-3 sm:flex-row">
                             <form
                                 onSubmit={submit}
@@ -688,7 +736,7 @@ function FilterPanel({
 
 function Filter({ label, children }: { label: string; children: ReactNode }) {
     return (
-        <fieldset className="rounded-xl border bg-muted/15 p-4">
+        <fieldset className="rounded-2xl border border-border/70 bg-gradient-to-br from-muted/35 to-background p-4 shadow-[0_10px_30px_-28px_rgba(15,23,42,.5)] transition hover:border-primary/20">
             <legend className="px-1 text-[10px] font-bold uppercase tracking-[0.14em] text-foreground">
                 {label}
             </legend>
@@ -871,11 +919,7 @@ function PriceValue({
 }
 
 function formatCurrency(value: number) {
-    return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 0,
-    }).format(value);
+    return formatMoney(value);
 }
 
 function Pagination({
