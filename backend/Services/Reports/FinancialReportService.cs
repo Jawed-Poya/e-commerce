@@ -2,12 +2,15 @@ using API.Entities.Orders;
 using ECommerce.Data;
 using ECommerce.Dtos.Reports;
 using ECommerce.Entities.Operations;
+using ECommerce.Services.Company;
 using Microsoft.EntityFrameworkCore;
 using OrderStatus = ECommerce.Entities.Orders.OrderStatus;
 
 namespace ECommerce.Services.Reports;
 
-public sealed class FinancialReportService(ApplicationDbContext context) : IFinancialReportService
+public sealed class FinancialReportService(
+    ApplicationDbContext context,
+    ICompanyContext companyContext) : IFinancialReportService
 {
     private static readonly HashSet<string> SupportedSources = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -31,6 +34,7 @@ public sealed class FinancialReportService(ApplicationDbContext context) : IFina
         bool includeAllResults = false,
         CancellationToken cancellationToken = default)
     {
+        request.BranchId = ResolveBranchId(request.BranchId);
         var end = (request.EndDate ?? DateTime.UtcNow).Date.AddDays(1).AddTicks(-1);
         var start = (request.StartDate ?? end.AddDays(-29)).Date;
         ValidateRange(start, end, request.MinimumAmount, request.MaximumAmount);
@@ -54,7 +58,9 @@ public sealed class FinancialReportService(ApplicationDbContext context) : IFina
         var availableCurrencies = await GetAvailableCurrenciesAsync(selectedCurrency, cancellationToken);
 
         if (request.BranchId.HasValue && !await context.Branches.AsNoTracking()
-                .AnyAsync(item => item.Id == request.BranchId.Value && item.IsActive, cancellationToken))
+                .AnyAsync(item => item.Id == request.BranchId.Value &&
+                    item.TenantId == companyContext.CompanyId && item.IsActive,
+                    cancellationToken))
             throw new ArgumentException("The selected branch is not available for this company.");
 
         var ordersQuery = context.Orders.AsNoTracking()
@@ -288,6 +294,7 @@ public sealed class FinancialReportService(ApplicationDbContext context) : IFina
         string? currencyCode,
         CancellationToken cancellationToken = default)
     {
+        branchId = ResolveBranchId(branchId);
         var asOf = (asOfDate ?? DateTime.UtcNow).Date.AddDays(1).AddTicks(-1);
         var periodStart = (periodStartDate ?? new DateTime(asOf.Year, asOf.Month, 1)).Date;
         if (periodStart > asOf)
@@ -352,7 +359,9 @@ public sealed class FinancialReportService(ApplicationDbContext context) : IFina
         CancellationToken cancellationToken = default)
     {
         var customer = await context.Customers.AsNoTracking()
-            .Where(item => item.Id == customerId)
+            .Where(item => item.Id == customerId &&
+                (!companyContext.BranchId.HasValue ||
+                    item.BranchId == companyContext.BranchId.Value))
             .Select(item => new
             {
                 item.Id,
@@ -1003,6 +1012,19 @@ public sealed class FinancialReportService(ApplicationDbContext context) : IFina
             direction,
             branchId,
             branchId.HasValue ? branches.GetValueOrDefault(branchId.Value) : null);
+
+    private long? ResolveBranchId(long? requestedBranchId)
+    {
+        if (!companyContext.BranchId.HasValue)
+            return requestedBranchId;
+
+        if (requestedBranchId.HasValue &&
+            requestedBranchId.Value != companyContext.BranchId.Value)
+            throw new UnauthorizedAccessException(
+                "You can view financial data only for your assigned branch.");
+
+        return companyContext.BranchId.Value;
+    }
 
     private static void ValidateRange(
         DateTime start,

@@ -12,6 +12,7 @@ public static class AppRoles
 {
     public const string Admin = "Admin";
     public const string Customer = "Customer";
+    public const string StoreOperator = "Store Operator";
 }
 
 public static class AppPermissions

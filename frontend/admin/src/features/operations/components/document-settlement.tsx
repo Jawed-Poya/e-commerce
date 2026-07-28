@@ -80,26 +80,37 @@ export function MoneySummaryRow({
     value,
     emphasis = false,
     muted = false,
+    onClick,
+    actionHint,
 }: {
     label: string;
     value: number;
     emphasis?: boolean;
     muted?: boolean;
+    onClick?: () => void;
+    actionHint?: string;
 }) {
     const { formatMoney } = useCompany();
-    return (
-        <div
-            className={`flex items-center justify-between gap-4 tabular-nums ${
-                emphasis
-                    ? "text-lg font-bold"
-                    : muted
-                      ? "text-sm text-muted-foreground"
-                      : "text-sm"
-            }`}
-        >
+    const content = (
+        <>
             <span>{label}</span>
             <span>{formatMoney(value)}</span>
-        </div>
+        </>
+    );
+    const className = `flex w-full items-center justify-between gap-4 rounded-lg tabular-nums ${
+        emphasis
+            ? "text-lg font-bold"
+            : muted
+              ? "text-sm text-muted-foreground"
+              : "text-sm"
+    } ${onClick ? "-mx-2 px-2 py-2 text-start transition hover:bg-primary/8 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" : ""}`;
+
+    return onClick ? (
+        <button type="button" className={className} onClick={onClick} title={actionHint}>
+            {content}
+        </button>
+    ) : (
+        <div className={className}>{content}</div>
     );
 }
 

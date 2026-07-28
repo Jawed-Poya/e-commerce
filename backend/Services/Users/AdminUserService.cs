@@ -556,7 +556,8 @@ public sealed class AdminUserService(
 
     private static bool IsSystemRole(string? roleName) =>
         string.Equals(roleName, AppRoles.Admin, StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(roleName, AppRoles.Customer, StringComparison.OrdinalIgnoreCase);
+        string.Equals(roleName, AppRoles.Customer, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(roleName, AppRoles.StoreOperator, StringComparison.OrdinalIgnoreCase);
 
     private static string? Clean(string? value)
     {
