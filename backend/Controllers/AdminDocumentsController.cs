@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ECommerce.Dtos.Documents;
 using ECommerce.Services.Documents;
 using ECommerce.Shared;
@@ -17,9 +18,17 @@ public sealed class AdminDocumentsController(IFinancialDocumentService documents
         [FromQuery] OperationalDocumentFilter filter)
     {
         using var operation = ServerOperation.CreateDocumentScope();
+        var stopwatch = Stopwatch.StartNew();
         var content = await TransientSqlRetry.ExecuteAsync(
             token => documents.CreateProductsPdfAsync(filter, token),
             operation.Token);
+        stopwatch.Stop();
+
+        Response.Headers["X-Document-Generation-Ms"] = stopwatch.ElapsedMilliseconds.ToString();
+        Response.Headers["X-Document-Bytes"] = content.LongLength.ToString();
+        if (filter.MaxRows.HasValue)
+            Response.Headers["X-Document-Max-Rows"] = Math.Clamp(filter.MaxRows.Value, 1, 50_000).ToString();
+
         return File(content, "application/pdf", FileName("products", filter));
     }
 

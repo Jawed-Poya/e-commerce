@@ -5,4 +5,5 @@ public sealed record OperationalDocumentFilter(
     DateOnly? EndDate = null,
     long? BranchId = null,
     string? CurrencyCode = null,
-    string? Search = null);
+    string? Search = null,
+    int? MaxRows = null);
