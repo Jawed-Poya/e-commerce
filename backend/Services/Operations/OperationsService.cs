@@ -14,16 +14,17 @@ namespace ECommerce.Services.Operations;
 public sealed class OperationsService(
     ApplicationDbContext context,
     IDefaultCustomerTypeResolver defaultCustomerTypeResolver,
-    IInventoryCostService inventoryCosts) : IOperationsService
+    IInventoryCostService inventoryCosts,
+    ICompanyContext companyContext) : IOperationsService
 {
     public async Task<OperationSummary> GetSummaryAsync(CancellationToken ct)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var first = new DateOnly(today.Year, today.Month, 1);
-        var purchases = await context.Purchases.Where(x => x.PurchaseDate >= first && x.Status != PurchaseStatus.Cancelled).SumAsync(x => (decimal?)x.Total, ct) ?? 0;
-        var sales = await context.InventorySales.Where(x => x.SaleDate >= first).SumAsync(x => (decimal?)x.Total, ct) ?? 0;
-        var expenses = await context.Expenses.Where(x => x.ExpenseDate >= first).SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
-        var salaries = await context.StaffSalaryPayments.Where(x => x.PaidDate >= first).SumAsync(x => (decimal?)x.PaidAmount, ct) ?? 0;
+        var purchases = await context.Purchases.Where(x => (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value) && x.PurchaseDate >= first && x.Status != PurchaseStatus.Cancelled).SumAsync(x => (decimal?)x.Total, ct) ?? 0;
+        var sales = await context.InventorySales.Where(x => (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value) && x.SaleDate >= first).SumAsync(x => (decimal?)x.Total, ct) ?? 0;
+        var expenses = await context.Expenses.Where(x => (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value) && x.ExpenseDate >= first).SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
+        var salaries = await context.StaffSalaryPayments.Where(x => (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value) && x.PaidDate >= first).SumAsync(x => (decimal?)x.PaidAmount, ct) ?? 0;
         var low = await context.Products.AsNoTracking().CountAsync(product =>
             product.IsActive &&
             !product.UsesDisplayStock &&
@@ -50,13 +51,17 @@ public sealed class OperationsService(
                     : x.Inventory == null ? 0 : x.Inventory.Quantity - x.Inventory.ReservedQuantity,
                 x.Prices.Where(p => p.CustomerTypeId == defaultTypeId).OrderBy(p => p.Id)
                     .Select(p => (decimal?)(p.SalePrice.HasValue && (!p.StartDate.HasValue || p.StartDate.Value <= today) && (!p.EndDate.HasValue || p.EndDate.Value >= today) ? p.SalePrice.Value : p.RegularPrice))
-                    .FirstOrDefault()))
+                    .FirstOrDefault(),
+                x.MinimumValue,
+                x.MaximumValue,
+                x.UsesDisplayStock))
             .ToListAsync(ct);
     }
 
     public async Task<IReadOnlyList<OperationCustomerLookup>> GetCustomerLookupsAsync(string? search, int take, CancellationToken ct)
     {
-        var query = context.Customers.AsNoTracking();
+        var query = context.Customers.AsNoTracking()
+            .Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value);
         var clean = Clean(search);
         if (clean is not null)
             query = query.Where(x => x.FirstName.Contains(clean) || (x.LastName != null && x.LastName.Contains(clean)) || x.Phone.Contains(clean) || (x.Email != null && x.Email.Contains(clean)));
@@ -73,7 +78,8 @@ public sealed class OperationsService(
 
     public async Task<IReadOnlyList<SupplierResponse>> GetSuppliersAsync(string? search, int take, CancellationToken ct)
     {
-        var query = context.Suppliers.AsNoTracking();
+        var query = context.Suppliers.AsNoTracking()
+            .Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value);
         var clean = Clean(search);
         if (clean is not null)
             query = query.Where(x => x.Name.Contains(clean) || (x.Phone != null && x.Phone.Contains(clean)) || (x.ContactPerson != null && x.ContactPerson.Contains(clean)));
@@ -88,7 +94,9 @@ public sealed class OperationsService(
         RequireText(request.Name, "Supplier name");
         Supplier entity;
         if (id.HasValue)
-            entity = await context.Suppliers.SingleOrDefaultAsync(x => x.Id == id.Value, ct) ?? throw new KeyNotFoundException("Supplier not found.");
+            entity = await context.Suppliers.SingleOrDefaultAsync(
+                x => x.Id == id.Value && (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value),
+                ct) ?? throw new KeyNotFoundException("Supplier not found.");
         else
         {
             entity = new Supplier();
@@ -107,27 +115,26 @@ public sealed class OperationsService(
     }
 
     public async Task<IReadOnlyList<PurchaseListItem>> GetPurchasesAsync(CancellationToken ct) =>
-        await context.Purchases.AsNoTracking().OrderByDescending(x => x.PurchaseDate).ThenByDescending(x => x.Id).Take(500)
+        await context.Purchases.AsNoTracking().Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value).OrderByDescending(x => x.PurchaseDate).ThenByDescending(x => x.Id).Take(500)
             .Select(x => new PurchaseListItem(x.Id, x.PurchaseNumber, x.PurchaseDate, x.Supplier == null ? null : x.Supplier.Name, x.Items.Count, x.Total, x.PaidAmount, x.Total > x.PaidAmount ? x.Total - x.PaidAmount : 0, x.PaymentStatus, x.Status, x.CreatedAt))
             .ToListAsync(ct);
 
     public async Task<PurchaseListItem> CreatePurchaseAsync(CreatePurchaseRequest request, string? userId, CancellationToken ct)
     {
         ValidatePurchase(request);
-        var items = request.Items.GroupBy(x => x.ProductId).Select(group =>
-        {
-            if (group.Select(x => new { x.UnitCost, x.LotNumber, x.ExpireDate }).Distinct().Count() > 1)
-                throw new ArgumentException("A product can appear only once per purchase unless its cost and lot details are identical.");
-            var first = group.First();
-            return new PurchaseItemRequest { ProductId = group.Key, Quantity = group.Sum(x => x.Quantity), UnitCost = first.UnitCost, LotNumber = first.LotNumber, ExpireDate = first.ExpireDate };
-        }).ToList();
-        await EnsureProductsExist(items.Select(x => x.ProductId), ct);
+        EnsureNoDuplicateProducts(request.Items.Select(item => item.ProductId), "purchase");
+        var items = request.Items.ToList();
+        await EnsurePurchasableProductsAsync(items.Select(x => x.ProductId), ct);
 
 
         string? supplierName = null;
         if (request.SupplierId.HasValue)
         {
-            supplierName = await context.Suppliers.Where(x => x.Id == request.SupplierId && x.IsActive).Select(x => x.Name).SingleOrDefaultAsync(ct);
+            supplierName = await context.Suppliers
+                .Where(x => x.Id == request.SupplierId && x.IsActive &&
+                    (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value))
+                .Select(x => x.Name)
+                .SingleOrDefaultAsync(ct);
             if (supplierName is null) throw new ArgumentException("Selected supplier does not exist or is inactive.");
         }
 
@@ -162,7 +169,12 @@ public sealed class OperationsService(
         await using var tx = await context.Database.BeginTransactionAsync(ct);
         context.Purchases.Add(purchase);
         await context.SaveChangesAsync(ct);
-        var warehouseId = await context.Warehouses.Where(x => x.IsActive).OrderBy(x => x.Id).Select(x => (long?)x.Id).FirstOrDefaultAsync(ct)
+        var warehouseId = await context.Warehouses
+            .Where(x => x.IsActive && (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value))
+            .OrderByDescending(x => x.IsMain)
+            .ThenBy(x => x.Id)
+            .Select(x => (long?)x.Id)
+            .FirstOrDefaultAsync(ct)
             ?? throw new InvalidOperationException("No active warehouse is configured. Activate or create a warehouse before receiving purchases.");
         foreach (var item in items)
         {
@@ -175,7 +187,7 @@ public sealed class OperationsService(
     }
 
     public async Task<IReadOnlyList<DocumentPaymentResponse>> GetPurchasePaymentsAsync(long purchaseId, CancellationToken ct) =>
-        await context.PurchasePayments.AsNoTracking().Where(x => x.PurchaseId == purchaseId).OrderByDescending(x => x.PaymentDate).ThenByDescending(x => x.Id).Select(MapPurchasePayment()).ToListAsync(ct);
+        await context.PurchasePayments.AsNoTracking().Where(x => x.PurchaseId == purchaseId && (!companyContext.BranchId.HasValue || x.Purchase.BranchId == companyContext.BranchId.Value)).OrderByDescending(x => x.PaymentDate).ThenByDescending(x => x.Id).Select(MapPurchasePayment()).ToListAsync(ct);
 
     public async Task<PurchaseListItem> AddPurchasePaymentAsync(long purchaseId, RecordDocumentPaymentRequest request, string? userId, CancellationToken ct)
     {
@@ -184,6 +196,7 @@ public sealed class OperationsService(
         var purchase = await context.Purchases
             .FromSqlInterpolated($"SELECT * FROM [Purchases] WITH (UPDLOCK, ROWLOCK) WHERE [Id] = {purchaseId}")
             .Include(x => x.Supplier)
+            .Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value)
             .SingleOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Purchase not found.");
         var remaining = Math.Max(0, purchase.Total - purchase.PaidAmount);
@@ -197,7 +210,7 @@ public sealed class OperationsService(
     }
 
     public async Task<IReadOnlyList<InventorySaleListItem>> GetSalesAsync(CancellationToken ct) =>
-        await context.InventorySales.AsNoTracking().OrderByDescending(x => x.SaleDate).ThenByDescending(x => x.Id).Take(500)
+        await context.InventorySales.AsNoTracking().Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value).OrderByDescending(x => x.SaleDate).ThenByDescending(x => x.Id).Take(500)
             .Select(x => new InventorySaleListItem(x.Id, x.SaleNumber, x.SaleDate, x.Customer != null ? (x.Customer.FirstName + " " + (x.Customer.LastName ?? "")).Trim() : (x.CustomerName ?? "Walk-in customer"), x.Items.Count, x.Total, x.PaidAmount, x.Total > x.PaidAmount ? x.Total - x.PaidAmount : 0, x.PaymentStatus, x.CreatedAt))
             .ToListAsync(ct);
 
@@ -206,11 +219,8 @@ public sealed class OperationsService(
         if (request.Items.Count == 0) throw new ArgumentException("At least one sale item is required.");
         if (request.Items.Any(x => x.ProductId <= 0 || x.Quantity <= 0 || x.UnitPrice < 0)) throw new ArgumentException("Every sale item requires a product, positive quantity, and non-negative price.");
         if (request.Discount < 0 || request.Tax < 0) throw new ArgumentException("Discount and tax cannot be negative.");
-        var items = request.Items.GroupBy(x => x.ProductId).Select(group =>
-        {
-            if (group.Select(item => item.UnitPrice).Distinct().Count() > 1) throw new ArgumentException("A product can appear only once per sale unless every line uses the same unit price.");
-            return new InventorySaleItemRequest { ProductId = group.Key, Quantity = group.Sum(item => item.Quantity), UnitPrice = group.First().UnitPrice };
-        }).ToList();
+        EnsureNoDuplicateProducts(request.Items.Select(item => item.ProductId), "sale");
+        var items = request.Items.ToList();
         var productIds = items.Select(x => x.ProductId).Distinct().ToArray();
         var productModes = await context.Products
             .AsNoTracking()
@@ -222,7 +232,10 @@ public sealed class OperationsService(
                 product.MinimumValue,
                 product.MaximumValue,
                 product.UsesDisplayStock,
-                product.DisplayStockQuantity
+                product.DisplayStockQuantity,
+                AvailableQuantity = product.Inventory == null
+                    ? 0
+                    : product.Inventory.Quantity - product.Inventory.ReservedQuantity
             })
             .ToDictionaryAsync(product => product.Id, ct);
 
@@ -236,8 +249,11 @@ public sealed class OperationsService(
                 throw new ArgumentException($"The minimum sale quantity for '{product.Name}' is {product.MinimumValue.Value}.");
             if (product.MaximumValue.HasValue && item.Quantity > product.MaximumValue.Value)
                 throw new ArgumentException($"The maximum sale quantity for '{product.Name}' is {product.MaximumValue.Value}.");
-            if (product.UsesDisplayStock && item.Quantity > Math.Max(0, product.DisplayStockQuantity ?? 0))
-                throw new ArgumentException($"Only {Math.Max(0, product.DisplayStockQuantity ?? 0):N3} unit(s) of '{product.Name}' are displayed as available.");
+            var availableQuantity = product.UsesDisplayStock
+                ? Math.Max(0, product.DisplayStockQuantity ?? 0)
+                : Math.Max(0, product.AvailableQuantity);
+            if (item.Quantity > availableQuantity)
+                throw new ArgumentException($"Only {availableQuantity:N3} unit(s) of '{product.Name}' are available.");
         }
 
         // Display-stock products do not mutate inventory, but an existing purchase cost
@@ -248,7 +264,11 @@ public sealed class OperationsService(
         string? registeredCustomerPhone = null;
         if (request.CustomerId.HasValue)
         {
-            var customer = await context.Customers.Where(x => x.Id == request.CustomerId).Select(x => new { Name = (x.FirstName + " " + (x.LastName ?? "")).Trim(), x.Phone }).SingleOrDefaultAsync(ct);
+            var customer = await context.Customers
+                .Where(x => x.Id == request.CustomerId &&
+                    (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value))
+                .Select(x => new { Name = (x.FirstName + " " + (x.LastName ?? "")).Trim(), x.Phone })
+                .SingleOrDefaultAsync(ct);
             if (customer is null) throw new ArgumentException("Customer not found.");
             registeredCustomerName = customer.Name;
             registeredCustomerPhone = customer.Phone;
@@ -308,7 +328,7 @@ public sealed class OperationsService(
     }
 
     public async Task<IReadOnlyList<DocumentPaymentResponse>> GetSalePaymentsAsync(long saleId, CancellationToken ct) =>
-        await context.InventorySalePayments.AsNoTracking().Where(x => x.InventorySaleId == saleId).OrderByDescending(x => x.PaymentDate).ThenByDescending(x => x.Id).Select(MapSalePayment()).ToListAsync(ct);
+        await context.InventorySalePayments.AsNoTracking().Where(x => x.InventorySaleId == saleId && (!companyContext.BranchId.HasValue || x.InventorySale.BranchId == companyContext.BranchId.Value)).OrderByDescending(x => x.PaymentDate).ThenByDescending(x => x.Id).Select(MapSalePayment()).ToListAsync(ct);
 
     public async Task<InventorySaleListItem> AddSalePaymentAsync(long saleId, RecordDocumentPaymentRequest request, string? userId, CancellationToken ct)
     {
@@ -317,6 +337,7 @@ public sealed class OperationsService(
         var sale = await context.InventorySales
             .FromSqlInterpolated($"SELECT * FROM [InventorySales] WITH (UPDLOCK, ROWLOCK) WHERE [Id] = {saleId}")
             .Include(x => x.Customer)
+            .Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value)
             .SingleOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Sale not found.");
         var remaining = Math.Max(0, sale.Total - sale.PaidAmount);
@@ -332,7 +353,7 @@ public sealed class OperationsService(
     }
 
     public async Task<IReadOnlyList<StaffResponse>> GetStaffAsync(CancellationToken ct) =>
-        await context.StaffMembers.AsNoTracking().OrderByDescending(x => x.IsActive).ThenBy(x => x.FullName)
+        await context.StaffMembers.AsNoTracking().Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value).OrderByDescending(x => x.IsActive).ThenBy(x => x.FullName)
             .Select(x => new StaffResponse(x.Id, x.EmployeeNumber, x.FullName, x.Phone, x.Email, x.Position, x.Department, x.HireDate, x.BaseSalary, x.IsActive, x.Address, x.Notes)).ToListAsync(ct);
 
     public async Task<StaffResponse> SaveStaffAsync(long? id, StaffUpsertRequest request, CancellationToken ct)
@@ -340,9 +361,16 @@ public sealed class OperationsService(
         RequireText(request.EmployeeNumber, "Employee number");
         RequireText(request.FullName, "Staff name");
         if (request.BaseSalary < 0) throw new ArgumentException("Base salary cannot be negative.");
-        if (await context.StaffMembers.AnyAsync(x => x.EmployeeNumber == request.EmployeeNumber.Trim() && (!id.HasValue || x.Id != id), ct)) throw new ArgumentException("Employee number already exists.");
+        if (await context.StaffMembers.AnyAsync(x =>
+            x.EmployeeNumber == request.EmployeeNumber.Trim() &&
+            (!id.HasValue || x.Id != id) &&
+            (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value), ct))
+            throw new ArgumentException("Employee number already exists.");
         Staff entity;
-        if (id.HasValue) entity = await context.StaffMembers.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new KeyNotFoundException("Staff member not found.");
+        if (id.HasValue)
+            entity = await context.StaffMembers.SingleOrDefaultAsync(
+                x => x.Id == id && (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value),
+                ct) ?? throw new KeyNotFoundException("Staff member not found.");
         else { entity = new Staff(); context.StaffMembers.Add(entity); }
         entity.EmployeeNumber = request.EmployeeNumber.Trim();
         entity.FullName = request.FullName.Trim();
@@ -361,21 +389,31 @@ public sealed class OperationsService(
 
     public async Task DeleteStaffAsync(long id, CancellationToken ct)
     {
-        var entity = await context.StaffMembers.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new KeyNotFoundException("Staff member not found.");
+        var entity = await context.StaffMembers.SingleOrDefaultAsync(
+            x => x.Id == id && (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value),
+            ct) ?? throw new KeyNotFoundException("Staff member not found.");
         entity.IsActive = false;
         await context.SaveChangesAsync(ct);
     }
 
     public async Task<IReadOnlyList<SalaryPaymentResponse>> GetSalaryPaymentsAsync(CancellationToken ct) =>
-        await context.StaffSalaryPayments.AsNoTracking().OrderByDescending(x => x.PeriodYear).ThenByDescending(x => x.PeriodMonth).ThenByDescending(x => x.Id).Take(500)
+        await context.StaffSalaryPayments.AsNoTracking().Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value).OrderByDescending(x => x.PeriodYear).ThenByDescending(x => x.PeriodMonth).ThenByDescending(x => x.Id).Take(500)
             .Select(x => new SalaryPaymentResponse(x.Id, x.StaffId, x.Staff.FullName, x.PeriodYear, x.PeriodMonth, x.BaseSalary, x.Bonus, x.Deduction, x.NetAmount, x.PaidAmount, x.NetAmount > x.PaidAmount ? x.NetAmount - x.PaidAmount : 0, x.PaymentStatus, x.PaidDate, x.PaymentMethod, x.ReferenceNumber, x.CreatedAt)).ToListAsync(ct);
 
     public async Task<SalaryPaymentResponse> CreateSalaryPaymentAsync(CreateSalaryPaymentRequest request, string? userId, CancellationToken ct)
     {
         if (request.PeriodMonth is < 1 or > 12 || request.PeriodYear < 2000) throw new ArgumentException("A valid salary period is required.");
         if (request.Bonus < 0 || request.Deduction < 0) throw new ArgumentException("Bonus and deduction cannot be negative.");
-        var staff = await context.StaffMembers.SingleOrDefaultAsync(x => x.Id == request.StaffId && x.IsActive, ct) ?? throw new ArgumentException("Active staff member not found.");
-        if (await context.StaffSalaryPayments.AnyAsync(x => x.StaffId == request.StaffId && x.PeriodYear == request.PeriodYear && x.PeriodMonth == request.PeriodMonth, ct)) throw new ArgumentException("Salary for this staff member and period is already recorded.");
+        var staff = await context.StaffMembers.SingleOrDefaultAsync(
+            x => x.Id == request.StaffId && x.IsActive &&
+                (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value),
+            ct) ?? throw new ArgumentException("Active staff member not found.");
+        if (await context.StaffSalaryPayments.AnyAsync(x =>
+            x.StaffId == request.StaffId &&
+            x.PeriodYear == request.PeriodYear &&
+            x.PeriodMonth == request.PeriodMonth &&
+            (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value), ct))
+            throw new ArgumentException("Salary for this staff member and period is already recorded.");
         var net = staff.BaseSalary + request.Bonus - request.Deduction;
         if (net < 0) throw new ArgumentException("Deductions cannot exceed salary plus bonus.");
         ValidateInitialPayment(request.PaidAmount, net);
@@ -407,7 +445,7 @@ public sealed class OperationsService(
     }
 
     public async Task<IReadOnlyList<DocumentPaymentResponse>> GetSalaryInstallmentsAsync(long salaryId, CancellationToken ct) =>
-        await context.StaffSalaryInstallments.AsNoTracking().Where(x => x.StaffSalaryPaymentId == salaryId).OrderByDescending(x => x.PaymentDate).ThenByDescending(x => x.Id).Select(MapSalaryPayment()).ToListAsync(ct);
+        await context.StaffSalaryInstallments.AsNoTracking().Where(x => x.StaffSalaryPaymentId == salaryId && (!companyContext.BranchId.HasValue || x.StaffSalaryPayment.BranchId == companyContext.BranchId.Value)).OrderByDescending(x => x.PaymentDate).ThenByDescending(x => x.Id).Select(MapSalaryPayment()).ToListAsync(ct);
 
     public async Task<SalaryPaymentResponse> AddSalaryInstallmentAsync(long salaryId, RecordDocumentPaymentRequest request, string? userId, CancellationToken ct)
     {
@@ -416,6 +454,7 @@ public sealed class OperationsService(
         var salary = await context.StaffSalaryPayments
             .FromSqlInterpolated($"SELECT * FROM [StaffSalaryPayments] WITH (UPDLOCK, ROWLOCK) WHERE [Id] = {salaryId}")
             .Include(x => x.Staff)
+            .Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value)
             .SingleOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Salary record not found.");
         var remaining = Math.Max(0, salary.NetAmount - salary.PaidAmount);
@@ -456,7 +495,7 @@ public sealed class OperationsService(
     }
 
     public async Task<IReadOnlyList<ExpenseResponse>> GetExpensesAsync(CancellationToken ct) =>
-        await context.Expenses.AsNoTracking().OrderByDescending(x => x.ExpenseDate).ThenByDescending(x => x.Id).Take(500)
+        await context.Expenses.AsNoTracking().Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value).OrderByDescending(x => x.ExpenseDate).ThenByDescending(x => x.Id).Take(500)
             .Select(x => new ExpenseResponse(x.Id, x.ExpenseDate, x.GeneralTypeCategoryId ?? x.CategoryId ?? 0, x.GeneralTypeCategory != null ? x.GeneralTypeCategory.Name : (x.Category != null ? x.Category.Name : "Uncategorized"), x.Amount, x.Vendor, x.PaymentMethod, x.ReferenceNumber, x.Description, x.CreatedAt)).ToListAsync(ct);
 
     public async Task<ExpenseResponse> CreateExpenseAsync(CreateExpenseRequest request, string? userId, CancellationToken ct)
@@ -533,11 +572,29 @@ public sealed class OperationsService(
         });
     }
 
-    private async Task EnsureProductsExist(IEnumerable<long> ids, CancellationToken ct)
+    private async Task EnsurePurchasableProductsAsync(IEnumerable<long> ids, CancellationToken ct)
     {
         var distinct = ids.Distinct().ToArray();
-        var count = await context.Products.CountAsync(x => distinct.Contains(x.Id), ct);
-        if (count != distinct.Length) throw new ArgumentException("One or more selected products do not exist.");
+        var products = await context.Products
+            .AsNoTracking()
+            .Where(product => distinct.Contains(product.Id))
+            .Select(product => new { product.Id, product.Name, product.UsesDisplayStock })
+            .ToListAsync(ct);
+
+        if (products.Count != distinct.Length)
+            throw new ArgumentException("One or more selected products do not exist.");
+
+        var displayOnly = products.FirstOrDefault(product => product.UsesDisplayStock);
+        if (displayOnly is not null)
+            throw new ArgumentException(
+                "Display-stock products cannot be added to purchases because they do not update physical inventory.");
+    }
+
+    private static void EnsureNoDuplicateProducts(IEnumerable<long> productIds, string documentName)
+    {
+        var ids = productIds.ToArray();
+        if (ids.Length != ids.Distinct().Count())
+            throw new ArgumentException($"A product can be selected only once in a {documentName}. Remove the duplicate line and update the original quantity instead.");
     }
 
     private static void ValidatePurchase(CreatePurchaseRequest request)

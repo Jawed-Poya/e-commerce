@@ -2,7 +2,7 @@ using ECommerce.Entities.Operations;
 
 namespace ECommerce.Entities.Operations.Contracts;
 
-public sealed record OperationProductLookup(long Id, string Name, string? Barcode, decimal AvailableQuantity, decimal? DefaultPrice);
+public sealed record OperationProductLookup(long Id, string Name, string? Barcode, decimal AvailableQuantity, decimal? DefaultPrice, decimal? MinimumValue, decimal? MaximumValue, bool UsesDisplayStock);
 public sealed record OperationCustomerLookup(long Id, string Name, string Phone, string? Email, string? CustomerTypeName);
 public sealed record OperationSummary(decimal PurchasesThisMonth, decimal SalesThisMonth, decimal ExpensesThisMonth, decimal SalariesThisMonth, int LowStockProducts);
 

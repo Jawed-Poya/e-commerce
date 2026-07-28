@@ -507,7 +507,18 @@ export default function PurchasesPage() {
                             }
                         />
                         <Separator />
-                        <MoneySummaryRow label="Purchase total" value={total} emphasis />
+                        <MoneySummaryRow
+                            label="Purchase total"
+                            value={total}
+                            emphasis
+                            actionHint="Click to pay the full amount"
+                            onClick={() =>
+                                setForm((current) => ({
+                                    ...current,
+                                    paidAmount: total,
+                                }))
+                            }
+                        />
                         <AmountInputRow
                             label="Opening payment"
                             value={form.paidAmount}
@@ -704,6 +715,7 @@ export default function PurchasesPage() {
                             body,
                         )
                     }
+                    onDocumentUpdated={setSelectedPurchase}
                     invalidate={[operationKeys.purchases, operationKeys.summary]}
                     canManage={canManage}
                 />

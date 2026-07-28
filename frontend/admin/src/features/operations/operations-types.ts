@@ -1,6 +1,6 @@
 export type PaymentStatus = "Unpaid" | "Partial" | "Paid";
 export interface OperationSummary { purchasesThisMonth: number; salesThisMonth: number; expensesThisMonth: number; salariesThisMonth: number; lowStockProducts: number }
-export interface OperationProduct { id: number; name: string; barcode: string | null; availableQuantity: number; defaultPrice: number | null }
+export interface OperationProduct { id: number; name: string; barcode: string | null; availableQuantity: number; defaultPrice: number | null; minimumValue: number | null; maximumValue: number | null; usesDisplayStock: boolean }
 export interface OperationCustomer { id: number; name: string; phone: string; email: string | null; customerTypeName: string | null }
 export interface Supplier { id: number; name: string; contactPerson: string | null; phone: string | null; email: string | null; address: string | null; taxNumber: string | null; isActive: boolean }
 export interface Purchase { id: number; purchaseNumber: string; purchaseDate: string; supplierName: string | null; itemCount: number; total: number; paidAmount: number; remainingAmount: number; paymentStatus: PaymentStatus; status: "Draft" | "Received" | "Cancelled"; createdAt: string }

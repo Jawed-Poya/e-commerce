@@ -253,6 +253,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
         OperationalDocumentFilter filter,
         CancellationToken cancellationToken = default)
     {
+        filter = filter with { BranchId = ResolveBranchId(filter.BranchId) };
         var company = await GetDocumentCompanyAsync(cancellationToken);
         var search = CleanSearch(filter.Search);
         var productsQuery = context.Products.AsNoTracking();
@@ -332,6 +333,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
         OperationalDocumentFilter filter,
         CancellationToken cancellationToken = default)
     {
+        filter = filter with { BranchId = ResolveBranchId(filter.BranchId) };
         var company = await GetDocumentCompanyAsync(cancellationToken);
         var (start, end) = ResolvePeriod(filter, 30);
         var startDateTime = start.ToDateTime(TimeOnly.MinValue);
@@ -462,6 +464,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
         OperationalDocumentFilter filter,
         CancellationToken cancellationToken = default)
     {
+        filter = filter with { BranchId = ResolveBranchId(filter.BranchId) };
         var company = await GetDocumentCompanyAsync(cancellationToken);
         var (start, end) = ResolvePeriod(filter, 30);
         var currency = ResolveCurrency(filter.CurrencyCode, company.CurrencyCode);
@@ -528,6 +531,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
         OperationalDocumentFilter filter,
         CancellationToken cancellationToken = default)
     {
+        filter = filter with { BranchId = ResolveBranchId(filter.BranchId) };
         var company = await GetDocumentCompanyAsync(cancellationToken);
         var (start, end) = ResolvePeriod(filter, 90);
         var currency = ResolveCurrency(filter.CurrencyCode, company.CurrencyCode);
@@ -602,6 +606,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
         OperationalDocumentFilter filter,
         CancellationToken cancellationToken = default)
     {
+        filter = filter with { BranchId = ResolveBranchId(filter.BranchId) };
         var company = await GetDocumentCompanyAsync(cancellationToken);
         var (start, end) = ResolvePeriod(filter, 30);
         var currency = ResolveCurrency(filter.CurrencyCode, company.CurrencyCode);
@@ -677,7 +682,8 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
         if (source.Equals("orders", StringComparison.OrdinalIgnoreCase) || source.Equals("order", StringComparison.OrdinalIgnoreCase))
         {
             var order = await context.Orders.AsNoTracking()
-                .Where(item => item.Id == id && item.Status != OrderStatus.Cancelled)
+                .Where(item => item.Id == id && item.Status != OrderStatus.Cancelled &&
+                    (!companyContext.BranchId.HasValue || item.BranchId == companyContext.BranchId.Value))
                 .Select(item => new
                 {
                     item.Id, item.OrderNumber, item.CreatedAt, item.Currency, item.Subtotal, item.DiscountTotal,
@@ -703,7 +709,8 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
         if (source.Equals("manual-sales", StringComparison.OrdinalIgnoreCase) || source.Equals("sale", StringComparison.OrdinalIgnoreCase))
         {
             var sale = await context.InventorySales.AsNoTracking()
-                .Where(item => item.Id == id)
+                .Where(item => item.Id == id &&
+                    (!companyContext.BranchId.HasValue || item.BranchId == companyContext.BranchId.Value))
                 .Select(item => new
                 {
                     item.Id, item.SaleNumber, item.SaleDate, item.CurrencyCode, item.Subtotal, item.Discount, item.Tax,
@@ -727,6 +734,19 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
         }
 
         throw new ArgumentException("Receipt source must be 'orders' or 'manual-sales'.");
+    }
+
+    private long? ResolveBranchId(long? requestedBranchId)
+    {
+        if (!companyContext.BranchId.HasValue)
+            return requestedBranchId;
+
+        if (requestedBranchId.HasValue &&
+            requestedBranchId.Value != companyContext.BranchId.Value)
+            throw new UnauthorizedAccessException(
+                "You can export documents only for your assigned branch.");
+
+        return companyContext.BranchId.Value;
     }
 
     public byte[] CreateReceiptPdf(ReceiptResponse receipt, bool thermal = false) =>

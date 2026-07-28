@@ -127,15 +127,30 @@ export default function ManualSalesPage() {
         if (new Set(items.map((item) => item.productId)).size !== items.length) {
             return toast.error("Each product may appear only once.");
         }
-
-        const unavailable = items.find(
-            (item) =>
-                item.product && item.quantity > item.product.availableQuantity,
-        );
-        if (unavailable?.product) {
-            return toast.error(
-                `${unavailable.product.name} ${tr("has only")} ${unavailable.product.availableQuantity} ${tr("available.")}`,
-            );
+        for (const item of items) {
+            const product = item.product;
+            if (!product) continue;
+            if (
+                product.minimumValue != null &&
+                item.quantity < product.minimumValue
+            ) {
+                return toast.error(
+                    `${product.name}: ${tr("Minimum quantity")} ${product.minimumValue}.`,
+                );
+            }
+            if (
+                product.maximumValue != null &&
+                item.quantity > product.maximumValue
+            ) {
+                return toast.error(
+                    `${product.name}: ${tr("Maximum quantity")} ${product.maximumValue}.`,
+                );
+            }
+            if (item.quantity > product.availableQuantity) {
+                return toast.error(
+                    `${product.name}: ${tr("Available quantity")} ${product.availableQuantity}.`,
+                );
+            }
         }
         if (form.paidAmount < 0 || form.paidAmount > total) {
             return toast.error(
@@ -454,6 +469,7 @@ export default function ManualSalesPage() {
                     addPayment={(body) =>
                         operationsService.addSalePayment(selectedSale.id, body)
                     }
+                    onDocumentUpdated={setSelectedSale}
                     invalidate={[operationKeys.sales, operationKeys.summary]}
                     canManage={canManage}
                 />

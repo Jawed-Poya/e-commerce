@@ -26,6 +26,7 @@ public static class DatabaseInitializer
         var company = await EnsureCompanyAsync(context);
         await EnsureRolesAsync(services);
         await EnsureAdminPermissionsAsync(services);
+        await EnsureStoreOperatorRoleAsync(services, company.Company.Id);
         await EnsureDefaultCustomerTypesAsync(context, company.Company.Id, company.MainBranch.Id);
         await EnsureOperationDefaultsAsync(context, company.Company.Id, company.MainBranch.Id);
         await EnsureAdminAsync(services, company.Company.Id, company.MainBranch.Id);
@@ -233,6 +234,86 @@ END;
                     $"Could not assign permission '{permission}' to the Admin role: " +
                     string.Join(" ", result.Errors.Select(error => error.Description)));
             }
+        }
+    }
+
+    private static async Task EnsureStoreOperatorRoleAsync(IServiceProvider services, long companyId)
+    {
+        var roleManager = services.GetRequiredService<RoleManager<Role>>();
+        var internalName = $"company:{AppRoles.StoreOperator}";
+        var role = await roleManager.FindByNameAsync(internalName);
+        if (role is null)
+        {
+            role = new Role
+            {
+                Name = internalName,
+                Description = "Daily catalog, inventory, order, customer, purchase, sales, payroll, expense, and report operations without user, role, branch, or company settings access.",
+                TenantId = companyId
+            };
+            var create = await roleManager.CreateAsync(role);
+            if (!create.Succeeded)
+                throw new InvalidOperationException(
+                    $"Could not create role '{AppRoles.StoreOperator}': " +
+                    string.Join(" ", create.Errors.Select(error => error.Description)));
+        }
+        else if (role.TenantId != companyId)
+        {
+            role.TenantId = companyId;
+            role.Description = "Daily catalog, inventory, order, customer, purchase, sales, payroll, expense, and report operations without user, role, branch, or company settings access.";
+            var update = await roleManager.UpdateAsync(role);
+            if (!update.Succeeded)
+                throw new InvalidOperationException($"Could not scope role '{AppRoles.StoreOperator}' to the active company.");
+        }
+
+        var safePermissions = new[]
+        {
+            AppPermissions.DashboardView,
+            AppPermissions.ProductsView,
+            AppPermissions.ProductsManage,
+            AppPermissions.ProductPricingManage,
+            AppPermissions.InventoryView,
+            AppPermissions.InventoryManage,
+            AppPermissions.OrdersView,
+            AppPermissions.OrdersManage,
+            AppPermissions.PaymentsManage,
+            AppPermissions.CustomersView,
+            AppPermissions.CustomersManage,
+            AppPermissions.OperationsView,
+            AppPermissions.PurchasesView,
+            AppPermissions.PurchasesManage,
+            AppPermissions.ManualSalesView,
+            AppPermissions.ManualSalesManage,
+            AppPermissions.StaffView,
+            AppPermissions.StaffManage,
+            AppPermissions.PayrollView,
+            AppPermissions.PayrollManage,
+            AppPermissions.ExpensesView,
+            AppPermissions.ExpensesManage,
+            AppPermissions.FinancialReportsView
+        };
+
+        var claims = (await roleManager.GetClaimsAsync(role))
+            .Where(claim => claim.Type == AuthClaims.Permission)
+            .ToArray();
+        var existing = claims.Select(claim => claim.Value)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var permission in safePermissions.Where(permission => !existing.Contains(permission)))
+        {
+            var result = await roleManager.AddClaimAsync(role, new Claim(AuthClaims.Permission, permission));
+            if (!result.Succeeded)
+                throw new InvalidOperationException(
+                    $"Could not assign permission '{permission}' to '{AppRoles.StoreOperator}': " +
+                    string.Join(" ", result.Errors.Select(error => error.Description)));
+        }
+
+        var allowed = safePermissions.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var claim in claims.Where(claim => !allowed.Contains(claim.Value)))
+        {
+            var remove = await roleManager.RemoveClaimAsync(role, claim);
+            if (!remove.Succeeded)
+                throw new InvalidOperationException(
+                    $"Could not remove restricted permission '{claim.Value}' from '{AppRoles.StoreOperator}'.");
         }
     }
 
