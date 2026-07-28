@@ -63,11 +63,14 @@ export function cartQuantityStep(product: QuantityLimitedProduct) {
   return minimum < 1 ? minimum : 1;
 }
 
-function clampQuantity(product: CartProduct, quantity: number) {
+export function normalizeCartQuantity(product: QuantityLimitedProduct, quantity: number) {
   const minimum = minimumCartQuantity(product);
   const maximum = maximumCartQuantity(product);
   if (maximum < minimum) return 0;
-  return Math.min(maximum, Math.max(minimum, quantity));
+  if (!Number.isFinite(quantity)) return minimum;
+
+  const bounded = Math.min(maximum, Math.max(minimum, quantity));
+  return Math.round((bounded + Number.EPSILON) * 1000) / 1000;
 }
 
 function sameNumberArray(left: number[], right: number[]) {
@@ -78,7 +81,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(() =>
     readStorage<CartItem[]>("store-cart", []).map((item) => ({
       ...item,
-      quantity: clampQuantity(item, item.quantity),
+      quantity: normalizeCartQuantity(item, item.quantity),
     })).filter((item) => item.quantity > 0),
   );
   const [wishlist, setWishlist] = useState<number[]>(() =>
@@ -107,7 +110,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
           const found = current.find((item) => item.id === product.id);
           if (found) {
-            const quantity = clampQuantity(
+            const quantity = normalizeCartQuantity(
               product,
               found.quantity + cartQuantityStep(product),
             );
@@ -124,7 +127,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setItems((current) =>
           current.map((item) =>
             item.id === id
-              ? { ...item, quantity: clampQuantity(item, quantity) }
+              ? { ...item, quantity: normalizeCartQuantity(item, quantity) }
               : item,
           ).filter((item) => item.quantity > 0),
         ),

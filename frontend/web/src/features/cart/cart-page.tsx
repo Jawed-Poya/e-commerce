@@ -7,6 +7,7 @@ import {
     Truck,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { imageUrl } from "../../shared/api/api-client";
@@ -17,7 +18,9 @@ import {
     cartQuantityStep,
     maximumCartQuantity,
     minimumCartQuantity,
+    normalizeCartQuantity,
     useCart,
+    type CartItem,
 } from "./cart-context";
 import { useI18n } from "../../i18n/i18n-provider";
 
@@ -179,9 +182,10 @@ export function CartPage() {
                                                     <Minus className="size-3.5" />
                                                 </Button>
 
-                                                <span className="grid h-9 min-w-9 place-items-center border-x px-2 text-xs font-bold">
-                                                    {item.quantity}
-                                                </span>
+                                                <CartQuantityInput
+                                                    item={item}
+                                                    onChange={(quantity) => cart.updateQuantity(item.id, quantity)}
+                                                />
 
                                                 <Button
                                                     type="button"
@@ -377,5 +381,55 @@ export function CartPage() {
                 </div>
             </div>
         </>
+    );
+}
+
+
+function CartQuantityInput({ item, onChange }: { item: CartItem; onChange: (quantity: number) => void }) {
+    const { t } = useI18n();
+    const [draft, setDraft] = useState(String(item.quantity));
+
+    useEffect(() => {
+        setDraft(String(item.quantity));
+    }, [item.quantity]);
+
+    const commit = () => {
+        const parsed = Number(draft.replace(",", "."));
+        if (!Number.isFinite(parsed)) {
+            setDraft(String(item.quantity));
+            return;
+        }
+
+        const normalized = normalizeCartQuantity(item, parsed);
+        onChange(normalized);
+        setDraft(String(normalized));
+    };
+
+    const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            event.currentTarget.blur();
+        }
+
+        if (event.key === "Escape") {
+            setDraft(String(item.quantity));
+            event.currentTarget.blur();
+        }
+    };
+
+    return (
+        <input
+            type="number"
+            inputMode="decimal"
+            min={minimumCartQuantity(item)}
+            max={maximumCartQuantity(item)}
+            step="any"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={commit}
+            onKeyDown={handleKeyDown}
+            aria-label={t("cart.quantityInput", { name: item.name })}
+            className="h-9 w-[4.75rem] border-x bg-transparent px-1 text-center text-xs font-bold tabular-nums outline-none transition focus:bg-primary/5 focus:ring-2 focus:ring-inset focus:ring-primary/25 sm:w-20"
+        />
     );
 }
