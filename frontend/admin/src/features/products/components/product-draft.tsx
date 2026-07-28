@@ -382,6 +382,58 @@ export function ProductDraftCard({
                         </div>
                     </div>
 
+                    <Controller
+                        control={control}
+                        name={`products.${index}.usesDisplayStock`}
+                        render={({ field }) => (
+                            <div className={`rounded-xl border p-4 transition-colors ${field.value ? "border-primary/40 bg-primary/5" : "bg-muted/20"}`}>
+                                <div
+                                    role="switch"
+                                    aria-checked={field.value}
+                                    tabIndex={disabled ? -1 : 0}
+                                    onClick={() => !disabled && field.onChange(!field.value)}
+                                    onKeyDown={(event) => {
+                                        if (!disabled && (event.key === " " || event.key === "Enter")) {
+                                            event.preventDefault();
+                                            field.onChange(!field.value);
+                                        }
+                                    }}
+                                    className={`flex items-start justify-between gap-4 outline-none focus-visible:ring-2 focus-visible:ring-ring ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                                >
+                                    <div>
+                                        <Label>Display stock</Label>
+                                        <p className="mt-1 text-xs leading-5 text-muted-foreground">Show an orderable quantity to customers without changing physical inventory.</p>
+                                    </div>
+                                    <Switch disabled={disabled} checked={field.value} tabIndex={-1} aria-hidden className="pointer-events-none" />
+                                </div>
+
+                                {field.value ? (
+                                    <div className="mt-4 border-t border-primary/10 pt-4">
+                                        <Controller
+                                            control={control}
+                                            name={`products.${index}.displayStockQuantity`}
+                                            render={({ field: quantityField }) => (
+                                                <div className="space-y-1.5">
+                                                    <Label>Customer-visible quantity</Label>
+                                                    <Input
+                                                        type="number"
+                                                        min={0}
+                                                        step="any"
+                                                        disabled={disabled}
+                                                        placeholder="250"
+                                                        value={quantityField.value ?? ""}
+                                                        onChange={(event) => quantityField.onChange(event.target.value === "" ? null : Number(event.target.value))}
+                                                    />
+                                                    <FieldError message={productErrors?.displayStockQuantity?.message} />
+                                                </div>
+                                            )}
+                                        />
+                                    </div>
+                                ) : null}
+                            </div>
+                        )}
+                    />
+
                     <div className="space-y-1.5">
                         <Label>{t("form.slug")}</Label>
 

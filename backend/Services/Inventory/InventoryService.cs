@@ -17,7 +17,7 @@ public sealed class InventoryService(
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var expiringThreshold = today.AddDays(30);
-        var baseQuery = context.Products.AsNoTracking().Where(x => !x.IsDeleted);
+        var baseQuery = context.Products.AsNoTracking().Where(x => !x.IsDeleted && !x.UsesDisplayStock);
 
         var totals = await baseQuery
             .GroupBy(_ => 1)

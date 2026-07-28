@@ -10,6 +10,10 @@ public sealed class ProductDetailsDto
     public string? Description { get; set; }
     public int? MinimumValue { get; set; }
     public int? MaximumValue { get; set; }
+    public bool UsesDisplayStock { get; set; }
+    public decimal? DisplayStockQuantity { get; set; }
+    public decimal Stock { get; set; }
+    public decimal InventoryStock { get; set; }
     public long CategoryId { get; set; }
     public string CategoryName { get; set; } = null!;
     public long? BrandId { get; set; }

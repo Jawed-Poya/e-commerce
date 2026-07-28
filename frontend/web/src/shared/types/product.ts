@@ -21,6 +21,9 @@ export type Product = {
     unitId: number | null;
     minimumValue: number | null;
     maximumValue: number | null;
+    usesDisplayStock: boolean;
+    displayStockQuantity: number | null;
+    inventoryStock: number;
     isFeatured: boolean;
     isActive: boolean;
     stock: number;
@@ -35,7 +38,7 @@ export type Product = {
     images: ProductImage[];
 };
 
-export type ProductDetails = Omit<Product, "stock" | "primaryImageUrl"> & {
+export type ProductDetails = Omit<Product, "primaryImageUrl"> & {
     brandName: string | null;
     unitName: string | null;
     priceCustomerTypeId: number | null;

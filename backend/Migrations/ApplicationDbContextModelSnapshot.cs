@@ -244,6 +244,11 @@ namespace ECommerce.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
+                    b.Property<bool>("AffectsInventory")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -438,6 +443,10 @@ namespace ECommerce.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<decimal?>("DisplayStockQuantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
                     b.Property<string>("Description")
                         .HasMaxLength(5000)
                         .HasColumnType("nvarchar(max)");
@@ -480,6 +489,9 @@ namespace ECommerce.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("UsesDisplayStock")
+                        .HasColumnType("bit");
+
                     b.Property<long>("ViewCount")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bigint")
@@ -501,7 +513,10 @@ namespace ECommerce.Migrations
 
                     b.HasIndex("UnitId");
 
-                    b.ToTable("Products");
+                    b.ToTable("Products", t =>
+                        {
+                            t.HasCheckConstraint("CK_Product_DisplayStockQuantity", "[DisplayStockQuantity] IS NULL OR [DisplayStockQuantity] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("API.Entities.Products.ProductImage", b =>

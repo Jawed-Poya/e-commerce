@@ -1,4 +1,4 @@
-﻿namespace ECommerce.Entities.Products.Requests;
+namespace ECommerce.Entities.Products.Requests;
 
 
 using System.ComponentModel.DataAnnotations;
@@ -41,6 +41,11 @@ public sealed class CreateBulkProductItemRequest
 
     [Range(0, int.MaxValue)]
     public int? MaximumValue { get; set; }
+
+    public bool UsesDisplayStock { get; set; }
+
+    [Range(typeof(decimal), "0", "999999999999999.999", ErrorMessage = "Display quantity cannot be negative.")]
+    public decimal? DisplayStockQuantity { get; set; }
 
     [Range(1, long.MaxValue, ErrorMessage = "Category is required.")]
     public long CategoryId { get; set; }

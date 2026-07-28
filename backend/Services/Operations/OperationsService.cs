@@ -26,6 +26,7 @@ public sealed class OperationsService(
         var salaries = await context.StaffSalaryPayments.Where(x => x.PaidDate >= first).SumAsync(x => (decimal?)x.PaidAmount, ct) ?? 0;
         var low = await context.Products.AsNoTracking().CountAsync(product =>
             product.IsActive &&
+            !product.UsesDisplayStock &&
             (product.Inventory == null || product.Inventory.Quantity - product.Inventory.ReservedQuantity <= product.Inventory.MinimumQuantity), ct);
         return new OperationSummary(purchases, sales, expenses, salaries, low);
     }
@@ -44,7 +45,9 @@ public sealed class OperationsService(
                 x.Id,
                 x.Name,
                 x.Barcode,
-                x.Inventory == null ? 0 : x.Inventory.Quantity - x.Inventory.ReservedQuantity,
+                x.UsesDisplayStock
+                    ? x.DisplayStockQuantity ?? 0
+                    : x.Inventory == null ? 0 : x.Inventory.Quantity - x.Inventory.ReservedQuantity,
                 x.Prices.Where(p => p.CustomerTypeId == defaultTypeId).OrderBy(p => p.Id)
                     .Select(p => (decimal?)(p.SalePrice.HasValue && (!p.StartDate.HasValue || p.StartDate.Value <= today) && (!p.EndDate.HasValue || p.EndDate.Value >= today) ? p.SalePrice.Value : p.RegularPrice))
                     .FirstOrDefault()))
@@ -208,8 +211,38 @@ public sealed class OperationsService(
             if (group.Select(item => item.UnitPrice).Distinct().Count() > 1) throw new ArgumentException("A product can appear only once per sale unless every line uses the same unit price.");
             return new InventorySaleItemRequest { ProductId = group.Key, Quantity = group.Sum(item => item.Quantity), UnitPrice = group.First().UnitPrice };
         }).ToList();
-        await EnsureProductsExist(items.Select(x => x.ProductId), ct);
-        var productCosts = await inventoryCosts.GetCurrentUnitCostsAsync(items.Select(x => x.ProductId), ct);
+        var productIds = items.Select(x => x.ProductId).Distinct().ToArray();
+        var productModes = await context.Products
+            .AsNoTracking()
+            .Where(product => productIds.Contains(product.Id))
+            .Select(product => new
+            {
+                product.Id,
+                product.Name,
+                product.MinimumValue,
+                product.MaximumValue,
+                product.UsesDisplayStock,
+                product.DisplayStockQuantity
+            })
+            .ToDictionaryAsync(product => product.Id, ct);
+
+        if (productModes.Count != productIds.Length)
+            throw new ArgumentException("One or more selected products do not exist.");
+
+        foreach (var item in items)
+        {
+            var product = productModes[item.ProductId];
+            if (product.MinimumValue.HasValue && item.Quantity < product.MinimumValue.Value)
+                throw new ArgumentException($"The minimum sale quantity for '{product.Name}' is {product.MinimumValue.Value}.");
+            if (product.MaximumValue.HasValue && item.Quantity > product.MaximumValue.Value)
+                throw new ArgumentException($"The maximum sale quantity for '{product.Name}' is {product.MaximumValue.Value}.");
+            if (product.UsesDisplayStock && item.Quantity > Math.Max(0, product.DisplayStockQuantity ?? 0))
+                throw new ArgumentException($"Only {Math.Max(0, product.DisplayStockQuantity ?? 0):N3} unit(s) of '{product.Name}' are displayed as available.");
+        }
+
+        // Display-stock products do not mutate inventory, but an existing purchase cost
+        // is still snapshotted so profit reports remain accurate.
+        var productCosts = await inventoryCosts.GetCurrentUnitCostsAsync(productIds, ct);
 
         string? registeredCustomerName = null;
         string? registeredCustomerPhone = null;
@@ -245,7 +278,16 @@ public sealed class OperationsService(
             CreatedByUserId = userId
         };
         foreach (var item in items)
-            sale.Items.Add(new InventorySaleItem { ProductId = item.ProductId, Quantity = item.Quantity, UnitPrice = item.UnitPrice, UnitCost = productCosts.GetValueOrDefault(item.ProductId), LineTotal = item.Quantity * item.UnitPrice });
+        {
+            sale.Items.Add(new InventorySaleItem
+            {
+                ProductId = item.ProductId,
+                Quantity = item.Quantity,
+                UnitPrice = item.UnitPrice,
+                UnitCost = productCosts.GetValueOrDefault(item.ProductId),
+                LineTotal = item.Quantity * item.UnitPrice
+            });
+        }
         if (request.PaidAmount > 0)
             sale.Payments.Add(NewSalePayment(request.PaidAmount, saleDate, request.PaymentMethod, request.PaymentReferenceNumber, "Initial sale payment", userId));
 
@@ -254,6 +296,9 @@ public sealed class OperationsService(
         await context.SaveChangesAsync(ct);
         foreach (var item in items)
         {
+            if (productModes[item.ProductId].UsesDisplayStock)
+                continue;
+
             await ApplyStockMovement(item.ProductId, -item.Quantity, InventoryTransactionType.Sale, "ManualSale", sale.Id, sale.SaleNumber, userId, null, ct);
             await ConsumeInventoryLotsAsync(item.ProductId, item.Quantity, ct);
         }

@@ -1,4 +1,4 @@
-﻿using API.Entities.Common;
+using API.Entities.Common;
 using API.Entities.Products;
 using ECommerce.Entities.Products;
 
@@ -15,6 +15,11 @@ public class OrderItem : ProductEntity
     public decimal UnitPrice { get; set; }
 
     public decimal UnitCost { get; set; }
+
+    /// <summary>
+    /// Snapshot captured when the order is created. False for display-stock products.
+    /// </summary>
+    public bool AffectsInventory { get; set; } = true;
 
     public decimal Discount { get; set; }
 

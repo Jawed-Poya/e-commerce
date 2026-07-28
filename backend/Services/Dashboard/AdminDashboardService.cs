@@ -50,6 +50,7 @@ public sealed class AdminDashboardService(
 
         var inventory = await context.ProductInventories
             .AsNoTracking()
+            .Where(item => !item.Product.UsesDisplayStock)
             .GroupBy(_ => 1)
             .Select(group => new InventoryHealthSummary(
                 group.Count(item => item.Quantity - item.ReservedQuantity > item.MinimumQuantity),
@@ -145,6 +146,7 @@ public sealed class AdminDashboardService(
 
         var lowStock = await context.ProductInventories
             .AsNoTracking()
+            .Where(item => !item.Product.UsesDisplayStock)
             .Where(item => item.Quantity - item.ReservedQuantity <= item.MinimumQuantity)
             .OrderBy(item => item.Quantity - item.ReservedQuantity)
             .Take(8)

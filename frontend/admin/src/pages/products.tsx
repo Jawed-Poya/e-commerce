@@ -97,6 +97,8 @@ export default function ProductsPage() {
                 unitId: item.unitId,
                 minimumValue: item.minimumValue,
                 maximumValue: item.maximumValue,
+                usesDisplayStock: item.usesDisplayStock,
+                displayStockQuantity: item.displayStockQuantity,
                 isFeatured: item.isFeatured,
                 isActive: item.isActive,
                 primaryImageUrl: item.images.find(image => image.isPrimary)?.url ?? null,
@@ -118,6 +120,8 @@ export default function ProductsPage() {
             const priceDrafts = createCustomerPriceDrafts(lookups.customerTypes, lookups.defaultCustomerTypeId, draft.prices.map(price => ({ ...price, enabled: true })));
             const error = validatePriceDrafts(priceDrafts);
             if (error) return toast.error(`${draft.name}: ${error}`);
+            if (draft.usesDisplayStock && draft.displayStockQuantity == null) return toast.error(`${draft.name}: enter the quantity customers should see.`);
+            if (draft.displayStockQuantity != null && draft.displayStockQuantity < 0) return toast.error(`${draft.name}: display quantity cannot be negative.`);
         }
         setSaving(true);
         try {
@@ -181,7 +185,7 @@ export default function ProductsPage() {
                 {products.map(product => <TableRow key={product.id} className="group cursor-pointer" data-state={selected.includes(product.id) ? "selected" : undefined} onDoubleClick={() => navigate(`/products/${product.id}`)}>
                     <TableCell onDoubleClick={event => event.stopPropagation()}><Checkbox aria-label={`Select ${product.name}`} checked={selected.includes(product.id)} onCheckedChange={() => toggle(product.id)} /></TableCell>
                     <TableCell><div className="flex items-center gap-3">{resolveProductImageUrl(product.primaryImageUrl) ? <img src={resolveProductImageUrl(product.primaryImageUrl)!} alt="" className="size-10 shrink-0 rounded-md border bg-muted object-cover" /> : <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted"><ImagePlus className="size-4 text-muted-foreground" /></div>}<span className="font-medium">{product.name}</span></div></TableCell><TableCell>{product.barcode || "—"}</TableCell><TableCell>{product.categoryName}</TableCell>
-                    <TableCell>{product.price == null ? "—" : product.price.toLocaleString()}</TableCell><TableCell>{product.stock.toLocaleString()}</TableCell>
+                    <TableCell>{product.price == null ? "—" : product.price.toLocaleString()}</TableCell><TableCell><div className="space-y-1"><span className="font-medium">{product.stock.toLocaleString()}</span>{product.usesDisplayStock ? <Badge variant="secondary" className="block w-fit text-[10px]">Display stock</Badge> : null}</div></TableCell>
                     <TableCell className="relative"><Badge variant={product.isActive ? "outline" : "secondary"}>{product.isActive ? t("products.active") : t("products.inactive")}</Badge><Button type="button" variant="outline" size="icon-sm" className="absolute end-2 top-1/2 -translate-y-1/2 bg-background/95 text-primary opacity-0 shadow-sm backdrop-blur-sm transition-[opacity,transform,background-color] hover:bg-primary hover:text-primary-foreground group-hover:opacity-100 focus-visible:opacity-100" aria-label={t("details.open")} onClick={() => navigate(`/products/${product.id}`)}><Eye className="size-4" /></Button></TableCell>
                 </TableRow>)}
             </TableBody>
@@ -208,6 +212,10 @@ export default function ProductsPage() {
                             <LookupSelect label={t("form.unit")} value={item.unitId} options={lookups?.units ?? []} onChange={unitId => change(item.id, { unitId })} searchText={t("update.searchOption")} emptyText={t("update.noMatch")} />
                         </div>
                         <div className="grid gap-4 md:grid-cols-2"><div className="space-y-2"><Label>{t("form.minimum")}</Label><Input type="number" min={0} value={item.minimumValue ?? ""} onChange={e => change(item.id, { minimumValue: e.target.value ? Number(e.target.value) : null })} /></div><div className="space-y-2"><Label>{t("form.maximum")}</Label><Input type="number" min={0} value={item.maximumValue ?? ""} onChange={e => change(item.id, { maximumValue: e.target.value ? Number(e.target.value) : null })} /></div></div>
+                        <div className="rounded-xl border bg-muted/20 p-4">
+                            <ToggleCard title="Display stock" description="Show an orderable quantity without changing physical inventory." checked={item.usesDisplayStock} onChange={usesDisplayStock => change(item.id, { usesDisplayStock, displayStockQuantity: usesDisplayStock ? item.displayStockQuantity : null })} />
+                            {item.usesDisplayStock ? <div className="mt-4 space-y-2 border-t pt-4"><Label>Customer-visible quantity</Label><Input type="number" min={0} step="any" value={item.displayStockQuantity ?? ""} onChange={event => change(item.id, { displayStockQuantity: event.target.value === "" ? null : Number(event.target.value) })} /></div> : null}
+                        </div>
                         <div className="space-y-2"><Label>{t("form.slug")}</Label><Input value={item.slug ?? ""} onChange={e => change(item.id, { slug: e.target.value || null })} /></div>
                         <div className="space-y-2"><Label>{t("form.shortDescription")}</Label><Textarea rows={2} value={item.shortDescription ?? ""} onChange={e => change(item.id, { shortDescription: e.target.value || null })} /></div>
                         <div className="space-y-2"><Label>{t("form.description")}</Label><Textarea rows={5} value={item.description ?? ""} onChange={e => change(item.id, { description: e.target.value || null })} /></div>
@@ -225,7 +233,7 @@ export default function ProductsPage() {
             })}</div>
             <footer className="flex flex-col-reverse items-center justify-between gap-2 border-t pt-4 sm:flex-row">
                 <div className="flex gap-2">{drafts.length > 1 && <><Button type="button" variant="outline" disabled={activeEditor === 0} onClick={() => setActiveEditor(x => x - 1)}>{t("update.previous")}</Button><Button type="button" variant="outline" disabled={activeEditor === drafts.length - 1} onClick={() => setActiveEditor(x => x + 1)}>{t("update.next")}</Button></>}</div>
-                <div className="flex gap-2"><Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>{t("form.cancel")}</Button><Button onClick={save} disabled={saving || drafts.some(x => x.name.trim().length < 2 || x.categoryId < 1)}>{saving && <LoaderCircle className="me-2 size-4 animate-spin" />}{saving ? t("update.submitting") : `${t("update.submit")} (${drafts.length})`}</Button></div>
+                <div className="flex gap-2"><Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>{t("form.cancel")}</Button><Button onClick={save} disabled={saving || drafts.some(x => x.name.trim().length < 2 || x.categoryId < 1 || (x.usesDisplayStock && x.displayStockQuantity == null))}>{saving && <LoaderCircle className="me-2 size-4 animate-spin" />}{saving ? t("update.submitting") : `${t("update.submit")} (${drafts.length})`}</Button></div>
             </footer>
           </section>
         </div>, document.body)}

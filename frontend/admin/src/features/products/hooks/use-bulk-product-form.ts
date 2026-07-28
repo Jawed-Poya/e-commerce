@@ -61,6 +61,8 @@ function createProductDraft(file: File): ProductBulkItemFormValues {
 
         minimumValue: null,
         maximumValue: null,
+        usesDisplayStock: false,
+        displayStockQuantity: null,
 
         categoryId: 0,
         brandId: null,
