@@ -212,7 +212,7 @@ export function HomePage() {
 
             <section id="deals" className="grid gap-4 py-7 sm:gap-5 sm:py-8 lg:grid-cols-[1.45fr_.55fr]">
                 <div className="relative min-h-[420px] overflow-hidden rounded-[26px] bg-gradient-to-br from-primary via-primary to-blue-700 p-6 text-primary-foreground shadow-xl sm:min-h-[390px] sm:p-10 lg:p-12">
-                    <div className="relative z-10 max-w-lg">
+                    <div className="relative z-10 max-w-[78%] pb-40 sm:max-w-[55%] sm:pb-0">
                         <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-orange-200">
                             <Sparkles className="size-3.5" /> {t("home.featuredCatalog")}
                         </div>
@@ -223,8 +223,12 @@ export function HomePage() {
                         </Button>
                     </div>
                     {deal && (
-                        <div className="absolute bottom-0 end-0 h-[44%] w-[52%] sm:flex sm:h-full sm:w-[46%] sm:items-end sm:justify-center">
-                            <img src={imageUrl(deal.primaryImageUrl) || "/placeholder-product.svg"} alt={deal.name} className="relative z-10 max-h-full w-full object-contain object-bottom drop-shadow-[0_25px_25px_rgba(0,0,0,0.24)] sm:max-h-[88%]" />
+                        <div className="absolute bottom-4 end-4 h-[42%] w-[50%] sm:bottom-8 sm:end-8 sm:h-[78%] sm:w-[40%]">
+                            <div className="relative flex size-full items-center justify-center overflow-hidden rounded-[26px] border border-white/30 bg-white/95 p-4 shadow-[0_28px_70px_rgba(15,23,42,0.28)] sm:rounded-[34px] sm:p-7">
+                                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,hsl(var(--primary)/0.10),transparent_58%)]" />
+                                <div className="pointer-events-none absolute inset-x-8 bottom-4 h-8 rounded-full bg-slate-950/12 blur-xl" />
+                                <img src={imageUrl(deal.primaryImageUrl) || "/placeholder-product.svg"} alt={deal.name} className="relative z-10 size-full object-contain transition-transform duration-500 hover:scale-[1.03]" />
+                            </div>
                         </div>
                     )}
                 </div>
