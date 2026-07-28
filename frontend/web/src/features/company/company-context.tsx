@@ -24,11 +24,26 @@ export interface CompanySettings {
     allowUserClaimManagement: boolean;
 }
 
+export interface PublicCompanyBranch {
+    id: number;
+    name: string;
+    code: string;
+    phone: string | null;
+    address: string | null;
+    isMain: boolean;
+    isActive: boolean;
+}
+
 export interface PublicCompanyProfile {
     id: number;
     name: string;
+    legalName: string | null;
+    email: string | null;
+    phone: string | null;
+    address: string | null;
     logoUrl: string | null;
     faviconUrl: string | null;
+    branches: PublicCompanyBranch[];
     settings: CompanySettings;
 }
 

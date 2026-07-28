@@ -16,6 +16,7 @@ import { apiGet, apiPost, imageUrl } from "../../shared/api/api-client";
 import { Badge } from "../../shared/components/ui/badge";
 import { Button } from "../../shared/components/ui/button";
 import { Skeleton } from "../../shared/components/ui/skeleton";
+import { formatMoney } from "../../shared/lib/money";
 import { cn } from "../../shared/lib/utils";
 import type { ProductDetails } from "../../shared/types/product";
 import { maximumCartQuantity, minimumCartQuantity, useCart } from "../cart/cart-context";
@@ -288,7 +289,7 @@ export function ProductPage() {
                 </p>
 
                 <p className="mt-1 text-3xl font-black tracking-[-0.04em] text-primary sm:text-4xl">
-                  {hasPrice ? `$${price.toFixed(2)}` : t("product.noPrice")}
+                  {hasPrice ? formatMoney(price) : t("product.noPrice")}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="rounded-full bg-primary/10 px-2.5 py-1 font-bold text-primary">
@@ -471,7 +472,7 @@ export function ProductPage() {
             </p>
 
             <p className="text-xl font-black tracking-tight text-primary">
-              {hasPrice ? `$${price.toFixed(2)}` : t("product.noPrice")}
+              {hasPrice ? formatMoney(price) : t("product.noPrice")}
             </p>
           </div>
 

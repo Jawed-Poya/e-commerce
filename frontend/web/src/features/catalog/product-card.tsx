@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { imageUrl } from "../../shared/api/api-client";
 import { Badge } from "../../shared/components/ui/badge";
 import { Button } from "../../shared/components/ui/button";
+import { formatMoney } from "../../shared/lib/money";
 import { cn } from "../../shared/lib/utils";
 import { productPath } from "../../shared/lib/product-path";
 import type { Product } from "../../shared/types/product";
@@ -53,7 +54,7 @@ export function ProductCard({ product }: { product: Product }) {
   return (
     <article className="group relative grid h-full min-w-0 grid-cols-[116px_minmax(0,1fr)] overflow-hidden rounded-[20px] border border-border/70 bg-card p-2 shadow-[0_5px_20px_rgba(15,23,42,0.05)] transition-all duration-300 active:scale-[0.99] dark:shadow-[0_8px_28px_rgba(0,0,0,0.22)] sm:flex sm:flex-col sm:p-0 sm:hover:-translate-y-1.5 sm:hover:border-primary/25 sm:hover:shadow-[0_24px_60px_rgba(15,23,42,0.12)] dark:sm:hover:shadow-[0_24px_60px_rgba(0,0,0,0.38)]">
       {/* Product image */}
-      <div className="relative min-h-[152px] overflow-hidden rounded-2xl border border-border/40 bg-muted/40 sm:aspect-[1/0.88] sm:min-h-0 sm:rounded-none sm:border-0">
+      <div className="relative min-h-[152px] overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:aspect-[1/0.88] sm:min-h-0 sm:rounded-none sm:border-0">
         <Link
           to={productPath(product)}
           className="absolute inset-0 z-10"
@@ -64,7 +65,7 @@ export function ProductCard({ product }: { product: Product }) {
           src={primary}
           alt={product.name}
           className={cn(
-            "size-full object-cover transition-all duration-700 ease-out sm:group-hover:scale-[1.06]",
+            "size-full object-contain p-3 drop-shadow-sm transition-all duration-700 ease-out sm:p-5 sm:group-hover:scale-[1.06]",
             alternate && "sm:group-hover:opacity-0",
           )}
         />
@@ -73,7 +74,7 @@ export function ProductCard({ product }: { product: Product }) {
           <img
             src={imageUrl(alternate.url) ?? primary}
             alt=""
-            className="absolute inset-0 hidden size-full scale-[1.04] object-cover opacity-0 transition-all duration-700 ease-out sm:block sm:group-hover:scale-100 sm:group-hover:opacity-100"
+            className="absolute inset-0 hidden size-full scale-[1.04] object-contain p-5 opacity-0 drop-shadow-sm transition-all duration-700 ease-out sm:block sm:group-hover:scale-100 sm:group-hover:opacity-100"
           />
         )}
 
@@ -187,7 +188,7 @@ export function ProductCard({ product }: { product: Product }) {
             <div className="min-w-0">
               <p className="text-lg font-black tracking-[-0.035em] text-foreground sm:text-2xl">
                 {hasPrice
-                  ? `$${product.price!.toFixed(2)}`
+                  ? formatMoney(product.price!)
                   : t("product.noPrice")}
               </p>
               {hasPrice && (
@@ -208,7 +209,7 @@ export function ProductCard({ product }: { product: Product }) {
               {hasDiscount && (
                 <div className="mt-0.5 flex items-center gap-1.5">
                   <p className="text-[10px] font-medium text-muted-foreground line-through decoration-destructive/70 sm:text-xs">
-                    ${product.oldPrice!.toFixed(2)}
+                    {formatMoney(product.oldPrice!)}
                   </p>
 
                   <span className="hidden rounded-full bg-brand-orange/10 px-2 py-0.5 text-[10px] font-bold text-brand-orange sm:inline">

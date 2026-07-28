@@ -3,31 +3,36 @@ import {
     Check,
     CircleHelp,
     Heart,
+    Mail,
+    MapPin,
     Menu,
-    Search,
+    Phone,
     Share2,
     ShoppingBag,
+    Store,
     UserRound,
     X,
 } from "lucide-react";
-import { useState, type FormEvent } from "react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useState, type ReactNode } from "react";
+import { Link, Outlet, useLocation } from "react-router-dom";
 
 import { useAuth } from "../../features/auth/auth-context";
 import { useCart } from "../../features/cart/cart-context";
-import { NotificationCenter } from "../../features/notifications/notification-center";
 import {
     CategoryMegaMenu,
     MobileCategoryLinks,
 } from "../../features/catalog/category-menu";
-
-import { ThemeToggle } from "../components/theme-toggle";
+import { GlobalSearch } from "../../features/catalog/global-search";
+import { useLookups } from "../../features/catalog/use-catalog";
+import { useCompany } from "../../features/company/company-context";
+import { NotificationCenter } from "../../features/notifications/notification-center";
+import { PwaInstallButton } from "../../features/pwa/pwa-install-button";
 import { LanguageSwitcher } from "../../i18n/language-switcher";
 import { useI18n } from "../../i18n/i18n-provider";
-import { PwaInstallButton } from "../../features/pwa/pwa-install-button";
+import { imageUrl } from "../api/api-client";
+import { ThemeToggle } from "../components/theme-toggle";
 import { Button } from "../components/ui/button";
 import { cn } from "../lib/utils";
-import { useCompany } from "../../features/company/company-context";
 
 type StoreNavItem = {
     to: string;
@@ -39,60 +44,98 @@ type StoreNavItem = {
 const nav: StoreNavItem[] = [
     { to: "/", label: "nav.home", match: "home" },
     { to: "/products", label: "nav.shop", match: "products" },
-    { to: "/?section=categories#categories", label: "nav.categories", match: "section", section: "categories" },
-    { to: "/?section=deals#deals", label: "nav.deals", match: "section", section: "deals" },
+    {
+        to: "/?section=categories#categories",
+        label: "nav.categories",
+        match: "section",
+        section: "categories",
+    },
+    {
+        to: "/?section=deals#deals",
+        label: "nav.deals",
+        match: "section",
+        section: "deals",
+    },
     { to: "/track-order", label: "nav.trackOrder", match: "exact" },
 ];
 
-function isStoreNavItemActive(item: StoreNavItem, pathname: string, search: string) {
+function isStoreNavItemActive(
+    item: StoreNavItem,
+    pathname: string,
+    search: string,
+) {
     const selectedSection = new URLSearchParams(search).get("section");
     if (item.match === "home") return pathname === "/" && !selectedSection;
-    if (item.match === "products") return pathname === "/products" || pathname.startsWith("/products/");
-    if (item.match === "section") return pathname === "/" && selectedSection === item.section;
+    if (item.match === "products")
+        return pathname === "/products" || pathname.startsWith("/products/");
+    if (item.match === "section")
+        return pathname === "/" && selectedSection === item.section;
     return pathname === item.to;
 }
 
-function Logo() {
+function Logo({ inverse = false }: { inverse?: boolean }) {
     const { company } = useCompany();
     const name = company?.name ?? "EasyCart";
+    const initials = name
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join("")
+        .toUpperCase();
+
     return (
-        <Link to="/" className="group flex min-w-0 shrink-0 items-center gap-2.5 font-black tracking-tight">
-            <span className="relative grid size-10 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-brand-orange text-xs text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-300 group-hover:-rotate-3 group-hover:scale-105">
-                {company?.logoUrl ? <img src={company.logoUrl} alt="" className="size-full object-cover" /> : <span className="relative z-10">{name.split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase()}</span>}
-                <span className="absolute -right-2 -top-2 size-6 rounded-full bg-white/20" />
+        <Link
+            to="/"
+            className="group flex min-w-0 shrink-0 items-center gap-2.5 font-black tracking-tight"
+        >
+            <span className="relative grid size-10 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-brand-orange text-xs text-primary-foreground shadow-lg shadow-primary/20 transition duration-300 group-hover:-rotate-3 group-hover:scale-105">
+                {company?.logoUrl ? (
+                    <img
+                        src={imageUrl(company.logoUrl) ?? company.logoUrl}
+                        alt=""
+                        className="size-full object-contain bg-white p-1 dark:bg-slate-950"
+                    />
+                ) : (
+                    <span className="relative z-10">{initials}</span>
+                )}
+                <span className="absolute -end-2 -top-2 size-6 rounded-full bg-white/20" />
             </span>
-            <span className="max-w-36 truncate text-xl tracking-[-0.04em] text-foreground sm:max-w-48">{name}</span>
+            <span
+                className={cn(
+                    "max-w-36 truncate text-xl tracking-[-0.04em] sm:max-w-48",
+                    inverse ? "text-white" : "text-foreground",
+                )}
+            >
+                {name}
+            </span>
         </Link>
     );
 }
 
 export function StoreLayout() {
-    const [query, setQuery] = useState("");
-    const [open, setOpen] = useState(false);
+    const [mobileOpen, setMobileOpen] = useState(false);
     const [shareConfirmed, setShareConfirmed] = useState(false);
-
-    const navigate = useNavigate();
     const location = useLocation();
     const cart = useCart();
     const auth = useAuth();
-    const { language, direction, t } = useI18n();
+    const { t } = useI18n();
     const { company } = useCompany();
+    const lookups = useLookups();
     const accountPath = auth.isAuthenticated ? "/account" : "/account/login";
-
-    const submit = (e: FormEvent) => {
-        e.preventDefault();
-
-        navigate(
-            `/products${query ? `?search=${encodeURIComponent(query)}` : ""}`,
-        );
-    };
+    const roots = (lookups.data?.categories ?? []).filter(
+        (category) => category.parentId == null,
+    );
 
     const shareStore = async () => {
         const url = window.location.href;
         const title = company?.name ?? "Online store";
         if (navigator.share) {
             try {
-                await navigator.share({ title, text: t("common.shareStoreText"), url });
+                await navigator.share({
+                    title,
+                    text: t("common.shareStoreText"),
+                    url,
+                });
                 return;
             } catch (error) {
                 if ((error as DOMException)?.name === "AbortError") return;
@@ -110,496 +153,327 @@ export function StoreLayout() {
     return (
         <div className="min-h-screen bg-background text-foreground">
             <header className="sticky top-0 z-40 border-b border-border/70 bg-background/90 shadow-[0_1px_16px_rgba(15,23,42,0.04)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 dark:shadow-[0_1px_20px_rgba(0,0,0,0.25)]">
-                {/* Top announcement bar */}
-                <div className="border-b border-border/60 bg-primary/[0.04] text-foreground dark:border-white/10 dark:bg-slate-950 dark:text-slate-200">
+                <div className="border-b border-border/60 bg-primary/[0.04] dark:border-white/10 dark:bg-slate-950">
                     <div className="mx-auto flex h-9 w-full max-w-[1500px] items-center justify-between gap-4 px-4 text-[11px] sm:px-6 lg:px-8">
                         <div className="flex min-w-0 items-center gap-2">
                             <span className="relative flex size-2 shrink-0">
-                                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-60 dark:bg-emerald-400" />
-                                <span className="relative inline-flex size-2 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+                                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+                                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
                             </span>
-
                             <span className="truncate font-medium">
                                 {t("header.welcome")}
                             </span>
                         </div>
-
                         <div className="hidden items-center gap-5 sm:flex">
-                            <a
-                                href="mailto:support@easycart.com"
-                                className="flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-primary dark:text-slate-300 dark:hover:text-white"
-                            >
-                                <CircleHelp className="size-3.5" />
-                                {t("header.help")}
-                            </a>
-
-                            <span className="text-muted-foreground dark:text-slate-400">
+                            {company?.email ? (
+                                <a
+                                    href={`mailto:${company.email}`}
+                                    className="flex items-center gap-1.5 text-muted-foreground transition hover:text-primary"
+                                >
+                                    <CircleHelp className="size-3.5" />
+                                    {t("header.help")}
+                                </a>
+                            ) : null}
+                            <span className="text-muted-foreground">
                                 {t("header.secure")}
                             </span>
                         </div>
                     </div>
                 </div>
 
-                {/* Main header */}
                 <div className="border-b border-border/70 bg-background/95">
-                    <div className="mx-auto flex h-[70px] w-full max-w-[1500px] items-center gap-2.5 px-4 sm:h-[76px] sm:px-6 md:gap-6 lg:h-20 lg:px-8">
+                    <div className="mx-auto flex h-[70px] w-full max-w-[1500px] items-center gap-2.5 px-4 sm:h-[76px] sm:px-6 md:gap-5 lg:h-20 lg:px-8">
                         <Logo />
-
-                        <form
-                            onSubmit={submit}
-                            className="group mx-auto hidden h-12 w-full max-w-2xl items-center rounded-2xl border border-input bg-muted/35 p-1 transition-all duration-200 focus-within:border-primary/60 focus-within:bg-background focus-within:shadow-sm focus-within:ring-4 focus-within:ring-primary/10 md:flex"
-                        >
-                            <Search className="ml-3 size-5 shrink-0 text-muted-foreground transition-colors group-focus-within:text-primary" />
-
-                            <input
-                                className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                placeholder={t("header.searchPlaceholder")}
-                            />
-
-                            <Button className="h-10 rounded-xl px-6 font-semibold shadow-sm">
-                                {t("common.search")}
-                            </Button>
-                        </form>
-
+                        <GlobalSearch className="mx-auto hidden w-full max-w-2xl md:block" />
                         <div className="ms-auto flex items-center gap-0.5">
                             <LanguageSwitcher />
                             <PwaInstallButton compact />
                             <ThemeToggle />
                             <NotificationCenter />
-
                             <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="hidden rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary sm:inline-flex"
-                                aria-label={shareConfirmed ? t("common.linkCopied") : t("common.shareStore")}
-                                title={shareConfirmed ? t("common.linkCopied") : t("common.shareStore")}
+                                className="hidden rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary sm:inline-flex"
+                                aria-label={
+                                    shareConfirmed
+                                        ? t("common.linkCopied")
+                                        : t("common.shareStore")
+                                }
                                 onClick={() => void shareStore()}
                             >
-                                {shareConfirmed ? <Check className="size-5 text-emerald-600" /> : <Share2 className="size-5" />}
+                                {shareConfirmed ? (
+                                    <Check className="size-5 text-emerald-600" />
+                                ) : (
+                                    <Share2 className="size-5" />
+                                )}
                             </Button>
-
                             <Button
                                 asChild
                                 variant="ghost"
                                 size="icon"
-                                className="hidden rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary sm:inline-flex"
+                                className="hidden rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary sm:inline-flex"
                             >
-                                <Link to={accountPath} aria-label={auth.isAuthenticated ? t("common.account") : t("common.login")}>
+                                <Link
+                                    to={accountPath}
+                                    aria-label={
+                                        auth.isAuthenticated
+                                            ? t("common.account")
+                                            : t("common.login")
+                                    }
+                                >
                                     <UserRound className="size-5" />
                                 </Link>
                             </Button>
-
-                            <Button asChild variant="ghost" size="icon" className="relative hidden rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary sm:inline-flex">
-                                <Link to="/wishlist" aria-label={t("common.wishlist")}>
-                                    <Heart className="size-5" />
-                                    <Count value={cart.wishlist.length} />
-                                </Link>
-                            </Button>
-
                             <Button
                                 asChild
                                 variant="ghost"
                                 size="icon"
-                                className="relative rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                                className="relative hidden rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary sm:inline-flex"
+                            >
+                                <Link to="/wishlist" aria-label={t("common.wishlist")}>
+                                    <Heart className="size-5" />
+                                    {cart.wishlist.length ? (
+                                        <CountBadge>{cart.wishlist.length}</CountBadge>
+                                    ) : null}
+                                </Link>
+                            </Button>
+                            <Button
+                                asChild
+                                variant="ghost"
+                                size="icon"
+                                className="relative rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary"
                             >
                                 <Link to="/cart" aria-label={t("common.cart")}>
                                     <ShoppingBag className="size-5" />
-                                    <Count value={cart.count} />
+                                    {cart.items.length ? (
+                                        <CountBadge>{cart.items.length}</CountBadge>
+                                    ) : null}
                                 </Link>
                             </Button>
-
-                            <Dialog.Root open={open} onOpenChange={setOpen}>
-                                <Dialog.Trigger asChild>
-                                    <Button
-                                        className="rounded-xl lg:hidden"
-                                        variant="ghost"
-                                        size="icon"
-                                        aria-label="Open menu"
-                                    >
-                                        <Menu className="size-5" />
-                                    </Button>
-                                </Dialog.Trigger>
-
-                                <Dialog.Portal>
-                                    <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-sm data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out data-[state=open]:fade-in" />
-
-                                    <Dialog.Content
-                                        dir={direction}
-                                        className={cn(
-                                            "fixed inset-y-0 z-50 w-[90%] max-w-sm overflow-y-auto bg-background shadow-2xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
-                                            language === "en"
-                                                ? "right-0 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right"
-                                                : "left-0 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left",
-                                        )}
-                                    >
-                                        <div className="flex min-h-full flex-col">
-                                            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-5 py-4 backdrop-blur-xl">
-                                                <Logo />
-
-                                                <Dialog.Close asChild>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="rounded-xl"
-                                                        aria-label="Close menu"
-                                                    >
-                                                        <X className="size-5" />
-                                                    </Button>
-                                                </Dialog.Close>
-                                            </div>
-
-                                            <div className="px-5 py-5">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    className="mb-4 w-full justify-center rounded-xl"
-                                                    onClick={() => void shareStore()}
-                                                >
-                                                    {shareConfirmed ? <Check className="size-4 text-emerald-600" /> : <Share2 className="size-4" />}
-                                                    {shareConfirmed ? t("common.linkCopied") : t("common.shareStore")}
-                                                </Button>
-                                                <form
-                                                    onSubmit={submit}
-                                                    className="flex h-12 items-center rounded-2xl border bg-muted/40 px-1 transition-all focus-within:border-primary/60 focus-within:bg-background focus-within:ring-4 focus-within:ring-primary/10"
-                                                >
-                                                    <Search className="ms-3 size-4 text-muted-foreground" />
-
-                                                    <input
-                                                        className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm outline-none"
-                                                        value={query}
-                                                        onChange={(e) =>
-                                                            setQuery(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder={t("header.searchPlaceholder")}
-                                                    />
-
-                                                    <Button
-                                                        type="submit"
-                                                        size="sm"
-                                                        className="rounded-xl px-4"
-                                                    >
-                                                        {t("common.search")}
-                                                    </Button>
-                                                </form>
-                                            </div>
-
-                                            <div className="grid grid-cols-3 gap-2 px-5 pb-5">
-                                                <MobileAction
-                                                    icon={<UserRound className="size-5" />}
-                                                    label={auth.isAuthenticated ? auth.user?.customerTypeName ?? t("common.account") : t("common.login")}
-                                                    to={accountPath}
-                                                    onNavigate={() => setOpen(false)}
-                                                />
-
-                                                <MobileAction
-                                                    icon={<Heart className="size-5" />}
-                                                    label={t("common.wishlist")}
-                                                    count={cart.wishlist.length}
-                                                    to="/wishlist"
-                                                    onNavigate={() => setOpen(false)}
-                                                />
-
-                                                <Link
-                                                    to="/cart"
-                                                    onClick={() =>
-                                                        setOpen(false)
-                                                    }
-                                                    className="relative flex flex-col items-center gap-2 rounded-2xl border bg-card px-2 py-4 text-xs font-semibold shadow-sm transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-                                                >
-                                                    <span className="relative">
-                                                        <ShoppingBag className="size-5" />
-                                                        <Count
-                                                            value={cart.count}
-                                                        />
-                                                    </span>
-                                                    {t("common.cart")}
-                                                </Link>
-                                            </div>
-
-                                            <div className="border-y bg-muted/15 px-5 py-5">
-                                                <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                                                    {t("mobile.mainMenu")}
-                                                </p>
-
-                                                <nav className="grid gap-1">
-                                                    {nav.map((x) => {
-                                                        const isActive = isStoreNavItemActive(x, location.pathname, location.search);
-                                                        return (
-                                                            <Link onClick={() => setOpen(false)} key={t(x.label)} to={x.to} className={cn(
-                                                                "flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold text-muted-foreground transition-all hover:bg-background hover:text-foreground",
-                                                                isActive && "bg-primary/10 text-primary shadow-sm hover:bg-primary/10 hover:text-primary",
-                                                            )}>
-                                                                {t(x.label)}
-                                                                <span className="text-lg font-light opacity-40">›</span>
-                                                            </Link>
-                                                        );
-                                                    })}
-                                                </nav>
-                                            </div>
-
-                                            <div className="px-5 py-5">
-                                                <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                                                    {t("mobile.shopByCategory")}
-                                                </p>
-
-                                                <MobileCategoryLinks
-                                                    onNavigate={() =>
-                                                        setOpen(false)
-                                                    }
-                                                />
-                                            </div>
-
-                                            <div className="mt-auto border-t bg-muted/25 p-5">
-                                                <div className="rounded-2xl border bg-card p-4 shadow-sm">
-                                                    <div className="flex gap-3">
-                                                        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                                                            <CircleHelp className="size-5" />
-                                                        </span>
-
-                                                        <div>
-                                                            <p className="text-sm font-bold">
-                                                                {t("mobile.needHelp")}
-                                                            </p>
-
-                                                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                                                                {t("mobile.helpDescription")}
-                                                            </p>
-
-                                                            <a
-                                                                href="mailto:support@easycart.com"
-                                                                className="mt-2 inline-block text-xs font-bold text-primary"
-                                                            >
-                                                                support@easycart.com
-                                                            </a>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Dialog.Content>
-                                </Dialog.Portal>
-                            </Dialog.Root>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="rounded-xl md:hidden"
+                                onClick={() => setMobileOpen(true)}
+                                aria-label={t("mobile.openMenu")}
+                            >
+                                <Menu className="size-5" />
+                            </Button>
                         </div>
                     </div>
-
-                    {/* Mobile search */}
-                    <div className="mx-auto w-full max-w-[1500px] px-4 pb-3 md:hidden">
-                        <form
-                            onSubmit={submit}
-                            className="flex h-11 items-center rounded-2xl border bg-muted/35 px-1 transition-all focus-within:border-primary/60 focus-within:bg-background focus-within:ring-4 focus-within:ring-primary/10"
-                        >
-                            <Search className="ms-3 size-4 text-muted-foreground" />
-
-                            <input
-                                className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm outline-none"
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                placeholder={t("header.searchPlaceholder")}
-                            />
-
-                            <Button
-                                type="submit"
-                                size="sm"
-                                className="h-9 rounded-xl px-4"
-                            >
-                                {t("common.search")}
-                            </Button>
-                        </form>
+                    <div className="mx-auto w-full max-w-[1500px] px-4 pb-3 md:hidden sm:px-6">
+                        <GlobalSearch compact />
                     </div>
                 </div>
 
-                {/* Desktop category/navigation bar */}
-                <div className="hidden bg-background lg:block">
-                    <div className="mx-auto flex h-[52px] w-full max-w-[1500px] items-center px-8">
+                <div className="hidden bg-background/95 md:block">
+                    <div className="mx-auto flex h-12 w-full max-w-[1500px] items-center gap-2 px-6 lg:px-8">
                         <CategoryMegaMenu />
-
-                        <div className="mx-4 h-6 w-px bg-border" />
-
-                        <nav className="flex h-full items-center gap-1">
-                            {nav.map((x) => {
-                                const isActive = isStoreNavItemActive(x, location.pathname, location.search);
+                        <nav className="ms-2 flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+                            {nav.map((item) => {
+                                const active = isStoreNavItemActive(
+                                    item,
+                                    location.pathname,
+                                    location.search,
+                                );
                                 return (
-                                    <Link key={t(x.label)} to={x.to} className={cn(
-                                        "relative flex h-full items-center rounded-lg px-4 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted/40 hover:text-primary",
-                                        isActive && "text-primary",
-                                    )}>
-                                        {t(x.label)}
-                                        <span className={cn(
-                                            "absolute inset-x-4 bottom-0 h-0.5 origin-center scale-x-0 rounded-full bg-primary transition-transform duration-200",
-                                            isActive && "scale-x-100",
-                                        )} />
+                                    <Link
+                                        key={item.to}
+                                        to={item.to}
+                                        className={cn(
+                                            "relative shrink-0 rounded-xl px-3.5 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground",
+                                            active &&
+                                                "bg-primary/8 text-primary after:absolute after:inset-x-4 after:-bottom-1 after:h-0.5 after:rounded-full after:bg-primary",
+                                        )}
+                                    >
+                                        {t(item.label)}
                                     </Link>
                                 );
                             })}
                         </nav>
-
-                        <Link
-                            to="/products?isFeatured=true"
-                            className="group ml-auto flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-brand-orange transition-colors hover:bg-brand-orange/10"
-                        >
-                            <span className="relative flex size-2">
-                                <span className="absolute inline-flex size-full animate-ping rounded-full bg-brand-orange opacity-60" />
-                                <span className="relative inline-flex size-2 rounded-full bg-brand-orange" />
-                            </span>
-                            {t("nav.featured")}
-                            <span className="transition-transform group-hover:translate-x-1">
-                                →
-                            </span>
-                        </Link>
                     </div>
                 </div>
             </header>
 
-            <main className="min-h-[60vh] bg-gradient-to-b from-muted/15 via-background to-background">
+            <main>
                 <Outlet />
             </main>
 
-            {/* Footer */}
-            <footer className="relative mt-16 overflow-hidden border-t bg-muted/35 text-muted-foreground dark:border-white/10 dark:bg-[#071526] dark:text-slate-300">
-                <div className="pointer-events-none absolute -right-40 -top-40 size-96 rounded-full bg-primary/8 blur-3xl dark:bg-primary/15" />
-                <div className="pointer-events-none absolute -bottom-40 -left-40 size-96 rounded-full bg-blue-500/5 blur-3xl dark:bg-blue-500/10" />
-
-                <div className="relative border-b border-border/70 dark:border-white/10">
-                    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-6 px-4 py-9 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-                        <div>
-                            <h2 className="text-xl font-black tracking-tight text-foreground dark:text-white sm:text-2xl">
-                                {t("footer.title")}
-                            </h2>
-
-                            <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground dark:text-slate-400">
-                                {t("footer.description")}
-                            </p>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2.5 text-xs font-semibold">
-                            <span className="rounded-full border bg-background/70 px-4 py-2 text-muted-foreground shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:shadow-none">
-                                {t("footer.secureCheckout")}
-                            </span>
-
-                            <span className="rounded-full border bg-background/70 px-4 py-2 text-muted-foreground shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:shadow-none">
-                                {t("footer.fastDelivery")}
-                            </span>
-
-                            <span className="rounded-full border bg-background/70 px-4 py-2 text-muted-foreground shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:shadow-none">
-                                {t("footer.easyReturns")}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="relative mx-auto grid w-full max-w-[1500px] gap-10 px-4 py-12 sm:px-6 sm:py-14 md:grid-cols-2 lg:grid-cols-4 lg:px-8">
-                    <div className="md:col-span-2">
-                        <Logo />
-
-                        <p className="mt-5 max-w-md text-sm leading-7 text-muted-foreground dark:text-slate-400">
-                            {t("footer.about")}
+            <footer className="mt-16 border-t bg-slate-950 text-slate-200 dark:bg-black">
+                <div className="mx-auto grid w-full max-w-[1500px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-[1.3fr_.7fr_.8fr_1fr] lg:px-8">
+                    <div>
+                        <Logo inverse />
+                        <p className="mt-5 max-w-md text-sm leading-7 text-slate-400">
+                            {company?.legalName ?? company?.name ?? t("footer.onlineStore")}
                         </p>
-
-                        <a
-                            href="mailto:support@easycart.com"
-                            className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-foreground transition-colors hover:text-primary dark:text-white dark:hover:text-primary"
-                        >
-                            <CircleHelp className="size-4" />
-                            support@easycart.com
-                        </a>
+                        <div className="mt-5 grid gap-2 text-sm text-slate-400">
+                            {company?.address ? (
+                                <FooterContact icon={<MapPin />} text={company.address} />
+                            ) : null}
+                            {company?.phone ? (
+                                <FooterContact
+                                    icon={<Phone />}
+                                    text={company.phone}
+                                    href={`tel:${company.phone}`}
+                                />
+                            ) : null}
+                            {company?.email ? (
+                                <FooterContact
+                                    icon={<Mail />}
+                                    text={company.email}
+                                    href={`mailto:${company.email}`}
+                                />
+                            ) : null}
+                        </div>
                     </div>
-
-                    <FooterGroup
-                        title={t("footer.shop")}
-                        links={[t("footer.allProducts"), t("footer.newArrivals"), t("footer.categories")]}
-                    />
-
-                    <FooterGroup
-                        title={t("footer.customerCare")}
-                        links={[t("footer.contactSupport"), t("footer.deliveryReturns"), t("footer.privacy")]}
-                    />
+                    <FooterColumn title={t("nav.shop")}>
+                        <FooterLink to="/products">{t("catalog.allCategories")}</FooterLink>
+                        {roots.slice(0, 5).map((category) => (
+                            <FooterLink
+                                key={category.id}
+                                to={`/products?categoryId=${category.id}`}
+                            >
+                                {category.name}
+                            </FooterLink>
+                        ))}
+                    </FooterColumn>
+                    <FooterColumn title={t("common.account")}>
+                        <FooterLink to={accountPath}>{t("common.account")}</FooterLink>
+                        <FooterLink to="/track-order">{t("nav.trackOrder")}</FooterLink>
+                        <FooterLink to="/wishlist">{t("common.wishlist")}</FooterLink>
+                        <FooterLink to="/cart">{t("common.cart")}</FooterLink>
+                    </FooterColumn>
+                    <FooterColumn title={t("footer.locations")}>
+                        {(company?.branches ?? []).slice(0, 6).map((branch) => (
+                            <div
+                                key={branch.id}
+                                className="rounded-xl border border-white/10 bg-white/[0.04] p-3"
+                            >
+                                <p className="flex items-center gap-2 text-sm font-bold text-white">
+                                    <Store className="size-4 text-primary" />
+                                    {branch.name}
+                                </p>
+                                {branch.address ? (
+                                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                                        {branch.address}
+                                    </p>
+                                ) : null}
+                            </div>
+                        ))}
+                    </FooterColumn>
                 </div>
-
-                <div className="relative border-t border-border/70 dark:border-white/10">
-                    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3 px-4 py-5 text-xs text-muted-foreground sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8 dark:text-slate-500">
+                <div className="border-t border-white/10">
+                    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-2 px-4 py-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
                         <span>
-                            © {new Date().getFullYear()} {company?.name ?? "EasyCart"}. {t("footer.rights")}
+                            © {new Date().getFullYear()} {company?.legalName ?? company?.name ?? "EasyCart"}
                         </span>
-
-                        <span>
-                            {t("footer.betterExperience")}
-                        </span>
+                        <span>{t("header.secure")}</span>
                     </div>
                 </div>
             </footer>
+
+            <Dialog.Root open={mobileOpen} onOpenChange={setMobileOpen}>
+                <Dialog.Portal>
+                    <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm" />
+                    <Dialog.Content className="fixed inset-y-0 end-0 z-50 w-[90%] max-w-sm overflow-y-auto border-s bg-background p-5 shadow-2xl outline-none">
+                        <div className="flex items-center justify-between">
+                            <Logo />
+                            <Dialog.Close asChild>
+                                <Button variant="ghost" size="icon" className="rounded-xl">
+                                    <X className="size-5" />
+                                </Button>
+                            </Dialog.Close>
+                        </div>
+                        <GlobalSearch
+                            compact
+                            className="mt-6"
+                            onNavigate={() => setMobileOpen(false)}
+                        />
+                        <nav className="mt-6 grid gap-1">
+                            {nav.map((item) => (
+                                <Link
+                                    key={item.to}
+                                    to={item.to}
+                                    onClick={() => setMobileOpen(false)}
+                                    className="rounded-xl px-4 py-3 text-sm font-bold transition hover:bg-primary/8 hover:text-primary"
+                                >
+                                    {t(item.label)}
+                                </Link>
+                            ))}
+                        </nav>
+                        <div className="my-5 h-px bg-border" />
+                        <MobileCategoryLinks onNavigate={() => setMobileOpen(false)} />
+                        <div className="my-5 h-px bg-border" />
+                        <div className="grid grid-cols-2 gap-2">
+                            <Button asChild variant="outline">
+                                <Link to={accountPath} onClick={() => setMobileOpen(false)}>
+                                    <UserRound className="size-4" />
+                                    {t("common.account")}
+                                </Link>
+                            </Button>
+                            <Button asChild variant="outline">
+                                <Link to="/wishlist" onClick={() => setMobileOpen(false)}>
+                                    <Heart className="size-4" />
+                                    {t("common.wishlist")}
+                                </Link>
+                            </Button>
+                        </div>
+                    </Dialog.Content>
+                </Dialog.Portal>
+            </Dialog.Root>
         </div>
     );
 }
 
-function Count({ value }: { value: number }) {
-    if (value <= 0) {
-        return null;
-    }
-
+function CountBadge({ children }: { children: ReactNode }) {
     return (
-        <span className="absolute -right-1.5 -top-1.5 grid min-w-4.5 place-items-center rounded-full border-2 border-background bg-brand-orange px-1 text-[9px] font-bold leading-4 text-white shadow-sm">
-            {value > 99 ? "99+" : value}
+        <span className="absolute end-0 top-0 grid min-w-4 -translate-y-0.5 translate-x-0.5 place-items-center rounded-full bg-brand-orange px-1 text-[9px] font-black leading-4 text-white">
+            {children}
         </span>
     );
 }
 
-function MobileAction({
-    icon,
-    label,
-    count,
-    to,
-    onNavigate,
-}: {
-    icon: React.ReactNode;
-    label: string;
-    count?: number;
-    to?: string;
-    onNavigate?: () => void;
-}) {
-    const content = (
-        <>
-            <span className="relative">
-                {icon}
-                {typeof count === "number" && <Count value={count} />}
-            </span>
-            <span className="max-w-full truncate">{label}</span>
-        </>
-    );
-    const className = "relative flex min-w-0 flex-col items-center gap-2 rounded-2xl border bg-card px-2 py-4 text-xs font-semibold shadow-sm transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary";
-
-    return to ? (
-        <Link to={to} onClick={onNavigate} className={className}>
-            {content}
-        </Link>
-    ) : (
-        <button type="button" className={className}>
-            {content}
-        </button>
+function FooterColumn({ title, children }: { title: string; children: ReactNode }) {
+    return (
+        <div>
+            <h3 className="text-sm font-black uppercase tracking-[0.14em] text-white">
+                {title}
+            </h3>
+            <div className="mt-5 grid gap-3 text-sm text-slate-400">{children}</div>
+        </div>
     );
 }
 
-function FooterGroup({ title, links }: { title: string; links: string[] }) {
+function FooterLink({ to, children }: { to: string; children: ReactNode }) {
     return (
-        <div>
-            <h3 className="mb-5 text-sm font-bold uppercase tracking-[0.15em] text-foreground dark:text-white">
-                {title}
-            </h3>
+        <Link to={to} className="transition hover:translate-x-1 hover:text-white rtl:hover:-translate-x-1">
+            {children}
+        </Link>
+    );
+}
 
-            <div className="grid gap-3.5 text-sm">
-                {links.map((x) => (
-                    <span
-                        key={x}
-                        className="w-fit cursor-pointer text-muted-foreground transition-colors hover:text-primary dark:text-slate-400 dark:hover:text-white"
-                    >
-                        {x}
-                    </span>
-                ))}
-            </div>
-        </div>
+function FooterContact({
+    icon,
+    text,
+    href,
+}: {
+    icon: ReactNode;
+    text: string;
+    href?: string;
+}) {
+    const content = (
+        <span className="flex items-start gap-2">
+            <span className="mt-0.5 [&>svg]:size-4">{icon}</span>
+            <span>{text}</span>
+        </span>
+    );
+    return href ? (
+        <a href={href} className="transition hover:text-white">
+            {content}
+        </a>
+    ) : (
+        content
     );
 }

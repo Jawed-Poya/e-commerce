@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { imageUrl } from "../../shared/api/api-client";
 import { Button } from "../../shared/components/ui/button";
+import { formatMoney } from "../../shared/lib/money";
 import { productPath } from "../../shared/lib/product-path";
 import { getCheckoutConfiguration } from "../checkout/checkout-api";
 import {
@@ -151,14 +152,11 @@ export function CartPage() {
                                         </Link>
 
                                         <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-                                            ${item.price.toFixed(2)} {t("cart.each")}
+                                            {formatMoney(item.price)} {t("cart.each")}
                                         </p>
 
                                         <p className="mt-2 text-lg font-black tracking-tight sm:hidden">
-                                            $
-                                            {(
-                                                item.price * item.quantity
-                                            ).toFixed(2)}
+                                            {formatMoney(item.price * item.quantity)}
                                         </p>
 
                                         <div className="mt-auto flex items-end justify-between gap-3 pt-3">
@@ -235,10 +233,7 @@ export function CartPage() {
                                             </p>
 
                                             <p className="mt-1 text-xl font-black tracking-tight">
-                                                $
-                                                {(
-                                                    item.price * item.quantity
-                                                ).toFixed(2)}
+                                                {formatMoney(item.price * item.quantity)}
                                             </p>
                                         </div>
 
@@ -274,7 +269,7 @@ export function CartPage() {
 
                                             <span className="text-xs font-bold text-primary">
                                                 {t("cart.amountLeft", {
-                                                    amount: `$${(threshold - subtotal).toFixed(2)}`,
+                                                    amount: formatMoney(threshold - subtotal),
                                                 })}
                                             </span>
                                         </div>
@@ -303,7 +298,7 @@ export function CartPage() {
                             </p>
 
                             <h2 className="mt-2 text-3xl font-black tracking-[-0.04em]">
-                                ${total.toFixed(2)}
+                                {formatMoney(total)}
                             </h2>
                         </div>
 
@@ -313,7 +308,7 @@ export function CartPage() {
                                     <span>{t("common.subtotal")}</span>
 
                                     <span className="font-bold text-foreground">
-                                        ${subtotal.toFixed(2)}
+                                        {formatMoney(subtotal)}
                                     </span>
                                 </div>
 
@@ -322,7 +317,7 @@ export function CartPage() {
 
                                     <span className="font-bold text-foreground">
                                         {shipping
-                                            ? `$${shipping.toFixed(2)}`
+                                            ? formatMoney(shipping)
                                             : t("common.free")}
                                     </span>
                                 </div>
@@ -330,7 +325,7 @@ export function CartPage() {
                                 <div className="flex items-center justify-between border-t pt-4 text-base font-bold">
                                     <span>{t("common.total")}</span>
                                     <span className="text-xl">
-                                        ${total.toFixed(2)}
+                                        {formatMoney(total)}
                                     </span>
                                 </div>
                             </div>
@@ -362,12 +357,12 @@ export function CartPage() {
                         </p>
 
                         <p className="truncate text-xl font-black tracking-tight">
-                            ${total.toFixed(2)}
+                            {formatMoney(total)}
                         </p>
 
                         <p className="text-[10px] text-muted-foreground">
                             {shipping
-                                ? t("cart.includesDelivery", { amount: `$${shipping.toFixed(2)}` })
+                                ? t("cart.includesDelivery", { amount: formatMoney(shipping) })
                                 : t("cart.freeDelivery")}
                         </p>
                     </div>

@@ -42,8 +42,13 @@ public sealed record CompanyProfileResponse(
 public sealed record PublicCompanyProfileResponse(
     long Id,
     string Name,
+    string? LegalName,
+    string? Email,
+    string? Phone,
+    string? Address,
     string? LogoUrl,
     string? FaviconUrl,
+    IReadOnlyCollection<CompanyBranchResponse> Branches,
     CompanySettingsResponse Settings);
 
 public sealed record UpdateCompanyProfileRequest(

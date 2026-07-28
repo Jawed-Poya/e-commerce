@@ -5,6 +5,9 @@ import {
     Eye,
     EyeOff,
     LockKeyhole,
+    Mail,
+    MapPin,
+    Phone,
     ShieldCheck,
     ShoppingBag,
     Sparkles,
@@ -124,6 +127,20 @@ export function AuthPage() {
                         <Benefit icon={<ShieldCheck />} title={t("auth.checkoutBenefit")} text={t("auth.checkoutBenefitHelp")} />
                         <Benefit icon={<UserRound />} title={t("auth.historyBenefit")} text={t("auth.historyBenefitHelp")} />
                     </div>
+
+                    {(company?.phone || company?.email || company?.address) && (
+                        <div className="relative z-10 mt-5 flex flex-wrap gap-2 text-[11px] text-primary-foreground/75">
+                            {company.phone ? (
+                                <ContactChip icon={<Phone />} value={company.phone} />
+                            ) : null}
+                            {company.email ? (
+                                <ContactChip icon={<Mail />} value={company.email} />
+                            ) : null}
+                            {company.address ? (
+                                <ContactChip icon={<MapPin />} value={company.address} />
+                            ) : null}
+                        </div>
+                    )}
                 </section>
 
                 <section className="flex min-h-[680px] items-center justify-center p-5 sm:p-9 lg:min-h-[720px] xl:p-14">
@@ -227,6 +244,15 @@ function AuthField({ label, value, onChange, required, type = "text", placeholde
 
 function Benefit({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
     return <div className="rounded-2xl border border-white/12 bg-white/[0.08] p-4 backdrop-blur"><span className="grid size-10 place-items-center rounded-xl bg-white/12 text-primary-foreground [&_svg]:size-4">{icon}</span><p className="mt-3 text-sm font-bold">{title}</p><p className="mt-1 text-[11px] leading-5 text-primary-foreground/65">{text}</p></div>;
+}
+
+function ContactChip({ icon, value }: { icon: React.ReactNode; value: string }) {
+    return (
+        <span className="inline-flex min-w-0 items-center gap-2 rounded-full border border-white/12 bg-white/[0.08] px-3 py-2 backdrop-blur">
+            <span className="shrink-0 [&_svg]:size-3.5">{icon}</span>
+            <span className="max-w-56 truncate">{value}</span>
+        </span>
+    );
 }
 
 function nullable(value: string) {
