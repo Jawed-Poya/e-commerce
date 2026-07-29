@@ -17,6 +17,8 @@ public sealed class OperationsService(
     IInventoryCostService inventoryCosts,
     ICompanyContext companyContext) : IOperationsService
 {
+    private const string MainWarehouseCode = "MAIN";
+
     public async Task<OperationSummary> GetSummaryAsync(CancellationToken ct)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -171,7 +173,9 @@ public sealed class OperationsService(
         await context.SaveChangesAsync(ct);
         var warehouseId = await context.Warehouses
             .Where(x => x.IsActive && (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value))
-            .OrderByDescending(x => x.IsMain)
+            // Warehouse does not have an IsMain flag. Prefer the seeded MAIN warehouse,
+            // then fall back to the oldest active warehouse for the current branch/company.
+            .OrderByDescending(x => x.Code == MainWarehouseCode)
             .ThenBy(x => x.Id)
             .Select(x => (long?)x.Id)
             .FirstOrDefaultAsync(ct)
