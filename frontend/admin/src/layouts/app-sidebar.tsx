@@ -1,5 +1,5 @@
 import * as React from "react";
-import { BarChart3, BriefcaseBusiness, Building2, Crown, LayoutDashboard, PackageIcon, SettingsIcon, ShoppingCart, Star, Trash2, Users, Warehouse } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, Building2, ClipboardPlus, Crown, LayoutDashboard, PackageIcon, SettingsIcon, ShoppingCart, Star, Trash2, Users, Warehouse } from "lucide-react";
 
 import { NavMain, type NavigationGroup } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
@@ -23,6 +23,7 @@ const navigation: ProtectedGroup[] = [
         { title: "Reviews", url: "/reviews", icon: <Star />, permission: Permissions.ProductsManage },
         { title: "Inventory", url: "/inventory", icon: <Warehouse />, permission: Permissions.InventoryView },
         { title: "Orders", url: "/orders", icon: <ShoppingCart />, permission: Permissions.OrdersView },
+        { title: "Prescription requests", url: "/prescription-requests", icon: <ClipboardPlus />, permission: Permissions.OrdersView },
         { title: "Customers", url: "/customers", icon: <Users />, permission: Permissions.CustomersView },
     ]},
     { label: "Operations", items: [

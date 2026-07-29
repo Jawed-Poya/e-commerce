@@ -102,6 +102,7 @@ public class ApplicationDbContext
 
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<StorefrontContent> StorefrontContents => Set<StorefrontContent>();
+    public DbSet<PrescriptionRequest> PrescriptionRequests => Set<PrescriptionRequest>();
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<Purchase> Purchases => Set<Purchase>();
     public DbSet<PurchaseItem> PurchaseItems => Set<PurchaseItem>();
@@ -220,12 +221,35 @@ public class ApplicationDbContext
             entity.Property(item => item.FlatShippingFee).HasPrecision(18, 2);
             entity.Property(item => item.FreeShippingThreshold).HasPrecision(18, 2);
         });
+        builder.Entity<PrescriptionRequest>(entity =>
+        {
+            entity.HasIndex(item => item.RequestNumber).IsUnique();
+            entity.HasIndex(item => new { item.TenantId, item.BranchId, item.Status, item.CreatedAt });
+            entity.Property(item => item.RequestNumber).HasMaxLength(40);
+            entity.Property(item => item.FullName).HasMaxLength(160);
+            entity.Property(item => item.Phone).HasMaxLength(40);
+            entity.Property(item => item.Email).HasMaxLength(256);
+            entity.Property(item => item.Notes).HasMaxLength(1500);
+            entity.Property(item => item.AttachmentPath).HasMaxLength(500);
+            entity.Property(item => item.OriginalFileName).HasMaxLength(260);
+            entity.Property(item => item.ContentType).HasMaxLength(100);
+            entity.Property(item => item.AdminNotes).HasMaxLength(1500);
+            entity.HasOne<Branch>()
+                .WithMany()
+                .HasForeignKey(item => item.BranchId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Tenant>()
+                .WithMany()
+                .HasForeignKey(item => item.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
 
         builder.Entity<Product>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<Customer>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<Order>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<GeneralType>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<StorefrontContent>().HasQueryFilter(x => !x.IsDeleted);
+        builder.Entity<PrescriptionRequest>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<Supplier>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<Purchase>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<PurchaseItem>().HasQueryFilter(x => !x.IsDeleted && !x.Purchase.IsDeleted && !x.Product.IsDeleted);

@@ -8,6 +8,7 @@ import { ProductEditorPage } from "@/features/products/components/product-editor
 import ProductDetailsPage from "@/pages/product-details";
 import { InventoryPage } from "@/features/inventory/components/inventory-page";
 import OrdersPage from "@/pages/orders";
+import PrescriptionRequestsPage from "@/pages/prescription-requests";
 import OrderDetailsPage from "@/pages/order-details";
 import CustomersPage from "@/pages/customers";
 import CustomerDetailsPage from "@/pages/customer-details";
@@ -118,6 +119,13 @@ export const router = createBrowserRouter([
                             { path: "staff", element: allowed(Permissions.StaffView, <StaffPage />) },
                             { path: "expenses", element: allowed(Permissions.ExpensesView, <ExpensesPage />) },
                         ],
+                    },
+                    {
+                        path: "prescription-requests",
+                        element: allowed(
+                            Permissions.OrdersView,
+                            <PrescriptionRequestsPage />,
+                        ),
                     },
                     {
                         path: "orders",
