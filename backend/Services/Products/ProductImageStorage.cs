@@ -27,7 +27,7 @@ public sealed class LocalProductImageStorage : IProductImageStorage
         CancellationToken cancellationToken = default
     )
     {
-        if (collection is not ("products" or "types"))
+        if (collection is not ("products" or "types" or "company"))
         {
             throw new InvalidOperationException(
                 "The image collection is not supported."
