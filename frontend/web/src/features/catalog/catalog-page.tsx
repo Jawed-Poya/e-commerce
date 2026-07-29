@@ -225,7 +225,7 @@ export function CatalogPage() {
     return (
         <div className="mx-auto w-full max-w-[1500px] px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
             <nav className="mb-6 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <Link
+                <Link viewTransition
                     to="/"
                     className="rounded-md px-1 py-1 transition-colors hover:text-primary"
                 >

@@ -52,10 +52,10 @@ export function ProductCard({ product }: { product: Product }) {
   };
 
   return (
-    <article className="group relative grid h-full min-w-0 grid-cols-[116px_minmax(0,1fr)] overflow-hidden rounded-[20px] border border-border/70 bg-card p-2 shadow-[0_5px_20px_rgba(15,23,42,0.05)] transition-all duration-300 active:scale-[0.99] dark:shadow-[0_8px_28px_rgba(0,0,0,0.22)] sm:flex sm:flex-col sm:p-0 sm:hover:-translate-y-1.5 sm:hover:border-primary/25 sm:hover:shadow-[0_24px_60px_rgba(15,23,42,0.12)] dark:sm:hover:shadow-[0_24px_60px_rgba(0,0,0,0.38)]">
+    <article className="group relative grid h-full min-w-0 grid-cols-[116px_minmax(0,1fr)] overflow-hidden rounded-[20px] border border-border/80 bg-card dark:border-white/10 p-2 shadow-[0_5px_20px_rgba(15,23,42,0.05)] transition-all duration-300 active:scale-[0.99] dark:shadow-[0_8px_28px_rgba(0,0,0,0.22)] sm:flex sm:flex-col sm:p-0 sm:hover:-translate-y-1.5 sm:hover:border-primary/25 sm:hover:shadow-[0_24px_60px_rgba(15,23,42,0.12)] dark:sm:hover:shadow-[0_24px_60px_rgba(0,0,0,0.38)]">
       {/* Product image */}
-      <div className="relative min-h-[152px] overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:aspect-[1/0.88] sm:min-h-0 sm:rounded-none sm:border-0">
-        <Link
+      <div className="relative min-h-[152px] overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:border-white/10 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:aspect-square sm:min-h-0 sm:rounded-none sm:border-x-0 sm:border-t-0">
+        <Link viewTransition
           to={productPath(product)}
           className="absolute inset-0 z-10"
           aria-label={`View ${product.name}`}
@@ -65,7 +65,7 @@ export function ProductCard({ product }: { product: Product }) {
           src={primary}
           alt={product.name}
           className={cn(
-            "size-full object-contain p-3 drop-shadow-sm transition-all duration-700 ease-out sm:p-5 sm:group-hover:scale-[1.06]",
+            "size-full object-contain p-3.5 drop-shadow-sm transition-all duration-700 ease-out sm:p-6 sm:group-hover:scale-[1.05]",
             alternate && "sm:group-hover:opacity-0",
           )}
         />
@@ -74,7 +74,7 @@ export function ProductCard({ product }: { product: Product }) {
           <img
             src={imageUrl(alternate.url) ?? primary}
             alt=""
-            className="absolute inset-0 hidden size-full scale-[1.04] object-contain p-5 opacity-0 drop-shadow-sm transition-all duration-700 ease-out sm:block sm:group-hover:scale-100 sm:group-hover:opacity-100"
+            className="absolute inset-0 hidden size-full scale-[1.04] object-contain p-6 opacity-0 drop-shadow-sm transition-all duration-700 ease-out sm:block sm:group-hover:scale-100 sm:group-hover:opacity-100"
           />
         )}
 
@@ -120,7 +120,7 @@ export function ProductCard({ product }: { product: Product }) {
         </Button>
 
         {/* Desktop quick view */}
-        <Link
+        <Link viewTransition
           to={productPath(product)}
           className="absolute inset-x-3 bottom-3 z-30 hidden translate-y-4 items-center justify-between rounded-xl border border-white/50 bg-background/95 px-4 py-3 text-xs font-bold opacity-0 shadow-xl backdrop-blur-md transition-all duration-300 sm:flex sm:group-hover:translate-y-0 sm:group-hover:opacity-100"
         >
@@ -154,7 +154,7 @@ export function ProductCard({ product }: { product: Product }) {
           </span>
         </div>
 
-        <Link
+        <Link viewTransition
           to={productPath(product)}
           className="mt-1.5 line-clamp-2 text-sm font-bold leading-5 tracking-[-0.015em] transition-colors hover:text-primary sm:mt-2 sm:min-h-10 sm:text-[15px] sm:leading-6"
         >
@@ -191,28 +191,13 @@ export function ProductCard({ product }: { product: Product }) {
                   ? formatMoney(product.price!)
                   : t("product.noPrice")}
               </p>
-              {hasPrice && (
-                <p className="mt-1 truncate text-[9px] font-semibold text-muted-foreground sm:text-[10px]">
-                  {product.isDefaultPrice
-                    ? t("product.defaultTierPrice", {
-                        type:
-                          product.priceCustomerTypeName ?? t("product.general"),
-                      })
-                    : t("product.tierPrice", {
-                        type:
-                          product.priceCustomerTypeName ??
-                          t("product.customer"),
-                      })}
-                </p>
-              )}
-
               {hasDiscount && (
-                <div className="mt-0.5 flex items-center gap-1.5">
-                  <p className="text-[10px] font-medium text-muted-foreground line-through decoration-destructive/70 sm:text-xs">
-                    {formatMoney(product.oldPrice!)}
-                  </p>
-
-                  <span className="hidden rounded-full bg-brand-orange/10 px-2 py-0.5 text-[10px] font-bold text-brand-orange sm:inline">
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <span className="relative inline-flex items-center rounded-lg border border-border/70 bg-muted/55 px-2 py-1 text-[10px] font-semibold text-muted-foreground dark:border-white/10 sm:text-xs">
+                    <span className="absolute inset-x-1 top-1/2 h-px -rotate-3 bg-destructive/75" />
+                    <span className="relative">{formatMoney(product.oldPrice!)}</span>
+                  </span>
+                  <span className="inline-flex items-center rounded-full border border-brand-orange/20 bg-brand-orange/10 px-2 py-0.5 text-[9px] font-black text-brand-orange sm:text-[10px]">
                     {t("common.save")} {discount}%
                   </span>
                 </div>
@@ -265,7 +250,7 @@ export function ProductCard({ product }: { product: Product }) {
               size="icon"
               className="size-9 shrink-0 rounded-xl bg-background shadow-sm sm:hidden"
             >
-              <Link
+              <Link viewTransition
                 to={productPath(product)}
                 aria-label={`View ${product.name}`}
               >

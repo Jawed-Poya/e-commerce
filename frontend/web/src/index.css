@@ -61,8 +61,8 @@
   --accent: #3a2317;
   --accent-foreground: #ffad6f;
   --destructive: #f97066;
-  --border: #23364c;
-  --input: #2a3d54;
+  --border: #304761;
+  --input: #3a526d;
   --ring: #4e9aff;
   --brand-orange: #ff8b3d;
 }
@@ -195,5 +195,56 @@ html[dir="rtl"] textarea {
 @media (display-mode: standalone) {
   body {
     overscroll-behavior-y: contain;
+  }
+}
+
+/* Storefront motion: React Router enables the browser View Transition API on
+   internal links, while these keyframes provide a polished fallback for the
+   home carousel and browsers that do not animate route snapshots. */
+@keyframes hero-media-enter {
+  from { opacity: 0; transform: scale(1.045) translate3d(1.25%, 0, 0); }
+  to { opacity: 1; transform: scale(1) translate3d(0, 0, 0); }
+}
+@keyframes hero-copy-enter {
+  from { opacity: 0; transform: translate3d(0, 18px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes hero-product-enter {
+  from { opacity: 0; transform: translate3d(20px, 12px, 0) scale(.96); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes hero-progress {
+  from { width: 0; }
+  to { width: 100%; }
+}
+.hero-media-enter { animation: hero-media-enter .9s cubic-bezier(.2,.8,.2,1) both; }
+.hero-copy-enter { animation: hero-copy-enter .65s cubic-bezier(.2,.8,.2,1) both; }
+.hero-product-enter { animation: hero-product-enter .75s cubic-bezier(.2,.8,.2,1) .08s both; }
+.hero-progress { animation: hero-progress 7s linear both; }
+
+::view-transition-old(root) {
+  animation: 180ms cubic-bezier(.4,0,1,1) both route-fade-out;
+}
+::view-transition-new(root) {
+  animation: 320ms cubic-bezier(.16,1,.3,1) both route-fade-in;
+}
+@keyframes route-fade-out {
+  to { opacity: 0; transform: translateY(-4px) scale(.995); filter: blur(1px); }
+}
+@keyframes route-fade-in {
+  from { opacity: 0; transform: translateY(8px) scale(.995); filter: blur(2px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-media-enter,
+  .hero-copy-enter,
+  .hero-product-enter,
+  .hero-progress {
+    animation: none !important;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 1ms !important;
   }
 }

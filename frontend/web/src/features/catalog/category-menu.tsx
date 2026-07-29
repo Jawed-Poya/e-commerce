@@ -7,12 +7,17 @@ import {
     ShoppingBag,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { imageUrl } from "../../shared/api/api-client";
 import { Button } from "../../shared/components/ui/button";
 import { cn } from "../../shared/lib/utils";
+import { formatMoney } from "../../shared/lib/money";
+import { productPath } from "../../shared/lib/product-path";
+import type { Product } from "../../shared/types/product";
 import { buildCategoryTree, type CategoryNode } from "./category-tree";
+import { getProducts } from "./catalog-api";
 import { useLookups } from "./use-catalog";
 import { useI18n } from "../../i18n/i18n-provider";
 
@@ -38,7 +43,7 @@ export function CategoryMegaMenu() {
             <DropdownMenu.Trigger asChild>
                 <Button
                     variant="secondary"
-                    className="group mr-7 h-10 min-w-56 justify-between rounded-xl border border-primary/15 bg-primary/8 px-3.5 font-bold text-primary shadow-none transition-all hover:border-primary/25 hover:bg-primary/15 hover:text-primary data-[state=open]:border-primary data-[state=open]:bg-primary data-[state=open]:text-primary-foreground dark:bg-primary/10"
+                    className="group me-2 h-10 min-w-52 justify-between rounded-xl border border-primary/15 bg-primary/8 px-3.5 font-bold text-primary shadow-none transition-all hover:border-primary/25 hover:bg-primary/15 hover:text-primary data-[state=open]:border-primary data-[state=open]:bg-primary data-[state=open]:text-primary-foreground dark:bg-primary/10"
                 >
                     <span className="flex items-center gap-2.5">
                         <span className="grid size-7 place-items-center rounded-lg border border-primary/10 bg-background/80 shadow-sm transition-colors group-data-[state=open]:border-white/10 group-data-[state=open]:bg-white/15 group-data-[state=open]:text-white">
@@ -147,19 +152,34 @@ export function CategoryMegaMenu() {
 
 function ActiveCategory({ category }: { category: CategoryNode }) {
     const { t } = useI18n();
+    const hasChildren = category.children.length > 0;
+    const products = useQuery({
+        queryKey: ["category-mega-menu-products", category.id],
+        queryFn: () =>
+            getProducts({
+                page: 1,
+                pageSize: 8,
+                categoryId: category.id,
+                isActive: true,
+                sortBy: "createdAt",
+                sortDescending: true,
+            }),
+        enabled: !hasChildren,
+        staleTime: 5 * 60_000,
+    });
 
     return (
-        <section className="relative min-w-0 overflow-hidden p-7">
-            <div className="pointer-events-none absolute -right-24 -top-24 size-64 rounded-full bg-primary/8 blur-3xl dark:bg-primary/10" />
+        <section className="relative min-w-0 overflow-hidden p-6 lg:p-7">
+            <div className="pointer-events-none absolute -right-24 -top-24 size-64 rounded-full bg-primary/8 blur-3xl dark:bg-primary/12" />
 
-            <div className="relative flex items-center justify-between gap-6 border-b border-border/70 pb-6">
+            <div className="relative flex items-center justify-between gap-5 border-b border-border/80 pb-5 dark:border-white/10">
                 <div className="flex min-w-0 items-center gap-4">
-                    <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-2xl border bg-muted shadow-sm">
+                    <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-border/80 bg-white p-2 shadow-sm dark:border-white/12 dark:bg-slate-950">
                         {category.imageUrl ? (
                             <img
                                 src={imageUrl(category.imageUrl) ?? ""}
                                 alt={category.name}
-                                className="size-full object-cover"
+                                className="size-full object-contain"
                             />
                         ) : (
                             <ShoppingBag className="size-6 text-muted-foreground" />
@@ -168,102 +188,112 @@ function ActiveCategory({ category }: { category: CategoryNode }) {
 
                     <div className="min-w-0">
                         <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-primary">
-                            {t("category.featured")}
+                            {hasChildren ? t("category.featured") : t("search.products")}
                         </p>
-
                         <h2 className="mt-1 truncate text-2xl font-black tracking-[-0.03em]">
                             {category.name}
                         </h2>
-
                         <p className="mt-1 text-xs text-muted-foreground">
-                            {t("category.exploreRelated")}
+                            {hasChildren
+                                ? t("category.exploreRelated")
+                                : t("category.productsInsteadOfSubcategories")}
                         </p>
                     </div>
                 </div>
 
                 <DropdownMenu.Item asChild>
                     <Link
+                        viewTransition
                         to={`/products?categoryId=${category.id}`}
-                        className="group flex shrink-0 items-center gap-2 rounded-xl border bg-background px-4 py-2.5 text-sm font-bold text-primary shadow-sm outline-none transition-all hover:border-primary/30 hover:bg-primary/5 focus:bg-primary/5"
+                        className="group flex shrink-0 items-center gap-2 rounded-xl border border-border/80 bg-background px-4 py-2.5 text-sm font-bold text-primary shadow-sm outline-none transition-all hover:border-primary/30 hover:bg-primary/5 focus:bg-primary/5 dark:border-white/12"
                     >
                         {t("category.viewAll")}
-                        <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
+                        <ArrowRight className="size-4 transition-transform group-hover:translate-x-1 rtl:rotate-180" />
                     </Link>
                 </DropdownMenu.Item>
             </div>
 
-            {category.children.length > 0 ? (
-                <div className="relative grid grid-cols-2 gap-x-8 gap-y-8 pt-7 lg:grid-cols-3">
+            {hasChildren ? (
+                <div className="relative grid grid-cols-2 gap-3 pt-6 lg:grid-cols-3">
                     {category.children.map((subcategory) => (
-                        <div key={subcategory.id} className="min-w-0">
-                            <DropdownMenu.Item asChild>
-                                <Link
-                                    to={`/products?categoryId=${subcategory.id}`}
-                                    className="group flex items-center justify-between gap-2 rounded-lg text-sm font-bold outline-none transition-colors hover:text-primary focus:text-primary"
-                                >
-                                    <span className="truncate">
-                                        {subcategory.name}
+                        <DropdownMenu.Item key={subcategory.id} asChild>
+                            <Link
+                                viewTransition
+                                to={`/products?categoryId=${subcategory.id}`}
+                                className="group min-w-0 rounded-2xl border border-border/75 bg-card/70 p-3 outline-none transition duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/5 hover:shadow-sm focus:border-primary/30 dark:border-white/10"
+                            >
+                                <span className="flex items-center gap-3">
+                                    <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/70 bg-white p-1.5 dark:border-white/10 dark:bg-slate-950">
+                                        {subcategory.imageUrl ? (
+                                            <img src={imageUrl(subcategory.imageUrl) ?? ""} alt="" className="size-full object-contain" />
+                                        ) : (
+                                            <ShoppingBag className="size-4 text-primary" />
+                                        )}
                                     </span>
-
-                                    <ChevronRight className="size-3.5 shrink-0 -translate-x-1 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
-                                </Link>
-                            </DropdownMenu.Item>
-
-                            {subcategory.children.length > 0 ? (
-                                <div className="mt-3 grid gap-2.5">
-                                    {subcategory.children.map((child) => (
-                                        <DropdownMenu.Item
-                                            key={child.id}
-                                            asChild
-                                        >
-                                            <Link
-                                                to={`/products?categoryId=${child.id}`}
-                                                className="group flex min-w-0 items-center gap-2 text-sm text-muted-foreground outline-none transition-colors hover:text-primary focus:text-primary"
-                                            >
-                                                <span className="size-1 shrink-0 rounded-full bg-border transition-colors group-hover:bg-primary" />
-
-                                                <span className="truncate">
-                                                    {child.name}
-                                                </span>
-                                            </Link>
-                                        </DropdownMenu.Item>
-                                    ))}
-                                </div>
-                            ) : (
-                                <small className="mt-2 block text-muted-foreground">
-                                    {subcategory.productCount}{" "}
-                                    {subcategory.productCount === 1 ? t("common.product") : t("common.productsLower")}
-                                </small>
-                            )}
-                        </div>
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block truncate text-sm font-bold group-hover:text-primary">{subcategory.name}</span>
+                                        <span className="mt-1 block text-[10px] text-muted-foreground">
+                                            {subcategory.children.length || subcategory.productCount} {subcategory.children.length ? t("category.subcategories") : t("common.productsLower")}
+                                        </span>
+                                    </span>
+                                    <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary rtl:rotate-180" />
+                                </span>
+                            </Link>
+                        </DropdownMenu.Item>
+                    ))}
+                </div>
+            ) : products.isLoading ? (
+                <div className="grid grid-cols-2 gap-3 pt-6 lg:grid-cols-4">
+                    {Array.from({ length: 8 }).map((_, index) => (
+                        <div key={index} className="h-36 animate-pulse rounded-2xl border border-border/70 bg-muted/60 dark:border-white/10" />
+                    ))}
+                </div>
+            ) : (products.data?.items.length ?? 0) > 0 ? (
+                <div className="relative grid grid-cols-2 gap-3 pt-6 lg:grid-cols-4">
+                    {products.data!.items.map((product) => (
+                        <MegaMenuProduct key={product.id} product={product} />
                     ))}
                 </div>
             ) : (
                 <div className="grid min-h-64 place-items-center text-center">
                     <div>
-                        <span className="mx-auto grid size-12 place-items-center rounded-2xl border bg-muted/50 text-primary">
+                        <span className="mx-auto grid size-12 place-items-center rounded-2xl border border-border/80 bg-muted/50 text-primary dark:border-white/10">
                             <ShoppingBag className="size-5" />
                         </span>
-
                         <p className="mt-4 font-bold">{t("category.browseName", { name: category.name })}</p>
-
                         <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-muted-foreground">
-                            {t("category.noSubcategories")}
+                            {t("category.noProductsConfigured")}
                         </p>
-
-                        <DropdownMenu.Item asChild>
-                            <Link
-                                to={`/products?categoryId=${category.id}`}
-                                className="mt-4 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-primary outline-none transition-colors hover:bg-primary/5"
-                            >
-                                {t("category.viewProducts")}
-                                <ArrowRight className="size-4" />
-                            </Link>
-                        </DropdownMenu.Item>
                     </div>
                 </div>
             )}
         </section>
+    );
+}
+
+function MegaMenuProduct({ product }: { product: Product }) {
+    return (
+        <DropdownMenu.Item asChild>
+            <Link
+                viewTransition
+                to={productPath(product)}
+                className="group min-w-0 overflow-hidden rounded-2xl border border-border/75 bg-card outline-none transition duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus:border-primary/30 dark:border-white/10"
+            >
+                <span className="grid aspect-[1.35] place-items-center bg-gradient-to-br from-white via-slate-50 to-slate-100 p-3 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+                    <img
+                        src={imageUrl(product.primaryImageUrl) ?? "/placeholder-product.svg"}
+                        alt=""
+                        className="size-full object-contain drop-shadow-sm transition duration-300 group-hover:scale-[1.04]"
+                    />
+                </span>
+                <span className="block p-3">
+                    <span className="block truncate text-xs font-bold group-hover:text-primary">{product.name}</span>
+                    <span className="mt-1.5 block text-sm font-black">
+                        {product.price != null ? formatMoney(product.price) : "—"}
+                    </span>
+                </span>
+            </Link>
+        </DropdownMenu.Item>
     );
 }
 
@@ -285,7 +315,7 @@ function CategoryImage({
                 <img
                     src={imageUrl(image) ?? ""}
                     alt=""
-                    className="size-full object-cover"
+                    className="size-full object-contain p-1"
                 />
             ) : (
                 <ShoppingBag
@@ -376,7 +406,7 @@ function MobileCategoryBranch({
     const { t } = useI18n();
     return (
         <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-            <Link
+            <Link viewTransition
                 to={`/products?categoryId=${category.id}`}
                 onClick={onNavigate}
                 className="group flex items-center justify-between gap-3 px-3 py-3 transition-colors hover:bg-muted/50"
@@ -387,7 +417,7 @@ function MobileCategoryBranch({
                             <img
                                 src={imageUrl(category.imageUrl) ?? ""}
                                 alt={category.name}
-                                className="size-full object-cover"
+                                className="size-full object-contain p-1"
                             />
                         ) : (
                             <ShoppingBag className="size-4" />
@@ -412,7 +442,7 @@ function MobileCategoryBranch({
             {category.children.length > 0 && (
                 <div className="mx-3 mb-3 grid overflow-hidden rounded-xl border bg-muted/20">
                     {category.children.map((child, index) => (
-                        <Link
+                        <Link viewTransition
                             key={child.id}
                             to={`/products?categoryId=${child.id}`}
                             onClick={onNavigate}
