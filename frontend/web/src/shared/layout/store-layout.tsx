@@ -8,6 +8,7 @@ import {
     Menu,
     Phone,
     Share2,
+    ShieldCheck,
     ShoppingBag,
     Store,
     UserRound,
@@ -161,30 +162,25 @@ export function StoreLayout() {
     return (
         <div className="min-h-screen bg-background text-foreground">
             <header className="sticky top-0 z-40 border-b border-border/70 bg-background/90 shadow-[0_1px_16px_rgba(15,23,42,0.04)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 dark:shadow-[0_1px_20px_rgba(0,0,0,0.25)]">
-                <div className="border-b border-border/60 bg-primary/[0.04] dark:border-white/10 dark:bg-slate-950">
+                <div className="border-b border-border/60 bg-primary/[0.045] dark:border-white/10 dark:bg-slate-950">
                     <div className="mx-auto flex h-9 w-full max-w-[1500px] items-center justify-between gap-4 px-4 text-[11px] sm:px-6 lg:px-8">
-                        <div className="flex min-w-0 items-center gap-2">
-                            <span className="relative flex size-2 shrink-0">
-                                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-60" />
-                                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-                            </span>
-                            <span className="truncate font-medium">
-                                {t("header.welcome")}
-                            </span>
+                        <div className="flex min-w-0 items-center gap-2 font-semibold text-muted-foreground">
+                            <ShieldCheck className="size-3.5 shrink-0 text-primary" />
+                            <span className="truncate">{t("header.secure")}</span>
                         </div>
                         <div className="hidden items-center gap-5 sm:flex">
+                            {company?.phone ? (
+                                <a href={`tel:${company.phone}`} className="flex items-center gap-1.5 text-muted-foreground transition hover:text-primary">
+                                    <Phone className="size-3.5" />
+                                    {company.phone}
+                                </a>
+                            ) : null}
                             {company?.email ? (
-                                <a
-                                    href={`mailto:${company.email}`}
-                                    className="flex items-center gap-1.5 text-muted-foreground transition hover:text-primary"
-                                >
+                                <a href={`mailto:${company.email}`} className="flex items-center gap-1.5 text-muted-foreground transition hover:text-primary">
                                     <CircleHelp className="size-3.5" />
                                     {t("header.help")}
                                 </a>
                             ) : null}
-                            <span className="text-muted-foreground">
-                                {t("header.secure")}
-                            </span>
                         </div>
                     </div>
                 </div>
@@ -345,23 +341,19 @@ export function StoreLayout() {
                             title={t("footer.easyReturns")}
                             description={t("home.simplePolicy")}
                         />
-                        <Link
-                            viewTransition
-                            to="/#prescription"
-                            className="group flex min-h-24 items-center gap-3 bg-slate-950 px-5 py-4 transition hover:bg-white/[0.05] dark:bg-black"
-                        >
+                        <div className="flex min-h-24 items-center gap-3 bg-slate-950 px-5 py-4 dark:bg-black">
                             <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-                                <Check className="size-5" />
+                                <CircleHelp className="size-5" />
                             </span>
                             <span className="min-w-0">
                                 <span className="block text-sm font-black text-white">
-                                    {t("footer.prescriptionService")}
+                                    {t("footer.contactSupport")}
                                 </span>
-                                <span className="mt-1 block text-xs leading-5 text-slate-400">
-                                    {t("footer.prescriptionDescription")}
+                                <span className="mt-1 block truncate text-xs leading-5 text-slate-400">
+                                    {company?.phone ?? company?.email ?? t("footer.customerCare")}
                                 </span>
                             </span>
-                        </Link>
+                        </div>
                     </div>
                 </div>
                 <div className="mx-auto grid w-full max-w-[1500px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-[1.3fr_.7fr_.8fr_1fr] lg:px-8">

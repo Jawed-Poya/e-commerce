@@ -14,7 +14,6 @@ using ECommerce.Services.Notifications;
 using ECommerce.Services.Orders;
 using ECommerce.Services.Operations;
 using ECommerce.Services.Products;
-using ECommerce.Services.Prescriptions;
 using ECommerce.Services.Reports;
 using ECommerce.Services.Storefront;
 using ECommerce.Services.Reviews;
@@ -39,7 +38,6 @@ public static class DependencyInjection
         services.AddScoped<IProductPricingService, ProductPricingService>();
         services.AddScoped<IGeneralTypeService, GeneralTypesService>();
         services.AddScoped<IProductImageStorage, LocalProductImageStorage>();
-        services.AddScoped<IPrescriptionFileStorage, LocalPrescriptionFileStorage>();
         services.AddScoped<IInventoryService, InventoryService>();
         services.AddScoped<IInventoryCostService, InventoryCostService>();
         services.AddScoped<IFinancialReportService, FinancialReportService>();

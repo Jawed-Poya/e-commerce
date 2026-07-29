@@ -14,7 +14,7 @@ export interface NavigationGroup { label: string; items: NavigationItem[] }
 
 const keys: Record<string, string> = {
     "Workspace": "nav.workspace", "Commerce": "nav.commerce", "Operations": "nav.operations", "Administration": "nav.administration",
-    "Dashboard": "nav.dashboard", "Reports": "nav.reports", "Products": "nav.products", "Reviews": "nav.reviews", "Inventory": "nav.inventory", "Orders": "nav.orders", "Prescription requests": "nav.prescriptions", "Customers": "nav.customers",
+    "Dashboard": "nav.dashboard", "Reports": "nav.reports", "Products": "nav.products", "Reviews": "nav.reviews", "Inventory": "nav.inventory", "Orders": "nav.orders", "Customers": "nav.customers",
     "Overview": "nav.overview", "Purchases": "nav.purchases", "Manual sales": "nav.manualSales", "Staff & payroll": "nav.staffPayroll", "Expenses": "nav.expenses",
     "Company profile": "nav.company", "Storefront": "nav.storefront", "General Types": "nav.generalTypes", "Users": "nav.users", "Roles & Permissions": "nav.roles", "Trash": "nav.trash",
 };
