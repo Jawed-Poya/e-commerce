@@ -171,6 +171,7 @@ export function CheckoutPage() {
             items: cart.items.map((item) => ({
                 productId: item.id,
                 quantity: item.quantity,
+                unitId: item.unitId ?? null,
             })),
         };
 
@@ -470,7 +471,7 @@ export function CheckoutPage() {
 
                     <div className="max-h-72 space-y-4 overflow-auto p-6">
                         {cart.items.map((item) => (
-                            <div key={item.id} className="flex gap-3">
+                            <div key={item.lineKey} className="flex gap-3">
                                 <img
                                     src={
                                         imageUrl(item.image) ??
@@ -484,7 +485,7 @@ export function CheckoutPage() {
                                         {item.name}
                                     </p>
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        {item.quantity} × {formatMoney(item.price, config?.currency)}
+                                        {item.quantity} {item.unitName ?? ""} × {formatMoney(item.price, config?.currency)}
                                     </p>
                                 </div>
                                 <p className="text-sm font-bold">

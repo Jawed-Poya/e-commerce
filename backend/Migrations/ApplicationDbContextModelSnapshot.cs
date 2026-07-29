@@ -282,21 +282,40 @@ namespace ECommerce.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<decimal>("OrderedQuantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
                     b.Property<decimal>("Quantity")
                         .HasPrecision(18, 3)
                         .HasColumnType("decimal(18,3)");
 
+                    b.Property<long?>("SelectedUnitId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("SelectedUnitName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal>("SellingUnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<decimal>("Tax")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("UnitConversionFactor")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
 
                     b.Property<decimal>("UnitCost")
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
                     b.Property<decimal>("UnitPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -312,7 +331,7 @@ namespace ECommerce.Migrations
 
                     b.ToTable("OrderItems", t =>
                         {
-                            t.HasCheckConstraint("CK_OrderItem_Values", "[Quantity] > 0 AND [UnitPrice] >= 0 AND [Discount] >= 0 AND [Tax] >= 0");
+                            t.HasCheckConstraint("CK_OrderItem_Values", "[Quantity] > 0 AND [OrderedQuantity] > 0 AND [UnitConversionFactor] > 0 AND [UnitPrice] >= 0 AND [SellingUnitPrice] >= 0 AND [Discount] >= 0 AND [Tax] >= 0");
                         });
                 });
 
@@ -517,6 +536,110 @@ namespace ECommerce.Migrations
                         {
                             t.HasCheckConstraint("CK_Product_DisplayStockQuantity", "[DisplayStockQuantity] IS NULL OR [DisplayStockQuantity] >= 0");
                         });
+                });
+
+            modelBuilder.Entity("API.Entities.Products.ProductUnitConversion", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Barcode")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<long?>("BranchId")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("ConversionFactor")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("OldPriceOverride")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("PriceOverride")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<long>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L);
+
+                    b.Property<long>("UnitId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId", "UnitId")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex("ProductId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ProductUnitConversions_ProductId_Default")
+                        .HasFilter("[IsDefault] = 1 AND [IsDeleted] = 0");
+
+                    b.HasIndex("TenantId", "Barcode")
+                        .IsUnique()
+                        .HasFilter("[Barcode] IS NOT NULL AND [IsDeleted] = 0");
+
+                    b.HasIndex("UnitId");
+
+                    b.ToTable("ProductUnitConversions", t =>
+                        {
+                            t.HasCheckConstraint("CK_ProductUnitConversion_Factor", "[ConversionFactor] >= 1");
+                            t.HasCheckConstraint("CK_ProductUnitConversion_Prices", "[PriceOverride] IS NULL OR ([PriceOverride] >= 0 AND ([OldPriceOverride] IS NULL OR [OldPriceOverride] >= [PriceOverride]))");
+                            t.HasCheckConstraint("CK_ProductUnitConversion_DefaultActive", "[IsDefault] = 0 OR [IsActive] = 1");
+                        });
+                });
+
+            modelBuilder.Entity("API.Entities.Products.ProductUnitConversion", b =>
+                {
+                    b.HasOne("API.Entities.Products.Product", "Product")
+                        .WithMany("UnitConversions")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("API.Entities.Types.GeneralType", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("API.Entities.Products.ProductImage", b =>
@@ -1120,6 +1243,8 @@ namespace ECommerce.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
                     b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
                     b.Property<DateTime?>("DeletedAt").HasColumnType("datetime2");
+                    b.Property<decimal>("EnteredQuantity").HasPrecision(18, 3).HasColumnType("decimal(18,3)");
+                    b.Property<decimal>("EnteredUnitCost").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
                     b.Property<DateOnly?>("ExpireDate").HasColumnType("date");
                     b.Property<bool>("IsDeleted").HasColumnType("bit");
                     b.Property<decimal>("LineTotal").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
@@ -1127,12 +1252,18 @@ namespace ECommerce.Migrations
                     b.Property<long>("ProductId").HasColumnType("bigint");
                     b.Property<long>("PurchaseId").HasColumnType("bigint");
                     b.Property<decimal>("Quantity").HasPrecision(18, 3).HasColumnType("decimal(18,3)");
-                    b.Property<decimal>("UnitCost").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<long?>("SelectedUnitId").HasColumnType("bigint");
+                    b.Property<string>("SelectedUnitName").HasMaxLength(100).HasColumnType("nvarchar(100)");
+                    b.Property<decimal>("UnitConversionFactor").HasPrecision(18, 6).HasColumnType("decimal(18,6)");
+                    b.Property<decimal>("UnitCost").HasPrecision(18, 4).HasColumnType("decimal(18,4)");
                     b.Property<DateTime?>("UpdatedAt").HasColumnType("datetime2");
                     b.HasKey("Id");
                     b.HasIndex("ProductId");
                     b.HasIndex("PurchaseId");
-                    b.ToTable("PurchaseItems");
+                    b.ToTable("PurchaseItems", t =>
+                        {
+                            t.HasCheckConstraint("CK_PurchaseItem_UnitValues", "[Quantity] > 0 AND [EnteredQuantity] > 0 AND [UnitConversionFactor] > 0 AND [UnitCost] >= 0 AND [EnteredUnitCost] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("ECommerce.Entities.Operations.InventorySale", b =>
@@ -1170,18 +1301,26 @@ namespace ECommerce.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
                     b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
                     b.Property<DateTime?>("DeletedAt").HasColumnType("datetime2");
+                    b.Property<decimal>("EnteredQuantity").HasPrecision(18, 3).HasColumnType("decimal(18,3)");
+                    b.Property<decimal>("EnteredUnitPrice").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
                     b.Property<long>("InventorySaleId").HasColumnType("bigint");
                     b.Property<bool>("IsDeleted").HasColumnType("bit");
                     b.Property<decimal>("LineTotal").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
                     b.Property<long>("ProductId").HasColumnType("bigint");
                     b.Property<decimal>("Quantity").HasPrecision(18, 3).HasColumnType("decimal(18,3)");
+                    b.Property<long?>("SelectedUnitId").HasColumnType("bigint");
+                    b.Property<string>("SelectedUnitName").HasMaxLength(100).HasColumnType("nvarchar(100)");
+                    b.Property<decimal>("UnitConversionFactor").HasPrecision(18, 6).HasColumnType("decimal(18,6)");
                     b.Property<decimal>("UnitCost").HasPrecision(18, 4).HasColumnType("decimal(18,4)");
-                    b.Property<decimal>("UnitPrice").HasPrecision(18, 2).HasColumnType("decimal(18,2)");
+                    b.Property<decimal>("UnitPrice").HasPrecision(18, 4).HasColumnType("decimal(18,4)");
                     b.Property<DateTime?>("UpdatedAt").HasColumnType("datetime2");
                     b.HasKey("Id");
                     b.HasIndex("InventorySaleId");
                     b.HasIndex("ProductId");
-                    b.ToTable("InventorySaleItems");
+                    b.ToTable("InventorySaleItems", t =>
+                        {
+                            t.HasCheckConstraint("CK_InventorySaleItem_UnitValues", "[Quantity] > 0 AND [EnteredQuantity] > 0 AND [UnitConversionFactor] > 0 AND [UnitPrice] >= 0 AND [EnteredUnitPrice] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("ECommerce.Entities.Operations.PurchasePayment", b =>
@@ -2165,6 +2304,8 @@ namespace ECommerce.Migrations
                         .IsRequired();
 
                     b.Navigation("Prices");
+
+                    b.Navigation("UnitConversions");
 
                     b.Navigation("Variants");
                 });

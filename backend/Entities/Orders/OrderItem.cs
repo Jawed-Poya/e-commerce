@@ -10,8 +10,24 @@ public class OrderItem : ProductEntity
 
     public Order Order { get; set; } = null!;
 
+    /// <summary>Quantity in the product base inventory unit.</summary>
     public decimal Quantity { get; set; }
 
+    /// <summary>Quantity entered by the customer in the selected selling unit.</summary>
+    public decimal OrderedQuantity { get; set; }
+
+    /// <summary>General type id of the selected unit; null for legacy rows.</summary>
+    public long? SelectedUnitId { get; set; }
+
+    public string? SelectedUnitName { get; set; }
+
+    /// <summary>Base units contained in one selected unit.</summary>
+    public decimal UnitConversionFactor { get; set; } = 1;
+
+    /// <summary>Price for one selected unit, kept as an immutable order snapshot.</summary>
+    public decimal SellingUnitPrice { get; set; }
+
+    /// <summary>Price per base inventory unit. Existing reports continue to use this value.</summary>
     public decimal UnitPrice { get; set; }
 
     public decimal UnitCost { get; set; }
@@ -33,7 +49,7 @@ public class OrderItem : ProductEntity
 
     public string Currency { get; set; } = "AFN";
 
-    public decimal Total => (Quantity * UnitPrice) - Discount + Tax;
+    public decimal Total => ((OrderedQuantity > 0 ? OrderedQuantity * SellingUnitPrice : Quantity * UnitPrice) - Discount + Tax);
 
     public decimal CostTotal => Quantity * UnitCost;
 }

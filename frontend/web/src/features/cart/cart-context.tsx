@@ -14,11 +14,15 @@ export interface CartProduct {
   image?: string | null;
   price: number;
   stock: number;
+  unitId?: number | null;
+  unitName?: string | null;
+  conversionFactor?: number;
   minimumValue?: number | null;
   maximumValue?: number | null;
 }
 
 export interface CartItem extends CartProduct {
+  lineKey: string;
   quantity: number;
 }
 
@@ -27,8 +31,8 @@ interface CartValue {
   wishlist: number[];
   count: number;
   addItem: (product: CartProduct) => void;
-  updateQuantity: (id: number, quantity: number) => void;
-  removeItem: (id: number) => void;
+  updateQuantity: (lineKey: string, quantity: number) => void;
+  removeItem: (lineKey: string) => void;
   clear: () => void;
   toggleWishlist: (id: number) => void;
   clearWishlist: () => void;
@@ -42,6 +46,10 @@ function readStorage<T>(key: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+export function cartLineKey(productId: number, unitId?: number | null) {
+  return `${productId}:${unitId ?? "base"}`;
 }
 
 type QuantityLimitedProduct = Pick<CartProduct, "stock" | "minimumValue" | "maximumValue">;
@@ -73,16 +81,28 @@ export function normalizeCartQuantity(product: QuantityLimitedProduct, quantity:
   return Math.round((bounded + Number.EPSILON) * 1000) / 1000;
 }
 
+function normalizeStoredItem(item: CartItem | (CartProduct & { quantity: number })) {
+  const unitId = item.unitId ?? null;
+  const normalized: CartItem = {
+    ...item,
+    unitId,
+    unitName: item.unitName ?? null,
+    conversionFactor: item.conversionFactor && item.conversionFactor > 0 ? item.conversionFactor : 1,
+    lineKey: "lineKey" in item && item.lineKey ? item.lineKey : cartLineKey(item.id, unitId),
+    quantity: normalizeCartQuantity(item, item.quantity),
+  };
+  return normalized;
+}
+
 function sameNumberArray(left: number[], right: number[]) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(() =>
-    readStorage<CartItem[]>("store-cart", []).map((item) => ({
-      ...item,
-      quantity: normalizeCartQuantity(item, item.quantity),
-    })).filter((item) => item.quantity > 0),
+    readStorage<CartItem[]>("store-cart", [])
+      .map(normalizeStoredItem)
+      .filter((item) => item.quantity > 0),
   );
   const [wishlist, setWishlist] = useState<number[]>(() =>
     readStorage("store-wishlist", []),
@@ -108,31 +128,32 @@ export function CartProvider({ children }: { children: ReactNode }) {
           const maximum = maximumCartQuantity(product);
           if (maximum < minimum) return current;
 
-          const found = current.find((item) => item.id === product.id);
+          const lineKey = cartLineKey(product.id, product.unitId);
+          const found = current.find((item) => item.lineKey === lineKey);
           if (found) {
             const quantity = normalizeCartQuantity(
               product,
               found.quantity + cartQuantityStep(product),
             );
             return current.map((item) =>
-              item.id === product.id
-                ? { ...item, ...product, quantity }
+              item.lineKey === lineKey
+                ? { ...item, ...product, lineKey, quantity }
                 : item,
             );
           }
 
-          return [...current, { ...product, quantity: minimum }];
+          return [...current, { ...product, lineKey, quantity: minimum }];
         }),
-      updateQuantity: (id, quantity) =>
+      updateQuantity: (lineKey, quantity) =>
         setItems((current) =>
           current.map((item) =>
-            item.id === id
+            item.lineKey === lineKey
               ? { ...item, quantity: normalizeCartQuantity(item, quantity) }
               : item,
           ).filter((item) => item.quantity > 0),
         ),
-      removeItem: (id) =>
-        setItems((current) => current.filter((item) => item.id !== id)),
+      removeItem: (lineKey) =>
+        setItems((current) => current.filter((item) => item.lineKey !== lineKey)),
       clear: () => setItems([]),
       toggleWishlist: (id) =>
         setWishlist((current) => {

@@ -34,6 +34,9 @@ export function ProductCard({ product }: { product: Product }) {
             image: product.primaryImageUrl,
             price: product.price,
             stock: product.stock,
+            unitId: product.unitId,
+            unitName: product.unitName,
+            conversionFactor: 1,
             slug: product.slug,
             minimumValue: product.minimumValue,
             maximumValue: product.maximumValue,
@@ -138,7 +141,7 @@ export function ProductCard({ product }: { product: Product }) {
                     >
                         {product.stock > 0 ? <Check className="size-3" /> : null}
                         {product.stock > 0
-                            ? t("product.availableCount", { count: product.stock })
+                            ? `${t("product.availableCount", { count: product.stock })}${product.unitName ? ` ${product.unitName}` : ""}`
                             : t("product.unavailable")}
                     </span>
                 </div>
@@ -148,6 +151,7 @@ export function ProductCard({ product }: { product: Product }) {
                         <span className="text-lg font-black tracking-[-0.04em] text-foreground sm:text-2xl">
                             {hasPrice ? formatMoney(product.price!) : t("product.noPrice")}
                         </span>
+                        {hasPrice && product.unitName ? <span className="text-[10px] font-bold text-muted-foreground">/ {product.unitName}</span> : null}
                         {hasDiscount ? (
                             <>
                                 <span className="text-xs font-semibold text-muted-foreground line-through decoration-destructive/70 decoration-2">

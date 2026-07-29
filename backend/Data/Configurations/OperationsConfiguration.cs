@@ -41,8 +41,13 @@ public sealed class PurchaseItemConfiguration : IEntityTypeConfiguration<Purchas
     public void Configure(EntityTypeBuilder<PurchaseItem> b)
     {
         b.Property(x => x.Quantity).HasPrecision(18, 3);
-        b.Property(x => x.UnitCost).HasPrecision(18, 2);
+        b.Property(x => x.UnitCost).HasPrecision(18, 4);
+        b.Property(x => x.EnteredQuantity).HasPrecision(18, 3);
+        b.Property(x => x.SelectedUnitName).HasMaxLength(100);
+        b.Property(x => x.UnitConversionFactor).HasPrecision(18, 6);
+        b.Property(x => x.EnteredUnitCost).HasPrecision(18, 2);
         b.Property(x => x.LineTotal).HasPrecision(18, 2);
+        b.ToTable(table => table.HasCheckConstraint("CK_PurchaseItem_UnitValues", "[Quantity] > 0 AND [EnteredQuantity] > 0 AND [UnitConversionFactor] > 0 AND [UnitCost] >= 0 AND [EnteredUnitCost] >= 0"));
         b.Property(x => x.LotNumber).HasMaxLength(100);
         b.HasOne(x => x.Purchase).WithMany(x => x.Items).HasForeignKey(x => x.PurchaseId).OnDelete(DeleteBehavior.Cascade);
         b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
@@ -74,9 +79,14 @@ public sealed class InventorySaleItemConfiguration : IEntityTypeConfiguration<In
     public void Configure(EntityTypeBuilder<InventorySaleItem> b)
     {
         b.Property(x => x.Quantity).HasPrecision(18, 3);
-        b.Property(x => x.UnitPrice).HasPrecision(18, 2);
+        b.Property(x => x.UnitPrice).HasPrecision(18, 4);
         b.Property(x => x.UnitCost).HasPrecision(18, 4);
+        b.Property(x => x.EnteredQuantity).HasPrecision(18, 3);
+        b.Property(x => x.SelectedUnitName).HasMaxLength(100);
+        b.Property(x => x.UnitConversionFactor).HasPrecision(18, 6);
+        b.Property(x => x.EnteredUnitPrice).HasPrecision(18, 2);
         b.Property(x => x.LineTotal).HasPrecision(18, 2);
+        b.ToTable(table => table.HasCheckConstraint("CK_InventorySaleItem_UnitValues", "[Quantity] > 0 AND [EnteredQuantity] > 0 AND [UnitConversionFactor] > 0 AND [UnitPrice] >= 0 AND [EnteredUnitPrice] >= 0"));
         b.HasOne(x => x.InventorySale).WithMany(x => x.Items).HasForeignKey(x => x.InventorySaleId).OnDelete(DeleteBehavior.Cascade);
         b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
     }

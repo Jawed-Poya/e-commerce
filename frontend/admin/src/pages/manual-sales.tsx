@@ -177,6 +177,7 @@ export default function ManualSalesPage() {
                 notes: nullable(form.notes),
                 items: items.map((item) => ({
                     productId: item.productId,
+                    unitId: item.unitId,
                     quantity: item.quantity,
                     unitPrice: item.amount,
                 })),

@@ -1,6 +1,7 @@
 export type PaymentStatus = "Unpaid" | "Partial" | "Paid";
 export interface OperationSummary { purchasesThisMonth: number; salesThisMonth: number; expensesThisMonth: number; salariesThisMonth: number; lowStockProducts: number }
-export interface OperationProduct { id: number; name: string; barcode: string | null; availableQuantity: number; defaultPrice: number | null; minimumValue: number | null; maximumValue: number | null; usesDisplayStock: boolean }
+export interface OperationProductUnit { unitId: number; unitName: string; conversionFactor: number; barcode: string | null; defaultPrice: number | null; availableQuantity: number; isBase: boolean; isDefault: boolean }
+export interface OperationProduct { id: number; name: string; barcode: string | null; availableQuantity: number; defaultPrice: number | null; minimumValue: number | null; maximumValue: number | null; usesDisplayStock: boolean; baseUnitId: number | null; baseUnitName: string | null; units: OperationProductUnit[] }
 export interface OperationCustomer { id: number; name: string; phone: string; email: string | null; customerTypeName: string | null }
 export interface Supplier { id: number; name: string; contactPerson: string | null; phone: string | null; email: string | null; address: string | null; taxNumber: string | null; isActive: boolean }
 export interface Purchase { id: number; purchaseNumber: string; purchaseDate: string; supplierName: string | null; itemCount: number; total: number; paidAmount: number; remainingAmount: number; paymentStatus: PaymentStatus; status: "Draft" | "Received" | "Cancelled"; createdAt: string }
@@ -10,4 +11,4 @@ export interface SalaryPayment { id: number; staffId: number; staffName: string;
 export interface ExpenseCategory { id: number; name: string; description: string | null; isActive: boolean }
 export interface Expense { id: number; expenseDate: string; categoryId: number; categoryName: string; amount: number; vendor: string | null; paymentMethod: string; referenceNumber: string | null; description: string; createdAt: string }
 export interface DocumentPayment { id: number; amount: number; paymentDate: string; paymentMethod: string; referenceNumber: string | null; notes: string | null; createdAt: string }
-export interface DocumentItem { productId: number; quantity: number; amount: number; lotNumber?: string; expireDate?: string | null; product?: OperationProduct | null }
+export interface DocumentItem { productId: number; unitId: number | null; unitName: string | null; conversionFactor: number; quantity: number; amount: number; lotNumber?: string; expireDate?: string | null; product?: OperationProduct | null }

@@ -74,13 +74,14 @@ public sealed class OrderService(
         var currency = await GetCompanyCurrencyAsync(cancellationToken);
 
         var groupedItems = request.Items
-            .GroupBy(item => item.ProductId)
+            .GroupBy(item => new { item.ProductId, item.UnitId })
             .Select(group => new CheckoutItemRequest(
-                group.Key,
-                group.Sum(item => item.Quantity)))
+                group.Key.ProductId,
+                group.Sum(item => item.Quantity),
+                group.Key.UnitId))
             .ToList();
 
-        var productIds = groupedItems.Select(item => item.ProductId).ToArray();
+        var productIds = groupedItems.Select(item => item.ProductId).Distinct().ToArray();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
@@ -96,57 +97,77 @@ public sealed class OrderService(
                 .Include(product => product.Inventory)
                 .Include(product => product.Prices)
                     .ThenInclude(price => price.CustomerType)
+                .Include(product => product.Unit)
+                .Include(product => product.UnitConversions)
+                    .ThenInclude(conversion => conversion.Unit)
                 .Where(product => productIds.Contains(product.Id) && product.IsActive)
                 .ToListAsync(cancellationToken);
 
             if (products.Count != productIds.Length)
                 throw new InvalidOperationException("One or more products are unavailable.");
 
-            var requestByProductId = groupedItems.ToDictionary(item => item.ProductId);
-            var orderItems = new List<OrderItem>(products.Count);
+            var productById = products.ToDictionary(product => product.Id);
+            var orderItems = new List<OrderItem>(groupedItems.Count);
             var productCosts = await inventoryCosts.GetCurrentUnitCostsAsync(productIds, cancellationToken);
             var defaultCustomerTypeId = await defaultCustomerType.GetIdAsync(cancellationToken);
 
-            foreach (var product in products)
+            foreach (var requested in groupedItems)
             {
-                var requested = requestByProductId[product.Id];
-                ValidateRequestedQuantity(product, requested.Quantity);
+                var product = productById[requested.ProductId];
+                var selectedUnit = ResolveSelectedUnit(product, requested.UnitId);
+                var baseQuantity = decimal.Round(requested.Quantity * selectedUnit.ConversionFactor, 3);
+                if (baseQuantity <= 0)
+                    throw new InvalidOperationException("Product quantities must be greater than zero.");
 
-                if (product.UsesDisplayStock)
-                {
-                    var displayQuantity = Math.Max(0, product.DisplayStockQuantity ?? 0);
-                    if (displayQuantity < requested.Quantity)
-                        throw new InvalidOperationException(
-                            $"Only {displayQuantity:N3} unit(s) of '{product.Name}' are currently available to order.");
-                }
-                else if (product.Inventory is null || product.Inventory.AvailableQuantity < requested.Quantity)
-                {
-                    throw new InvalidOperationException($"Insufficient stock for '{product.Name}'.");
-                }
-
-                var unitPrice = ResolveEffectivePrice(
+                var baseUnitPrice = ResolveEffectivePrice(
                     product,
                     customer.CustomerTypeId,
                     defaultCustomerTypeId,
                     today)
                     ?? throw new InvalidOperationException($"No active price is configured for '{product.Name}'.");
+                var sellingUnitPrice = selectedUnit.PriceOverride
+                    ?? decimal.Round(baseUnitPrice * selectedUnit.ConversionFactor, 2);
+                var normalizedBasePrice = decimal.Round(sellingUnitPrice / selectedUnit.ConversionFactor, 6);
 
                 orderItems.Add(new OrderItem
                 {
                     ProductId = product.Id,
-                    Quantity = requested.Quantity,
-                    UnitPrice = unitPrice,
+                    Quantity = baseQuantity,
+                    OrderedQuantity = requested.Quantity,
+                    SelectedUnitId = selectedUnit.UnitId,
+                    SelectedUnitName = selectedUnit.UnitName,
+                    UnitConversionFactor = selectedUnit.ConversionFactor,
+                    SellingUnitPrice = sellingUnitPrice,
+                    UnitPrice = normalizedBasePrice,
                     UnitCost = productCosts.GetValueOrDefault(product.Id),
                     AffectsInventory = !product.UsesDisplayStock,
                     Discount = 0,
                     Tax = 0,
                     ProductName = product.Name,
-                    ProductBarcode = product.Barcode,
+                    ProductBarcode = selectedUnit.Barcode ?? product.Barcode,
                     Currency = currency
                 });
             }
 
-            var subtotal = orderItems.Sum(item => item.Quantity * item.UnitPrice);
+            foreach (var productGroup in orderItems.GroupBy(item => item.ProductId))
+            {
+                var product = productById[productGroup.Key];
+                var requiredBaseQuantity = productGroup.Sum(item => item.Quantity);
+                ValidateRequestedQuantity(product, requiredBaseQuantity);
+                if (product.UsesDisplayStock)
+                {
+                    var displayQuantity = Math.Max(0, product.DisplayStockQuantity ?? 0);
+                    if (displayQuantity < requiredBaseQuantity)
+                        throw new InvalidOperationException(
+                            $"Only {displayQuantity:N3} base unit(s) of '{product.Name}' are currently available to order.");
+                }
+                else if (product.Inventory is null || product.Inventory.AvailableQuantity < requiredBaseQuantity)
+                {
+                    throw new InvalidOperationException($"Insufficient stock for '{product.Name}'.");
+                }
+            }
+
+            var subtotal = orderItems.Sum(item => item.OrderedQuantity * item.SellingUnitPrice);
             var shippingRules = await storefrontContent.GetAsync(cancellationToken);
             var freeThreshold = Math.Max(0, shippingRules.FreeShippingThreshold);
             var qualifiesForFreeShipping = freeThreshold > 0 && subtotal >= freeThreshold;
@@ -203,7 +224,7 @@ public sealed class OrderService(
 
             foreach (var product in products.Where(item => !item.UsesDisplayStock))
             {
-                var quantity = requestByProductId[product.Id].Quantity;
+                var quantity = orderItems.Where(item => item.ProductId == product.Id).Sum(item => item.Quantity);
                 var inventory = product.Inventory
                     ?? throw new InvalidOperationException($"Inventory is not configured for '{product.Name}'.");
                 var quantityBefore = inventory.Quantity;
@@ -869,6 +890,38 @@ public sealed class OrderService(
                 $"The maximum order quantity for '{product.Name}' is {product.MaximumValue.Value}.");
     }
 
+    private static SelectedProductUnit ResolveSelectedUnit(Product product, long? requestedUnitId)
+    {
+        if (!product.UnitId.HasValue || product.Unit is null)
+        {
+            if (requestedUnitId.HasValue)
+                throw new InvalidOperationException($"A base unit is not configured for '{product.Name}'.");
+            return new SelectedProductUnit(null, "Unit", 1, product.Barcode, null);
+        }
+
+        if (!requestedUnitId.HasValue || requestedUnitId.Value == product.UnitId.Value)
+            return new SelectedProductUnit(product.UnitId, product.Unit.Name, 1, product.Barcode, null);
+
+        var conversion = product.UnitConversions.FirstOrDefault(item =>
+            item.UnitId == requestedUnitId.Value && item.IsActive);
+        if (conversion is null)
+            throw new InvalidOperationException($"The selected selling unit is not available for '{product.Name}'.");
+
+        return new SelectedProductUnit(
+            conversion.UnitId,
+            conversion.Unit.Name,
+            conversion.ConversionFactor,
+            conversion.Barcode,
+            conversion.PriceOverride);
+    }
+
+    private sealed record SelectedProductUnit(
+        long? UnitId,
+        string UnitName,
+        decimal ConversionFactor,
+        string? Barcode,
+        decimal? PriceOverride);
+
     private static decimal? ResolveEffectivePrice(
         Product product,
         long? customerTypeId,
@@ -925,8 +978,11 @@ public sealed class OrderService(
                     item.ProductId,
                     item.ProductName,
                     item.ProductBarcode,
-                    item.Quantity,
-                    item.UnitPrice,
+                    item.OrderedQuantity > 0 ? item.OrderedQuantity : item.Quantity,
+                    item.SelectedUnitId,
+                    item.SelectedUnitName,
+                    item.UnitConversionFactor > 0 ? item.UnitConversionFactor : 1,
+                    item.SellingUnitPrice > 0 ? item.SellingUnitPrice : item.UnitPrice,
                     item.Discount,
                     item.Tax,
                     item.Total,

@@ -19,6 +19,7 @@ export type Product = {
     categoryName: string;
     brandId: number | null;
     unitId: number | null;
+    unitName: string | null;
     minimumValue: number | null;
     maximumValue: number | null;
     usesDisplayStock: boolean;
@@ -38,6 +39,24 @@ export type Product = {
     images: ProductImage[];
 };
 
+
+export type ProductUnitConversion = {
+    id: number | null;
+    unitId: number;
+    unitName: string;
+    conversionFactor: number;
+    barcode: string | null;
+    priceOverride: number | null;
+    oldPriceOverride: number | null;
+    isBaseUnit: boolean;
+    isDefault: boolean;
+    isActive: boolean;
+    sortOrder: number;
+    availableQuantity: number;
+    price: number | null;
+    oldPrice: number | null;
+};
+
 export type ProductDetails = Omit<Product, "primaryImageUrl"> & {
     brandName: string | null;
     unitName: string | null;
@@ -51,6 +70,7 @@ export type ProductDetails = Omit<Product, "primaryImageUrl"> & {
         minimumQuantity: number;
         expireDate: string | null;
     } | null;
+    unitConversions: ProductUnitConversion[];
     prices: {
         id: number;
         customerTypeId: number;

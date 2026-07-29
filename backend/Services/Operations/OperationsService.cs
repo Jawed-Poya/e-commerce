@@ -38,26 +38,48 @@ public sealed class OperationsService(
     {
         var defaultTypeId = await defaultCustomerTypeResolver.GetIdAsync(ct);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var query = context.Products.AsNoTracking().Where(x => x.IsActive);
         var clean = Clean(search);
-        if (clean is not null)
-            query = query.Where(x => x.Name.Contains(clean) || (x.Barcode != null && x.Barcode.Contains(clean)));
+        var query = context.Products
+            .AsNoTracking()
+            .Include(product => product.Unit)
+            .Include(product => product.UnitConversions.Where(unit => unit.IsActive))
+                .ThenInclude(unit => unit.Unit)
+            .Include(product => product.Inventory)
+            .Include(product => product.Prices.Where(price => price.CustomerTypeId == defaultTypeId))
+            .Where(product => product.IsActive);
 
-        return await query.OrderBy(x => x.Name).Take(Math.Clamp(take, 1, 50))
-            .Select(x => new OperationProductLookup(
-                x.Id,
-                x.Name,
-                x.Barcode,
-                x.UsesDisplayStock
-                    ? x.DisplayStockQuantity ?? 0
-                    : x.Inventory == null ? 0 : x.Inventory.Quantity - x.Inventory.ReservedQuantity,
-                x.Prices.Where(p => p.CustomerTypeId == defaultTypeId).OrderBy(p => p.Id)
-                    .Select(p => (decimal?)(p.SalePrice.HasValue && (!p.StartDate.HasValue || p.StartDate.Value <= today) && (!p.EndDate.HasValue || p.EndDate.Value >= today) ? p.SalePrice.Value : p.RegularPrice))
-                    .FirstOrDefault(),
-                x.MinimumValue,
-                x.MaximumValue,
-                x.UsesDisplayStock))
+        if (clean is not null)
+            query = query.Where(product =>
+                product.Name.Contains(clean) ||
+                (product.Barcode != null && product.Barcode.Contains(clean)) ||
+                product.UnitConversions.Any(unit => unit.IsActive && unit.Barcode != null && unit.Barcode.Contains(clean)));
+
+        var products = await query
+            .OrderBy(product => product.Name)
+            .Take(Math.Clamp(take, 1, 50))
             .ToListAsync(ct);
+
+        return products.Select(product =>
+        {
+            var availableBaseQuantity = product.UsesDisplayStock
+                ? Math.Max(0, product.DisplayStockQuantity ?? 0)
+                : Math.Max(0, product.Inventory?.Quantity - product.Inventory?.ReservedQuantity ?? 0);
+            var basePrice = ResolveDefaultPrice(product, today);
+            var units = BuildOperationUnits(product, availableBaseQuantity, basePrice);
+
+            return new OperationProductLookup(
+                product.Id,
+                product.Name,
+                product.Barcode,
+                availableBaseQuantity,
+                basePrice,
+                product.MinimumValue,
+                product.MaximumValue,
+                product.UsesDisplayStock,
+                product.UnitId,
+                product.Unit?.Name,
+                units);
+        }).ToList();
     }
 
     public async Task<IReadOnlyList<OperationCustomerLookup>> GetCustomerLookupsAsync(string? search, int take, CancellationToken ct)
@@ -126,8 +148,24 @@ public sealed class OperationsService(
         ValidatePurchase(request);
         EnsureNoDuplicateProducts(request.Items.Select(item => item.ProductId), "purchase");
         var items = request.Items.ToList();
-        await EnsurePurchasableProductsAsync(items.Select(x => x.ProductId), ct);
+        var productIds = items.Select(item => item.ProductId).Distinct().ToArray();
+        var products = await LoadProductsForUnitsAsync(productIds, ct);
+        EnsureAllProductsExist(productIds, products);
 
+        var displayOnly = products.Values.FirstOrDefault(product => product.UsesDisplayStock);
+        if (displayOnly is not null)
+            throw new ArgumentException("Display-stock products cannot be added to purchases because they do not update physical inventory.");
+
+        var normalizedItems = items.Select(item =>
+        {
+            var product = products[item.ProductId];
+            var selectedUnit = ResolveOperationUnit(product, item.UnitId);
+            var baseQuantity = decimal.Round(item.Quantity * selectedUnit.ConversionFactor, 3, MidpointRounding.AwayFromZero);
+            var baseUnitCost = decimal.Round(item.UnitCost / selectedUnit.ConversionFactor, 4, MidpointRounding.AwayFromZero);
+            if (baseQuantity <= 0)
+                throw new ArgumentException($"The quantity for '{product.Name}' is too small for base-unit precision.");
+            return new NormalizedPurchaseLine(item, product, selectedUnit, baseQuantity, baseUnitCost);
+        }).ToList();
 
         string? supplierName = null;
         if (request.SupplierId.HasValue)
@@ -140,7 +178,7 @@ public sealed class OperationsService(
             if (supplierName is null) throw new ArgumentException("Selected supplier does not exist or is inactive.");
         }
 
-        var subtotal = items.Sum(x => x.Quantity * x.UnitCost);
+        var subtotal = normalizedItems.Sum(line => line.Request.Quantity * line.Request.UnitCost);
         var total = Math.Max(0, subtotal - request.Discount + request.Tax + request.OtherCost);
         ValidateInitialPayment(request.PaidAmount, total);
         var purchaseDate = request.PurchaseDate == default ? DateOnly.FromDateTime(DateTime.UtcNow) : request.PurchaseDate;
@@ -163,8 +201,23 @@ public sealed class OperationsService(
             Notes = Clean(request.Notes),
             CreatedByUserId = userId
         };
-        foreach (var item in items)
-            purchase.Items.Add(new PurchaseItem { ProductId = item.ProductId, Quantity = item.Quantity, UnitCost = item.UnitCost, LineTotal = item.Quantity * item.UnitCost, LotNumber = Clean(item.LotNumber), ExpireDate = item.ExpireDate });
+
+        foreach (var line in normalizedItems)
+            purchase.Items.Add(new PurchaseItem
+            {
+                ProductId = line.Request.ProductId,
+                Quantity = line.BaseQuantity,
+                UnitCost = line.BaseUnitCost,
+                EnteredQuantity = line.Request.Quantity,
+                SelectedUnitId = line.Unit.UnitId,
+                SelectedUnitName = line.Unit.UnitName,
+                UnitConversionFactor = line.Unit.ConversionFactor,
+                EnteredUnitCost = line.Request.UnitCost,
+                LineTotal = line.Request.Quantity * line.Request.UnitCost,
+                LotNumber = Clean(line.Request.LotNumber),
+                ExpireDate = line.Request.ExpireDate
+            });
+
         if (request.PaidAmount > 0)
             purchase.Payments.Add(NewPurchasePayment(request.PaidAmount, purchaseDate, request.PaymentMethod, request.PaymentReferenceNumber, "Initial purchase payment", userId));
 
@@ -173,17 +226,25 @@ public sealed class OperationsService(
         await context.SaveChangesAsync(ct);
         var warehouseId = await context.Warehouses
             .Where(x => x.IsActive && (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value))
-            // Warehouse does not have an IsMain flag. Prefer the seeded MAIN warehouse,
-            // then fall back to the oldest active warehouse for the current branch/company.
             .OrderByDescending(x => x.Code == MainWarehouseCode)
             .ThenBy(x => x.Id)
             .Select(x => (long?)x.Id)
             .FirstOrDefaultAsync(ct)
             ?? throw new InvalidOperationException("No active warehouse is configured. Activate or create a warehouse before receiving purchases.");
-        foreach (var item in items)
+
+        foreach (var line in normalizedItems)
         {
-            await ApplyStockMovement(item.ProductId, item.Quantity, InventoryTransactionType.Purchase, "Purchase", purchase.Id, purchase.PurchaseNumber, userId, item.ExpireDate, ct);
-            context.InventoryLots.Add(new InventoryLot { ProductId = item.ProductId, WarehouseId = warehouseId, LotNumber = Clean(item.LotNumber) ?? purchase.PurchaseNumber, Quantity = item.Quantity, ReservedQuantity = 0, UnitCost = item.UnitCost, ExpiresAt = item.ExpireDate });
+            await ApplyStockMovement(line.Request.ProductId, line.BaseQuantity, InventoryTransactionType.Purchase, "Purchase", purchase.Id, purchase.PurchaseNumber, userId, line.Request.ExpireDate, ct);
+            context.InventoryLots.Add(new InventoryLot
+            {
+                ProductId = line.Request.ProductId,
+                WarehouseId = warehouseId,
+                LotNumber = Clean(line.Request.LotNumber) ?? purchase.PurchaseNumber,
+                Quantity = line.BaseQuantity,
+                ReservedQuantity = 0,
+                UnitCost = line.BaseUnitCost,
+                ExpiresAt = line.Request.ExpireDate
+            });
         }
         await context.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
@@ -224,44 +285,26 @@ public sealed class OperationsService(
         if (request.Items.Any(x => x.ProductId <= 0 || x.Quantity <= 0 || x.UnitPrice < 0)) throw new ArgumentException("Every sale item requires a product, positive quantity, and non-negative price.");
         if (request.Discount < 0 || request.Tax < 0) throw new ArgumentException("Discount and tax cannot be negative.");
         EnsureNoDuplicateProducts(request.Items.Select(item => item.ProductId), "sale");
+
         var items = request.Items.ToList();
-        var productIds = items.Select(x => x.ProductId).Distinct().ToArray();
-        var productModes = await context.Products
-            .AsNoTracking()
-            .Where(product => productIds.Contains(product.Id))
-            .Select(product => new
-            {
-                product.Id,
-                product.Name,
-                product.MinimumValue,
-                product.MaximumValue,
-                product.UsesDisplayStock,
-                product.DisplayStockQuantity,
-                AvailableQuantity = product.Inventory == null
-                    ? 0
-                    : product.Inventory.Quantity - product.Inventory.ReservedQuantity
-            })
-            .ToDictionaryAsync(product => product.Id, ct);
+        var productIds = items.Select(item => item.ProductId).Distinct().ToArray();
+        var products = await LoadProductsForUnitsAsync(productIds, ct);
+        EnsureAllProductsExist(productIds, products);
 
-        if (productModes.Count != productIds.Length)
-            throw new ArgumentException("One or more selected products do not exist.");
-
-        foreach (var item in items)
+        var normalizedItems = items.Select(item =>
         {
-            var product = productModes[item.ProductId];
-            if (product.MinimumValue.HasValue && item.Quantity < product.MinimumValue.Value)
-                throw new ArgumentException($"The minimum sale quantity for '{product.Name}' is {product.MinimumValue.Value}.");
-            if (product.MaximumValue.HasValue && item.Quantity > product.MaximumValue.Value)
-                throw new ArgumentException($"The maximum sale quantity for '{product.Name}' is {product.MaximumValue.Value}.");
-            var availableQuantity = product.UsesDisplayStock
-                ? Math.Max(0, product.DisplayStockQuantity ?? 0)
-                : Math.Max(0, product.AvailableQuantity);
-            if (item.Quantity > availableQuantity)
-                throw new ArgumentException($"Only {availableQuantity:N3} unit(s) of '{product.Name}' are available.");
-        }
+            var product = products[item.ProductId];
+            var selectedUnit = ResolveOperationUnit(product, item.UnitId);
+            var baseQuantity = decimal.Round(item.Quantity * selectedUnit.ConversionFactor, 3, MidpointRounding.AwayFromZero);
+            var baseUnitPrice = decimal.Round(item.UnitPrice / selectedUnit.ConversionFactor, 4, MidpointRounding.AwayFromZero);
+            if (baseQuantity <= 0)
+                throw new ArgumentException($"The quantity for '{product.Name}' is too small for base-unit precision.");
+            ValidateSaleQuantity(product, baseQuantity, selectedUnit);
+            return new NormalizedSaleLine(item, product, selectedUnit, baseQuantity, baseUnitPrice);
+        }).ToList();
 
-        // Display-stock products do not mutate inventory, but an existing purchase cost
-        // is still snapshotted so profit reports remain accurate.
+        // Display-stock products do not mutate inventory, but an existing base-unit
+        // purchase cost is still snapshotted so profit reports remain accurate.
         var productCosts = await inventoryCosts.GetCurrentUnitCostsAsync(productIds, ct);
 
         string? registeredCustomerName = null;
@@ -278,7 +321,7 @@ public sealed class OperationsService(
             registeredCustomerPhone = customer.Phone;
         }
 
-        var subtotal = items.Sum(x => x.Quantity * x.UnitPrice);
+        var subtotal = normalizedItems.Sum(line => line.Request.Quantity * line.Request.UnitPrice);
         var total = Math.Max(0, subtotal - request.Discount + request.Tax);
         ValidateInitialPayment(request.PaidAmount, total);
         var saleDate = request.SaleDate == default ? DateOnly.FromDateTime(DateTime.UtcNow) : request.SaleDate;
@@ -301,30 +344,35 @@ public sealed class OperationsService(
             Notes = Clean(request.Notes),
             CreatedByUserId = userId
         };
-        foreach (var item in items)
-        {
+
+        foreach (var line in normalizedItems)
             sale.Items.Add(new InventorySaleItem
             {
-                ProductId = item.ProductId,
-                Quantity = item.Quantity,
-                UnitPrice = item.UnitPrice,
-                UnitCost = productCosts.GetValueOrDefault(item.ProductId),
-                LineTotal = item.Quantity * item.UnitPrice
+                ProductId = line.Request.ProductId,
+                Quantity = line.BaseQuantity,
+                UnitPrice = line.BaseUnitPrice,
+                UnitCost = productCosts.GetValueOrDefault(line.Request.ProductId),
+                EnteredQuantity = line.Request.Quantity,
+                SelectedUnitId = line.Unit.UnitId,
+                SelectedUnitName = line.Unit.UnitName,
+                UnitConversionFactor = line.Unit.ConversionFactor,
+                EnteredUnitPrice = line.Request.UnitPrice,
+                LineTotal = line.Request.Quantity * line.Request.UnitPrice
             });
-        }
+
         if (request.PaidAmount > 0)
             sale.Payments.Add(NewSalePayment(request.PaidAmount, saleDate, request.PaymentMethod, request.PaymentReferenceNumber, "Initial sale payment", userId));
 
         await using var tx = await context.Database.BeginTransactionAsync(ct);
         context.InventorySales.Add(sale);
         await context.SaveChangesAsync(ct);
-        foreach (var item in items)
+        foreach (var line in normalizedItems)
         {
-            if (productModes[item.ProductId].UsesDisplayStock)
+            if (line.Product.UsesDisplayStock)
                 continue;
 
-            await ApplyStockMovement(item.ProductId, -item.Quantity, InventoryTransactionType.Sale, "ManualSale", sale.Id, sale.SaleNumber, userId, null, ct);
-            await ConsumeInventoryLotsAsync(item.ProductId, item.Quantity, ct);
+            await ApplyStockMovement(line.Request.ProductId, -line.BaseQuantity, InventoryTransactionType.Sale, "ManualSale", sale.Id, sale.SaleNumber, userId, null, ct);
+            await ConsumeInventoryLotsAsync(line.Request.ProductId, line.BaseQuantity, ct);
         }
         await context.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
@@ -524,6 +572,99 @@ public sealed class OperationsService(
         await context.SaveChangesAsync(ct);
         return new ExpenseResponse(entity.Id, entity.ExpenseDate, category.Id, category.Name, entity.Amount, entity.Vendor, entity.PaymentMethod, entity.ReferenceNumber, entity.Description, entity.CreatedAt);
     }
+
+
+    private async Task<Dictionary<long, Product>> LoadProductsForUnitsAsync(long[] productIds, CancellationToken ct) =>
+        await context.Products
+            .AsNoTracking()
+            .Include(product => product.Unit)
+            .Include(product => product.UnitConversions.Where(unit => unit.IsActive))
+                .ThenInclude(unit => unit.Unit)
+            .Include(product => product.Inventory)
+            .Where(product => productIds.Contains(product.Id) && product.IsActive)
+            .ToDictionaryAsync(product => product.Id, ct);
+
+    private static void EnsureAllProductsExist(long[] productIds, IReadOnlyDictionary<long, Product> products)
+    {
+        if (products.Count != productIds.Length)
+            throw new ArgumentException("One or more selected products do not exist or are inactive.");
+    }
+
+    private static decimal? ResolveDefaultPrice(Product product, DateOnly today)
+    {
+        var price = product.Prices.OrderBy(item => item.Id).FirstOrDefault();
+        if (price is null) return null;
+        return price.SalePrice.HasValue &&
+               (!price.StartDate.HasValue || price.StartDate.Value <= today) &&
+               (!price.EndDate.HasValue || price.EndDate.Value >= today)
+            ? price.SalePrice.Value
+            : price.RegularPrice;
+    }
+
+    private static IReadOnlyList<OperationProductUnitLookup> BuildOperationUnits(Product product, decimal availableBaseQuantity, decimal? basePrice)
+    {
+        var units = new List<OperationProductUnitLookup>();
+        if (product.UnitId.HasValue && product.Unit is not null)
+            units.Add(new OperationProductUnitLookup(
+                product.UnitId.Value,
+                product.Unit.Name,
+                1,
+                product.Barcode,
+                basePrice,
+                decimal.Round(availableBaseQuantity, 3),
+                true,
+                !product.UnitConversions.Any(unit => unit.IsDefault && unit.IsActive)));
+
+        units.AddRange(product.UnitConversions
+            .Where(unit => unit.IsActive)
+            .OrderByDescending(unit => unit.IsDefault)
+            .ThenBy(unit => unit.SortOrder)
+            .ThenBy(unit => unit.Id)
+            .Select(unit => new OperationProductUnitLookup(
+                unit.UnitId,
+                unit.Unit.Name,
+                unit.ConversionFactor,
+                unit.Barcode,
+                unit.PriceOverride ?? (basePrice.HasValue ? basePrice.Value * unit.ConversionFactor : null),
+                decimal.Round(availableBaseQuantity / unit.ConversionFactor, 3),
+                false,
+                unit.IsDefault)));
+        return units;
+    }
+
+    private static SelectedOperationUnit ResolveOperationUnit(Product product, long? requestedUnitId)
+    {
+        if (!requestedUnitId.HasValue || requestedUnitId == product.UnitId)
+            return new SelectedOperationUnit(product.UnitId, product.Unit?.Name ?? "Base unit", 1);
+
+        var conversion = product.UnitConversions.FirstOrDefault(unit =>
+            unit.IsActive && unit.UnitId == requestedUnitId.Value);
+        if (conversion is null)
+            throw new ArgumentException($"The selected selling unit is not configured for '{product.Name}'.");
+
+        return new SelectedOperationUnit(conversion.UnitId, conversion.Unit.Name, conversion.ConversionFactor);
+    }
+
+    private static void ValidateSaleQuantity(Product product, decimal baseQuantity, SelectedOperationUnit selectedUnit)
+    {
+        if (product.MinimumValue.HasValue && baseQuantity < product.MinimumValue.Value)
+            throw new ArgumentException($"The minimum sale quantity for '{product.Name}' is {product.MinimumValue.Value:N3} {product.Unit?.Name ?? "base unit"}.");
+        if (product.MaximumValue.HasValue && baseQuantity > product.MaximumValue.Value)
+            throw new ArgumentException($"The maximum sale quantity for '{product.Name}' is {product.MaximumValue.Value:N3} {product.Unit?.Name ?? "base unit"}.");
+
+        var availableBaseQuantity = product.UsesDisplayStock
+            ? Math.Max(0, product.DisplayStockQuantity ?? 0)
+            : Math.Max(0, product.Inventory?.Quantity - product.Inventory?.ReservedQuantity ?? 0);
+        if (baseQuantity > availableBaseQuantity)
+        {
+            var availableSelectedQuantity = availableBaseQuantity / selectedUnit.ConversionFactor;
+            throw new ArgumentException($"Only {availableSelectedQuantity:N3} {selectedUnit.UnitName} of '{product.Name}' are available.");
+        }
+    }
+
+    private sealed record SelectedOperationUnit(long? UnitId, string UnitName, decimal ConversionFactor);
+    private sealed record NormalizedPurchaseLine(PurchaseItemRequest Request, Product Product, SelectedOperationUnit Unit, decimal BaseQuantity, decimal BaseUnitCost);
+    private sealed record NormalizedSaleLine(InventorySaleItemRequest Request, Product Product, SelectedOperationUnit Unit, decimal BaseQuantity, decimal BaseUnitPrice);
 
 
     private async Task<string> GetCurrencyCodeAsync(CancellationToken ct) =>

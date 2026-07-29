@@ -24,7 +24,9 @@ IF NOT EXISTS (SELECT 1 FROM dbo.Tenants WHERE Id = @TenantId)
 
 IF COL_LENGTH(N'dbo.Products', N'UsesDisplayStock') IS NULL OR
    COL_LENGTH(N'dbo.OrderItems', N'UnitCost') IS NULL OR
-   COL_LENGTH(N'dbo.OrderItems', N'AffectsInventory') IS NULL
+   COL_LENGTH(N'dbo.OrderItems', N'AffectsInventory') IS NULL OR
+   COL_LENGTH(N'dbo.OrderItems', N'OrderedQuantity') IS NULL OR
+   OBJECT_ID(N'dbo.ProductUnitConversions', N'U') IS NULL
     THROW 51002, 'Apply the latest EF Core migrations before running the performance seed.', 1;
 
 IF @ProductCount < 1 OR @ProductCount > 100000 OR
@@ -112,6 +114,26 @@ BEGIN
     SET @CustomerTypeId = SCOPE_IDENTITY();
 END;
 
+DECLARE @ProductUnitId bigint =
+(
+    SELECT TOP (1) Id
+    FROM dbo.Types
+    WHERE TenantId = @TenantId AND [Group] = 3 AND IsDeleted = 0
+    ORDER BY CASE WHEN Name = N'Piece (Dana)' THEN 0 ELSE 1 END, SortOrder, Id
+);
+
+IF @ProductUnitId IS NULL
+BEGIN
+    INSERT dbo.Types (TenantId, BranchId, [Group], Name, SortOrder, CreatedAt, IsDeleted)
+    VALUES (@TenantId, @BranchId, 3, N'Piece (Dana)', 0, SYSUTCDATETIME(), 0);
+    SET @ProductUnitId = SCOPE_IDENTITY();
+END;
+
+DECLARE @ProductUnitName nvarchar(200) =
+(
+    SELECT Name FROM dbo.Types WHERE Id = @ProductUnitId
+);
+
 DECLARE @MaximumNumber int =
 (
     SELECT MAX(Value)
@@ -148,7 +170,7 @@ SELECT
     CASE WHEN Number % 5 = 0 THEN CONVERT(decimal(18,3), 1000 + Number % 9000) END,
     @CategoryId,
     NULL,
-    NULL,
+    @ProductUnitId,
     CASE WHEN Number % 20 = 0 THEN 1 ELSE 0 END,
     1,
     CONCAT(N'perf-load-product-', RIGHT(REPLICATE('0', 10) + CONVERT(varchar(10), Number), 10)),
@@ -284,7 +306,9 @@ CREATE UNIQUE CLUSTERED INDEX IX_ItemOffsets_Number ON #ItemOffsets(OffsetNumber
 PRINT CONCAT('Inserting ', FORMAT(@OrderCount * @ItemsPerOrder, 'N0'), ' order items...');
 INSERT dbo.OrderItems
 (
-    TenantId, BranchId, OrderId, ProductId, Quantity, UnitPrice, UnitCost,
+    TenantId, BranchId, OrderId, ProductId,
+    Quantity, OrderedQuantity, SelectedUnitId, SelectedUnitName, UnitConversionFactor,
+    UnitPrice, SellingUnitPrice, UnitCost,
     AffectsInventory, Discount, ProductName, ProductBarcode,
     VariantDescription, Tax, Currency, CreatedAt, IsDeleted
 )
@@ -294,6 +318,11 @@ SELECT
     orders.Id,
     product.Id,
     CONVERT(decimal(18,3), 1 + ((orders.Number + item.OffsetNumber) % 4)),
+    CONVERT(decimal(18,3), 1 + ((orders.Number + item.OffsetNumber) % 4)),
+    @ProductUnitId,
+    @ProductUnitName,
+    CONVERT(decimal(18,6), 1),
+    CONVERT(decimal(18,6), 10 + product.Number % 990),
     CONVERT(decimal(18,2), 10 + product.Number % 990),
     CONVERT(decimal(18,4), (10 + product.Number % 990) * 0.62),
     CASE WHEN product.UsesDisplayStock = 1 THEN 0 ELSE 1 END,
@@ -318,7 +347,7 @@ SET
 FROM dbo.Orders orders
 INNER JOIN
 (
-    SELECT OrderId, SUM((Quantity * UnitPrice) - Discount + Tax) AS Subtotal
+    SELECT OrderId, SUM((OrderedQuantity * SellingUnitPrice) - Discount + Tax) AS Subtotal
     FROM dbo.OrderItems
     WHERE TenantId = @TenantId AND IsDeleted = 0
     GROUP BY OrderId

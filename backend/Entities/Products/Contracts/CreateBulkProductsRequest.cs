@@ -52,6 +52,8 @@ public sealed class CreateBulkProductItemRequest
 
     public long? BrandId { get; set; }
 
+    [Required(ErrorMessage = "Base inventory unit is required.")]
+    [Range(1, long.MaxValue, ErrorMessage = "Base inventory unit is required.")]
     public long? UnitId { get; set; }
 
     public bool IsFeatured { get; set; }
@@ -62,4 +64,6 @@ public sealed class CreateBulkProductItemRequest
     public string? Slug { get; set; }
 
     public List<ECommerce.Entities.Products.Contracts.ProductPriceItemRequest> Prices { get; set; } = [];
+
+    public List<ECommerce.Entities.Products.Contracts.ProductUnitConversionRequest> UnitConversions { get; set; } = [];
 }

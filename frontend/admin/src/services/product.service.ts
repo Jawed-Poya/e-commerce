@@ -18,6 +18,7 @@ export interface ProductListItem {
     categoryName: string;
     brandId: number | null;
     unitId: number | null;
+    unitName: string | null;
     minimumValue: number | null;
     maximumValue: number | null;
     usesDisplayStock: boolean;
@@ -52,8 +53,31 @@ export interface ProductDetails extends Omit<ProductListItem, "price" | "primary
     updatedAt: string | null;
     inventory: { quantity: number; reservedQuantity: number; availableQuantity: number; minimumQuantity: number; expireDate: string | null } | null;
     prices: ProductPrice[];
+    unitConversions: ProductUnitConversion[];
     images: (ProductListImage & { originalFileName: string | null; contentType: string; size: number })[];
 }
+
+
+export interface ProductUnitConversion {
+    id: number | null;
+    unitId: number;
+    unitName: string;
+    conversionFactor: number;
+    barcode: string | null;
+    priceOverride: number | null;
+    oldPriceOverride: number | null;
+    isBaseUnit: boolean;
+    isDefault: boolean;
+    isActive: boolean;
+    sortOrder: number;
+    availableQuantity: number;
+    price: number | null;
+    oldPrice: number | null;
+}
+
+export type ProductUnitConversionInput = Pick<ProductUnitConversion,
+    "id" | "unitId" | "conversionFactor" | "barcode" | "priceOverride" |
+    "oldPriceOverride" | "isDefault" | "isActive" | "sortOrder">;
 
 export interface ProductPrice {
     id: number;
@@ -112,6 +136,7 @@ export interface CreateSingleProductInput {
     isFeatured: boolean;
     isActive: boolean;
     prices: ProductPriceInput[];
+    unitConversions?: ProductUnitConversionInput[];
 }
 
 export interface CreateSingleProductResult {
@@ -122,7 +147,7 @@ export interface CreateSingleProductResult {
 export type BulkUpdateProduct = Pick<ProductListItem,
     "id" | "name" | "barcode" | "categoryId" | "brandId" | "unitId" |
     "shortDescription" | "description" | "slug" | "minimumValue" |
-    "maximumValue" | "usesDisplayStock" | "displayStockQuantity" | "isFeatured" | "isActive" | "primaryImageUrl" | "images"> & { image?: File; galleryImages?: File[]; removedImageIds?: number[]; prices: ProductPriceInput[] };
+    "maximumValue" | "usesDisplayStock" | "displayStockQuantity" | "isFeatured" | "isActive" | "primaryImageUrl" | "images"> & { image?: File; galleryImages?: File[]; removedImageIds?: number[]; prices: ProductPriceInput[]; unitConversions?: ProductUnitConversionInput[] };
 
 function append(formData: FormData, key: string, value: string | number | boolean | null | undefined) {
     if (value !== null && value !== undefined) formData.append(key, String(value));
@@ -159,6 +184,18 @@ export const productService = {
             append(formData, `${pricePrefix}.StartDate`, price.startDate);
             append(formData, `${pricePrefix}.EndDate`, price.endDate);
         });
+        product.unitConversions?.forEach((unit, index) => {
+            const unitPrefix = `${prefix}.UnitConversions[${index}]`;
+            append(formData, `${unitPrefix}.Id`, unit.id);
+            append(formData, `${unitPrefix}.UnitId`, unit.unitId);
+            append(formData, `${unitPrefix}.ConversionFactor`, unit.conversionFactor);
+            append(formData, `${unitPrefix}.Barcode`, unit.barcode?.trim() || null);
+            append(formData, `${unitPrefix}.PriceOverride`, unit.priceOverride);
+            append(formData, `${unitPrefix}.OldPriceOverride`, unit.oldPriceOverride);
+            append(formData, `${unitPrefix}.IsDefault`, unit.isDefault);
+            append(formData, `${unitPrefix}.IsActive`, unit.isActive);
+            append(formData, `${unitPrefix}.SortOrder`, unit.sortOrder);
+        });
         return apiClient.post<CreateSingleProductResult>("/products/bulk", formData);
     },
     bulkUpdate(products: BulkUpdateProduct[]) {
@@ -191,6 +228,18 @@ export const productService = {
                 append(formData, `${pricePrefix}.SalePrice`, price.salePrice);
                 append(formData, `${pricePrefix}.StartDate`, price.startDate);
                 append(formData, `${pricePrefix}.EndDate`, price.endDate);
+            });
+            product.unitConversions?.forEach((unit, unitIndex) => {
+                const unitPrefix = `${prefix}.UnitConversions[${unitIndex}]`;
+                append(formData, `${unitPrefix}.Id`, unit.id);
+                append(formData, `${unitPrefix}.UnitId`, unit.unitId);
+                append(formData, `${unitPrefix}.ConversionFactor`, unit.conversionFactor);
+                append(formData, `${unitPrefix}.Barcode`, unit.barcode?.trim() || null);
+                append(formData, `${unitPrefix}.PriceOverride`, unit.priceOverride);
+                append(formData, `${unitPrefix}.OldPriceOverride`, unit.oldPriceOverride);
+                append(formData, `${unitPrefix}.IsDefault`, unit.isDefault);
+                append(formData, `${unitPrefix}.IsActive`, unit.isActive);
+                append(formData, `${unitPrefix}.SortOrder`, unit.sortOrder);
             });
         });
         return apiClient.put<{ updatedCount: number }>("/products/bulk", formData);

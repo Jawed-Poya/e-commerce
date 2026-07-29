@@ -694,7 +694,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
                     Paid = item.Payments.Where(payment => payment.Status == PaymentStatus.Paid || payment.Status == PaymentStatus.PartiallyRefunded)
                         .Sum(payment => (decimal?)payment.Amount) ?? 0,
                     PaymentMethod = item.Payments.OrderByDescending(payment => payment.PaidAt).Select(payment => payment.Provider).FirstOrDefault(),
-                    Items = item.Items.Select(line => new ReceiptItemResponse(line.ProductName, line.Quantity, line.UnitPrice, line.Discount, line.Tax, (line.Quantity * line.UnitPrice) - line.Discount + line.Tax)).ToArray()
+                    Items = item.Items.Select(line => new ReceiptItemResponse(line.ProductName, line.OrderedQuantity > 0 ? line.OrderedQuantity : line.Quantity, line.SelectedUnitName, line.SellingUnitPrice > 0 ? line.SellingUnitPrice : line.UnitPrice, line.Discount, line.Tax, (line.OrderedQuantity > 0 ? line.OrderedQuantity * line.SellingUnitPrice : line.Quantity * line.UnitPrice) - line.Discount + line.Tax)).ToArray()
                 }).SingleOrDefaultAsync(cancellationToken)
                 ?? throw new KeyNotFoundException("Order was not found.");
 
@@ -721,7 +721,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
                         : item.CustomerName ?? "Walk-in customer",
                     CustomerPhone = item.Customer != null ? item.Customer.Phone : item.CustomerPhone,
                     CustomerAddress = item.Customer != null ? item.Customer.Address : null,
-                    Items = item.Items.Select(line => new ReceiptItemResponse(line.Product.Name, line.Quantity, line.UnitPrice, 0, 0, line.LineTotal)).ToArray()
+                    Items = item.Items.Select(line => new ReceiptItemResponse(line.Product.Name, line.EnteredQuantity > 0 ? line.EnteredQuantity : line.Quantity, line.SelectedUnitName ?? (line.Product.Unit != null ? line.Product.Unit.Name : null), line.EnteredUnitPrice > 0 ? line.EnteredUnitPrice : line.UnitPrice, 0, 0, line.LineTotal)).ToArray()
                 }).SingleOrDefaultAsync(cancellationToken)
                 ?? throw new KeyNotFoundException("Manual sale was not found.");
 
@@ -913,7 +913,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
                         itemColumn.Item().Text(item.Name).FontSize(7.5f).SemiBold();
                         itemColumn.Item().Row(row =>
                         {
-                            row.RelativeItem(2).Text($"{item.Quantity:N2} × {Money(item.UnitPrice, receipt.CurrencyCode)}")
+                            row.RelativeItem(2).Text($"{item.Quantity:N2}{(string.IsNullOrWhiteSpace(item.UnitName) ? string.Empty : $" {item.UnitName}")} × {Money(item.UnitPrice, receipt.CurrencyCode)}")
                                 .FontSize(6.5f).FontColor(Slate);
                             row.RelativeItem().AlignRight().ScaleToFit()
                                 .Text(Money(item.Total, receipt.CurrencyCode)).FontSize(7.5f).SemiBold();
@@ -946,7 +946,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
             {
                 table.Cell().BorderBottom(1).BorderColor(Border).PaddingVertical(6).PaddingHorizontal(5)
                     .Text(item.Name).FontSize(8).SemiBold();
-                ReceiptBodyCell(table.Cell().AlignRight(), item.Quantity.ToString("N2"), compact: false);
+                ReceiptBodyCell(table.Cell().AlignRight(), $"{item.Quantity:N2}{(string.IsNullOrWhiteSpace(item.UnitName) ? string.Empty : $" {item.UnitName}")}", compact: false);
                 ReceiptBodyCell(table.Cell().AlignRight(), Money(item.UnitPrice, receipt.CurrencyCode), compact: false);
                 ReceiptBodyCell(table.Cell().AlignRight(), Money(item.Total, receipt.CurrencyCode), compact: false, semiBold: true);
             }

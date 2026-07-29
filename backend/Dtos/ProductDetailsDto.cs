@@ -20,6 +20,7 @@ public sealed class ProductDetailsDto
     public string? BrandName { get; set; }
     public long? UnitId { get; set; }
     public string? UnitName { get; set; }
+    public List<ECommerce.Entities.Products.Contracts.ProductUnitConversionResponse> UnitConversions { get; set; } = [];
     public bool IsFeatured { get; set; }
     public bool IsActive { get; set; }
     public long ViewCount { get; set; }

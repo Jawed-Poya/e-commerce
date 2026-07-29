@@ -5,7 +5,8 @@ namespace ECommerce.Entities.Orders.Contracts;
 
 public sealed record CheckoutItemRequest(
     long ProductId,
-    decimal Quantity
+    decimal Quantity,
+    long? UnitId = null
 );
 
 public sealed record CheckoutCustomerRequest(
@@ -115,6 +116,9 @@ public sealed record OrderItemResponse(
     string ProductName,
     string? ProductBarcode,
     decimal Quantity,
+    long? UnitId,
+    string? UnitName,
+    decimal ConversionFactor,
     decimal UnitPrice,
     decimal Discount,
     decimal Tax,
