@@ -64,6 +64,8 @@ export function ProductCard({ product }: { product: Product }) {
         <img
           src={primary}
           alt={product.name}
+          loading="lazy"
+          decoding="async"
           className={cn(
             "size-full object-contain p-3.5 drop-shadow-sm transition-all duration-700 ease-out sm:p-6 sm:group-hover:scale-[1.05]",
             alternate && "sm:group-hover:opacity-0",
@@ -74,6 +76,8 @@ export function ProductCard({ product }: { product: Product }) {
           <img
             src={imageUrl(alternate.url) ?? primary}
             alt=""
+            loading="lazy"
+            decoding="async"
             className="absolute inset-0 hidden size-full scale-[1.04] object-contain p-6 opacity-0 drop-shadow-sm transition-all duration-700 ease-out sm:block sm:group-hover:scale-100 sm:group-hover:opacity-100"
           />
         )}
