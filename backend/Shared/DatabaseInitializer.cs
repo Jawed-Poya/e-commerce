@@ -28,6 +28,7 @@ public static class DatabaseInitializer
         await EnsureAdminPermissionsAsync(services);
         await EnsureStoreOperatorRoleAsync(services, company.Company.Id);
         await EnsureDefaultCustomerTypesAsync(context, company.Company.Id, company.MainBranch.Id);
+        await EnsureDefaultProductUnitsAsync(context, company.Company.Id, company.MainBranch.Id);
         await EnsureOperationDefaultsAsync(context, company.Company.Id, company.MainBranch.Id);
         await EnsureAdminAsync(services, company.Company.Id, company.MainBranch.Id);
         await EnsureSafeIdentityUserNamesAsync(services);
@@ -353,6 +354,68 @@ END;
         }
 
         await context.SaveChangesAsync();
+    }
+
+
+    private static async Task EnsureDefaultProductUnitsAsync(
+        ApplicationDbContext context,
+        long companyId,
+        long mainBranchId)
+    {
+        var unitNames = new[]
+        {
+            "Piece (Dana)",
+            "Tablet",
+            "Capsule",
+            "Strip",
+            "Box",
+            "Bottle",
+            "Pack",
+            "Vial",
+            "Tube",
+            "Sachet",
+            "Carton"
+        };
+
+        var existing = await context.Types
+            .IgnoreQueryFilters()
+            .Where(type => type.TenantId == companyId && type.Group == GeneralTypeEnum.ProductUnit)
+            .ToListAsync();
+        var byName = existing
+            .GroupBy(type => type.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.OrderBy(type => type.Id).First(), StringComparer.OrdinalIgnoreCase);
+        var changed = false;
+
+        for (var index = 0; index < unitNames.Length; index++)
+        {
+            var name = unitNames[index];
+            if (byName.TryGetValue(name, out var unit))
+            {
+                if (!unit.IsDeleted && unit.BranchId.HasValue && unit.SortOrder == index)
+                    continue;
+
+                unit.IsDeleted = false;
+                unit.DeletedAt = null;
+                unit.BranchId ??= mainBranchId;
+                unit.SortOrder = index;
+                unit.UpdatedAt = DateTime.UtcNow;
+                changed = true;
+                continue;
+            }
+
+            context.Types.Add(new GeneralType
+            {
+                TenantId = companyId,
+                BranchId = mainBranchId,
+                Name = name,
+                Group = GeneralTypeEnum.ProductUnit,
+                SortOrder = index
+            });
+            changed = true;
+        }
+
+        if (changed)
+            await context.SaveChangesAsync();
     }
 
 

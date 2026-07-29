@@ -78,12 +78,16 @@ public sealed class OrderItemConfiguration : IEntityTypeConfiguration<OrderItem>
         b.Property(x => x.ProductBarcode).HasMaxLength(100);
         b.Property(x => x.Currency).HasMaxLength(3).IsRequired();
         b.Property(x => x.Quantity).HasPrecision(18, 3);
-        b.Property(x => x.UnitPrice).HasPrecision(18, 2);
+        b.Property(x => x.OrderedQuantity).HasPrecision(18, 3);
+        b.Property(x => x.UnitConversionFactor).HasPrecision(18, 6);
+        b.Property(x => x.SellingUnitPrice).HasPrecision(18, 2);
+        b.Property(x => x.SelectedUnitName).HasMaxLength(100);
+        b.Property(x => x.UnitPrice).HasPrecision(18, 6);
         b.Property(x => x.UnitCost).HasPrecision(18, 4);
         b.Property(x => x.AffectsInventory).HasDefaultValue(true);
         b.Property(x => x.Discount).HasPrecision(18, 2);
         b.Property(x => x.Tax).HasPrecision(18, 2);
-        b.ToTable(t => t.HasCheckConstraint("CK_OrderItem_Values", "[Quantity] > 0 AND [UnitPrice] >= 0 AND [Discount] >= 0 AND [Tax] >= 0"));
+        b.ToTable(t => t.HasCheckConstraint("CK_OrderItem_Values", "[Quantity] > 0 AND [OrderedQuantity] > 0 AND [UnitConversionFactor] > 0 AND [UnitPrice] >= 0 AND [SellingUnitPrice] >= 0 AND [Discount] >= 0 AND [Tax] >= 0"));
     }
 }
 

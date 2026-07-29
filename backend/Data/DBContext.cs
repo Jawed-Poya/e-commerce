@@ -62,6 +62,7 @@ public class ApplicationDbContext
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
 
     public DbSet<ProductPrice> ProductPrices => Set<ProductPrice>();
+    public DbSet<ProductUnitConversion> ProductUnitConversions => Set<ProductUnitConversion>();
 
     public DbSet<ProductInventory> ProductInventories => Set<ProductInventory>();
 
@@ -241,6 +242,7 @@ public class ApplicationDbContext
         builder.Entity<ProductImage>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted);
         builder.Entity<ProductInventory>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted);
         builder.Entity<ProductPrice>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted && !x.CustomerType.IsDeleted);
+        builder.Entity<ProductUnitConversion>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted && !x.Unit.IsDeleted);
         builder.Entity<InventoryTransaction>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted);
         builder.Entity<ProductReview>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted && !x.Customer.IsDeleted);
         builder.Entity<ProductVariant>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted);

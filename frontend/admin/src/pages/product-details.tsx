@@ -13,6 +13,7 @@ import { useProductLookupsQuery } from "@/features/products/hooks/use-product-mu
 import { ProductPricingDialog } from "@/features/products/components/product-pricing-dialog";
 import { resolveProductImageUrl } from "@/services/product.service";
 import { useI18n } from "@/i18n/i18n-provider";
+import { useCompany } from "@/features/company/company-context";
 
 const formatNumber = (value: number | null | undefined) => value == null ? "—" : value.toLocaleString();
 
@@ -20,6 +21,7 @@ export default function ProductDetailsPage() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { t, language } = useI18n();
+    const { formatMoney } = useCompany();
     const { user } = useAdminAuth();
     const canManageProduct = hasPermission(user, Permissions.ProductsManage);
     const canManagePricing = hasPermission(user, Permissions.ProductPricingManage);
@@ -41,7 +43,7 @@ export default function ProductDetailsPage() {
 
     const date = (value: string | null) => value ? new Intl.DateTimeFormat(language, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
     const shortDate = (value: string | null) => value ? new Intl.DateTimeFormat(language, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`)) : null;
-    const money = (value: number | null) => value == null ? "—" : new Intl.NumberFormat(language, { style: "currency", currency: "USD" }).format(value);
+    const money = (value: number | null) => value == null ? "—" : formatMoney(value);
     const inventory = product.inventory;
 
     return <div className="space-y-6">
@@ -62,6 +64,37 @@ export default function ProductDetailsPage() {
                 <div className="grid gap-4 sm:grid-cols-2"><Metric label={product.usesDisplayStock ? "Customer-visible stock" : t("details.availableStock")} value={formatNumber(product.usesDisplayStock ? product.displayStockQuantity : inventory?.availableQuantity)} icon={PackageCheck} /><Metric label={product.usesDisplayStock ? "Physical inventory" : t("details.reservedStock")} value={formatNumber(product.usesDisplayStock ? product.inventoryStock : inventory?.reservedQuantity)} icon={Boxes} /></div>
             </div>
         </div>
+
+        <Card>
+            <CardHeader>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <CardTitle className="flex items-center gap-2"><Boxes className="size-5" />Selling units</CardTitle>
+                        <p className="mt-1 text-xs text-muted-foreground">Inventory is stored in the base unit while customers and staff can buy or sell configured packaging units.</p>
+                    </div>
+                    <Badge variant="outline">Base: {product.unitName || "Not configured"}</Badge>
+                </div>
+            </CardHeader>
+            <CardContent>
+                {product.unitConversions.length ? (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {product.unitConversions.map(unit => (
+                            <div key={`${unit.isBaseUnit ? "base" : unit.id}-${unit.unitId}`} className={`rounded-xl border p-4 ${unit.isDefault ? "border-primary/35 bg-primary/[0.04]" : "bg-muted/15"}`}>
+                                <div className="flex items-start justify-between gap-2">
+                                    <div><p className="font-semibold">{unit.unitName}</p><p className="mt-1 text-xs text-muted-foreground">1 {unit.unitName} = {unit.conversionFactor} {product.unitName || "base units"}</p></div>
+                                    <div className="flex flex-wrap justify-end gap-1">{unit.isBaseUnit ? <Badge variant="secondary">Base</Badge> : null}{unit.isDefault ? <Badge>Default</Badge> : null}</div>
+                                </div>
+                                <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                                    <Detail label="Available" value={`${formatNumber(unit.availableQuantity)} ${unit.unitName}`} />
+                                    <Detail label="Price" value={money(unit.price)} />
+                                </div>
+                                {unit.barcode ? <p className="mt-3 truncate font-mono text-[11px] text-muted-foreground">{unit.barcode}</p> : null}
+                            </div>
+                        ))}
+                    </div>
+                ) : <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">No selling units are configured. Edit the product to add box, strip, bottle, piece, or other unit conversions.</div>}
+            </CardContent>
+        </Card>
 
         <div className="grid gap-6 lg:grid-cols-2">
             <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-2"><CardTitle>{t("details.inventory")}</CardTitle>{product.usesDisplayStock ? <Badge variant="secondary">Display-only stock</Badge> : null}</div></CardHeader><CardContent className="grid gap-4 sm:grid-cols-2">{product.usesDisplayStock ? <><Detail label="Customer-visible quantity" value={formatNumber(product.displayStockQuantity)} /><Detail label="Physical inventory" value={formatNumber(product.inventoryStock)} /><Detail label="Inventory effect" value="Orders do not reserve or reduce stock" /><Detail label="Financial valuation" value="Excluded from inventory value" /></> : <><Detail label={t("details.totalStock")} value={formatNumber(inventory?.quantity)} /><Detail label={t("details.availableStock")} value={formatNumber(inventory?.availableQuantity)} /><Detail label={t("details.reservedStock")} value={formatNumber(inventory?.reservedQuantity)} /><Detail label={t("details.minimumStock")} value={formatNumber(inventory?.minimumQuantity)} /></>}<Detail label={t("details.expiry")} value={inventory?.expireDate || "—"} /><Detail label={t("details.updated")} value={date(product.updatedAt)} /></CardContent></Card>

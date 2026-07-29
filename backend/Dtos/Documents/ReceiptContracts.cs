@@ -3,6 +3,7 @@ namespace ECommerce.Dtos.Documents;
 public sealed record ReceiptItemResponse(
     string Name,
     decimal Quantity,
+    string? UnitName,
     decimal UnitPrice,
     decimal Discount,
     decimal Tax,

@@ -41,6 +41,7 @@ export function ProductPage() {
   });
 
   const [selected, setSelected] = useState<number | null>(null);
+  const [selectedUnitId, setSelectedUnitId] = useState<number | null>(null);
   const cart = useCart();
   const {
     trackProduct,
@@ -62,6 +63,14 @@ export function ProductPage() {
       sessionStorage.removeItem(viewKey);
     });
   }, [productId, trackProduct]);
+
+  useEffect(() => {
+    if (!q.data) return;
+    const preferred = q.data.unitConversions.find(unit => unit.isDefault && unit.isActive)
+      ?? q.data.unitConversions.find(unit => unit.isBaseUnit)
+      ?? q.data.unitConversions[0];
+    setSelectedUnitId(preferred?.unitId ?? q.data.unitId ?? null);
+  }, [q.data]);
 
   if (q.isLoading) {
     return (
@@ -122,10 +131,40 @@ export function ProductPage() {
 
   const p = q.data;
 
-  const price = p.price;
+  const unitOptions = p.unitConversions.length
+    ? p.unitConversions.filter(unit => unit.isActive)
+    : [{
+        id: null,
+        unitId: p.unitId ?? 0,
+        unitName: p.unitName ?? t("product.unit"),
+        conversionFactor: 1,
+        barcode: p.barcode,
+        priceOverride: null,
+        oldPriceOverride: null,
+        isBaseUnit: true,
+        isDefault: true,
+        isActive: true,
+        sortOrder: 0,
+        availableQuantity: p.stock,
+        price: p.price,
+        oldPrice: p.oldPrice,
+      }];
+  const selectedUnit = unitOptions.find(unit => unit.unitId === selectedUnitId)
+    ?? unitOptions.find(unit => unit.isDefault)
+    ?? unitOptions[0];
+  const factor = selectedUnit?.conversionFactor && selectedUnit.conversionFactor > 0
+    ? selectedUnit.conversionFactor
+    : 1;
+  const price = selectedUnit?.price ?? p.price;
+  const oldPrice = selectedUnit?.oldPrice ?? p.oldPrice;
   const hasPrice = price != null;
-
-  const stock = p.inventory?.availableQuantity ?? 0;
+  const stock = selectedUnit?.availableQuantity ?? p.stock;
+  const convertedMinimum = p.minimumValue != null
+    ? Math.ceil((p.minimumValue / factor) * 1000) / 1000
+    : null;
+  const convertedMaximum = p.maximumValue != null
+    ? Math.floor((p.maximumValue / factor) * 1000) / 1000
+    : null;
 
   const active =
     p.images.find((x) => x.id === selected) ??
@@ -133,8 +172,8 @@ export function ProductPage() {
     p.images[0];
 
   const liked = cart.wishlist.includes(p.id);
-  const minimumQuantity = minimumCartQuantity({ ...p, stock });
-  const maximumQuantity = maximumCartQuantity({ ...p, stock });
+  const minimumQuantity = minimumCartQuantity({ stock, minimumValue: convertedMinimum, maximumValue: convertedMaximum });
+  const maximumQuantity = maximumCartQuantity({ stock, minimumValue: convertedMinimum, maximumValue: convertedMaximum });
   const canAddToCart = hasPrice && maximumQuantity >= minimumQuantity;
   const notificationLabel =
     notificationPermission === "granted"
@@ -152,9 +191,12 @@ export function ProductPage() {
       image: active?.url,
       price: price!,
       stock,
+      unitId: selectedUnit?.unitId ?? p.unitId,
+      unitName: selectedUnit?.unitName ?? p.unitName,
+      conversionFactor: factor,
       slug: p.slug,
-      minimumValue: p.minimumValue,
-      maximumValue: p.maximumValue,
+      minimumValue: convertedMinimum,
+      maximumValue: convertedMaximum,
     });
 
   return (
@@ -291,6 +333,10 @@ export function ProductPage() {
                 <p className="mt-1 text-3xl font-black tracking-[-0.04em] text-primary sm:text-4xl">
                   {hasPrice ? formatMoney(price) : t("product.noPrice")}
                 </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {hasPrice && selectedUnit?.unitName ? <span className="rounded-full border border-primary/15 bg-primary/5 px-2.5 py-1 text-xs font-bold text-primary">{t("product.perUnit", { unit: selectedUnit.unitName })}</span> : null}
+                  {oldPrice != null && price != null && oldPrice > price ? <span className="text-sm font-semibold text-muted-foreground line-through decoration-destructive/70 decoration-2">{formatMoney(oldPrice)}</span> : null}
+                </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="rounded-full bg-primary/10 px-2.5 py-1 font-bold text-primary">
                     {p.isDefaultPrice
@@ -327,11 +373,42 @@ export function ProductPage() {
                   )}
                 >
                   {stock > 0
-                    ? t("product.availableCount", { count: stock })
+                    ? `${t("product.availableCount", { count: stock })}${selectedUnit?.unitName ? ` ${selectedUnit.unitName}` : ""}`
                     : t("product.soldOut")}
                 </p>
               </div>
             </div>
+
+            {unitOptions.length > 1 ? (
+              <div className="mt-5 rounded-2xl border border-border/80 bg-card p-4 dark:border-white/12 sm:p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black">{t("product.chooseSellingUnit")}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{t("product.unitConversionHelp")}</p>
+                  </div>
+                  <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-bold text-muted-foreground">{t("product.baseUnit", { unit: p.unitName ?? "—" })}</span>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {unitOptions.map(unit => (
+                    <button
+                      key={`${unit.unitId}-${unit.isBaseUnit ? "base" : unit.id}`}
+                      type="button"
+                      onClick={() => setSelectedUnitId(unit.unitId)}
+                      className={cn(
+                        "rounded-xl border px-3 py-3 text-start transition",
+                        selectedUnit?.unitId === unit.unitId
+                          ? "border-primary bg-primary/8 shadow-sm"
+                          : "border-border/70 bg-background hover:border-primary/30 dark:border-white/10",
+                      )}
+                    >
+                      <span className="block text-sm font-black">{unit.unitName}</span>
+                      <span className="mt-1 block text-[10px] text-muted-foreground">{unit.isBaseUnit ? t("product.baseInventoryUnit") : t("product.unitEquation", { unit: unit.unitName, factor: unit.conversionFactor, baseUnit: p.unitName ?? t("product.unit") })}</span>
+                      <span className="mt-2 block text-xs font-bold text-primary">{unit.price != null ? formatMoney(unit.price) : t("product.noPrice")}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             <div
               className={cn(
@@ -359,7 +436,7 @@ export function ProductPage() {
 
                 <small className="mt-1 block leading-5 opacity-80">
                   {stock > 0
-                    ? t("product.stockDescription", { count: stock })
+                    ? `${t("product.stockDescription", { count: stock })}${selectedUnit?.unitName ? ` ${selectedUnit.unitName}` : ""}`
                     : t("product.unavailableDescription")}
                 </small>
               </div>
@@ -474,6 +551,7 @@ export function ProductPage() {
             <p className="text-xl font-black tracking-tight text-primary">
               {hasPrice ? formatMoney(price) : t("product.noPrice")}
             </p>
+            {selectedUnit?.unitName ? <p className="text-[10px] font-bold text-muted-foreground">per {selectedUnit.unitName}</p> : null}
           </div>
 
           <Button

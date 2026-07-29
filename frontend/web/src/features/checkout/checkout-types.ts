@@ -60,7 +60,7 @@ export interface CreateOrderRequest {
     paymentMethod: PaymentMethod;
     bankTransferReference: string | null;
     notes: string | null;
-    items: { productId: number; quantity: number }[];
+    items: { productId: number; quantity: number; unitId: number | null }[];
 }
 
 export interface OrderConfirmation {

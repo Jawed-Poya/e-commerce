@@ -11,6 +11,7 @@ public sealed record ProductListItemResponse(
     string CategoryName,
     long? BrandId,
     long? UnitId,
+    string? UnitName,
     int? MinimumValue,
     int? MaximumValue,
     bool UsesDisplayStock,

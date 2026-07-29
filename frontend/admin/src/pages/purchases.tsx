@@ -184,6 +184,7 @@ export default function PurchasesPage() {
                 notes: nullable(form.notes),
                 items: items.map((item) => ({
                     productId: item.productId,
+                    unitId: item.unitId,
                     quantity: item.quantity,
                     unitCost: item.amount,
                     lotNumber: nullable(item.lotNumber ?? ""),

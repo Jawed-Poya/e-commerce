@@ -114,7 +114,7 @@ public sealed class AdminDashboardService(
                 group.Key.ProductId,
                 Name = group.Key.ProductName,
                 Quantity = group.Sum(item => item.Quantity),
-                Revenue = group.Sum(item => (item.Quantity * item.UnitPrice) - item.Discount + item.Tax)
+                Revenue = group.Sum(item => ((item.OrderedQuantity > 0 ? item.OrderedQuantity * item.SellingUnitPrice : item.Quantity * item.UnitPrice) - item.Discount + item.Tax))
             })
             .OrderByDescending(item => item.Quantity)
             .Take(6)

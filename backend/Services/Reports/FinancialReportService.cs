@@ -861,7 +861,7 @@ public sealed class FinancialReportService(
                 group.Key.ProductId,
                 group.Key.Name,
                 group.Sum(item => item.Quantity),
-                group.Sum(item => (item.Quantity * item.UnitPrice) - item.Discount + item.Tax)))
+                group.Sum(item => (item.OrderedQuantity > 0 ? item.OrderedQuantity * item.SellingUnitPrice : item.Quantity * item.UnitPrice) - item.Discount + item.Tax)))
             .ToListAsync(cancellationToken);
         var topManual = await context.InventorySaleItems.AsNoTracking()
             .Where(item => item.InventorySale.SaleDate >= startOnly && item.InventorySale.SaleDate <= endOnly &&

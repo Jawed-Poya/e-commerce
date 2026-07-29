@@ -45,7 +45,7 @@ export interface OrderDetails {
     reservationExpiresAt: string | null;
     customer: { id: number; name: string; phone: string; email: string | null; customerTypeName: string | null };
     shippingAddress: { label: string; recipientName: string; phone: string; addressLine1: string; addressLine2: string | null; city: string; state: string | null; country: string; postalCode: string | null };
-    items: { id: number; productId: number; productName: string; productBarcode: string | null; quantity: number; unitPrice: number; discount: number; tax: number; total: number; currency: string }[];
+    items: { id: number; productId: number; productName: string; productBarcode: string | null; quantity: number; unitId: number | null; unitName: string | null; conversionFactor: number; unitPrice: number; discount: number; tax: number; total: number; currency: string }[];
     payments: { id: number; method: PaymentMethod; provider: string; externalReference: string | null; amount: number; currency: string; status: PaymentStatus; paidAt: string | null; failureReason: string | null; createdAt: string }[];
     statusHistory: { id: number; fromStatus: OrderStatus; toStatus: OrderStatus; note: string | null; changedByUserId: string | null; createdAt: string }[];
 }

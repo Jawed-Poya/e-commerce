@@ -120,7 +120,7 @@ export function CartPage() {
                         <div className="grid gap-3 sm:gap-4">
                             {cart.items.map((item) => (
                                 <article
-                                    key={item.id}
+                                    key={item.lineKey}
                                     className="grid min-w-0 grid-cols-[105px_minmax(0,1fr)] gap-3 rounded-2xl border bg-card p-2.5 shadow-[0_6px_22px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-md sm:grid-cols-[130px_minmax(0,1fr)_auto] sm:gap-5 sm:p-4"
                                 >
                                     <Link viewTransition
@@ -150,9 +150,10 @@ export function CartPage() {
                                         >
                                             {item.name}
                                         </Link>
+                                        {item.unitName ? <span className="mt-1 inline-flex w-fit rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-[10px] font-bold text-primary">{item.quantity} {item.unitName}</span> : null}
 
                                         <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-                                            {formatMoney(item.price)} {t("cart.each")}
+                                            {formatMoney(item.price)} {item.unitName ? `/ ${item.unitName}` : t("cart.each")}
                                         </p>
 
                                         <p className="mt-2 text-lg font-black tracking-tight sm:hidden">
@@ -171,7 +172,7 @@ export function CartPage() {
                                                     }
                                                     onClick={() =>
                                                         cart.updateQuantity(
-                                                            item.id,
+                                                            item.lineKey,
                                                             item.quantity - cartQuantityStep(item),
                                                         )
                                                     }
@@ -182,7 +183,7 @@ export function CartPage() {
 
                                                 <CartQuantityInput
                                                     item={item}
-                                                    onChange={(quantity) => cart.updateQuantity(item.id, quantity)}
+                                                    onChange={(quantity) => cart.updateQuantity(item.lineKey, quantity)}
                                                 />
 
                                                 <Button
@@ -195,7 +196,7 @@ export function CartPage() {
                                                     }
                                                     onClick={() =>
                                                         cart.updateQuantity(
-                                                            item.id,
+                                                            item.lineKey,
                                                             item.quantity + cartQuantityStep(item),
                                                         )
                                                     }
@@ -211,7 +212,7 @@ export function CartPage() {
                                                 size="icon"
                                                 className="size-9 shrink-0 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive sm:hidden"
                                                 onClick={() =>
-                                                    cart.removeItem(item.id)
+                                                    cart.removeItem(item.lineKey)
                                                 }
                                                 aria-label={`Remove ${item.name}`}
                                             >
@@ -243,7 +244,7 @@ export function CartPage() {
                                             size="sm"
                                             className="rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                                             onClick={() =>
-                                                cart.removeItem(item.id)
+                                                cart.removeItem(item.lineKey)
                                             }
                                         >
                                             <Trash2 className="size-4" />

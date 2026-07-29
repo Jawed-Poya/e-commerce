@@ -63,7 +63,8 @@ public class ProductService : IProductService
             var search = filter.Search.Trim();
             products = products.Where(product =>
                 product.Name.Contains(search) ||
-                (product.Barcode != null && product.Barcode.Contains(search)));
+                (product.Barcode != null && product.Barcode.Contains(search)) ||
+                product.UnitConversions.Any(unit => unit.IsActive && unit.Barcode != null && unit.Barcode.Contains(search)));
         }
 
         if (filter.Ids is { Length: > 0 })
@@ -79,7 +80,7 @@ public class ProductService : IProductService
         }
 
         if (filter.BrandId.HasValue) products = products.Where(product => product.BrandId == filter.BrandId);
-        if (filter.UnitId.HasValue) products = products.Where(product => product.UnitId == filter.UnitId);
+        if (filter.UnitId.HasValue) products = products.Where(product => product.UnitId == filter.UnitId || product.UnitConversions.Any(unit => unit.IsActive && unit.UnitId == filter.UnitId));
         if (filter.IsFeatured.HasValue) products = products.Where(product => product.IsFeatured == filter.IsFeatured);
         if (filter.IsActive.HasValue) products = products.Where(product => product.IsActive == filter.IsActive);
         if (filter.InStock.HasValue)
@@ -105,6 +106,7 @@ public class ProductService : IProductService
             CategoryName = product.Category.Name,
             BrandId = product.BrandId,
             UnitId = product.UnitId,
+            UnitName = product.Unit == null ? null : product.Unit.Name,
             MinimumValue = product.MinimumValue,
             MaximumValue = product.MaximumValue,
             UsesDisplayStock = product.UsesDisplayStock,
@@ -206,6 +208,7 @@ public class ProductService : IProductService
                 product.CategoryName,
                 product.BrandId,
                 product.UnitId,
+                product.UnitName,
                 product.MinimumValue,
                 product.MaximumValue,
                 product.UsesDisplayStock,
@@ -247,6 +250,7 @@ public class ProductService : IProductService
         var products = await _context.Products
             .Include(x => x.Images)
             .Include(x => x.Prices)
+            .Include(x => x.UnitConversions)
             .Where(x => ids.Contains(x.Id) && !x.IsDeleted)
             .ToDictionaryAsync(x => x.Id, cancellationToken);
 
@@ -259,7 +263,7 @@ public class ProductService : IProductService
 
         var validationItems = request.Products.Select((item, index) => new NormalizedProductItem(
             index,
-            new CreateBulkProductItemRequest { CategoryId = item.CategoryId, BrandId = item.BrandId, UnitId = item.UnitId },
+            new CreateBulkProductItemRequest { CategoryId = item.CategoryId, BrandId = item.BrandId, UnitId = item.UnitId, UnitConversions = item.UnitConversions },
             item.Name.Trim(),
             NormalizeOptional(item.Barcode),
             null,
@@ -267,17 +271,28 @@ public class ProductService : IProductService
         await ValidateGeneralTypeIdsAsync(validationItems, cancellationToken);
 
         var requestedBarcodes = request.Products
-            .Where(x => !string.IsNullOrWhiteSpace(x.Barcode))
-            .Select(x => new { x.Id, Barcode = x.Barcode!.Trim() }).ToList();
-        var duplicates = requestedBarcodes.GroupBy(x => x.Barcode, StringComparer.OrdinalIgnoreCase).Where(x => x.Count() > 1).Select(x => x.Key).ToArray();
+            .SelectMany(item => new[] { NormalizeOptional(item.Barcode) }
+                .Concat(item.UnitConversions.Select(conversion => NormalizeOptional(conversion.Barcode))))
+            .Where(barcode => barcode is not null)
+            .Select(barcode => barcode!)
+            .ToArray();
+        var duplicates = requestedBarcodes
+            .GroupBy(barcode => barcode, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToArray();
         if (duplicates.Length > 0)
-            throw new ProductConflictException($"Duplicate barcodes in request: {string.Join(", ", duplicates)}");
+            throw new ProductConflictException($"Duplicate product or selling-unit barcodes in request: {string.Join(", ", duplicates)}");
 
-        var barcodeValues = requestedBarcodes.Select(x => x.Barcode).ToArray();
-        var barcodeConflict = await _context.Products.AsNoTracking()
-            .AnyAsync(x => !ids.Contains(x.Id) && x.Barcode != null && barcodeValues.Contains(x.Barcode), cancellationToken);
-        if (barcodeConflict)
-            throw new ProductConflictException("One or more barcodes already belong to another product.");
+        if (requestedBarcodes.Length > 0)
+        {
+            var productBarcodeConflict = await _context.Products.AsNoTracking()
+                .AnyAsync(product => !ids.Contains(product.Id) && product.Barcode != null && requestedBarcodes.Contains(product.Barcode), cancellationToken);
+            var unitBarcodeConflict = await _context.ProductUnitConversions.AsNoTracking()
+                .AnyAsync(unit => !ids.Contains(unit.ProductId) && unit.Barcode != null && requestedBarcodes.Contains(unit.Barcode), cancellationToken);
+            if (productBarcodeConflict || unitBarcodeConflict)
+                throw new ProductConflictException("One or more product or selling-unit barcodes already belong to another product.");
+        }
 
         var requestedSlugs = request.Products
             .Where(x => !string.IsNullOrWhiteSpace(x.Slug))
@@ -308,13 +323,16 @@ public class ProductService : IProductService
             foreach (var item in request.Products)
             {
                 if (string.IsNullOrWhiteSpace(item.Name) ||
+                    !item.UnitId.HasValue || item.UnitId.Value <= 0 ||
                     (item.MinimumValue.HasValue && item.MaximumValue.HasValue && item.MinimumValue > item.MaximumValue) ||
                     (item.UsesDisplayStock && !item.DisplayStockQuantity.HasValue) ||
                     (item.DisplayStockQuantity.HasValue && item.DisplayStockQuantity < 0))
                     throw new ProductValidationException(new Dictionary<string, string[]>
                     {
-                        ["Products"] = ["Names are required, maximum value must be at least minimum value, and display stock requires a non-negative customer-visible quantity."]
+                        ["Products"] = ["Names and base inventory units are required, maximum value must be at least minimum value, and display stock requires a non-negative customer-visible quantity."]
                     });
+
+                ValidateUnitConversions(item.UnitId, item.UnitConversions, $"Products[{item.Id}].UnitConversions");
 
                 var product = products[item.Id];
                 product.Name = item.Name.Trim();
@@ -337,6 +355,8 @@ public class ProductService : IProductService
 
                 if (item.Prices.Count > 0)
                     ReplacePrices(product, item.Prices);
+
+                ReplaceUnitConversions(product, item.UnitId, item.UnitConversions);
 
                 if (item.RemovedImageIds.Count > 0)
                 {
@@ -442,6 +462,8 @@ public class ProductService : IProductService
             .Include(entity => entity.Category)
             .Include(entity => entity.Brand)
             .Include(entity => entity.Unit)
+            .Include(entity => entity.UnitConversions)
+                .ThenInclude(conversion => conversion.Unit)
             .Include(entity => entity.Inventory)
             .Include(entity => entity.Images)
             .Include(entity => entity.Prices)
@@ -456,6 +478,59 @@ public class ProductService : IProductService
         var requestedTypeId = await _currentCustomer.GetCustomerTypeIdAsync(cancellationToken);
         var effectiveTypeId = requestedTypeId ?? defaultType.Id;
         var resolved = ResolvePrice(product.Prices, effectiveTypeId, defaultType.Id, today);
+        var availableBaseQuantity = product.UsesDisplayStock
+            ? Math.Max(0, product.DisplayStockQuantity ?? 0)
+            : product.Inventory is null
+                ? 0
+                : Math.Max(0, product.Inventory.Quantity - product.Inventory.ReservedQuantity);
+        var activeConversions = product.UnitConversions
+            .Where(conversion => conversion.IsActive)
+            .OrderByDescending(conversion => conversion.IsDefault)
+            .ThenBy(conversion => conversion.SortOrder)
+            .ThenBy(conversion => conversion.Unit.Name)
+            .ToList();
+        var unitConversions = new List<ProductUnitConversionResponse>();
+        if (product.UnitId.HasValue && product.Unit is not null)
+        {
+            unitConversions.Add(new ProductUnitConversionResponse(
+                null,
+                product.UnitId.Value,
+                product.Unit.Name,
+                1,
+                product.Barcode,
+                null,
+                null,
+                true,
+                activeConversions.All(conversion => !conversion.IsDefault),
+                true,
+                -1,
+                availableBaseQuantity,
+                resolved?.Price,
+                resolved?.OldPrice));
+        }
+
+        unitConversions.AddRange(activeConversions.Select(conversion =>
+        {
+            var factor = conversion.ConversionFactor <= 0 ? 1 : conversion.ConversionFactor;
+            var convertedPrice = conversion.PriceOverride ?? (resolved is null ? null : decimal.Round(resolved.Price * factor, 2));
+            var convertedOldPrice = conversion.OldPriceOverride
+                ?? (resolved?.OldPrice is null ? null : decimal.Round(resolved.OldPrice.Value * factor, 2));
+            return new ProductUnitConversionResponse(
+                conversion.Id,
+                conversion.UnitId,
+                conversion.Unit.Name,
+                factor,
+                conversion.Barcode,
+                conversion.PriceOverride,
+                conversion.OldPriceOverride,
+                false,
+                conversion.IsDefault,
+                conversion.IsActive,
+                conversion.SortOrder,
+                decimal.Round(availableBaseQuantity / factor, 3),
+                convertedPrice,
+                convertedOldPrice);
+        }));
 
         return new ProductDetailsDto
         {
@@ -483,6 +558,7 @@ public class ProductService : IProductService
             BrandName = product.Brand?.Name,
             UnitId = product.UnitId,
             UnitName = product.Unit?.Name,
+            UnitConversions = unitConversions,
             IsActive = product.IsActive,
             IsFeatured = product.IsFeatured,
             ViewCount = product.ViewCount,
@@ -569,6 +645,7 @@ public class ProductService : IProductService
         var entity = await _context.Products
             .Include(x => x.Images)
             .Include(x => x.Prices)
+            .Include(x => x.UnitConversions)
             .Include(x => x.Inventory)
             .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
 
@@ -762,6 +839,9 @@ public class ProductService : IProductService
 
                 foreach (var price in item.Request.Prices)
                     product.Prices.Add(CreatePrice(price));
+
+                foreach (var conversion in NormalizeUnitConversions(item.Request.UnitId, item.Request.UnitConversions))
+                    product.UnitConversions.Add(CreateUnitConversion(conversion));
 
                 product.Images.Add(
                     new ProductImage
@@ -1114,6 +1194,86 @@ public class ProductService : IProductService
         }
     }
 
+
+    private static ProductUnitConversion CreateUnitConversion(ProductUnitConversionRequest conversion) => new()
+    {
+        UnitId = conversion.UnitId,
+        ConversionFactor = conversion.ConversionFactor,
+        Barcode = NormalizeOptional(conversion.Barcode),
+        PriceOverride = conversion.PriceOverride,
+        OldPriceOverride = conversion.OldPriceOverride,
+        IsDefault = conversion.IsDefault,
+        IsActive = conversion.IsActive,
+        SortOrder = conversion.SortOrder
+    };
+
+    private static IReadOnlyCollection<ProductUnitConversionRequest> NormalizeUnitConversions(
+        long? baseUnitId,
+        IReadOnlyCollection<ProductUnitConversionRequest> conversions)
+    {
+        ValidateUnitConversions(baseUnitId, conversions, "UnitConversions");
+        return conversions
+            .OrderByDescending(item => item.IsDefault)
+            .ThenBy(item => item.SortOrder)
+            .ToArray();
+    }
+
+    private static void ReplaceUnitConversions(
+        Product product,
+        long? baseUnitId,
+        IReadOnlyCollection<ProductUnitConversionRequest> conversions)
+    {
+        var normalized = NormalizeUnitConversions(baseUnitId, conversions);
+        var requestedUnitIds = normalized.Select(item => item.UnitId).ToHashSet();
+        foreach (var existing in product.UnitConversions.Where(item => !requestedUnitIds.Contains(item.UnitId)).ToList())
+            product.UnitConversions.Remove(existing);
+
+        foreach (var request in normalized)
+        {
+            var existing = product.UnitConversions.FirstOrDefault(item => item.UnitId == request.UnitId);
+            if (existing is null)
+            {
+                product.UnitConversions.Add(CreateUnitConversion(request));
+                continue;
+            }
+
+            existing.ConversionFactor = request.ConversionFactor;
+            existing.Barcode = NormalizeOptional(request.Barcode);
+            existing.PriceOverride = request.PriceOverride;
+            existing.OldPriceOverride = request.OldPriceOverride;
+            existing.IsDefault = request.IsDefault;
+            existing.IsActive = request.IsActive;
+            existing.SortOrder = request.SortOrder;
+            existing.UpdatedAt = DateTime.UtcNow;
+        }
+    }
+
+    private static void ValidateUnitConversions(
+        long? baseUnitId,
+        IReadOnlyCollection<ProductUnitConversionRequest> conversions,
+        string key)
+    {
+        if (conversions.Count == 0) return;
+        if (!baseUnitId.HasValue)
+            throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Select a base inventory unit before adding selling units."] });
+        if (conversions.GroupBy(item => item.UnitId).Any(group => group.Count() > 1))
+            throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Each selling unit can be configured only once."] });
+        if (conversions.Any(item => item.UnitId == baseUnitId.Value))
+            throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["The base unit must not be repeated as a selling-unit conversion."] });
+        if (conversions.Count(item => item.IsDefault) > 1)
+            throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Only one selling unit can be the storefront default."] });
+        if (conversions.Any(item => item.IsDefault && !item.IsActive))
+            throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["The storefront default selling unit must be active."] });
+        foreach (var item in conversions)
+        {
+            if (item.UnitId <= 0 || item.ConversionFactor < 1)
+                throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Every selling unit requires a valid unit and a conversion factor of at least one base unit."] });
+            if (item.PriceOverride < 0 || item.OldPriceOverride < 0 ||
+                (item.PriceOverride.HasValue && item.OldPriceOverride.HasValue && item.OldPriceOverride < item.PriceOverride))
+                throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Unit prices cannot be negative and old price cannot be lower than the selling price."] });
+        }
+    }
+
     private static ResolvedProductPrice? ResolvePrice(
         IEnumerable<ProductPrice> prices,
         long requestedTypeId,
@@ -1153,6 +1313,7 @@ public class ProductService : IProductService
         public string CategoryName { get; init; } = string.Empty;
         public long? BrandId { get; init; }
         public long? UnitId { get; init; }
+        public string? UnitName { get; init; }
         public int? MinimumValue { get; init; }
         public int? MaximumValue { get; init; }
         public bool UsesDisplayStock { get; init; }
@@ -1270,13 +1431,24 @@ public class ProductService : IProductService
                 );
             }
 
-            if (product.UnitId is <= 0)
+            if (!product.UnitId.HasValue || product.UnitId.Value <= 0)
             {
                 AddError(
                     errors,
                     $"Products[{index}].UnitId",
                     "Unit ID must be greater than zero."
                 );
+            }
+
+            try
+            {
+                ValidateUnitConversions(product.UnitId, product.UnitConversions, $"Products[{index}].UnitConversions");
+            }
+            catch (ProductValidationException exception)
+            {
+                foreach (var error in exception.Errors)
+                    foreach (var message in error.Value)
+                        AddError(errors, error.Key, message);
             }
         }
 
@@ -1294,18 +1466,20 @@ public class ProductService : IProductService
                 x.Request.CategoryId,
                 x.Request.BrandId,
                 x.Request.UnitId
-            })
+            }.Concat(x.Request.UnitConversions.Select(conversion => (long?)conversion.UnitId)))
             .Where(x => x.HasValue)
             .Select(x => x!.Value)
             .Distinct()
             .ToArray();
 
-        var existingIds = await _context
+        var existingTypes = await _context
             .Set<GeneralType>()
             .AsNoTracking()
             .Where(x => requestedIds.Contains(x.Id))
-            .Select(x => x.Id)
-            .ToHashSetAsync(cancellationToken);
+            .Select(x => new { x.Id, x.Group })
+            .ToDictionaryAsync(x => x.Id, x => x.Group, cancellationToken);
+
+        var existingIds = existingTypes.Keys.ToHashSet();
 
         var errors =
             new Dictionary<string, List<string>>();
@@ -1336,15 +1510,27 @@ public class ProductService : IProductService
             }
 
             if (item.Request.UnitId.HasValue &&
-                !existingIds.Contains(
-                    item.Request.UnitId.Value
-                ))
+                (!existingTypes.TryGetValue(item.Request.UnitId.Value, out var baseUnitGroup) ||
+                 baseUnitGroup != GeneralTypeEnum.ProductUnit))
             {
                 AddError(
                     errors,
                     $"Products[{item.Index}].UnitId",
-                    "The selected unit does not exist."
+                    "The selected base unit does not exist or is not a product unit."
                 );
+            }
+
+            foreach (var conversion in item.Request.UnitConversions)
+            {
+                if (!existingTypes.TryGetValue(conversion.UnitId, out var conversionUnitGroup) ||
+                    conversionUnitGroup != GeneralTypeEnum.ProductUnit)
+                {
+                    AddError(
+                        errors,
+                        $"Products[{item.Index}].UnitConversions",
+                        "One or more selected selling units do not exist or are not product units."
+                    );
+                }
             }
         }
 
@@ -1357,10 +1543,10 @@ public class ProductService : IProductService
     )
     {
         var barcodes = items
-            .Where(x =>
-                !string.IsNullOrWhiteSpace(x.Barcode)
-            )
-            .Select(x => x.Barcode!)
+            .SelectMany(item => new[] { item.Barcode }
+                .Concat(item.Request.UnitConversions.Select(conversion => NormalizeOptional(conversion.Barcode))))
+            .Where(barcode => barcode is not null)
+            .Select(barcode => barcode!)
             .ToList();
 
         var duplicateBarcodes = barcodes
@@ -1386,20 +1572,25 @@ public class ProductService : IProductService
             return;
         }
 
-        var existingBarcodes = await _context
-            .Set<Product>()
+        var existingProductBarcodes = await _context.Products
             .AsNoTracking()
-            .Where(x =>
-                x.Barcode != null &&
-                barcodes.Contains(x.Barcode)
-            )
-            .Select(x => x.Barcode!)
+            .Where(product => product.Barcode != null && barcodes.Contains(product.Barcode))
+            .Select(product => product.Barcode!)
             .ToListAsync(cancellationToken);
+        var existingUnitBarcodes = await _context.ProductUnitConversions
+            .AsNoTracking()
+            .Where(unit => unit.Barcode != null && barcodes.Contains(unit.Barcode))
+            .Select(unit => unit.Barcode!)
+            .ToListAsync(cancellationToken);
+        var existingBarcodes = existingProductBarcodes
+            .Concat(existingUnitBarcodes)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
-        if (existingBarcodes.Count > 0)
+        if (existingBarcodes.Length > 0)
         {
             throw new ProductConflictException(
-                $"These barcodes already exist: {string.Join(", ", existingBarcodes)}"
+                $"These product or selling-unit barcodes already exist: {string.Join(", ", existingBarcodes)}"
             );
         }
     }

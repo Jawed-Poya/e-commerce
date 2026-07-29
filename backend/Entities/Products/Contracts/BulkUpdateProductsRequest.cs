@@ -40,6 +40,8 @@ public sealed class BulkUpdateProductItemRequest
     public long CategoryId { get; set; }
 
     public long? BrandId { get; set; }
+    [Required(ErrorMessage = "Base inventory unit is required.")]
+    [Range(1, long.MaxValue, ErrorMessage = "Base inventory unit is required.")]
     public long? UnitId { get; set; }
     public int? MinimumValue { get; set; }
     public int? MaximumValue { get; set; }
@@ -48,6 +50,7 @@ public sealed class BulkUpdateProductItemRequest
     public bool IsFeatured { get; set; }
     public bool IsActive { get; set; }
     public List<ProductPriceItemRequest> Prices { get; set; } = [];
+    public List<ProductUnitConversionRequest> UnitConversions { get; set; } = [];
 }
 
 public sealed record BulkUpdateProductsResponse(int UpdatedCount);

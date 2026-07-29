@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Eye, ImagePlus, LoaderCircle, PackagePlus, Save, X } from "lucide-react";
+import { ArrowLeft, Boxes, Eye, ImagePlus, LoaderCircle, PackagePlus, Plus, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { SimpleCombobox } from "@/components/simple-combobox";
@@ -15,7 +15,7 @@ import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
 import { useProductLookupsQuery } from "@/features/products/hooks/use-product-mutation";
 import { productKeys } from "@/keys/product-keys";
-import { productService, resolveProductImageUrl } from "@/services/product.service";
+import { productService, resolveProductImageUrl, type ProductUnitConversionInput } from "@/services/product.service";
 import { IMAGE_FILE_ACCEPT, isSupportedImageFile, MAXIMUM_IMAGE_FILE_SIZE } from "@/lib/image-files";
 import { CustomerPricingFields, activePriceInputs, createCustomerPriceDrafts, validatePriceDrafts, type CustomerPriceDraft } from "./customer-pricing-fields";
 
@@ -34,11 +34,23 @@ export function ProductEditorPage() {
   const [form, setForm] = useState(empty);
   const [image, setImage] = useState<File | null>(null);
   const [prices, setPrices] = useState<CustomerPriceDraft[]>([]);
+  const [unitConversions, setUnitConversions] = useState<ProductUnitConversionInput[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!product) return;
     setForm({ name: product.name, barcode: product.barcode ?? "", shortDescription: product.shortDescription ?? "", description: product.description ?? "", slug: product.slug ?? "", categoryId: product.categoryId, brandId: product.brandId, unitId: product.unitId, minimumValue: product.minimumValue, maximumValue: product.maximumValue, usesDisplayStock: product.usesDisplayStock, displayStockQuantity: product.displayStockQuantity, isFeatured: product.isFeatured, isActive: product.isActive });
+    setUnitConversions(product.unitConversions.filter(unit => !unit.isBaseUnit).map(unit => ({
+      id: unit.id,
+      unitId: unit.unitId,
+      conversionFactor: unit.conversionFactor,
+      barcode: unit.barcode,
+      priceOverride: unit.priceOverride,
+      oldPriceOverride: unit.oldPriceOverride,
+      isDefault: unit.isDefault,
+      isActive: unit.isActive,
+      sortOrder: unit.sortOrder,
+    })));
   }, [product]);
 
   useEffect(() => {
@@ -73,6 +85,12 @@ export function ProductEditorPage() {
     if (form.minimumValue != null && form.maximumValue != null && form.minimumValue > form.maximumValue) return toast.error("Maximum value must be at least the minimum value.");
     if (form.usesDisplayStock && form.displayStockQuantity == null) return toast.error("Enter the quantity customers should see.");
     if (form.displayStockQuantity != null && form.displayStockQuantity < 0) return toast.error("Display quantity cannot be negative.");
+    if (!form.unitId) return toast.error("Select the base inventory unit before saving the product.");
+    if (new Set(unitConversions.map(unit => unit.unitId)).size !== unitConversions.length) return toast.error("Each selling unit can be configured only once.");
+    if (unitConversions.some(unit => !unit.unitId || unit.unitId === form.unitId || unit.conversionFactor < 1)) return toast.error("Choose a different selling unit and enter a conversion factor of at least one base unit.");
+    if (unitConversions.filter(unit => unit.isDefault).length > 1) return toast.error("Only one selling unit can be the storefront default.");
+    if (unitConversions.some(unit => unit.isDefault && !unit.isActive)) return toast.error("The storefront default selling unit must be active.");
+    if (unitConversions.some(unit => unit.priceOverride != null && unit.oldPriceOverride != null && unit.oldPriceOverride < unit.priceOverride)) return toast.error("Old unit price cannot be lower than the selling price.");
     const activePrices = activePriceInputs(prices);
     const pricingError = canManagePricing ? validatePriceDrafts(prices) : null;
     if (pricingError) return toast.error(pricingError);
@@ -81,9 +99,9 @@ export function ProductEditorPage() {
     try {
       let productId = id;
       if (editing && product) {
-        await productService.bulkUpdate([{ id: product.id, ...form, primaryImageUrl: product.images.find(x => x.isPrimary)?.url ?? null, images: product.images.map(x => ({ id: x.id, url: x.url, isPrimary: x.isPrimary, sortOrder: x.sortOrder })), image: image ?? undefined, prices: canManagePricing ? activePrices : product.prices }]);
+        await productService.bulkUpdate([{ id: product.id, ...form, primaryImageUrl: product.images.find(x => x.isPrimary)?.url ?? null, images: product.images.map(x => ({ id: x.id, url: x.url, isPrimary: x.isPrimary, sortOrder: x.sortOrder })), image: image ?? undefined, prices: canManagePricing ? activePrices : product.prices, unitConversions }]);
       } else {
-        const created = await productService.createSingle({ ...form, image: image!, galleryImages: [], prices: activePrices });
+        const created = await productService.createSingle({ ...form, image: image!, galleryImages: [], prices: activePrices, unitConversions });
         productId = created.data.products[0]?.id ?? null;
       }
       if (!productId) throw new Error("The product was saved but no product id was returned.");
@@ -110,7 +128,7 @@ export function ProductEditorPage() {
           <Field label="Barcode"><Input value={form.barcode} onChange={e => setForm(x => ({ ...x, barcode: e.target.value }))} /></Field>
           <Field label="Category *"><SimpleCombobox<number> value={form.categoryId || null} onValueChange={(value) => setForm((x) => ({ ...x, categoryId: value ?? 0 }))} options={(lookups?.categories ?? []).map((option) => ({ value: option.id, label: option.name }))} placeholder="Select category" /></Field>
           <Field label="Brand"><SimpleCombobox<number> value={form.brandId} onValueChange={(value) => setForm((x) => ({ ...x, brandId: value }))} options={(lookups?.brands ?? []).map((option) => ({ value: option.id, label: option.name }))} placeholder="No brand" /></Field>
-          <Field label="Unit"><SimpleCombobox<number> value={form.unitId} onValueChange={(value) => setForm((x) => ({ ...x, unitId: value }))} options={(lookups?.units ?? []).map((option) => ({ value: option.id, label: option.name }))} placeholder="No unit" /></Field>
+          <Field label="Base inventory unit"><SimpleCombobox<number> value={form.unitId} onValueChange={(value) => setForm((x) => ({ ...x, unitId: value }))} options={(lookups?.units ?? []).map((option) => ({ value: option.id, label: option.name }))} placeholder="Select base unit" /></Field>
           <Field label="Slug"><Input value={form.slug} onChange={e => setForm(x => ({ ...x, slug: e.target.value }))} placeholder="Generated automatically when empty" /></Field>
           <Field label="Minimum value"><Input type="number" min={0} value={form.minimumValue ?? ""} onChange={e => setForm(x => ({ ...x, minimumValue: e.target.value ? Number(e.target.value) : null }))} /></Field>
           <Field label="Maximum value"><Input type="number" min={0} value={form.maximumValue ?? ""} onChange={e => setForm(x => ({ ...x, maximumValue: e.target.value ? Number(e.target.value) : null }))} /></Field>
@@ -132,6 +150,37 @@ export function ProductEditorPage() {
           <label className="flex items-center gap-3 rounded-lg border p-3"><Checkbox checked={form.isActive} onCheckedChange={v => setForm(x => ({ ...x, isActive: v === true }))} /><span><strong className="block text-sm">Active product</strong><span className="text-xs text-muted-foreground">Visible and available for sale.</span></span></label>
           <label className="flex items-center gap-3 rounded-lg border p-3"><Checkbox checked={form.isFeatured} onCheckedChange={v => setForm(x => ({ ...x, isFeatured: v === true }))} /><span><strong className="block text-sm">Featured product</strong><span className="text-xs text-muted-foreground">Highlight it on the storefront.</span></span></label>
         </CardContent></Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2"><Boxes className="size-5" />Selling units</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">Inventory stays in the base unit. Add packaging options such as box, strip, bottle, or piece.</p>
+            </div>
+            <Button type="button" variant="outline" size="sm" disabled={!form.unitId} onClick={() => setUnitConversions(current => [...current, { id: null, unitId: 0, conversionFactor: 1, barcode: null, priceOverride: null, oldPriceOverride: null, isDefault: current.length === 0, isActive: true, sortOrder: current.length }])}>
+              <Plus className="me-2 size-4" />Add unit
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="rounded-xl border border-primary/15 bg-primary/[0.035] px-4 py-3 text-xs leading-5 text-muted-foreground">
+              Example: base unit <strong className="text-foreground">Tablet</strong>, selling unit <strong className="text-foreground">Box</strong>, factor <strong className="text-foreground">20</strong>. Selling 2 boxes deducts 40 tablets from inventory.
+            </div>
+            {unitConversions.length === 0 ? <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">No additional selling units. The product is sold only in its base unit.</div> : unitConversions.map((unit, index) => {
+              const availableUnits = (lookups?.units ?? []).filter(option => option.id !== form.unitId && (option.id === unit.unitId || !unitConversions.some((item, itemIndex) => itemIndex !== index && item.unitId === option.id)));
+              const updateUnit = (patch: Partial<ProductUnitConversionInput>) => setUnitConversions(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
+              return <div key={`${unit.id ?? "new"}-${index}`} className="grid gap-3 rounded-xl border bg-muted/15 p-4 md:grid-cols-2 xl:grid-cols-4">
+                <Field label="Selling unit *"><SimpleCombobox<number> value={unit.unitId || null} onValueChange={value => updateUnit({ unitId: value ?? 0 })} options={availableUnits.map(option => ({ value: option.id, label: option.name }))} placeholder="Select unit" /></Field>
+                <Field label="Base units in one"><Input type="number" min="1" step="any" value={unit.conversionFactor} onChange={event => updateUnit({ conversionFactor: Number(event.target.value) || 0 })} /></Field>
+                <Field label="Unit barcode"><Input value={unit.barcode ?? ""} onChange={event => updateUnit({ barcode: event.target.value || null })} placeholder="Optional" /></Field>
+                <div className="flex items-end justify-end"><Button type="button" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setUnitConversions(current => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="me-2 size-4" />Remove</Button></div>
+                <Field label="Price override"><Input type="number" min={0} step="any" value={unit.priceOverride ?? ""} onChange={event => updateUnit({ priceOverride: event.target.value === "" ? null : Number(event.target.value) })} placeholder="Auto: base price × factor" /></Field>
+                <Field label="Old price override"><Input type="number" min={0} step="any" value={unit.oldPriceOverride ?? ""} onChange={event => updateUnit({ oldPriceOverride: event.target.value === "" ? null : Number(event.target.value) })} placeholder="Optional" /></Field>
+                <label className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2.5"><Checkbox checked={unit.isActive} onCheckedChange={value => updateUnit({ isActive: value === true, isDefault: value === true ? unit.isDefault : false })} /><span className="text-sm font-medium">Active selling unit</span></label>
+                <label className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2.5"><Checkbox checked={unit.isDefault} onCheckedChange={value => setUnitConversions(current => current.map((item, itemIndex) => ({ ...item, isDefault: itemIndex === index ? value === true : value === true ? false : item.isDefault })))} /><span className="text-sm font-medium">Storefront default</span></label>
+              </div>;
+            })}
+          </CardContent>
+        </Card>
 
         <CustomerPricingFields prices={prices} onChange={setPrices} disabled={!canManagePricing} />
       </div>

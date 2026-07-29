@@ -2,7 +2,28 @@ using ECommerce.Entities.Operations;
 
 namespace ECommerce.Entities.Operations.Contracts;
 
-public sealed record OperationProductLookup(long Id, string Name, string? Barcode, decimal AvailableQuantity, decimal? DefaultPrice, decimal? MinimumValue, decimal? MaximumValue, bool UsesDisplayStock);
+public sealed record OperationProductUnitLookup(
+    long UnitId,
+    string UnitName,
+    decimal ConversionFactor,
+    string? Barcode,
+    decimal? DefaultPrice,
+    decimal AvailableQuantity,
+    bool IsBase,
+    bool IsDefault);
+
+public sealed record OperationProductLookup(
+    long Id,
+    string Name,
+    string? Barcode,
+    decimal AvailableQuantity,
+    decimal? DefaultPrice,
+    decimal? MinimumValue,
+    decimal? MaximumValue,
+    bool UsesDisplayStock,
+    long? BaseUnitId,
+    string? BaseUnitName,
+    IReadOnlyList<OperationProductUnitLookup> Units);
 public sealed record OperationCustomerLookup(long Id, string Name, string Phone, string? Email, string? CustomerTypeName);
 public sealed record OperationSummary(decimal PurchasesThisMonth, decimal SalesThisMonth, decimal ExpensesThisMonth, decimal SalariesThisMonth, int LowStockProducts);
 
@@ -35,6 +56,7 @@ public sealed class CreatePurchaseRequest
 public sealed class PurchaseItemRequest
 {
     public long ProductId { get; set; }
+    public long? UnitId { get; set; }
     public decimal Quantity { get; set; }
     public decimal UnitCost { get; set; }
     public string? LotNumber { get; set; }
@@ -59,6 +81,7 @@ public sealed class CreateInventorySaleRequest
 public sealed class InventorySaleItemRequest
 {
     public long ProductId { get; set; }
+    public long? UnitId { get; set; }
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
 }

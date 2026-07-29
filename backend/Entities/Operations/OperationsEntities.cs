@@ -48,8 +48,14 @@ public sealed class PurchaseItem : BaseEntity
     public Purchase Purchase { get; set; } = null!;
     public long ProductId { get; set; }
     public Product Product { get; set; } = null!;
+    // Quantity and UnitCost are normalized to the product base inventory unit.
     public decimal Quantity { get; set; }
     public decimal UnitCost { get; set; }
+    public decimal EnteredQuantity { get; set; }
+    public long? SelectedUnitId { get; set; }
+    public string? SelectedUnitName { get; set; }
+    public decimal UnitConversionFactor { get; set; } = 1;
+    public decimal EnteredUnitCost { get; set; }
     public decimal LineTotal { get; set; }
     public string? LotNumber { get; set; }
     public DateOnly? ExpireDate { get; set; }
@@ -95,9 +101,15 @@ public sealed class InventorySaleItem : BaseEntity
     public InventorySale InventorySale { get; set; } = null!;
     public long ProductId { get; set; }
     public Product Product { get; set; } = null!;
+    // Quantity, UnitPrice and UnitCost are normalized to the product base inventory unit.
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal UnitCost { get; set; }
+    public decimal EnteredQuantity { get; set; }
+    public long? SelectedUnitId { get; set; }
+    public string? SelectedUnitName { get; set; }
+    public decimal UnitConversionFactor { get; set; } = 1;
+    public decimal EnteredUnitPrice { get; set; }
     public decimal LineTotal { get; set; }
     public decimal CostTotal => Quantity * UnitCost;
 }
