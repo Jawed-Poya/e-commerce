@@ -4,8 +4,10 @@ import {
     ArrowRight,
     BadgeCheck,
     BadgePercent,
+    ChevronRight,
     Clock3,
     Headphones,
+    HeartPulse,
     MapPin,
     PackageCheck,
     RotateCcw,
@@ -49,6 +51,15 @@ interface HeroSlide {
     product?: Product;
 }
 
+const categoryTints = [
+    "from-cyan-50 to-sky-100/70 dark:from-cyan-950/45 dark:to-sky-950/20",
+    "from-emerald-50 to-teal-100/70 dark:from-emerald-950/45 dark:to-teal-950/20",
+    "from-violet-50 to-fuchsia-100/60 dark:from-violet-950/45 dark:to-fuchsia-950/20",
+    "from-amber-50 to-orange-100/70 dark:from-amber-950/40 dark:to-orange-950/20",
+    "from-rose-50 to-pink-100/65 dark:from-rose-950/40 dark:to-pink-950/20",
+    "from-indigo-50 to-blue-100/70 dark:from-indigo-950/45 dark:to-blue-950/20",
+] as const;
+
 const serviceItems = [
     { icon: ShieldCheck, title: "home.secureShopping", description: "home.protectedCheckout" },
     { icon: Truck, title: "home.fastDelivery", description: "home.deliveryTracking" },
@@ -76,7 +87,7 @@ export function HomePage() {
 
     const products = useProducts({
         page: 1,
-        pageSize: 24,
+        pageSize: 30,
         isActive: true,
         sortBy: "createdAt",
         sortDescending: true,
@@ -89,28 +100,18 @@ export function HomePage() {
     });
 
     const items = useMemo(() => products.data?.items ?? [], [products.data?.items]);
-    const categoryTree = buildCategoryTree(lookups.data?.categories ?? []);
+    const categories = buildCategoryTree(lookups.data?.categories ?? []).slice(0, 8);
     const featured = items.filter((item) => item.isFeatured);
-    const featuredProducts = (featured.length >= 4 ? featured : items).slice(0, 8);
-    const newestProducts = items.slice(0, 8);
+    const featuredProducts = (featured.length >= 5 ? featured : items).slice(0, 10);
+    const newestProducts = items.slice(0, 5);
     const discountedProducts = items.filter(
         (item) => item.price != null && item.oldPrice != null && item.oldPrice > item.price,
     );
     const spotlightProduct = discountedProducts[0] ?? featuredProducts[0] ?? items[0];
+    const compactProducts = (featuredProducts.length ? featuredProducts : items).slice(0, 2);
     const hero = content.data ? localizedHero(content.data, language) : null;
 
     const slides = useMemo<HeroSlide[]>(() => {
-        const configuredSecondaryUrl = content.data?.secondaryButtonUrl;
-        const hasRemovedPrescriptionLink = configuredSecondaryUrl
-            ?.toLowerCase()
-            .includes("prescription");
-        const secondaryUrl = hasRemovedPrescriptionLink
-            ? "/?section=categories#categories"
-            : configuredSecondaryUrl ?? "/?section=categories#categories";
-        const secondaryText = hasRemovedPrescriptionLink
-            ? t("nav.categories")
-            : hero?.secondaryButtonText ?? t("nav.categories");
-
         const result: HeroSlide[] = [
             {
                 id: "storefront",
@@ -119,8 +120,10 @@ export function HomePage() {
                 description: hero?.description ?? t("home.heroFallbackDescription"),
                 primaryText: hero?.primaryButtonText ?? t("common.shopNow"),
                 primaryUrl: content.data?.primaryButtonUrl ?? "/products",
-                secondaryText,
-                secondaryUrl,
+                secondaryText: hero?.secondaryButtonText ?? t("nav.categories"),
+                secondaryUrl: content.data?.secondaryButtonUrl?.startsWith("/#")
+                    ? "/#categories"
+                    : content.data?.secondaryButtonUrl ?? "/#categories",
                 image: imageUrl(content.data?.heroImageUrl) ?? fallbackHeroImage,
             },
         ];
@@ -150,7 +153,7 @@ export function HomePage() {
         if (paused || slides.length < 2) return;
         const timer = window.setInterval(
             () => setSlideIndex((current) => (current + 1) % slides.length),
-            7000,
+            6200,
         );
         return () => window.clearInterval(timer);
     }, [paused, slides.length]);
@@ -160,299 +163,251 @@ export function HomePage() {
     }, [slides.length]);
 
     const activeSlide = slides[slideIndex] ?? slides[0];
-    const moveSlide = (direction: number) => {
+    const moveSlide = (direction: number) =>
         setSlideIndex((current) => (current + direction + slides.length) % slides.length);
-    };
 
     return (
-        <div className="mx-auto w-full max-w-[1480px] px-3 pb-10 sm:px-5 lg:px-7">
+        <div className="mx-auto w-full max-w-[1480px] px-3 pb-12 sm:px-5 lg:px-7">
             <section className="pt-4 sm:pt-6">
-                <div
-                    className="relative overflow-hidden rounded-[30px] border border-border/80 bg-card shadow-[0_28px_90px_-52px_rgba(15,23,42,.52)] dark:border-white/12 dark:shadow-[0_30px_90px_-54px_rgba(0,0,0,.88)]"
-                    onMouseEnter={() => setPaused(true)}
-                    onMouseLeave={() => setPaused(false)}
-                >
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,color-mix(in_srgb,var(--primary)_14%,transparent),transparent_34%),radial-gradient(circle_at_90%_90%,color-mix(in_srgb,var(--brand-orange)_10%,transparent),transparent_32%)]" />
+                <div className="rounded-[32px] border border-slate-200/90 bg-[#f7faf9] p-3 shadow-[0_28px_90px_-58px_rgba(15,23,42,.55)] dark:border-white/10 dark:bg-slate-950/70 sm:p-4">
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
+                        <article
+                            className="relative min-h-[430px] overflow-hidden rounded-[26px] border border-white/80 bg-gradient-to-br from-white via-[#f5fbf9] to-[#eaf5f1] dark:border-white/10 dark:from-slate-950 dark:via-slate-950 dark:to-emerald-950/30"
+                            onMouseEnter={() => setPaused(true)}
+                            onMouseLeave={() => setPaused(false)}
+                        >
+                            <div className="absolute -end-24 -top-24 size-[430px] rounded-full bg-primary/12 blur-3xl" />
+                            <div className="absolute -bottom-28 start-1/4 size-80 rounded-full bg-cyan-400/10 blur-3xl" />
 
-                    <div className="relative grid min-h-[520px] lg:grid-cols-[minmax(0,1.02fr)_minmax(430px,.98fr)]">
-                        <div className="flex items-center px-6 py-12 sm:px-10 lg:px-14 lg:py-16">
                             {content.isLoading ? (
                                 <HeroSkeleton />
                             ) : (
-                                <div key={activeSlide.id} className="hero-copy-enter max-w-2xl">
-                                    <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.07] px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-primary sm:text-xs">
-                                        <Sparkles className="size-4" />
-                                        {activeSlide.eyebrow}
-                                    </div>
-                                    <h1 className="mt-6 text-4xl font-black leading-[1.02] tracking-[-0.052em] sm:text-5xl lg:text-[64px]">
-                                        {activeSlide.title}
-                                    </h1>
-                                    <p className="mt-5 max-w-xl text-sm leading-7 text-muted-foreground sm:text-base">
-                                        {activeSlide.description}
-                                    </p>
+                                <div key={activeSlide.id} className="hero-copy-enter relative grid min-h-[430px] items-center gap-5 px-6 py-10 sm:px-9 lg:grid-cols-[minmax(0,.9fr)_minmax(330px,1.1fr)] lg:px-12">
+                                    <div className="relative z-10 max-w-xl">
+                                        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white/75 px-3 py-1.5 text-[10px] font-black uppercase tracking-[.15em] text-primary shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[.05]">
+                                            <HeartPulse className="size-3.5" />
+                                            {activeSlide.eyebrow}
+                                        </div>
+                                        <h1 className="mt-5 text-4xl font-black leading-[1.02] tracking-[-.055em] sm:text-5xl lg:text-[58px]">
+                                            {activeSlide.title}
+                                        </h1>
+                                        <p className="mt-4 max-w-lg text-sm leading-7 text-muted-foreground sm:text-base">
+                                            {activeSlide.description}
+                                        </p>
 
-                                    <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                                        <Button asChild size="lg" className="h-12 rounded-xl px-7 font-bold shadow-lg shadow-primary/20">
-                                            <Link viewTransition to={activeSlide.primaryUrl}>
-                                                {activeSlide.primaryText}
-                                                <ArrowRight className="size-4 rtl:rotate-180" />
-                                            </Link>
-                                        </Button>
-                                        <Button asChild size="lg" variant="outline" className="h-12 rounded-xl border-border/90 bg-background/75 px-7 font-bold backdrop-blur dark:border-white/15 dark:bg-white/[0.04]">
-                                            <Link viewTransition to={activeSlide.secondaryUrl}>
-                                                {activeSlide.secondaryText}
-                                            </Link>
-                                        </Button>
+                                        {activeSlide.product?.price != null ? (
+                                            <div className="mt-5 flex items-end gap-2">
+                                                <span className="text-3xl font-black tracking-[-.05em] text-primary">
+                                                    {formatMoney(activeSlide.product.price)}
+                                                </span>
+                                                {activeSlide.product.unitName ? (
+                                                    <span className="pb-1 text-xs font-bold text-muted-foreground">/ {activeSlide.product.unitName}</span>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
+
+                                        <div className="mt-7 flex flex-wrap gap-2.5">
+                                            <Button asChild size="lg" className="h-11 rounded-xl px-6 font-black shadow-lg shadow-primary/15">
+                                                <Link viewTransition to={activeSlide.primaryUrl}>
+                                                    {activeSlide.primaryText}
+                                                    <ArrowRight className="size-4 rtl:rotate-180" />
+                                                </Link>
+                                            </Button>
+                                            <Button asChild size="lg" variant="outline" className="h-11 rounded-xl border-slate-300/80 bg-white/70 px-5 font-black backdrop-blur dark:border-white/12 dark:bg-white/[.04]">
+                                                <Link viewTransition to={activeSlide.secondaryUrl}>{activeSlide.secondaryText}</Link>
+                                            </Button>
+                                        </div>
                                     </div>
 
-                                    <div className="mt-9 grid max-w-xl grid-cols-2 gap-3 sm:grid-cols-3">
-                                        <MiniPromise icon={<ShieldCheck />} title={t("home.secureShopping")} />
-                                        <MiniPromise icon={<Truck />} title={t("home.fastDelivery")} />
-                                        <MiniPromise icon={<PackageCheck />} title={t("home.liveAvailability")} className="col-span-2 sm:col-span-1" />
+                                    <div className="relative flex min-h-[280px] items-center justify-center lg:min-h-[390px]">
+                                        <div className="absolute inset-[12%] rounded-full bg-white/85 shadow-[0_32px_90px_-44px_rgba(15,23,42,.55)] ring-1 ring-white dark:bg-white/[.035] dark:ring-white/10" />
+                                        <div className="absolute start-[10%] top-[18%] size-3 rounded-full bg-primary shadow-[0_0_0_8px_rgba(16,185,129,.08)]" />
+                                        <div className="absolute end-[8%] top-[28%] size-2 rounded-full bg-cyan-500 shadow-[0_0_0_7px_rgba(6,182,212,.08)]" />
+                                        <img
+                                            src={activeSlide.image}
+                                            alt={activeSlide.title}
+                                            className="hero-media-enter relative z-10 h-[270px] w-full object-contain p-5 drop-shadow-[0_32px_28px_rgba(15,23,42,.22)] sm:h-[330px] lg:h-[390px]"
+                                        />
                                     </div>
                                 </div>
                             )}
-                        </div>
 
-                        <div className="relative min-h-[380px] overflow-hidden border-t border-border/70 bg-muted/25 lg:min-h-0 lg:border-s lg:border-t-0 dark:border-white/10 dark:bg-white/[0.025]">
-                            <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_0%,color-mix(in_srgb,var(--primary)_7%,transparent)_100%)]" />
-                            <div className="absolute inset-[12%] rounded-full bg-primary/12 blur-3xl" />
-                            <div key={activeSlide.id} className="hero-product-enter absolute inset-0 flex items-center justify-center p-7 sm:p-10">
-                                <div className="relative flex size-full max-h-[430px] max-w-[620px] items-center justify-center overflow-hidden rounded-[28px] border border-white/75 bg-white/90 p-6 shadow-[0_28px_80px_-34px_rgba(15,23,42,.45)] backdrop-blur dark:border-white/12 dark:bg-slate-950/82">
-                                    <img
-                                        src={activeSlide.image}
-                                        alt={activeSlide.product?.name ?? activeSlide.title}
-                                        className={cn(
-                                            "size-full drop-shadow-2xl",
-                                            activeSlide.product ? "object-contain" : "object-cover",
-                                        )}
-                                    />
-                                    {activeSlide.product?.price != null ? (
-                                        <div className="absolute bottom-5 start-5 rounded-2xl border border-white/80 bg-background/92 px-4 py-3 shadow-xl backdrop-blur dark:border-white/12">
-                                            <span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                                                {activeSlide.product.categoryName}
+                            <div className="absolute bottom-4 start-5 z-20 flex items-center gap-2">
+                                <button type="button" onClick={() => moveSlide(-1)} aria-label={t("home.previousSlide")} className="grid size-9 place-items-center rounded-full border border-white/70 bg-white/80 text-foreground shadow-sm backdrop-blur transition hover:bg-white dark:border-white/10 dark:bg-slate-950/75">
+                                    <ArrowLeft className="size-4 rtl:rotate-180" />
+                                </button>
+                                <div className="flex items-center gap-1.5 rounded-full border border-white/70 bg-white/75 px-2.5 py-2 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/75">
+                                    {slides.map((slide, index) => (
+                                        <button
+                                            key={slide.id}
+                                            type="button"
+                                            aria-label={t("home.goToSlide", { number: index + 1 })}
+                                            onClick={() => setSlideIndex(index)}
+                                            className={cn("h-1.5 rounded-full transition-all", index === slideIndex ? "w-7 bg-primary" : "w-1.5 bg-slate-300 dark:bg-white/25")}
+                                        />
+                                    ))}
+                                </div>
+                                <button type="button" onClick={() => moveSlide(1)} aria-label={t("home.nextSlide")} className="grid size-9 place-items-center rounded-full border border-white/70 bg-white/80 text-foreground shadow-sm backdrop-blur transition hover:bg-white dark:border-white/10 dark:bg-slate-950/75">
+                                    <ArrowRight className="size-4 rtl:rotate-180" />
+                                </button>
+                            </div>
+                        </article>
+
+                        <aside className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                            <div className="rounded-[24px] border border-slate-200/80 bg-white p-4 dark:border-white/10 dark:bg-slate-950">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase tracking-[.14em] text-primary">{t("home.shopByCategory")}</p>
+                                        <h2 className="mt-1 text-lg font-black tracking-[-.03em]">{t("home.browseCollection")}</h2>
+                                    </div>
+                                    <Link viewTransition to="/#categories" className="grid size-9 place-items-center rounded-full border border-border/80 text-primary transition hover:bg-primary/5 dark:border-white/10">
+                                        <ChevronRight className="size-4 rtl:rotate-180" />
+                                    </Link>
+                                </div>
+                                <div className="mt-4 grid grid-cols-4 gap-2">
+                                    {categories.slice(0, 8).map((category, index) => (
+                                        <Link
+                                            key={category.id}
+                                            viewTransition
+                                            to={`/products?categoryId=${category.id}`}
+                                            title={category.name}
+                                            className="group flex min-w-0 flex-col items-center gap-1.5"
+                                        >
+                                            <span className={cn("grid size-11 place-items-center overflow-hidden rounded-full bg-gradient-to-br ring-1 ring-black/[.04] transition group-hover:-translate-y-0.5 group-hover:ring-primary/25 dark:ring-white/10", categoryTints[index % categoryTints.length])}>
+                                                {category.imageUrl ? <img src={imageUrl(category.imageUrl) ?? ""} alt="" className="size-full object-contain p-1.5" /> : <ShoppingBag className="size-4 text-primary" />}
                                             </span>
-                                            <span className="mt-1 block text-xl font-black tracking-[-0.03em]">
-                                                {formatMoney(activeSlide.product.price)}
-                                            </span>
-                                        </div>
-                                    ) : null}
+                                            <span className="w-full truncate text-center text-[9px] font-bold text-muted-foreground group-hover:text-primary">{category.name}</span>
+                                        </Link>
+                                    ))}
                                 </div>
                             </div>
-                        </div>
+
+                            {compactProducts.map((product, index) => (
+                                <MiniProductCard key={product.id} product={product} accent={index === 0 ? "emerald" : "violet"} />
+                            ))}
+                        </aside>
                     </div>
 
-                    {slides.length > 1 ? (
-                        <div className="absolute bottom-4 end-4 z-20 flex items-center gap-2 rounded-2xl border border-border/70 bg-background/88 p-1.5 shadow-lg backdrop-blur dark:border-white/12">
-                            <button
-                                type="button"
-                                onClick={() => moveSlide(-1)}
-                                className="grid size-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-primary hover:text-primary-foreground"
-                                aria-label={t("home.previousSlide")}
-                            >
-                                <ArrowLeft className="size-4 rtl:rotate-180" />
-                            </button>
-                            <div className="flex items-center gap-1.5 px-1">
-                                {slides.map((slide, index) => (
-                                    <button
-                                        key={slide.id}
-                                        type="button"
-                                        onClick={() => setSlideIndex(index)}
-                                        className={cn(
-                                            "h-1.5 rounded-full transition-all",
-                                            index === slideIndex ? "w-8 bg-primary" : "w-1.5 bg-foreground/20 hover:bg-foreground/40",
-                                        )}
-                                        aria-label={t("home.goToSlide", { number: index + 1 })}
-                                    />
-                                ))}
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => moveSlide(1)}
-                                className="grid size-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-primary hover:text-primary-foreground"
-                                aria-label={t("home.nextSlide")}
-                            >
-                                <ArrowRight className="size-4 rtl:rotate-180" />
-                            </button>
-                        </div>
-                    ) : null}
+                    <div id="categories" className="mt-3 grid gap-2 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
+                        {lookups.isLoading
+                            ? Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-24 rounded-[18px]" />)
+                            : categories.map((category, index) => <CategoryDockCard key={category.id} category={category} index={index} />)}
+                    </div>
                 </div>
             </section>
 
-            <section className="py-4 sm:py-5">
-                <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-                    {serviceItems.map(({ icon: Icon, title, description }) => (
-                        <div key={title} className="flex items-center gap-3 rounded-2xl border border-border/75 bg-card px-4 py-3.5 shadow-[0_12px_34px_-30px_rgba(15,23,42,.55)] dark:border-white/10">
-                            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                                <Icon className="size-5" />
-                            </span>
-                            <span className="min-w-0">
-                                <span className="block text-sm font-black">{t(title)}</span>
-                                <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{t(description)}</span>
-                            </span>
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            <section id="categories" className="scroll-mt-40 py-7 sm:py-10">
-                <SectionHeading title={t("home.shopByCategory")} description={t("home.categoryDescription")} to="/products" />
-                {lookups.isLoading ? (
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-                        {Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-56 rounded-[24px]" />)}
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-                        {categoryTree.slice(0, 6).map((category, index) => (
-                            <CategoryTile key={category.id} category={category} emphasis={index < 2} />
-                        ))}
-                    </div>
-                )}
-            </section>
-
-            <section id="products" className="scroll-mt-40 py-7 sm:py-10">
+            <section className="py-8 sm:py-11">
                 <SectionHeading title={t("home.featuredProducts")} description={t("home.justForYouDescription")} to="/products?featured=true" />
                 {products.isLoading ? (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                        {Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-[430px] rounded-[24px]" />)}
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+                        {Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-[410px] rounded-[24px]" />)}
                     </div>
-                ) : products.isError ? (
-                    <EmptyPanel icon={<ShoppingBag className="size-6" />} title={t("home.productsUnavailable")} description={t("home.productsUnavailableDescription")} />
+                ) : featuredProducts.length ? (
+                    <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+                        {featuredProducts.slice(0, 5).map((product) => <ProductCard key={product.id} product={product} />)}
+                    </div>
                 ) : (
-                    <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                        {featuredProducts.map((product) => <ProductCard key={product.id} product={product} />)}
-                    </div>
+                    <EmptyPanel icon={<ShoppingBag className="size-6" />} title={t("home.productsUnavailable")} description={t("home.productsUnavailableDescription")} />
                 )}
             </section>
 
-            <section id="deals" className="scroll-mt-40 py-7 sm:py-10">
-                <div className="grid gap-4 lg:grid-cols-[1.35fr_.65fr]">
-                    <article className="relative min-h-[420px] overflow-hidden rounded-[30px] border border-primary/20 bg-gradient-to-br from-primary via-primary to-[color-mix(in_srgb,var(--primary)_68%,#041827)] p-7 text-primary-foreground shadow-[0_28px_80px_-40px_color-mix(in_srgb,var(--primary)_60%,transparent)] sm:p-10">
-                        <div className="absolute -end-24 -top-20 size-80 rounded-full border border-white/10 bg-white/5" />
-                        <div className="absolute -bottom-32 start-12 size-80 rounded-full bg-brand-orange/20 blur-3xl" />
-                        <div className="relative z-10 max-w-[58%] sm:max-w-[54%]">
-                            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em]">
-                                <BadgePercent className="size-4" />
-                                {t("home.limitedOffers")}
-                            </span>
-                            <h2 className="mt-6 text-3xl font-black leading-tight tracking-[-0.045em] sm:text-5xl">
-                                {spotlightProduct?.name ?? t("home.selectedForYou")}
-                            </h2>
-                            <p className="mt-4 max-w-lg text-sm leading-7 text-primary-foreground/78 sm:text-base">
-                                {spotlightProduct?.shortDescription ?? t("home.selectedDescription")}
-                            </p>
-                            <div className="mt-7 flex flex-wrap items-center gap-3">
-                                <Button asChild variant="orange" className="h-11 rounded-xl px-5 font-bold">
-                                    <Link viewTransition to={spotlightProduct ? productPath(spotlightProduct) : "/products"}>
-                                        {t("home.viewProduct")}
-                                        <ArrowRight className="size-4 rtl:rotate-180" />
-                                    </Link>
-                                </Button>
-                                {spotlightProduct?.price != null ? (
-                                    <span className="rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-lg font-black backdrop-blur">
-                                        {formatMoney(spotlightProduct.price)}
-                                    </span>
-                                ) : null}
-                            </div>
-                        </div>
-
+            <section className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(310px,.55fr)]">
+                <article className="relative min-h-[330px] overflow-hidden rounded-[28px] border border-border/80 bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-950 px-6 py-8 text-white shadow-[0_26px_72px_-48px_rgba(15,23,42,.8)] dark:border-white/12 sm:px-9">
+                    <div className="absolute -end-20 -top-24 size-80 rounded-full bg-emerald-400/18 blur-3xl" />
+                    <div className="relative z-10 max-w-[55%]">
+                        <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[.16em] text-emerald-300"><BadgePercent className="size-4" />{t("home.limitedOffers")}</span>
+                        <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-.045em] sm:text-4xl">{spotlightProduct?.name ?? t("home.selectedForYou")}</h2>
+                        <p className="mt-3 line-clamp-3 text-sm leading-7 text-white/68">{spotlightProduct?.shortDescription ?? t("home.selectedDescription")}</p>
                         {spotlightProduct ? (
-                            <Link viewTransition to={productPath(spotlightProduct)} className="absolute bottom-6 end-5 flex h-[72%] w-[39%] items-center justify-center overflow-hidden rounded-[26px] border border-white/30 bg-white/96 p-6 shadow-[0_34px_80px_-28px_rgba(2,8,23,.5)] dark:bg-slate-950/90 sm:end-8 sm:w-[41%]">
-                                <div className="absolute inset-[18%] rounded-full bg-primary/10 blur-3xl" />
-                                <img src={imageUrl(spotlightProduct.primaryImageUrl) ?? "/placeholder-product.svg"} alt={spotlightProduct.name} loading="lazy" decoding="async" className="relative z-10 size-full object-contain drop-shadow-2xl transition duration-500 hover:scale-[1.04]" />
-                            </Link>
+                            <div className="mt-6 flex flex-wrap items-center gap-3">
+                                <Button asChild className="rounded-xl bg-white font-black text-slate-950 hover:bg-white/90">
+                                    <Link viewTransition to={productPath(spotlightProduct)}>{t("home.viewProduct")}<ArrowRight className="size-4 rtl:rotate-180" /></Link>
+                                </Button>
+                                {spotlightProduct.price != null ? <span className="text-2xl font-black">{formatMoney(spotlightProduct.price)}</span> : null}
+                            </div>
                         ) : null}
-                    </article>
-
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-                        <InfoCard
-                            icon={<Headphones />}
-                            eyebrow={t("home.customerSupport")}
-                            title={t("home.needHelpChoosing")}
-                            description={t("home.supportDescription")}
-                            action={company?.phone ? <a href={`tel:${company.phone}`}>{company.phone}</a> : company?.email ? <a href={`mailto:${company.email}`}>{company.email}</a> : <Link viewTransition to="/account/login">{t("common.account")}</Link>}
-                        />
-                        <InfoCard
-                            icon={<MapPin />}
-                            eyebrow={t("home.storeLocations")}
-                            title={company?.branches?.[0]?.name ?? t("home.findNearestBranch")}
-                            description={company?.branches?.[0]?.address ?? company?.address ?? t("home.branchDescription")}
-                            action={<Link viewTransition to="/track-order">{t("nav.trackOrder")}</Link>}
-                        />
                     </div>
+                    {spotlightProduct ? (
+                        <Link viewTransition to={productPath(spotlightProduct)} className="absolute bottom-5 end-4 flex h-[82%] w-[42%] items-center justify-center rounded-[26px] border border-white/15 bg-white/[.98] p-6 shadow-2xl dark:bg-slate-900">
+                            <img src={imageUrl(spotlightProduct.primaryImageUrl) ?? "/placeholder-product.svg"} alt={spotlightProduct.name} className="size-full object-contain drop-shadow-2xl transition duration-500 hover:scale-[1.04]" />
+                        </Link>
+                    ) : null}
+                </article>
+
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                    <InfoCard
+                        icon={<Headphones />}
+                        eyebrow={t("home.customerSupport")}
+                        title={t("home.needHelpChoosing")}
+                        description={t("home.supportDescription")}
+                        action={company?.phone ? <a href={`tel:${company.phone}`}>{company.phone}</a> : company?.email ? <a href={`mailto:${company.email}`}>{company.email}</a> : <Link viewTransition to="/account/login">{t("common.account")}</Link>}
+                    />
+                    <InfoCard
+                        icon={<MapPin />}
+                        eyebrow={t("home.storeLocations")}
+                        title={company?.branches?.[0]?.name ?? t("home.findNearestBranch")}
+                        description={company?.branches?.[0]?.address ?? company?.address ?? t("home.branchDescription")}
+                        action={<Link viewTransition to="/track-order">{t("nav.trackOrder")}</Link>}
+                    />
                 </div>
             </section>
 
-            <section className="py-7 sm:py-10">
+            <section className="py-8 sm:py-11">
                 <SectionHeading title={t("home.newArrivals")} description={t("home.freshDescription")} to="/products?sortBy=createdAt&sortDescending=true" />
                 {products.isLoading ? (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-[430px] rounded-[24px]" />)}
-                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">{Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-[410px] rounded-[24px]" />)}</div>
                 ) : (
-                    <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        {newestProducts.slice(0, 4).map((product) => <ProductCard key={product.id} product={product} />)}
-                    </div>
+                    <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">{newestProducts.map((product) => <ProductCard key={product.id} product={product} />)}</div>
                 )}
             </section>
 
-            <section className="pb-3 pt-5">
-                <div className="relative overflow-hidden rounded-[28px] border border-border/80 bg-card px-6 py-8 shadow-[0_24px_70px_-48px_rgba(15,23,42,.5)] dark:border-white/12 sm:px-9 lg:flex lg:items-center lg:justify-between lg:gap-8">
-                    <div className="absolute -end-20 -top-24 size-72 rounded-full bg-primary/10 blur-3xl" />
-                    <div className="relative max-w-2xl">
-                        <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-primary">
-                            <Clock3 className="size-4" />
-                            {t("home.freshProducts")}
-                        </span>
-                        <h2 className="mt-3 text-2xl font-black tracking-[-0.04em] sm:text-3xl">
-                            {t("home.browseCollection")}
-                        </h2>
-                        <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                            {t("footer.description")}
-                        </p>
-                    </div>
-                    <Button asChild size="lg" className="relative mt-6 h-12 rounded-xl px-7 font-bold lg:mt-0">
-                        <Link viewTransition to="/products">
-                            {t("common.viewAll")}
-                            <ArrowRight className="size-4 rtl:rotate-180" />
-                        </Link>
-                    </Button>
-                </div>
+            <section className="grid gap-3 rounded-[26px] border border-border/80 bg-card p-3 shadow-[0_18px_54px_-44px_rgba(15,23,42,.5)] dark:border-white/10 sm:grid-cols-2 lg:grid-cols-4">
+                {serviceItems.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                        <div key={item.title} className="flex items-center gap-3 rounded-[18px] border border-border/60 bg-muted/20 p-4 dark:border-white/8 dark:bg-white/[.025]">
+                            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"><Icon className="size-5" /></span>
+                            <div><p className="text-sm font-black">{t(item.title)}</p><p className="mt-0.5 text-[11px] leading-5 text-muted-foreground">{t(item.description)}</p></div>
+                        </div>
+                    );
+                })}
             </section>
         </div>
     );
 }
 
-function MiniPromise({ icon, title, className }: { icon: ReactNode; title: string; className?: string }) {
-    return (
-        <div className={cn("flex items-center gap-2.5 rounded-2xl border border-border/70 bg-background/70 px-3 py-2.5 text-xs font-bold shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.035]", className)}>
-            <span className="text-primary [&>svg]:size-4">{icon}</span>
-            <span className="truncate">{title}</span>
-        </div>
-    );
-}
-
-function CategoryTile({ category, emphasis }: { category: CategoryNode; emphasis?: boolean }) {
+function MiniProductCard({ product, accent }: { product: Product; accent: "emerald" | "violet" }) {
     const { t } = useI18n();
     return (
         <Link
             viewTransition
-            to={`/products?categoryId=${category.id}`}
+            to={productPath(product)}
             className={cn(
-                "group relative flex min-h-[210px] flex-col overflow-hidden rounded-[24px] border border-border/80 bg-card p-3.5 shadow-[0_16px_44px_-36px_rgba(15,23,42,.65)] transition duration-300 hover:-translate-y-1 hover:border-primary/35 hover:shadow-[0_24px_60px_-38px_rgba(15,23,42,.72)] dark:border-white/12",
-                emphasis && "sm:col-span-1",
+                "group grid min-h-[144px] grid-cols-[1fr_108px] overflow-hidden rounded-[24px] border p-4 transition hover:-translate-y-0.5 hover:shadow-lg dark:border-white/10",
+                accent === "emerald" ? "border-emerald-100 bg-emerald-50/70 dark:bg-emerald-950/20" : "border-violet-100 bg-violet-50/70 dark:bg-violet-950/20",
             )}
         >
-            <span className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[18px] bg-gradient-to-br from-slate-50 via-white to-primary/[0.06] p-4 dark:from-slate-950 dark:via-slate-950 dark:to-primary/10">
-                <span className="absolute inset-[18%] rounded-full bg-primary/8 blur-2xl transition group-hover:bg-primary/16" />
-                {category.imageUrl ? (
-                    <img src={imageUrl(category.imageUrl) ?? ""} alt={category.name} loading="lazy" decoding="async" className="relative z-10 size-full object-contain drop-shadow-md transition duration-500 group-hover:scale-[1.06]" />
-                ) : (
-                    <ShoppingBag className="relative z-10 size-10 text-primary" />
-                )}
+            <div className="min-w-0 self-center">
+                <span className="text-[9px] font-black uppercase tracking-[.14em] text-primary">{t("home.featuredCatalog")}</span>
+                <h3 className="mt-2 line-clamp-2 text-sm font-black leading-5">{product.name}</h3>
+                <div className="mt-3 flex items-center gap-1.5"><Star className="size-3.5 fill-amber-400 text-amber-400" /><span className="text-[10px] font-bold text-muted-foreground">{product.reviewCount ? product.averageRating.toFixed(1) : "—"}</span></div>
+                {product.price != null ? <p className="mt-2 text-lg font-black text-primary">{formatMoney(product.price)}</p> : null}
+            </div>
+            <div className="flex items-center justify-center overflow-hidden rounded-[18px] border border-white/70 bg-white/85 p-2 dark:border-white/10 dark:bg-slate-950/70">
+                <img src={imageUrl(product.primaryImageUrl) ?? "/placeholder-product.svg"} alt={product.name} className="size-full object-contain drop-shadow-md transition duration-500 group-hover:scale-105" />
+            </div>
+        </Link>
+    );
+}
+
+function CategoryDockCard({ category, index }: { category: CategoryNode; index: number }) {
+    const { t } = useI18n();
+    return (
+        <Link viewTransition to={`/products?categoryId=${category.id}`} className="group grid grid-cols-[58px_1fr] items-center gap-2.5 rounded-[18px] border border-slate-200/80 bg-white p-2.5 transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md dark:border-white/10 dark:bg-slate-950 md:flex md:min-h-[112px] md:flex-col md:justify-center md:text-center">
+            <span className={cn("grid size-[58px] shrink-0 place-items-center overflow-hidden rounded-[16px] bg-gradient-to-br ring-1 ring-black/[.04] dark:ring-white/10", categoryTints[index % categoryTints.length])}>
+                {category.imageUrl ? <img src={imageUrl(category.imageUrl) ?? ""} alt={category.name} className="size-full object-contain p-1.5 transition duration-500 group-hover:scale-105" /> : <ShoppingBag className="size-5 text-primary" />}
             </span>
-            <span className="mt-4 line-clamp-2 text-sm font-black leading-5">{category.name}</span>
-            <span className="mt-1.5 text-[11px] font-medium text-muted-foreground">{t("home.productCount", { count: category.productCount })}</span>
+            <span className="min-w-0"><span className="block line-clamp-2 text-xs font-black leading-4">{category.name}</span><span className="mt-1 block text-[9px] font-bold text-muted-foreground">{t("home.productCount", { count: category.productCount })}</span></span>
         </Link>
     );
 }
@@ -461,54 +416,27 @@ function SectionHeading({ title, description, to }: { title: string; description
     const { t } = useI18n();
     return (
         <div className="mb-5 flex items-end justify-between gap-4 sm:mb-6">
-            <div className="min-w-0">
-                <h2 className="text-2xl font-black tracking-[-0.042em] sm:text-3xl">{title}</h2>
-                <p className="mt-1.5 max-w-2xl text-xs leading-6 text-muted-foreground sm:text-sm">{description}</p>
-            </div>
-            <Link viewTransition to={to} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs font-black text-primary shadow-sm transition hover:border-primary/30 hover:bg-primary/5 dark:border-white/10">
-                {t("common.viewAll")}
-                <ArrowRight className="size-3.5 rtl:rotate-180" />
-            </Link>
+            <div className="min-w-0"><h2 className="text-2xl font-black tracking-[-.042em] sm:text-3xl">{title}</h2><p className="mt-1.5 max-w-2xl text-xs leading-6 text-muted-foreground sm:text-sm">{description}</p></div>
+            <Link viewTransition to={to} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs font-black text-primary shadow-sm transition hover:border-primary/30 hover:bg-primary/5 dark:border-white/10">{t("common.viewAll")}<ArrowRight className="size-3.5 rtl:rotate-180" /></Link>
         </div>
     );
 }
 
 function InfoCard({ icon, eyebrow, title, description, action }: { icon: ReactNode; eyebrow: string; title: string; description: string; action: ReactNode }) {
     return (
-        <article className="relative overflow-hidden rounded-[26px] border border-border/80 bg-card p-6 shadow-[0_18px_52px_-42px_rgba(15,23,42,.58)] dark:border-white/12">
-            <div className="absolute -end-12 -top-12 size-36 rounded-full bg-primary/10 blur-2xl" />
-            <span className="relative grid size-12 place-items-center rounded-2xl border border-primary/15 bg-primary/10 text-primary [&>svg]:size-5">{icon}</span>
-            <p className="relative mt-5 text-[10px] font-black uppercase tracking-[0.16em] text-primary">{eyebrow}</p>
-            <h3 className="relative mt-2 text-xl font-black tracking-[-0.03em]">{title}</h3>
-            <p className="relative mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
-            <div className="relative mt-5 inline-flex items-center gap-1.5 text-sm font-black text-primary [&_a]:hover:underline">
-                {action}
-                <ArrowRight className="size-4 rtl:rotate-180" />
-            </div>
+        <article className="relative overflow-hidden rounded-[24px] border border-border/80 bg-card p-5 shadow-[0_16px_46px_-40px_rgba(15,23,42,.58)] dark:border-white/10">
+            <div className="absolute -end-10 -top-10 size-32 rounded-full bg-primary/10 blur-2xl" />
+            <div className="relative flex items-start gap-3.5"><span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-primary/15 bg-primary/10 text-primary [&>svg]:size-5">{icon}</span><div><p className="text-[9px] font-black uppercase tracking-[.15em] text-primary">{eyebrow}</p><h3 className="mt-1.5 text-lg font-black tracking-[-.03em]">{title}</h3></div></div>
+            <p className="relative mt-3 text-xs leading-6 text-muted-foreground">{description}</p>
+            <div className="relative mt-4 inline-flex items-center gap-1.5 text-xs font-black text-primary [&_a]:hover:underline">{action}<ArrowRight className="size-3.5 rtl:rotate-180" /></div>
         </article>
     );
 }
 
 function EmptyPanel({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
-    return (
-        <div className="rounded-[24px] border border-dashed border-border/80 bg-muted/20 px-6 py-16 text-center dark:border-white/12">
-            <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-muted text-muted-foreground">{icon}</span>
-            <h3 className="mt-4 text-lg font-black">{title}</h3>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">{description}</p>
-        </div>
-    );
+    return <div className="rounded-[24px] border border-dashed border-border/80 bg-muted/20 px-6 py-16 text-center dark:border-white/12"><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-muted text-muted-foreground">{icon}</span><h3 className="mt-4 text-lg font-black">{title}</h3><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">{description}</p></div>;
 }
 
 function HeroSkeleton() {
-    return (
-        <div className="max-w-xl space-y-5">
-            <Skeleton className="h-8 w-44 rounded-full" />
-            <Skeleton className="h-32 w-full rounded-2xl" />
-            <Skeleton className="h-20 w-full rounded-2xl" />
-            <div className="flex gap-3">
-                <Skeleton className="h-12 w-36 rounded-xl" />
-                <Skeleton className="h-12 w-36 rounded-xl" />
-            </div>
-        </div>
-    );
+    return <div className="grid min-h-[430px] items-center gap-6 px-8 py-10 lg:grid-cols-2"><div className="space-y-5"><Skeleton className="h-8 w-44 rounded-full" /><Skeleton className="h-28 w-full rounded-2xl" /><Skeleton className="h-20 w-full rounded-2xl" /><Skeleton className="h-11 w-40 rounded-xl" /></div><Skeleton className="h-[310px] rounded-full" /></div>;
 }
