@@ -66,7 +66,7 @@ export function AccountPage() {
                         <h2 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">{t("account.orderNumbers")}</h2>
                         <p className="mt-2 text-sm text-muted-foreground">{t("account.orderNumbersDescription")}</p>
                     </div>
-                    <Button asChild variant="outline" className="hidden rounded-xl sm:flex"><Link to="/track-order"><PackageSearch /> {t("account.guestTracking")}</Link></Button>
+                    <Button asChild variant="outline" className="hidden rounded-xl sm:flex"><Link viewTransition to="/track-order"><PackageSearch /> {t("account.guestTracking")}</Link></Button>
                 </div>
 
                 <div className="mt-6 grid gap-4">
@@ -88,7 +88,7 @@ export function AccountPage() {
                             </div>
                             <div className="flex items-center justify-between gap-4 sm:justify-end">
                                 <p className="text-xl font-black">{formatMoney(order.total, order.currency)}</p>
-                                <Button asChild variant="outline" size="icon" className="rounded-xl"><Link to={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&phone=${encodeURIComponent(order.customerPhone)}`} aria-label={`Track ${order.orderNumber}`}><ArrowRight className="rtl:rotate-180" /></Link></Button>
+                                <Button asChild variant="outline" size="icon" className="rounded-xl"><Link viewTransition to={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&phone=${encodeURIComponent(order.customerPhone)}`} aria-label={`Track ${order.orderNumber}`}><ArrowRight className="rtl:rotate-180" /></Link></Button>
                             </div>
                         </article>
                     ))}
@@ -97,7 +97,7 @@ export function AccountPage() {
                             <PackageSearch className="mx-auto size-10 text-muted-foreground" />
                             <h3 className="mt-4 text-xl font-black">{t("account.noOrders")}</h3>
                             <p className="mt-2 text-sm text-muted-foreground">{t("account.noOrdersDescription")}</p>
-                            <Button asChild className="mt-5 rounded-xl"><Link to="/products">{t("account.startShopping")}</Link></Button>
+                            <Button asChild className="mt-5 rounded-xl"><Link viewTransition to="/products">{t("account.startShopping")}</Link></Button>
                         </div>
                     )}
                 </div>

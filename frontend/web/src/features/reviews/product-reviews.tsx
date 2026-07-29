@@ -93,7 +93,7 @@ export function ProductReviews({ productId }: { productId: number }) {
 
                         {!auth.isAuthenticated ? (
                             <div className="mt-5 rounded-xl border border-dashed bg-background p-5 text-sm text-muted-foreground">
-                                {t("reviews.login")} <Link to="/account/login" className="font-bold text-primary underline">{t("common.login")}</Link>
+                                {t("reviews.login")} <Link viewTransition to="/account/login" className="font-bold text-primary underline">{t("common.login")}</Link>
                             </div>
                         ) : (
                             <div className="mt-5 space-y-4">

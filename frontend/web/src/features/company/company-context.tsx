@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useMemo, type PropsWithChildren } from "react";
 
 import { useI18n } from "../../i18n/i18n-provider";
-import { apiGet } from "../../shared/api/api-client";
+import { apiGet, imageUrl } from "../../shared/api/api-client";
 import { configureMoney } from "../../shared/lib/money";
 import { resolveCompanyFontStack, resolveCompanyHeadingStack } from "./company-fonts";
 
@@ -99,7 +99,7 @@ export function CompanyProvider({ children }: PropsWithChildren) {
                 link.rel = "icon";
                 document.head.appendChild(link);
             }
-            link.href = company.faviconUrl;
+            link.href = imageUrl(company.faviconUrl) ?? company.faviconUrl;
         }
     }, [company, language]);
 

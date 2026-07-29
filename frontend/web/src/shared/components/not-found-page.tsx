@@ -45,7 +45,7 @@ export function NotFoundPage() {
             size="lg"
             className="w-full rounded-xl px-6 sm:w-auto"
           >
-            <Link to="/">
+            <Link viewTransition to="/">
               <Home className="size-4" />
               {t("notFound.backHome")}
             </Link>
@@ -57,14 +57,14 @@ export function NotFoundPage() {
             size="lg"
             className="w-full rounded-xl px-6 sm:w-auto"
           >
-            <Link to="/products">
+            <Link viewTransition to="/products">
               <Search className="size-4" />
               {t("common.products")}
             </Link>
           </Button>
         </div>
 
-        <Link
+        <Link viewTransition
           to="/"
           className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-primary"
         >

@@ -84,7 +84,7 @@ function Logo({ inverse = false }: { inverse?: boolean }) {
         .toUpperCase();
 
     return (
-        <Link
+        <Link viewTransition
             to="/"
             className="group flex min-w-0 shrink-0 items-center gap-2.5 font-black tracking-tight"
         >
@@ -214,7 +214,7 @@ export function StoreLayout() {
                                 size="icon"
                                 className="hidden rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary sm:inline-flex"
                             >
-                                <Link
+                                <Link viewTransition
                                     to={accountPath}
                                     aria-label={
                                         auth.isAuthenticated
@@ -231,7 +231,7 @@ export function StoreLayout() {
                                 size="icon"
                                 className="relative hidden rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary sm:inline-flex"
                             >
-                                <Link to="/wishlist" aria-label={t("common.wishlist")}>
+                                <Link viewTransition to="/wishlist" aria-label={t("common.wishlist")}>
                                     <Heart className="size-5" />
                                     {cart.wishlist.length ? (
                                         <CountBadge>{cart.wishlist.length}</CountBadge>
@@ -244,7 +244,7 @@ export function StoreLayout() {
                                 size="icon"
                                 className="relative rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary"
                             >
-                                <Link to="/cart" aria-label={t("common.cart")}>
+                                <Link viewTransition to="/cart" aria-label={t("common.cart")}>
                                     <ShoppingBag className="size-5" />
                                     {cart.items.length ? (
                                         <CountBadge>{cart.items.length}</CountBadge>
@@ -271,7 +271,7 @@ export function StoreLayout() {
                 <div className="hidden bg-background/95 md:block">
                     <div className="mx-auto flex h-12 w-full max-w-[1500px] items-center gap-2 px-6 lg:px-8">
                         <CategoryMegaMenu />
-                        <nav className="ms-2 flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+                        <nav className="ms-1 flex min-w-0 flex-1 items-center justify-center gap-0.5 overflow-hidden lg:ms-2 lg:gap-1">
                             {nav.map((item) => {
                                 const active = isStoreNavItemActive(
                                     item,
@@ -279,11 +279,12 @@ export function StoreLayout() {
                                     location.search,
                                 );
                                 return (
-                                    <Link
+                                    <Link viewTransition
                                         key={item.to}
                                         to={item.to}
                                         className={cn(
-                                            "relative shrink-0 rounded-xl px-3.5 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground",
+                                            "relative shrink-0 rounded-xl px-2 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground lg:px-3.5 lg:text-sm",
+                                            item.to === "/track-order" && "hidden xl:inline-flex",
                                             active &&
                                                 "bg-primary/8 text-primary after:absolute after:inset-x-4 after:-bottom-1 after:h-0.5 after:rounded-full after:bg-primary",
                                         )}
@@ -393,7 +394,7 @@ export function StoreLayout() {
                         />
                         <nav className="mt-6 grid gap-1">
                             {nav.map((item) => (
-                                <Link
+                                <Link viewTransition
                                     key={item.to}
                                     to={item.to}
                                     onClick={() => setMobileOpen(false)}
@@ -408,13 +409,13 @@ export function StoreLayout() {
                         <div className="my-5 h-px bg-border" />
                         <div className="grid grid-cols-2 gap-2">
                             <Button asChild variant="outline">
-                                <Link to={accountPath} onClick={() => setMobileOpen(false)}>
+                                <Link viewTransition to={accountPath} onClick={() => setMobileOpen(false)}>
                                     <UserRound className="size-4" />
                                     {t("common.account")}
                                 </Link>
                             </Button>
                             <Button asChild variant="outline">
-                                <Link to="/wishlist" onClick={() => setMobileOpen(false)}>
+                                <Link viewTransition to="/wishlist" onClick={() => setMobileOpen(false)}>
                                     <Heart className="size-4" />
                                     {t("common.wishlist")}
                                 </Link>
@@ -448,7 +449,7 @@ function FooterColumn({ title, children }: { title: string; children: ReactNode 
 
 function FooterLink({ to, children }: { to: string; children: ReactNode }) {
     return (
-        <Link to={to} className="transition hover:translate-x-1 hover:text-white rtl:hover:-translate-x-1">
+        <Link viewTransition to={to} className="transition hover:translate-x-1 hover:text-white rtl:hover:-translate-x-1">
             {children}
         </Link>
     );

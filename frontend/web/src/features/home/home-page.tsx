@@ -148,7 +148,7 @@ export function HomePage() {
         <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-8">
             <section className="pb-6 pt-4 sm:py-7">
                 <div
-                    className="group relative min-h-[540px] overflow-hidden rounded-[28px] border border-border/70 bg-muted shadow-[0_26px_80px_-45px_rgba(15,23,42,.5)] sm:min-h-[610px] sm:rounded-[34px]"
+                    className="group relative min-h-[540px] overflow-hidden rounded-[28px] border border-border/80 bg-muted shadow-[0_26px_80px_-45px_rgba(15,23,42,.5)] dark:border-white/12 sm:min-h-[610px] sm:rounded-[34px]"
                     onMouseEnter={() => setPaused(true)}
                     onMouseLeave={() => setPaused(false)}
                 >
@@ -157,7 +157,7 @@ export function HomePage() {
                             key={activeSlide.id}
                             src={activeSlide.backgroundImage}
                             alt=""
-                            className="size-full animate-[fade-in_.5s_ease-out] object-cover object-[70%_center] rtl:object-[30%_center]"
+                            className="hero-media-enter size-full object-cover object-[70%_center] rtl:object-[30%_center]"
                         />
                         <div className="absolute inset-0 bg-gradient-to-r from-white via-white/95 to-white/10 dark:from-[#050b16] dark:via-[#050b16]/96 dark:to-[#050b16]/20 rtl:bg-gradient-to-l" />
                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,hsl(var(--primary)/.12),transparent_35%)] rtl:bg-[radial-gradient(circle_at_85%_20%,hsl(var(--primary)/.12),transparent_35%)]" />
@@ -168,7 +168,7 @@ export function HomePage() {
                             {content.isLoading ? (
                                 <HeroSkeleton />
                             ) : (
-                                <>
+                                <div key={activeSlide.id} className="hero-copy-enter">
                                     <div className="inline-flex w-fit items-center gap-2 rounded-full border border-primary/15 bg-background/80 px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-primary shadow-sm backdrop-blur-md sm:text-xs">
                                         <PackageCheck className="size-4" />
                                         {activeSlide.eyebrow}
@@ -185,7 +185,7 @@ export function HomePage() {
                                             size="lg"
                                             className="h-12 rounded-xl px-7 font-bold shadow-lg shadow-primary/20"
                                         >
-                                            <Link to={activeSlide.primaryUrl}>
+                                            <Link viewTransition to={activeSlide.primaryUrl}>
                                                 {activeSlide.primaryText}
                                                 <ArrowRight className="size-4 rtl:rotate-180" />
                                             </Link>
@@ -198,13 +198,13 @@ export function HomePage() {
                                                 variant="outline"
                                                 className="h-12 rounded-xl border-border/80 bg-background/80 px-7 font-bold shadow-sm backdrop-blur"
                                             >
-                                                <Link to={activeSlide.secondaryUrl}>
+                                                <Link viewTransition to={activeSlide.secondaryUrl}>
                                                     {activeSlide.secondaryText}
                                                 </Link>
                                             </Button>
                                         ) : null}
                                     </div>
-                                </>
+                                </div>
                             )}
 
                             <div className="mt-9 grid max-w-2xl grid-cols-3 gap-2 sm:gap-3">
@@ -237,8 +237,8 @@ export function HomePage() {
                         </div>
 
                         {activeSlide.product ? (
-                            <div className="absolute bottom-20 end-6 h-[33%] w-[42%] sm:bottom-12 sm:end-10 sm:h-[52%] sm:w-[34%] lg:static lg:me-12 lg:h-[430px] lg:w-auto">
-                                <Link
+                            <div key={activeSlide.product.id} className="hero-product-enter absolute bottom-20 end-6 h-[33%] w-[42%] sm:bottom-12 sm:end-10 sm:h-[52%] sm:w-[34%] lg:static lg:me-12 lg:h-[430px] lg:w-auto">
+                                <Link viewTransition
                                     to={productPath(activeSlide.product)}
                                     className="relative flex size-full items-center justify-center overflow-hidden rounded-[30px] border border-white/60 bg-white/95 p-4 shadow-[0_35px_80px_-20px_rgba(15,23,42,.35)] transition hover:-translate-y-1 dark:border-white/10 dark:bg-slate-950/90 sm:p-8"
                                 >
@@ -286,15 +286,17 @@ export function HomePage() {
                                         key={slide.id}
                                         type="button"
                                         onClick={() => setSlideIndex(index)}
-                                        className={`h-2 rounded-full transition-all ${
+                                        className={`relative h-2 overflow-hidden rounded-full transition-all duration-300 ${
                                             index === slideIndex
-                                                ? "w-8 bg-primary"
+                                                ? "w-10 bg-primary/25"
                                                 : "w-2 bg-foreground/25 hover:bg-foreground/45"
                                         }`}
                                         aria-label={t("home.goToSlide", {
                                             number: index + 1,
                                         })}
-                                    />
+                                    >
+                                        {index === slideIndex ? <span className="hero-progress absolute inset-y-0 start-0 bg-primary" style={{ animationPlayState: paused ? "paused" : "running" }} /> : null}
+                                    </button>
                                 ))}
                             </div>
                         </>
@@ -349,7 +351,7 @@ export function HomePage() {
                                 size="lg"
                                 className="mt-7 h-12 rounded-xl px-6 font-bold shadow-lg"
                             >
-                                <Link to={deal ? productPath(deal) : "/products"}>
+                                <Link viewTransition to={deal ? productPath(deal) : "/products"}>
                                     {t("home.viewProduct")}
                                     <ArrowRight className="size-4 rtl:rotate-180" />
                                 </Link>
@@ -458,112 +460,93 @@ function CategoryShowcaseCard({ category }: { category: CategoryNode }) {
         enabled: !hasChildren,
         staleTime: 5 * 60_000,
     });
+    const previewProducts = products.data?.items ?? [];
 
     return (
-        <article className="group relative min-h-[280px] overflow-hidden rounded-[26px] border border-border/70 bg-card p-5 shadow-[0_14px_45px_-32px_rgba(15,23,42,.45)] transition duration-300 hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_24px_65px_-34px_rgba(15,23,42,.5)] dark:shadow-black/25">
-            <div className="absolute -end-12 -top-12 size-40 rounded-full bg-primary/8 blur-2xl" />
-            <div className="relative flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">
-                        {hasChildren
-                            ? t("home.subcategories")
-                            : t("home.categoryProducts")}
-                    </p>
-                    <h3 className="mt-2 truncate text-xl font-black tracking-[-0.025em]">
-                        {category.name}
-                    </h3>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                        {category.productCount} {t("common.products")}
-                    </p>
-                </div>
-                <Link
-                    to={`/products?categoryId=${category.id}`}
-                    className="grid size-10 shrink-0 place-items-center rounded-xl border bg-background text-primary shadow-sm transition group-hover:border-primary/30 group-hover:bg-primary group-hover:text-primary-foreground"
-                    aria-label={t("home.openCategory", {
-                        category: category.name,
-                    })}
-                >
-                    <ArrowRight className="size-4 rtl:rotate-180" />
-                </Link>
-            </div>
+        <article className="group relative overflow-hidden rounded-[26px] border border-border/80 bg-card shadow-[0_14px_45px_-34px_rgba(15,23,42,.45)] transition duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_26px_68px_-38px_rgba(15,23,42,.55)] dark:border-white/10 dark:shadow-black/25">
+            <Link
+                viewTransition
+                to={`/products?categoryId=${category.id}`}
+                className="relative block aspect-[1.55] overflow-hidden border-b border-border/70 bg-gradient-to-br from-primary/8 via-muted to-brand-orange/10 dark:border-white/10"
+                aria-label={t("home.openCategory", { category: category.name })}
+            >
+                <div className="absolute -end-12 -top-12 size-40 rounded-full bg-primary/15 blur-3xl" />
+                <div className="absolute -bottom-16 -start-10 size-40 rounded-full bg-brand-orange/12 blur-3xl" />
+                {category.imageUrl ? (
+                    <img
+                        src={imageUrl(category.imageUrl) ?? ""}
+                        alt={category.name}
+                        className="relative z-10 size-full object-contain p-7 drop-shadow-xl transition duration-500 group-hover:scale-[1.06] sm:p-8"
+                    />
+                ) : (
+                    <span className="relative z-10 grid size-full place-items-center">
+                        <span className="grid size-20 place-items-center rounded-[28px] border border-border/80 bg-background/80 text-primary shadow-lg backdrop-blur dark:border-white/12">
+                            <ShoppingBag className="size-8" />
+                        </span>
+                    </span>
+                )}
+                <span className="absolute end-4 top-4 z-20 rounded-full border border-border/70 bg-background/85 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-primary shadow-sm backdrop-blur dark:border-white/12">
+                    {category.productCount} {t("common.productsLower")}
+                </span>
+            </Link>
 
-            {hasChildren ? (
-                <div className="relative mt-6 grid grid-cols-2 gap-2.5">
-                    {category.children.slice(0, 4).map((child) => (
-                        <Link
-                            key={child.id}
-                            to={`/products?categoryId=${child.id}`}
-                            className="flex min-w-0 items-center gap-3 rounded-2xl border bg-background/75 p-2.5 transition hover:border-primary/30 hover:bg-primary/5"
-                        >
-                            <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-muted">
-                                {child.imageUrl ? (
-                                    <img
-                                        src={imageUrl(child.imageUrl) ?? ""}
-                                        alt=""
-                                        className="size-full object-contain p-1.5"
-                                    />
-                                ) : (
-                                    <ShoppingBag className="size-4 text-primary" />
-                                )}
-                            </span>
-                            <span className="min-w-0">
-                                <span className="block truncate text-sm font-bold">
-                                    {child.name}
-                                </span>
-                                <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                                    {child.productCount} {t("common.products")}
-                                </span>
-                            </span>
-                        </Link>
-                    ))}
+            <div className="p-5">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">
+                            {hasChildren ? t("home.subcategories") : t("home.categoryProducts")}
+                        </p>
+                        <h3 className="mt-1.5 truncate text-xl font-black tracking-[-0.025em]">{category.name}</h3>
+                    </div>
+                    <Link
+                        viewTransition
+                        to={`/products?categoryId=${category.id}`}
+                        className="grid size-10 shrink-0 place-items-center rounded-xl border border-border/80 bg-background text-primary shadow-sm transition group-hover:border-primary/30 group-hover:bg-primary group-hover:text-primary-foreground dark:border-white/12"
+                    >
+                        <ArrowRight className="size-4 rtl:rotate-180" />
+                    </Link>
                 </div>
-            ) : products.isLoading ? (
-                <div className="mt-6 grid gap-2.5">
-                    {Array.from({ length: 3 }).map((_, index) => (
-                        <Skeleton key={index} className="h-[58px] rounded-2xl" />
-                    ))}
-                </div>
-            ) : (products.data?.items.length ?? 0) > 0 ? (
-                <div className="relative mt-6 grid gap-2.5">
-                    {products.data!.items.map((product) => (
-                        <Link
-                            key={product.id}
-                            to={productPath(product)}
-                            className="flex min-w-0 items-center gap-3 rounded-2xl border bg-background/75 p-2 transition hover:border-primary/30 hover:bg-primary/5"
-                        >
-                            <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-white p-1.5 dark:bg-slate-950">
-                                <img
-                                    src={
-                                        imageUrl(product.primaryImageUrl) ??
-                                        "/placeholder-product.svg"
-                                    }
-                                    alt=""
-                                    className="size-full object-contain"
-                                />
-                            </span>
-                            <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm font-bold">
-                                    {product.name}
+
+                {hasChildren ? (
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                        {category.children.slice(0, 4).map((child) => (
+                            <Link
+                                viewTransition
+                                key={child.id}
+                                to={`/products?categoryId=${child.id}`}
+                                className="flex min-w-0 items-center gap-2 rounded-xl border border-border/70 bg-muted/30 p-2 transition hover:border-primary/25 hover:bg-primary/5 dark:border-white/10"
+                            >
+                                <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-lg bg-white p-1 dark:bg-slate-950">
+                                    {child.imageUrl ? <img src={imageUrl(child.imageUrl) ?? ""} alt="" className="size-full object-contain" /> : <ShoppingBag className="size-3.5 text-primary" />}
                                 </span>
-                                <span className="mt-0.5 block text-xs font-black text-primary">
-                                    {product.price != null
-                                        ? formatMoney(product.price)
-                                        : t("product.noPrice")}
-                                </span>
-                            </span>
-                        </Link>
-                    ))}
-                </div>
-            ) : (
-                <div className="relative mt-6 rounded-2xl border border-dashed p-5 text-center">
-                    <p className="text-sm font-bold">
+                                <span className="truncate text-xs font-bold">{child.name}</span>
+                            </Link>
+                        ))}
+                    </div>
+                ) : products.isLoading ? (
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                        {Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="aspect-square rounded-xl" />)}
+                    </div>
+                ) : previewProducts.length ? (
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                        {previewProducts.map((product) => (
+                            <Link
+                                viewTransition
+                                key={product.id}
+                                to={productPath(product)}
+                                title={product.name}
+                                className="group/product grid aspect-square place-items-center overflow-hidden rounded-xl border border-border/70 bg-white p-2 transition hover:border-primary/30 dark:border-white/10 dark:bg-slate-950"
+                            >
+                                <img src={imageUrl(product.primaryImageUrl) ?? "/placeholder-product.svg"} alt="" className="size-full object-contain transition duration-300 group-hover/product:scale-105" />
+                            </Link>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="mt-4 rounded-xl border border-dashed border-border/80 px-3 py-4 text-center text-xs text-muted-foreground dark:border-white/12">
                         {t("home.noCategoryProducts")}
                     </p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                        {t("home.noCategoryProductsHelp")}
-                    </p>
-                </div>
-            )}
+                )}
+            </div>
         </article>
     );
 }
@@ -607,7 +590,7 @@ function Heading({
                 </p>
             </div>
             <Button asChild variant="outline" className="w-fit rounded-xl">
-                <Link to={to}>
+                <Link viewTransition to={to}>
                     {t("common.viewAll")}
                     <ArrowRight className="size-4 rtl:rotate-180" />
                 </Link>

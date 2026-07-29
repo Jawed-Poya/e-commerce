@@ -47,7 +47,7 @@ export function WishlistPage() {
             size="lg"
             className="mt-7 h-12 rounded-xl px-7 font-bold"
           >
-            <Link to="/products">
+            <Link viewTransition to="/products">
               {t("wishlist.explore")}
               <ArrowRight className="size-4 rtl:rotate-180" />
             </Link>

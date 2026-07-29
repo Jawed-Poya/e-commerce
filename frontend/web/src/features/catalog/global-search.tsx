@@ -93,20 +93,43 @@ export function GlobalSearch({
 
     const categoryMatches = useMemo(() => {
         if (debounced.length < 2) return [];
+
+        const categories = lookups.data?.categories ?? [];
         const normalized = debounced.toLocaleLowerCase();
-        return (lookups.data?.categories ?? [])
+        const byId = new Map(categories.map((category) => [category.id, category]));
+        const matches = new Map<number, (typeof categories)[number]>();
+
+        categories
             .filter((category) =>
                 category.name.toLocaleLowerCase().includes(normalized),
             )
-            .slice(0, 5);
-    }, [debounced, lookups.data?.categories]);
+            .forEach((category) => matches.set(category.id, category));
+
+        for (const product of products.data?.items ?? []) {
+            let category = byId.get(product.categoryId);
+            while (category) {
+                matches.set(category.id, category);
+                category = category.parentId == null
+                    ? undefined
+                    : byId.get(category.parentId);
+            }
+        }
+
+        if (selectedCategory) matches.set(selectedCategory.id, selectedCategory);
+        return Array.from(matches.values()).slice(0, 6);
+    }, [
+        debounced,
+        lookups.data?.categories,
+        products.data?.items,
+        selectedCategory,
+    ]);
 
     const goToResults = (event?: FormEvent) => {
         event?.preventDefault();
         const params = new URLSearchParams();
         if (query.trim()) params.set("search", query.trim());
         if (categoryId !== "all") params.set("categoryId", categoryId);
-        navigate(`/products${params.size ? `?${params.toString()}` : ""}`);
+        navigate(`/products${params.size ? `?${params.toString()}` : ""}`, { viewTransition: true });
         setOpen(false);
         onNavigate?.();
     };
@@ -212,7 +235,7 @@ export function GlobalSearch({
             </form>
 
             {showDropdown ? (
-                <div className="absolute inset-x-0 top-[calc(100%+10px)] z-50 overflow-hidden rounded-[22px] border bg-popover/98 text-popover-foreground shadow-[0_28px_80px_-30px_rgba(15,23,42,.55)] backdrop-blur-xl">
+                <div className="absolute inset-x-0 top-[calc(100%+10px)] z-50 overflow-hidden rounded-[22px] border border-border/80 bg-popover/98 dark:border-white/12 text-popover-foreground shadow-[0_28px_80px_-30px_rgba(15,23,42,.55)] backdrop-blur-xl">
                     <div className="flex items-center justify-between gap-3 border-b bg-muted/25 px-4 py-3">
                         <div className="min-w-0 flex-1">
                             <p className="text-xs font-black uppercase tracking-[0.15em] text-primary">
@@ -286,7 +309,7 @@ export function GlobalSearch({
                                 </p>
                                 <div className="grid gap-1.5">
                                     {(products.data?.items ?? []).map((product) => (
-                                        <Link
+                                        <Link viewTransition
                                             key={product.id}
                                             to={productPath(product)}
                                             onClick={() => {
@@ -336,7 +359,7 @@ export function GlobalSearch({
                                 </p>
                                 <div className="grid gap-1">
                                     {categoryMatches.map((category) => (
-                                        <Link
+                                        <Link viewTransition
                                             key={category.id}
                                             to={`/products?categoryId=${category.id}`}
                                             onClick={() => {
@@ -346,8 +369,11 @@ export function GlobalSearch({
                                             className="flex items-center gap-2 rounded-xl p-2 text-sm font-semibold transition hover:bg-background hover:text-primary hover:shadow-sm"
                                         >
                                             <FolderTree className="size-4 shrink-0" />
-                                            <span className="min-w-0 flex-1 truncate">
-                                                {category.name}
+                                            <span className="min-w-0 flex-1">
+                                                <span className="block truncate">{category.name}</span>
+                                                <span className="mt-0.5 block text-[10px] font-medium text-muted-foreground">
+                                                    {category.productCount} {t("common.productsLower")}
+                                                </span>
                                             </span>
                                             <ArrowRight className="size-3.5 rtl:rotate-180" />
                                         </Link>

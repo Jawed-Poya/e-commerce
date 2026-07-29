@@ -36,7 +36,7 @@ export function OrderSuccessPage() {
                     <PackageCheck className="mx-auto size-14 text-primary" />
                     <h1 className="mt-5 text-3xl font-black">{t("orders.submittedTitle")}</h1>
                     <p className="mt-3 text-muted-foreground">{t("orders.submittedDescription")}</p>
-                    <Button asChild className="mt-6"><Link to="/track-order">{t("orders.track")}</Link></Button>
+                    <Button asChild className="mt-6"><Link viewTransition to="/track-order">{t("orders.track")}</Link></Button>
                 </div>
             </main>
         );
@@ -83,12 +83,12 @@ export function OrderSuccessPage() {
 
                         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                             <Button asChild size="lg" className="rounded-xl">
-                                <Link to={`/track-order?orderNumber=${encodeURIComponent(confirmation.orderNumber)}&phone=${encodeURIComponent(state.phone)}`}>
+                                <Link viewTransition to={`/track-order?orderNumber=${encodeURIComponent(confirmation.orderNumber)}&phone=${encodeURIComponent(state.phone)}`}>
                                     {t("orders.trackThis")} <ArrowRight className={arrowClass} />
                                 </Link>
                             </Button>
-                            <Button asChild size="lg" variant="outline" className="rounded-xl"><Link to="/products">{t("orders.continueShopping")}</Link></Button>
-                            {auth.isAuthenticated && <Button asChild size="lg" variant="outline" className="rounded-xl"><Link to="/account">{t("orders.viewMine")}</Link></Button>}
+                            <Button asChild size="lg" variant="outline" className="rounded-xl"><Link viewTransition to="/products">{t("orders.continueShopping")}</Link></Button>
+                            {auth.isAuthenticated && <Button asChild size="lg" variant="outline" className="rounded-xl"><Link viewTransition to="/account">{t("orders.viewMine")}</Link></Button>}
                         </div>
                     </div>
 

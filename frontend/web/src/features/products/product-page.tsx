@@ -110,7 +110,7 @@ export function ProductPage() {
           </p>
 
           <Button asChild className="mt-7 rounded-xl">
-            <Link to="/products">
+            <Link viewTransition to="/products">
               <ChevronLeft className="size-4" />
               {t("common.backToShop")}
             </Link>
@@ -161,7 +161,7 @@ export function ProductPage() {
     <>
       <div className="mx-auto w-full max-w-[1500px] px-4 pb-28 pt-5 sm:px-6 sm:pb-14 sm:pt-8 lg:px-8 lg:pt-10">
         <nav className="mb-5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground sm:mb-8">
-          <Link
+          <Link viewTransition
             to="/products"
             className="mr-1 grid size-8 shrink-0 place-items-center rounded-full border bg-background transition-colors hover:border-primary/30 hover:text-primary sm:hidden"
             aria-label={t("common.backToShop")}
@@ -169,7 +169,7 @@ export function ProductPage() {
             <ChevronLeft className="size-4" />
           </Link>
 
-          <Link
+          <Link viewTransition
             to="/"
             className="hidden transition-colors hover:text-primary sm:inline"
           >
@@ -178,7 +178,7 @@ export function ProductPage() {
 
           <ChevronRight className="hidden size-3.5 opacity-50 sm:block" />
 
-          <Link to="/products" className="transition-colors hover:text-primary">
+          <Link viewTransition to="/products" className="transition-colors hover:text-primary">
             {t("common.products")}
           </Link>
 

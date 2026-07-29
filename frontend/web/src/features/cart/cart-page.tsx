@@ -75,7 +75,7 @@ export function CartPage() {
                         size="lg"
                         className="mt-7 h-12 rounded-xl px-7 font-bold"
                     >
-                        <Link to="/products">
+                        <Link viewTransition to="/products">
                             {t("wishlist.explore")}
                             <ArrowRight className="size-4 rtl:rotate-180" />
                         </Link>
@@ -108,7 +108,7 @@ export function CartPage() {
                         variant="outline"
                         className="hidden rounded-xl sm:flex"
                     >
-                        <Link to="/products">
+                        <Link viewTransition to="/products">
                             {t("common.continueShopping")}
                             <ArrowRight className="size-4 rtl:rotate-180" />
                         </Link>
@@ -123,7 +123,7 @@ export function CartPage() {
                                     key={item.id}
                                     className="grid min-w-0 grid-cols-[105px_minmax(0,1fr)] gap-3 rounded-2xl border bg-card p-2.5 shadow-[0_6px_22px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-md sm:grid-cols-[130px_minmax(0,1fr)_auto] sm:gap-5 sm:p-4"
                                 >
-                                    <Link
+                                    <Link viewTransition
                                         to={productPath(item)}
                                         className="relative block overflow-hidden rounded-xl bg-muted"
                                     >
@@ -144,7 +144,7 @@ export function CartPage() {
                                     </Link>
 
                                     <div className="flex min-w-0 flex-col py-1">
-                                        <Link
+                                        <Link viewTransition
                                             to={productPath(item)}
                                             className="line-clamp-2 text-sm font-bold leading-5 transition-colors hover:text-primary sm:text-base sm:leading-6"
                                         >
@@ -335,7 +335,7 @@ export function CartPage() {
                                 className="mt-6 h-12 w-full rounded-xl font-bold shadow-md shadow-primary/15"
                                 size="lg"
                             >
-                                <Link to="/checkout">
+                                <Link viewTransition to="/checkout">
                                     {t("cart.checkout")}
                                     <ArrowRight className="size-4 rtl:rotate-180" />
                                 </Link>
@@ -368,7 +368,7 @@ export function CartPage() {
                     </div>
 
                     <Button asChild className="ms-auto h-12 min-w-44 rounded-xl px-5 font-bold shadow-md shadow-primary/15">
-                        <Link to="/checkout">
+                        <Link viewTransition to="/checkout">
                             {t("checkout.title")}
                             <ArrowRight className="size-4 rtl:rotate-180" />
                         </Link>
@@ -412,6 +412,9 @@ function CartQuantityInput({ item, onChange }: { item: CartItem; onChange: (quan
         }
     };
 
+    const maximum = maximumCartQuantity(item);
+    const visibleCharacters = Math.min(14, Math.max(5, String(maximum).length + 2, draft.length + 1));
+
     return (
         <input
             type="number"
@@ -424,7 +427,9 @@ function CartQuantityInput({ item, onChange }: { item: CartItem; onChange: (quan
             onBlur={commit}
             onKeyDown={handleKeyDown}
             aria-label={t("cart.quantityInput", { name: item.name })}
-            className="h-9 w-[4.75rem] border-x bg-transparent px-1 text-center text-xs font-bold tabular-nums outline-none transition focus:bg-primary/5 focus:ring-2 focus:ring-inset focus:ring-primary/25 sm:w-20"
+            title={`${minimumCartQuantity(item)} – ${maximum}`}
+            style={{ width: `${visibleCharacters}ch` }}
+            className="h-9 min-w-[4.5rem] max-w-[9rem] border-x border-border/80 bg-transparent px-2 text-center text-xs font-bold tabular-nums outline-none transition focus:bg-primary/5 focus:ring-2 focus:ring-inset focus:ring-primary/25 dark:border-white/10"
         />
     );
 }

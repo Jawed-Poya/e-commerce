@@ -184,6 +184,7 @@ export function CheckoutPage() {
             cart.clear();
             navigate(`/orders/${confirmation.orderNumber}/success`, {
                 replace: true,
+                viewTransition: true,
                 state: { confirmation, phone: form.phone },
             });
         } catch (requestError) {
@@ -221,7 +222,7 @@ export function CheckoutPage() {
                 </div>
 
                 <Button asChild variant="outline" className="hidden sm:flex">
-                    <Link to="/cart">
+                    <Link viewTransition to="/cart">
                         <ArrowLeft className="rtl:rotate-180" /> {t("checkout.backToCart")}
                     </Link>
                 </Button>

@@ -71,7 +71,7 @@ export function AuthPage() {
             }
 
             const from = (location.state as { from?: string } | null)?.from;
-            navigate(from || "/account", { replace: true });
+            navigate(from || "/account", { replace: true, viewTransition: true });
         } catch (requestError) {
             setError(
                 requestError instanceof ApiError
@@ -87,18 +87,18 @@ export function AuthPage() {
     const companyName = company?.name ?? "EasyCart";
 
     return (
-        <main className="relative isolate overflow-hidden border-y bg-muted/20 px-4 py-8 sm:px-6 sm:py-12 lg:px-8 lg:py-16">
+        <main className="relative isolate overflow-hidden border-y border-border/80 bg-muted/20 dark:border-white/10 px-4 py-8 sm:px-6 sm:py-12 lg:px-8 lg:py-16">
             <div className="pointer-events-none absolute -start-24 -top-24 -z-10 size-96 rounded-full bg-primary/10 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-32 -end-24 -z-10 size-96 rounded-full bg-primary/5 blur-3xl" />
 
-            <div className="mx-auto grid w-full max-w-[1380px] overflow-hidden rounded-[30px] border bg-background/92 shadow-[0_28px_90px_rgba(15,23,42,0.13)] backdrop-blur-xl lg:grid-cols-[1.04fr_.96fr]">
+            <div className="mx-auto grid w-full max-w-[1380px] overflow-hidden rounded-[30px] border border-border/80 bg-background/92 dark:border-white/12 dark:bg-card/95 shadow-[0_28px_90px_rgba(15,23,42,0.13)] backdrop-blur-xl lg:grid-cols-[1.04fr_.96fr]">
                 <section className="relative hidden min-h-[720px] overflow-hidden bg-primary p-10 text-primary-foreground lg:flex lg:flex-col xl:p-14">
                     <div className="absolute -end-24 -top-24 size-80 rounded-full bg-white/15 blur-3xl" />
                     <div className="absolute -bottom-28 -start-20 size-96 rounded-full bg-[var(--brand-orange)] opacity-30 blur-3xl" />
                     <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_30%,rgba(255,255,255,0.08))]" />
 
                     <div className="relative z-10 flex items-center justify-between gap-4">
-                        <Link to="/" className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-2.5 pe-4 backdrop-blur transition hover:bg-white/15">
+                        <Link viewTransition to="/" className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-2.5 pe-4 backdrop-blur transition hover:bg-white/15">
                             <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-white text-primary shadow-lg">
                                 {logo ? <img src={logo} alt="" className="size-full object-contain p-1.5" /> : <ShoppingBag className="size-5" />}
                             </span>
@@ -146,18 +146,18 @@ export function AuthPage() {
                 <section className="flex min-h-[680px] items-center justify-center p-5 sm:p-9 lg:min-h-[720px] xl:p-14">
                     <div className="w-full max-w-[560px]">
                         <div className="mb-8 flex items-center justify-between gap-4 lg:hidden">
-                            <Link to="/" className="flex min-w-0 items-center gap-3">
-                                <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl border bg-card text-primary shadow-sm">
+                            <Link viewTransition to="/" className="flex min-w-0 items-center gap-3">
+                                <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/80 bg-card dark:border-white/12 text-primary shadow-sm">
                                     {logo ? <img src={logo} alt="" className="size-full object-contain p-1.5" /> : <ShoppingBag className="size-4" />}
                                 </span>
                                 <span className="truncate text-sm font-black">{companyName}</span>
                             </Link>
                             <Button asChild variant="ghost" size="sm" className="rounded-xl">
-                                <Link to="/products"><ArrowLeft className="size-4 rtl:rotate-180" />{t("auth.backToStore")}</Link>
+                                <Link viewTransition to="/products"><ArrowLeft className="size-4 rtl:rotate-180" />{t("auth.backToStore")}</Link>
                             </Button>
                         </div>
 
-                        <div className="rounded-[24px] border bg-muted/50 p-1.5 shadow-inner">
+                        <div className="rounded-[24px] border border-border/80 bg-muted/50 p-1.5 shadow-inner dark:border-white/12 dark:bg-slate-950/35">
                             <div className="grid grid-cols-2 gap-1">
                                 <ModeButton active={mode === "login"} onClick={() => { setMode("login"); setError(null); }}>{t("auth.signIn")}</ModeButton>
                                 <ModeButton active={mode === "register"} onClick={() => { setMode("register"); setError(null); }}>{t("auth.createAccount")}</ModeButton>
@@ -201,7 +201,7 @@ export function AuthPage() {
                                         type={showPassword ? "text" : "password"}
                                         value={form.password}
                                         onChange={(event) => update("password", event.target.value)}
-                                        className="h-14 w-full rounded-2xl border bg-background ps-11 pe-12 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                                        className="h-14 w-full rounded-2xl border border-input bg-background ps-11 pe-12 dark:border-white/12 dark:bg-slate-950/45 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
                                         placeholder={t("auth.passwordPlaceholder")}
                                     />
                                     <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute end-3 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}>
@@ -218,13 +218,13 @@ export function AuthPage() {
                             </Button>
                         </form>
 
-                        <div className="mt-6 flex items-start gap-3 rounded-2xl border bg-muted/30 p-4">
+                        <div className="mt-6 flex items-start gap-3 rounded-2xl border border-border/80 bg-muted/30 p-4 dark:border-white/10 dark:bg-slate-950/30">
                             <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
                             <p className="text-xs leading-5 text-muted-foreground">{t("auth.optionalHelp")}</p>
                         </div>
 
                         <Button asChild variant="ghost" className="mt-4 hidden rounded-xl lg:inline-flex">
-                            <Link to="/products"><ArrowLeft className="size-4 rtl:rotate-180" />{t("auth.backToStore")}</Link>
+                            <Link viewTransition to="/products"><ArrowLeft className="size-4 rtl:rotate-180" />{t("auth.backToStore")}</Link>
                         </Button>
                     </div>
                 </section>
@@ -234,12 +234,12 @@ export function AuthPage() {
 }
 
 function ModeButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-    return <button type="button" onClick={onClick} className={cn("rounded-[18px] px-4 py-3.5 text-sm font-bold transition", active ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60 hover:text-foreground")}>{children}</button>;
+    return <button type="button" onClick={onClick} className={cn("rounded-[18px] px-4 py-3.5 text-sm font-bold transition", active ? "bg-background text-foreground shadow-sm ring-1 ring-border dark:ring-white/12" : "text-muted-foreground hover:bg-background/60 hover:text-foreground")}>{children}</button>;
 }
 
 function AuthField({ label, value, onChange, required, type = "text", placeholder }: { label: string; value: string; onChange: (value: string) => void; required?: boolean; type?: string; placeholder?: string }) {
     const autoComplete = type === "email" ? "email" : label.toLowerCase().includes("phone") ? "tel" : undefined;
-    return <label className="grid gap-2"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{label}{required ? " *" : ""}</span><input required={required} type={type} autoComplete={autoComplete} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-14 rounded-2xl border bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10" /></label>;
+    return <label className="grid gap-2"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{label}{required ? " *" : ""}</span><input required={required} type={type} autoComplete={autoComplete} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-14 rounded-2xl border border-input bg-background px-4 dark:border-white/12 dark:bg-slate-950/45 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10" /></label>;
 }
 
 function Benefit({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {

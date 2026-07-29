@@ -78,7 +78,7 @@ export function NotificationCenter() {
                     <div className="max-h-[390px] overflow-y-auto p-2">
                         {notifications.items.map((item) => (
                             <DropdownMenu.Item key={item.id} asChild>
-                                <Link
+                                <Link viewTransition
                                     to={item.link}
                                     className="flex gap-3 rounded-xl p-3 outline-none transition hover:bg-muted focus:bg-muted"
                                 >
