@@ -12,6 +12,13 @@ public sealed class AddProductUnitConversions : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
+        // UnitPrice is included by the performance index created in
+        // AddPerformanceIndexes. SQL Server requires dependent indexes to be
+        // removed before the column precision can be changed. The migration is
+        // intentionally conditional so it also works on databases where the
+        // optional performance-index migration was not previously applied.
+        DropOrderItemsPerformanceIndex(migrationBuilder);
+
         migrationBuilder.DropCheckConstraint(
             name: "CK_OrderItem_Values",
             table: "OrderItems");
@@ -259,10 +266,14 @@ public sealed class AddProductUnitConversions : Migration
             name: "IX_ProductUnitConversions_UnitId",
             table: "ProductUnitConversions",
             column: "UnitId");
+
+        CreateOrderItemsPerformanceIndex(migrationBuilder);
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
     {
+        DropOrderItemsPerformanceIndex(migrationBuilder);
+
         migrationBuilder.DropCheckConstraint(name: "CK_OrderItem_Values", table: "OrderItems");
         migrationBuilder.DropCheckConstraint(name: "CK_PurchaseItem_UnitValues", table: "PurchaseItems");
         migrationBuilder.DropCheckConstraint(name: "CK_InventorySaleItem_UnitValues", table: "InventorySaleItems");
@@ -311,5 +322,41 @@ public sealed class AddProductUnitConversions : Migration
             name: "CK_OrderItem_Values",
             table: "OrderItems",
             sql: "[Quantity] > 0 AND [UnitPrice] >= 0 AND [Discount] >= 0 AND [Tax] >= 0");
+
+        CreateOrderItemsPerformanceIndex(migrationBuilder);
+    }
+
+    private static void DropOrderItemsPerformanceIndex(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.Sql("""
+            IF EXISTS
+            (
+                SELECT 1
+                FROM sys.indexes
+                WHERE object_id = OBJECT_ID(N'[dbo].[OrderItems]')
+                  AND name = N'IX_OrderItems_PerformanceOrder'
+            )
+            BEGIN
+                DROP INDEX [IX_OrderItems_PerformanceOrder] ON [dbo].[OrderItems];
+            END;
+            """);
+    }
+
+    private static void CreateOrderItemsPerformanceIndex(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.Sql("""
+            IF NOT EXISTS
+            (
+                SELECT 1
+                FROM sys.indexes
+                WHERE object_id = OBJECT_ID(N'[dbo].[OrderItems]')
+                  AND name = N'IX_OrderItems_PerformanceOrder'
+            )
+            BEGIN
+                CREATE INDEX [IX_OrderItems_PerformanceOrder]
+                    ON [dbo].[OrderItems] ([TenantId], [OrderId], [IsDeleted])
+                    INCLUDE ([ProductId], [Quantity], [UnitPrice], [UnitCost], [Discount], [Tax], [AffectsInventory]);
+            END;
+            """);
     }
 }
