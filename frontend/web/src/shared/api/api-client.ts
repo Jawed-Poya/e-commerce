@@ -101,6 +101,17 @@ export async function apiPost<T>(path: string, body?: unknown) {
     );
 }
 
+
+export async function apiPostForm<T>(path: string, body: FormData) {
+    return readResponse<T>(
+        await fetch(`${API_URL}${path}`, {
+            method: "POST",
+            headers: requestHeaders(),
+            body,
+        }),
+    );
+}
+
 export async function apiPut<T>(path: string, body?: unknown) {
     return readResponse<T>(
         await fetch(`${API_URL}${path}`, {
