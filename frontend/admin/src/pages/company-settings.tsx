@@ -1,8 +1,9 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, LoaderCircle, MapPin, Pencil, Plus, Save, Settings2 } from "lucide-react";
+import { Building2, ImagePlus, LoaderCircle, MapPin, Pencil, Plus, Save, Settings2, UploadCloud, X } from "lucide-react";
 import { toast } from "sonner";
 
+import { apiOrigin } from "@/api/axios";
 import { PageHeader } from "@/components/page-header";
 import { SimpleCombobox } from "@/components/simple-combobox";
 import { Badge } from "@/components/ui/badge";
@@ -197,8 +198,23 @@ export default function CompanySettingsPage() {
                             <Field label="Registration number"><Input value={profile.registrationNumber ?? ""} onChange={(event) => setProfile({ ...profile, registrationNumber: nullable(event.target.value) })} /></Field>
                             <Field label="Email"><Input type="email" value={profile.email ?? ""} onChange={(event) => setProfile({ ...profile, email: nullable(event.target.value) })} /></Field>
                             <Field label="Phone"><Input value={profile.phone ?? ""} onChange={(event) => setProfile({ ...profile, phone: nullable(event.target.value) })} /></Field>
-                            <Field label="Logo URL"><Input value={profile.logoUrl ?? ""} onChange={(event) => setProfile({ ...profile, logoUrl: nullable(event.target.value) })} /></Field>
-                            <Field label="Favicon URL"><Input value={profile.faviconUrl ?? ""} onChange={(event) => setProfile({ ...profile, faviconUrl: nullable(event.target.value) })} /></Field>
+                            <BrandAssetUploader
+                                assetType="logo"
+                                label="Company logo"
+                                description="Upload a transparent PNG, JPG, WEBP, or AVIF logo up to 5 MB."
+                                value={profile.logoUrl}
+                                disabled={!canManageProfile}
+                                onChange={(logoUrl) => setProfile({ ...profile, logoUrl })}
+                            />
+                            <BrandAssetUploader
+                                assetType="favicon"
+                                label="Browser favicon"
+                                description="Use a square image for browser tabs and saved shortcuts."
+                                value={profile.faviconUrl}
+                                disabled={!canManageProfile}
+                                compact
+                                onChange={(faviconUrl) => setProfile({ ...profile, faviconUrl })}
+                            />
                             <div className="space-y-2 sm:col-span-2"><Label>Address</Label><Textarea value={profile.address ?? ""} onChange={(event) => setProfile({ ...profile, address: nullable(event.target.value) })} /></div>
                             <div className="sm:col-span-2 flex items-center justify-between gap-3">
                                 {!canManageProfile && <p className="text-xs text-muted-foreground">You can view this profile but cannot edit it.</p>}
@@ -305,6 +321,108 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
 
 function Toggle({ label, description, checked, onCheckedChange }: { label: string; description: string; checked: boolean; onCheckedChange: (value: boolean) => void }) {
     return <div className="flex items-center justify-between gap-4 rounded-xl border p-4"><div><p className="text-sm font-semibold">{label}</p><p className="mt-1 text-xs text-muted-foreground">{description}</p></div><Switch checked={checked} onCheckedChange={onCheckedChange} /></div>;
+}
+
+
+function BrandAssetUploader({
+    assetType,
+    label,
+    description,
+    value,
+    onChange,
+    disabled,
+    compact = false,
+}: {
+    assetType: "logo" | "favicon";
+    label: string;
+    description: string;
+    value: string | null;
+    onChange: (value: string | null) => void;
+    disabled?: boolean;
+    compact?: boolean;
+}) {
+    const inputRef = useRef<HTMLInputElement>(null);
+    const { tr } = useI18n();
+    const upload = useMutation({
+        mutationFn: (file: File) => companyService.uploadBrandAsset(assetType, file),
+        onSuccess: (imageUrl) => {
+            onChange(imageUrl);
+            toast.success(tr(assetType === "logo" ? "Company logo uploaded." : "Company favicon uploaded."));
+        },
+        onError: (error) => toast.error(tr(message(error))),
+    });
+
+    const choose = (file?: File) => {
+        if (!file) return;
+        if (!file.type.startsWith("image/")) {
+            toast.error(tr("Choose a valid image file."));
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error(tr("The image must not exceed 5 MB."));
+            return;
+        }
+        upload.mutate(file);
+    };
+
+    const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        if (!disabled && !upload.isPending) choose(event.dataTransfer.files[0]);
+    };
+
+    const preview = value
+        ? /^https?:/i.test(value)
+            ? value
+            : `${apiOrigin}${value.startsWith("/") ? value : `/${value}`}`
+        : null;
+
+    return (
+        <div className="space-y-2">
+            <Label>{label}</Label>
+            <div
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={handleDrop}
+                className="group relative overflow-hidden rounded-2xl border border-dashed bg-muted/20 p-3 transition hover:border-primary/50 hover:bg-primary/[0.03] dark:border-white/12"
+            >
+                <input
+                    ref={inputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/avif"
+                    className="sr-only"
+                    disabled={disabled || upload.isPending}
+                    onChange={(event) => {
+                        choose(event.target.files?.[0]);
+                        event.currentTarget.value = "";
+                    }}
+                />
+                <div className="flex items-center gap-3">
+                    <div className={`${compact ? "size-16" : "h-20 w-28"} grid shrink-0 place-items-center overflow-hidden rounded-xl border bg-background p-2 shadow-sm dark:border-white/10`}>
+                        {preview ? (
+                            <img src={preview} alt="" className="size-full object-contain" />
+                        ) : (
+                            <ImagePlus className="size-6 text-muted-foreground" />
+                        )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold">{upload.isPending ? tr("Uploading…") : tr("Choose or drop an image")}</p>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
+                        {value ? <p className="mt-1 text-[11px] font-medium text-primary">{tr("The uploaded image will be applied when you save the company profile.")}</p> : null}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            <Button type="button" size="sm" variant="outline" disabled={disabled || upload.isPending} onClick={() => inputRef.current?.click()}>
+                                {upload.isPending ? <LoaderCircle className="animate-spin" /> : <UploadCloud />}
+                                {upload.isPending ? tr("Uploading…") : tr("Upload image")}
+                            </Button>
+                            {value ? (
+                                <Button type="button" size="sm" variant="ghost" disabled={disabled || upload.isPending} onClick={() => onChange(null)}>
+                                    <X /> {tr("Remove image")}
+                                </Button>
+                            ) : null}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 function nullable(value: string) {

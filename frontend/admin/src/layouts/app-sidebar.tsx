@@ -8,6 +8,7 @@ import { useI18n } from "@/i18n/i18n-provider";
 import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
 import { useCompany } from "@/features/company/company-context";
+import { resolveCompanyAssetUrl } from "@/features/company/company-service";
 
 type ProtectedItem = { title: string; url: string; icon?: React.ReactNode; permission?: string; items?: ProtectedItem[] };
 type ProtectedGroup = { label: string; items: ProtectedItem[] };
@@ -56,7 +57,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     })).filter((group) => group.items.length > 0);
 
     return <Sidebar side={language === "en" ? "left" : "right"} dir={language === "en" ? "ltr" : "rtl"} collapsible="icon" {...props}>
-        <SidebarHeader><div className="flex items-center gap-3 border-b p-2"><div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-primary text-primary-foreground">{company?.logoUrl ? <img src={company.logoUrl} alt="" className="size-full object-cover" /> : (company?.name ?? "C").slice(0, 1).toUpperCase()}</div><div className="min-w-0 group-data-[collapsible=icon]:hidden"><span className="block truncate font-bold">{company?.name ?? "Company"}</span><span className="block truncate text-xs text-muted-foreground">Commerce control center</span></div></div></SidebarHeader>
+        <SidebarHeader><div className="flex items-center gap-3 border-b p-2"><div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-primary text-primary-foreground">{company?.logoUrl ? <img src={resolveCompanyAssetUrl(company.logoUrl) ?? company.logoUrl} alt="" className="size-full object-contain bg-background p-1" /> : (company?.name ?? "C").slice(0, 1).toUpperCase()}</div><div className="min-w-0 group-data-[collapsible=icon]:hidden"><span className="block truncate font-bold">{company?.name ?? "Company"}</span><span className="block truncate text-xs text-muted-foreground">Commerce control center</span></div></div></SidebarHeader>
         <SidebarContent>{groups.length ? <NavMain groups={groups} /> : <div className="p-4 text-xs text-muted-foreground">No modules are available.</div>}</SidebarContent>
         <SidebarFooter><NavUser /></SidebarFooter><SidebarRail />
     </Sidebar>;

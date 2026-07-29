@@ -1,4 +1,5 @@
 import apiClient from "@/api/api-client";
+import axiosInstance, { apiOrigin } from "@/api/axios";
 import type {
     CompanyBranch,
     CompanyProfile,
@@ -17,6 +18,13 @@ export type UpdateCompanyProfile = Pick<
 >;
 export type UpsertCompanyBranch = Omit<CompanyBranch, "id">;
 
+export function resolveCompanyAssetUrl(path: string | null | undefined) {
+    if (!path) return null;
+    return /^https?:/i.test(path)
+        ? path
+        : `${apiOrigin}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 export const companyService = {
     publicProfile: async () =>
         (await apiClient.get<PublicCompanyProfile>("/company/public-profile")).data,
@@ -24,6 +32,14 @@ export const companyService = {
         (await apiClient.get<CompanyProfile>("/company/profile")).data,
     updateProfile: async (request: UpdateCompanyProfile) =>
         (await apiClient.put<CompanyProfile>("/company/profile", request)).data,
+    uploadBrandAsset: async (assetType: "logo" | "favicon", image: File) => {
+        const form = new FormData();
+        form.append("image", image, image.name);
+        const response = await axiosInstance.post<{
+            data: { assetType: string; imageUrl: string };
+        }>(`/company/assets/${assetType}`, form);
+        return response.data.data.imageUrl;
+    },
     updateSettings: async (request: CompanySettings) =>
         (await apiClient.put<CompanyProfile>("/company/settings", request)).data,
     createBranch: async (request: UpsertCompanyBranch) =>

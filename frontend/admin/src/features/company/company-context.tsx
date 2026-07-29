@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, type PropsWithChildren } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { companyService } from "./company-service";
+import { companyService, resolveCompanyAssetUrl } from "./company-service";
 import type { PublicCompanyProfile } from "./company-types";
 import { useI18n } from "@/i18n/i18n-provider";
 import { resolveCompanyFontStack, resolveCompanyHeadingStack } from "@/features/company/company-fonts";
@@ -52,7 +52,7 @@ export function CompanyProvider({ children }: PropsWithChildren) {
                 link.rel = "icon";
                 document.head.appendChild(link);
             }
-            link.href = company.faviconUrl;
+            link.href = resolveCompanyAssetUrl(company.faviconUrl) ?? company.faviconUrl;
         }
     }, [company]);
 

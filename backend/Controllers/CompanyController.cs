@@ -1,6 +1,7 @@
 using ECommerce.Dtos.Company;
 using ECommerce.Entities;
 using ECommerce.Services.Company;
+using ECommerce.Services.Products;
 using ECommerce.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +10,9 @@ namespace ECommerce.Controllers;
 
 [ApiController]
 [Route("api/company")]
-public sealed class CompanyController(ICompanyService company) : ControllerBase
+public sealed class CompanyController(
+    ICompanyService company,
+    IProductImageStorage imageStorage) : ControllerBase
 {
     [AllowAnonymous]
     [HttpGet("public-profile")]
@@ -38,6 +41,34 @@ public sealed class CompanyController(ICompanyService company) : ControllerBase
         using var operation = ServerOperation.CreateWriteScope();
         var updated = await company.UpdateProfileAsync(request, operation.Token);
         return Ok(ApiResponse<CompanyProfileResponse>.Ok(updated, "Company profile updated."));
+    }
+
+    [Authorize(Policy = AppPermissions.CompanyProfileManage)]
+    [HttpPost("assets/{assetType}")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(5 * 1024 * 1024)]
+    public async Task<ActionResult<ApiResponse<object>>> UploadBrandAsset(
+        string assetType,
+        IFormFile image)
+    {
+        var normalizedType = assetType.Trim().ToLowerInvariant();
+        if (normalizedType is not ("logo" or "favicon"))
+            return BadRequest(ApiResponse<object>.Fail("The company asset type must be logo or favicon."));
+
+        using var operation = ServerOperation.CreateWriteScope();
+        try
+        {
+            var stored = await imageStorage.SaveAsync(image, "company", operation.Token);
+            return Ok(ApiResponse<object>.Ok(
+                new { assetType = normalizedType, imageUrl = stored.PublicUrl },
+                normalizedType == "logo"
+                    ? "Company logo uploaded."
+                    : "Company favicon uploaded."));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
+        }
     }
 
     [Authorize(Policy = AppPermissions.CompanySettingsManage)]
