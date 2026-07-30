@@ -1,44 +1,40 @@
+import type { ComponentType } from "react";
 import { createBrowserRouter } from "react-router-dom";
-import AppLayout from "@/layouts/app-layout";
-import Dashboard from "@/pages/dashboard";
-import ProductsPage from "@/pages/products";
-import GeneralTypesPage from "@/pages/general-types";
-import { ProductBulkCreatePage } from "@/features/products/components/product-bulk-create-page";
-import { ProductEditorPage } from "@/features/products/components/product-editor-page";
-import ProductDetailsPage from "@/pages/product-details";
-import { InventoryPage } from "@/features/inventory/components/inventory-page";
-import OrdersPage from "@/pages/orders";
-import OrderDetailsPage from "@/pages/order-details";
-import CustomersPage from "@/pages/customers";
-import CustomerDetailsPage from "@/pages/customer-details";
-import UsersPage from "@/pages/users";
-import RolesPage from "@/pages/roles";
-import AdminLoginPage from "@/features/auth/login-page";
-import ProfilePage from "@/pages/profile";
-import AdminNotFoundPage from "@/pages/not-found";
-import StorefrontContentPage from "@/pages/storefront-content";
-import ReviewsPage from "@/pages/reviews";
-import OperationsDashboardPage from "@/pages/operations-dashboard";
-import PurchasesPage from "@/pages/purchases";
-import ManualSalesPage from "@/pages/manual-sales";
-import StaffPage from "@/pages/staff";
-import ExpensesPage from "@/pages/expenses";
-import CompanySettingsPage from "@/pages/company-settings";
-import FinancialReportsPage from "@/pages/financial-reports";
-import TrashPage from "@/pages/trash";
 
-import { ProtectedRoute } from "@/features/auth/protected-route";
 import { PermissionRoute } from "@/features/auth/permission-route";
 import { Permissions } from "@/features/auth/permissions";
+import { ProtectedRoute } from "@/features/auth/protected-route";
+import AppLayout from "@/layouts/app-layout";
 
-const allowed = (permission: string | readonly string[], element: React.ReactNode) => (
-    <PermissionRoute permission={permission}>{element}</PermissionRoute>
-);
+function lazyPage(load: () => Promise<ComponentType>) {
+    return async () => ({ Component: await load() });
+}
+
+function lazyAllowed(
+    permission: string | readonly string[],
+    load: () => Promise<ComponentType>,
+) {
+    return async () => {
+        const Page = await load();
+        return {
+            Component: () => (
+                <PermissionRoute permission={permission}>
+                    <Page />
+                </PermissionRoute>
+            ),
+        };
+    };
+}
+
+const loadNotFound = () =>
+    import("@/pages/not-found").then((module) => module.default);
 
 export const router = createBrowserRouter([
     {
         path: "/login",
-        element: <AdminLoginPage />,
+        lazy: lazyPage(() =>
+            import("@/features/auth/login-page").then((module) => module.default),
+        ),
     },
     {
         element: <ProtectedRoute />,
@@ -49,74 +45,101 @@ export const router = createBrowserRouter([
                 children: [
                     {
                         index: true,
-                        element: allowed(Permissions.DashboardView, <Dashboard />),
+                        lazy: lazyAllowed(Permissions.DashboardView, () =>
+                            import("@/pages/dashboard").then((module) => module.default),
+                        ),
                     },
                     {
                         path: "dashboard",
-                        element: allowed(Permissions.DashboardView, <Dashboard />),
+                        lazy: lazyAllowed(Permissions.DashboardView, () =>
+                            import("@/pages/dashboard").then((module) => module.default),
+                        ),
                     },
                     {
                         path: "products",
                         children: [
                             {
                                 index: true,
-                                element: allowed(
-                                    Permissions.ProductsView,
-                                    <ProductsPage />,
+                                lazy: lazyAllowed(Permissions.ProductsView, () =>
+                                    import("@/pages/products").then((module) => module.default),
                                 ),
                             },
                             {
                                 path: "new",
-                                element: allowed(
-                                    Permissions.ProductsManage,
-                                    <ProductEditorPage />,
+                                lazy: lazyAllowed(Permissions.ProductsManage, () =>
+                                    import("@/features/products/components/product-editor-page")
+                                        .then((module) => module.ProductEditorPage),
                                 ),
                             },
                             {
                                 path: "bulk",
-                                element: allowed(
-                                    Permissions.ProductsManage,
-                                    <ProductBulkCreatePage />,
+                                lazy: lazyAllowed(Permissions.ProductsManage, () =>
+                                    import("@/features/products/components/product-bulk-create-page")
+                                        .then((module) => module.ProductBulkCreatePage),
                                 ),
                             },
                             {
                                 path: ":id",
-                                element: allowed(
-                                    Permissions.ProductsView,
-                                    <ProductDetailsPage />,
+                                lazy: lazyAllowed(Permissions.ProductsView, () =>
+                                    import("@/pages/product-details").then((module) => module.default),
                                 ),
                             },
                             {
                                 path: ":id/edit",
-                                element: allowed(
-                                    Permissions.ProductsManage,
-                                    <ProductEditorPage />,
+                                lazy: lazyAllowed(Permissions.ProductsManage, () =>
+                                    import("@/features/products/components/product-editor-page")
+                                        .then((module) => module.ProductEditorPage),
                                 ),
                             },
                         ],
                     },
                     {
                         path: "reviews",
-                        element: allowed(
-                            Permissions.ProductsManage,
-                            <ReviewsPage />,
+                        lazy: lazyAllowed(Permissions.ProductsManage, () =>
+                            import("@/pages/reviews").then((module) => module.default),
                         ),
                     },
                     {
                         path: "inventory",
-                        element: allowed(
-                            Permissions.InventoryView,
-                            <InventoryPage />,
+                        lazy: lazyAllowed(Permissions.InventoryView, () =>
+                            import("@/features/inventory/components/inventory-page")
+                                .then((module) => module.InventoryPage),
                         ),
                     },
                     {
                         path: "operations",
                         children: [
-                            { index: true, element: allowed(Permissions.OperationsView, <OperationsDashboardPage />) },
-                            { path: "purchases", element: allowed(Permissions.PurchasesView, <PurchasesPage />) },
-                            { path: "sales", element: allowed(Permissions.ManualSalesView, <ManualSalesPage />) },
-                            { path: "staff", element: allowed(Permissions.StaffView, <StaffPage />) },
-                            { path: "expenses", element: allowed(Permissions.ExpensesView, <ExpensesPage />) },
+                            {
+                                index: true,
+                                lazy: lazyAllowed(Permissions.OperationsView, () =>
+                                    import("@/pages/operations-dashboard")
+                                        .then((module) => module.default),
+                                ),
+                            },
+                            {
+                                path: "purchases",
+                                lazy: lazyAllowed(Permissions.PurchasesView, () =>
+                                    import("@/pages/purchases").then((module) => module.default),
+                                ),
+                            },
+                            {
+                                path: "sales",
+                                lazy: lazyAllowed(Permissions.ManualSalesView, () =>
+                                    import("@/pages/manual-sales").then((module) => module.default),
+                                ),
+                            },
+                            {
+                                path: "staff",
+                                lazy: lazyAllowed(Permissions.StaffView, () =>
+                                    import("@/pages/staff").then((module) => module.default),
+                                ),
+                            },
+                            {
+                                path: "expenses",
+                                lazy: lazyAllowed(Permissions.ExpensesView, () =>
+                                    import("@/pages/expenses").then((module) => module.default),
+                                ),
+                            },
                         ],
                     },
                     {
@@ -124,16 +147,16 @@ export const router = createBrowserRouter([
                         children: [
                             {
                                 index: true,
-                                element: allowed(
-                                    Permissions.OrdersView,
-                                    <OrdersPage />,
+                                lazy: lazyAllowed(Permissions.OrdersView, () =>
+                                    import("@/features/orders/pages/orders-page")
+                                        .then((module) => module.default),
                                 ),
                             },
                             {
                                 path: ":id",
-                                element: allowed(
-                                    Permissions.OrdersView,
-                                    <OrderDetailsPage />,
+                                lazy: lazyAllowed(Permissions.OrdersView, () =>
+                                    import("@/features/orders/pages/order-details-page")
+                                        .then((module) => module.default),
                                 ),
                             },
                         ],
@@ -143,68 +166,77 @@ export const router = createBrowserRouter([
                         children: [
                             {
                                 index: true,
-                                element: allowed(
-                                    Permissions.CustomersView,
-                                    <CustomersPage />,
+                                lazy: lazyAllowed(Permissions.CustomersView, () =>
+                                    import("@/pages/customers").then((module) => module.default),
                                 ),
                             },
                             {
                                 path: ":id",
-                                element: allowed(
-                                    Permissions.CustomersView,
-                                    <CustomerDetailsPage />,
+                                lazy: lazyAllowed(Permissions.CustomersView, () =>
+                                    import("@/pages/customer-details")
+                                        .then((module) => module.default),
                                 ),
                             },
                         ],
                     },
                     {
                         path: "profile",
-                        element: <ProfilePage />,
+                        lazy: lazyPage(() =>
+                            import("@/pages/profile").then((module) => module.default),
+                        ),
                     },
                     {
                         path: "company",
-                        element: allowed(
+                        lazy: lazyAllowed(
                             [
                                 Permissions.CompanyProfileManage,
                                 Permissions.CompanySettingsManage,
                                 Permissions.CompanyBranchesManage,
                             ],
-                            <CompanySettingsPage />,
+                            () => import("@/pages/company-settings").then((module) => module.default),
                         ),
                     },
                     {
                         path: "reports",
-                        element: allowed(Permissions.FinancialReportsView, <FinancialReportsPage />),
+                        lazy: lazyAllowed(Permissions.FinancialReportsView, () =>
+                            import("@/features/finance/pages/financial-reports-page")
+                                .then((module) => module.default),
+                        ),
                     },
                     {
                         path: "trash",
-                        element: allowed(Permissions.CompanyTrashManage, <TrashPage />),
+                        lazy: lazyAllowed(Permissions.CompanyTrashManage, () =>
+                            import("@/pages/trash").then((module) => module.default),
+                        ),
                     },
                     {
                         path: "system/general-types",
-                        element: allowed(
-                            Permissions.SystemManage,
-                            <GeneralTypesPage />,
+                        lazy: lazyAllowed(Permissions.SystemManage, () =>
+                            import("@/pages/general-types").then((module) => module.default),
                         ),
                     },
                     {
                         path: "system/storefront",
-                        element: allowed(
-                            Permissions.SystemManage,
-                            <StorefrontContentPage />,
+                        lazy: lazyAllowed(Permissions.SystemManage, () =>
+                            import("@/pages/storefront-content")
+                                .then((module) => module.default),
                         ),
                     },
                     {
                         path: "system/users",
-                        element: allowed(Permissions.UsersView, <UsersPage />),
+                        lazy: lazyAllowed(Permissions.UsersView, () =>
+                            import("@/pages/users").then((module) => module.default),
+                        ),
                     },
                     {
                         path: "system/roles",
-                        element: allowed(Permissions.RolesManage, <RolesPage />),
+                        lazy: lazyAllowed(Permissions.RolesManage, () =>
+                            import("@/pages/roles").then((module) => module.default),
+                        ),
                     },
                     {
                         path: "*",
-                        element: <AdminNotFoundPage />,
+                        lazy: lazyPage(loadNotFound),
                     },
                 ],
             },
@@ -212,6 +244,6 @@ export const router = createBrowserRouter([
     },
     {
         path: "*",
-        element: <AdminNotFoundPage />,
+        lazy: lazyPage(loadNotFound),
     },
 ]);

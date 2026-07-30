@@ -36,7 +36,8 @@ import type {
     SalesTrendPoint,
     TopProductItem,
 } from "@/features/dashboard/dashboard-types";
-import { formatMoney, StatusBadge } from "@/pages/orders";
+import { OrderStatusBadge as StatusBadge } from "@/features/orders/components/order-status-badge";
+import { formatMoney } from "@/lib/format-money";
 import { useI18n } from "@/i18n/i18n-provider";
 
 export default function Dashboard() {
