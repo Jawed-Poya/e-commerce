@@ -408,31 +408,6 @@ export function StoreLayout() {
             </main>
 
             <footer className="mt-20 bg-card dark:bg-[#081713]">
-                <div className="bg-muted/[0.28] dark:bg-white/[0.02]">
-                    <div className="mx-auto grid w-full max-w-[1480px] gap-3 px-4 py-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
-                        <FooterPromise
-                            title={t("footer.secureCheckout")}
-                            description={t("header.secure")}
-                        />
-                        <FooterPromise
-                            title={t("footer.fastDelivery")}
-                            description={t("home.deliveryTracking")}
-                        />
-                        <FooterPromise
-                            title={t("footer.easyReturns")}
-                            description={t("home.simplePolicy")}
-                        />
-                        <FooterPromise
-                            title={t("footer.contactSupport")}
-                            description={
-                                contactPhone ??
-                                company?.email ??
-                                t("footer.customerCare")
-                            }
-                        />
-                    </div>
-                </div>
-
                 <div className="mx-auto grid w-full max-w-[1480px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-[1.2fr_.72fr_.72fr_1.15fr] lg:px-8">
                     <div>
                         <Logo />
@@ -704,30 +679,6 @@ function CountBadge({ children }: { children: ReactNode }) {
         <span className="absolute end-0 top-0 grid min-w-4 -translate-y-0.5 translate-x-0.5 place-items-center rounded-full bg-brand-orange px-1 text-[9px] font-black leading-4 text-white">
             {children}
         </span>
-    );
-}
-
-function FooterPromise({
-    title,
-    description,
-}: {
-    title: string;
-    description: string;
-}) {
-    return (
-        <div className="flex min-h-24 items-center gap-3 rounded-xl bg-background/[0.72] px-4 py-4 shadow-[0_10px_26px_-28px_rgba(15,23,42,.55)] dark:bg-white/[0.03]">
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                <Check className="size-4" />
-            </span>
-            <span className="min-w-0">
-                <span className="block text-sm font-bold text-foreground">
-                    {title}
-                </span>
-                <span className="mt-1 block text-xs leading-5 text-muted-foreground">
-                    {description}
-                </span>
-            </span>
-        </div>
     );
 }
 
