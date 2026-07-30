@@ -2,6 +2,8 @@ import * as Dialog from "@radix-ui/react-dialog";
 import {
     Check,
     Heart,
+    House,
+    LayoutGrid,
     Mail,
     MapPin,
     Menu,
@@ -91,9 +93,9 @@ function Logo({ inverse = false }: { inverse?: boolean }) {
         <Link
             viewTransition
             to="/"
-            className="group flex min-w-0 shrink-0 items-center gap-3"
+            className="group flex min-w-0 shrink-0 items-center gap-2.5"
         >
-            <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl border border-primary/15 bg-primary text-xs font-black text-primary-foreground shadow-sm transition duration-200 group-hover:-translate-y-0.5">
+            <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-primary text-xs font-black text-primary-foreground shadow-sm ring-1 ring-black/[0.05] transition duration-200 group-hover:-translate-y-0.5 dark:ring-white/[0.06]">
                 {company?.logoUrl ? (
                     <img
                         src={imageUrl(company.logoUrl) ?? company.logoUrl}
@@ -146,6 +148,46 @@ export function StoreLayout() {
     const primaryBranch =
         company?.branches.find((branch) => branch.isMain && branch.isActive) ??
         company?.branches.find((branch) => branch.isActive);
+    const contactPhone = company?.phone ?? primaryBranch?.phone ?? null;
+    const contactAddress = company?.address ?? primaryBranch?.address ?? null;
+    const mobileNav = [
+        {
+            to: "/",
+            label: t("nav.home"),
+            icon: House,
+            active: location.pathname === "/",
+        },
+        {
+            to: "/products",
+            label: t("nav.shop"),
+            icon: LayoutGrid,
+            active:
+                location.pathname === "/products" ||
+                location.pathname.startsWith("/products/"),
+        },
+        {
+            to: "/wishlist",
+            label: t("common.wishlist"),
+            icon: Heart,
+            active: location.pathname === "/wishlist",
+            count: cart.wishlist.length,
+        },
+        {
+            to: "/cart",
+            label: t("common.cart"),
+            icon: ShoppingBag,
+            active: location.pathname === "/cart",
+            count: cart.items.length,
+        },
+        {
+            to: accountPath,
+            label: t("common.account"),
+            icon: UserRound,
+            active:
+                location.pathname === "/account" ||
+                location.pathname.startsWith("/account/"),
+        },
+    ];
 
     const shareStore = async () => {
         const url = window.location.href;
@@ -174,9 +216,9 @@ export function StoreLayout() {
     };
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
-            <header className="sticky top-0 z-40 border-b border-border/70 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/88">
-                <div className="bg-slate-950 text-white dark:bg-black">
+        <div className="min-h-screen bg-background pb-20 text-foreground md:pb-0">
+            <header className="sticky top-0 z-40 bg-background/[0.95] shadow-[0_1px_0_rgba(15,23,42,.07)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/88 dark:shadow-[0_1px_0_rgba(255,255,255,.055)]">
+                <div className="hidden bg-slate-950 text-white sm:block dark:bg-black">
                     <div className="mx-auto flex h-9 w-full max-w-[1480px] items-center justify-between gap-4 px-4 text-[11px] sm:px-6 lg:px-8">
                         <div className="flex min-w-0 items-center gap-2 font-semibold text-white/80">
                             <ShieldCheck className="size-3.5 shrink-0 text-emerald-400" />
@@ -184,27 +226,27 @@ export function StoreLayout() {
                         </div>
                         <div className="hidden items-center gap-5 sm:flex">
                             {primaryBranch ? (
-                                <span className="flex items-center gap-1.5 text-white/65">
+                                <span className="flex items-center gap-1.5 text-white/[0.65]">
                                     <MapPin className="size-3.5" />
                                     <span className="max-w-48 truncate">
                                         {primaryBranch.name}
                                     </span>
                                 </span>
                             ) : null}
-                            {company?.phone ? (
+                            {contactPhone ? (
                                 <a
-                                    href={`tel:${company.phone}`}
-                                    className="flex items-center gap-1.5 text-white/65 transition hover:text-white"
+                                    href={`tel:${contactPhone}`}
+                                    className="flex items-center gap-1.5 text-white/[0.65] transition hover:text-white"
                                 >
                                     <Phone className="size-3.5" />
-                                    {company.phone}
+                                    {contactPhone}
                                 </a>
                             ) : null}
                         </div>
                     </div>
                 </div>
 
-                <div className="border-b border-border/70 bg-background/95">
+                <div className="bg-background/[0.95]">
                     <div className="mx-auto flex min-h-[72px] w-full max-w-[1480px] items-center gap-3 px-4 py-3 sm:px-6 lg:gap-5 lg:px-8">
                         <Logo />
 
@@ -365,9 +407,9 @@ export function StoreLayout() {
                 <Outlet />
             </main>
 
-            <footer className="mt-20 border-t border-border/70 bg-card">
-                <div className="border-b border-border/70 bg-muted/25">
-                    <div className="mx-auto grid w-full max-w-[1480px] divide-y divide-border/70 px-4 sm:grid-cols-2 sm:divide-x sm:divide-y-0 sm:px-6 lg:grid-cols-4 lg:px-8 rtl:sm:divide-x-reverse">
+            <footer className="mt-20 bg-card dark:bg-[#081713]">
+                <div className="bg-muted/[0.28] dark:bg-white/[0.02]">
+                    <div className="mx-auto grid w-full max-w-[1480px] gap-3 px-4 py-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
                         <FooterPromise
                             title={t("footer.secureCheckout")}
                             description={t("header.secure")}
@@ -383,7 +425,7 @@ export function StoreLayout() {
                         <FooterPromise
                             title={t("footer.contactSupport")}
                             description={
-                                company?.phone ??
+                                contactPhone ??
                                 company?.email ??
                                 t("footer.customerCare")
                             }
@@ -391,7 +433,7 @@ export function StoreLayout() {
                     </div>
                 </div>
 
-                <div className="mx-auto grid w-full max-w-[1480px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-[1.35fr_.75fr_.8fr_1fr] lg:px-8">
+                <div className="mx-auto grid w-full max-w-[1480px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-[1.2fr_.72fr_.72fr_1.15fr] lg:px-8">
                     <div>
                         <Logo />
                         <p className="mt-5 max-w-md text-sm leading-7 text-muted-foreground">
@@ -399,28 +441,23 @@ export function StoreLayout() {
                                 company?.name ??
                                 t("footer.onlineStore")}
                         </p>
-                        <div className="mt-5 grid gap-2 text-sm text-muted-foreground">
-                            {company?.address ? (
-                                <FooterContact
-                                    icon={<MapPin />}
-                                    text={company.address}
-                                />
-                            ) : null}
-                            {company?.phone ? (
-                                <FooterContact
-                                    icon={<Phone />}
-                                    text={company.phone}
-                                    href={`tel:${company.phone}`}
-                                />
-                            ) : null}
-                            {company?.email ? (
-                                <FooterContact
-                                    icon={<Mail />}
-                                    text={company.email}
-                                    href={`mailto:${company.email}`}
-                                />
-                            ) : null}
-                        </div>
+
+                        {(company?.branches ?? []).length ? (
+                            <div className="mt-5 flex flex-wrap gap-2">
+                                {(company?.branches ?? [])
+                                    .filter((branch) => branch.isActive)
+                                    .slice(0, 4)
+                                    .map((branch) => (
+                                        <span
+                                            key={branch.id}
+                                            className="inline-flex items-center gap-1.5 rounded-full bg-muted/[0.55] px-3 py-1.5 text-[11px] font-semibold text-muted-foreground dark:bg-white/[0.04]"
+                                        >
+                                            <Store className="size-3.5 text-primary" />
+                                            {branch.name}
+                                        </span>
+                                    ))}
+                            </div>
+                        ) : null}
                     </div>
 
                     <FooterColumn title={t("nav.shop")}>
@@ -450,27 +487,38 @@ export function StoreLayout() {
                         <FooterLink to="/cart">{t("common.cart")}</FooterLink>
                     </FooterColumn>
 
-                    <FooterColumn title={t("footer.locations")}>
-                        {(company?.branches ?? []).slice(0, 5).map((branch) => (
-                            <div
-                                key={branch.id}
-                                className="rounded-xl border border-border/70 bg-background p-3"
-                            >
-                                <p className="flex items-center gap-2 text-sm font-bold text-foreground">
-                                    <Store className="size-4 text-primary" />
-                                    {branch.name}
+                    <FooterColumn title={t("footer.contactSupport")}>
+                        <div className="grid gap-2.5">
+                            {company?.email ? (
+                                <FooterContact
+                                    icon={<Mail />}
+                                    text={company.email}
+                                    href={`mailto:${company.email}`}
+                                />
+                            ) : null}
+                            {contactPhone ? (
+                                <FooterContact
+                                    icon={<Phone />}
+                                    text={contactPhone}
+                                    href={`tel:${contactPhone}`}
+                                />
+                            ) : null}
+                            {contactAddress ? (
+                                <FooterContact
+                                    icon={<MapPin />}
+                                    text={contactAddress}
+                                />
+                            ) : null}
+                            {!company?.email && !contactPhone && !contactAddress ? (
+                                <p className="text-sm leading-6 text-muted-foreground">
+                                    {t("home.supportDescription")}
                                 </p>
-                                {branch.address ? (
-                                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                                        {branch.address}
-                                    </p>
-                                ) : null}
-                            </div>
-                        ))}
+                            ) : null}
+                        </div>
                     </FooterColumn>
                 </div>
 
-                <div className="border-t border-border/70">
+                <div className="bg-muted/[0.22] dark:bg-white/[0.018]">
                     <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-2 px-4 py-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
                         <span>
                             © {new Date().getFullYear()}{" "}
@@ -481,23 +529,61 @@ export function StoreLayout() {
                 </div>
             </footer>
 
-            {company?.phone ? (
+            {contactPhone ? (
                 <a
-                    href={`tel:${company.phone}`}
-                    className="fixed bottom-5 end-5 z-30 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-xl shadow-primary/25 transition hover:-translate-y-0.5"
+                    href={`tel:${contactPhone}`}
+                    className="fixed bottom-24 end-4 z-30 inline-flex size-12 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground shadow-xl shadow-primary/25 ring-1 ring-black/[0.06] transition hover:-translate-y-0.5 md:bottom-5 md:end-5 md:h-auto md:w-auto md:gap-2 md:px-4 md:py-3 dark:ring-white/[0.08]"
                     aria-label={t("footer.contactNow")}
                 >
                     <Phone className="size-4" />
-                    <span className="hidden sm:inline">
+                    <span className="hidden md:inline">
                         {t("footer.contactNow")}
                     </span>
                 </a>
             ) : null}
 
+            <nav
+                className="fixed inset-x-0 bottom-0 z-40 bg-background/[0.96] shadow-[0_-14px_36px_-30px_rgba(15,23,42,.55)] ring-1 ring-black/[0.06] backdrop-blur-xl md:hidden dark:ring-white/[0.06]"
+                style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+                aria-label={t("mobile.mainMenu")}
+            >
+                <div className="grid h-[68px] grid-cols-5 px-1.5">
+                    {mobileNav.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                            <Link
+                                viewTransition
+                                key={item.to}
+                                to={item.to}
+                                className={cn(
+                                    "relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-bold text-muted-foreground transition",
+                                    item.active && "text-primary",
+                                )}
+                            >
+                                <span
+                                    className={cn(
+                                        "relative grid size-8 place-items-center rounded-xl transition",
+                                        item.active && "bg-primary/10",
+                                    )}
+                                >
+                                    <Icon className="size-[18px]" />
+                                    {item.count ? (
+                                        <CountBadge>{item.count}</CountBadge>
+                                    ) : null}
+                                </span>
+                                <span className="max-w-full truncate px-1">
+                                    {item.label}
+                                </span>
+                            </Link>
+                        );
+                    })}
+                </div>
+            </nav>
+
             <Dialog.Root open={mobileOpen} onOpenChange={setMobileOpen}>
                 <Dialog.Portal>
                     <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm" />
-                    <Dialog.Content className="fixed inset-y-0 end-0 z-50 w-[92%] max-w-sm overflow-y-auto border-s bg-background p-5 shadow-2xl outline-none">
+                    <Dialog.Content className="fixed inset-y-0 end-0 z-50 w-[92%] max-w-sm overflow-y-auto bg-background p-5 shadow-2xl ring-1 ring-black/[0.08] outline-none dark:ring-white/[0.08]">
                         <div className="flex items-center justify-between">
                             <Logo />
                             <Dialog.Close asChild>
@@ -560,7 +646,7 @@ export function StoreLayout() {
                             </Button>
                         </div>
 
-                        <div className="mt-3 flex items-center justify-between rounded-xl border border-border/70 p-2">
+                        <div className="mt-3 flex items-center justify-between rounded-xl bg-muted/35 p-2 dark:bg-white/[0.035]">
                             <LanguageSwitcher />
                             <ThemeToggle />
                             <NotificationCenter />
@@ -629,8 +715,8 @@ function FooterPromise({
     description: string;
 }) {
     return (
-        <div className="flex min-h-24 items-center gap-3 px-5 py-4">
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-primary/15 bg-primary/8 text-primary">
+        <div className="flex min-h-24 items-center gap-3 rounded-xl bg-background/[0.72] px-4 py-4 shadow-[0_10px_26px_-28px_rgba(15,23,42,.55)] dark:bg-white/[0.03]">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                 <Check className="size-4" />
             </span>
             <span className="min-w-0">
@@ -680,14 +766,18 @@ function FooterContact({
     href?: string;
 }) {
     const content = (
-        <span className="flex items-start gap-2">
-            <span className="mt-0.5 text-primary [&>svg]:size-4">{icon}</span>
-            <span>{text}</span>
+        <span className="flex items-start gap-3 rounded-xl bg-muted/[0.42] p-3 transition hover:bg-muted/[0.62] dark:bg-white/[0.03] dark:hover:bg-white/[0.05]">
+            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary [&>svg]:size-4">
+                {icon}
+            </span>
+            <span className="min-w-0 break-words pt-1 text-sm leading-6 text-foreground">
+                {text}
+            </span>
         </span>
     );
 
     return href ? (
-        <a href={href} className="transition hover:text-primary">
+        <a href={href} className="block">
             {content}
         </a>
     ) : (

@@ -237,13 +237,13 @@ export function CatalogPage() {
                 <span className="text-foreground">{t("catalog.shop")}</span>
             </nav>
 
-            <section className="relative mb-7 overflow-hidden rounded-2xl border border-border/70 bg-card px-6 py-8 sm:px-9 lg:px-10 lg:py-10">
-                <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-primary/8 blur-3xl" />
-                <div className="pointer-events-none absolute -bottom-28 left-1/3 size-64 rounded-full bg-brand-orange/8 blur-3xl" />
+            <section className="relative mb-7 overflow-hidden rounded-2xl bg-card px-6 py-8 shadow-[0_16px_42px_-36px_rgba(15,23,42,.48)] ring-1 ring-black/[0.05] sm:px-9 lg:px-10 lg:py-10 dark:bg-white/[0.03] dark:ring-white/[0.05]">
+                <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-primary/[0.08] blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-28 left-1/3 size-64 rounded-full bg-brand-orange/[0.08] blur-3xl" />
 
                 <div className="relative flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
                     <div>
-                        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/7 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/[0.07] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
                             <PackageSearch className="size-3.5" />
                             {t("catalog.curated")}
                         </div>
@@ -258,7 +258,7 @@ export function CatalogPage() {
                     </div>
 
                     {!query.isLoading && query.data && (
-                        <div className="w-fit rounded-xl border border-border/70 bg-background px-5 py-4">
+                        <div className="w-fit rounded-xl bg-background/[0.80] px-5 py-4 ring-1 ring-black/[0.05] dark:bg-white/[0.04] dark:ring-white/[0.05]">
                             <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                                 {t("catalog.availableNow")}
                             </span>
@@ -276,7 +276,7 @@ export function CatalogPage() {
             </section>
 
             {rootCategories.length > 0 ? (
-                <div className="mb-7 overflow-x-auto rounded-xl border border-border/70 bg-card p-2">
+                <div className="mb-7 overflow-x-auto rounded-xl bg-card p-2 shadow-[0_12px_30px_-28px_rgba(15,23,42,.45)] ring-1 ring-black/[0.05] dark:bg-white/[0.025] dark:ring-white/[0.05]">
                     <div className="flex min-w-max items-center gap-2">
                         <button
                             type="button"
@@ -301,7 +301,7 @@ export function CatalogPage() {
                                 }`}
                             >
                                 {item.name}
-                                <span className="ms-2 rounded-full bg-foreground/8 px-1.5 py-0.5 text-[10px]">
+                                <span className="ms-2 rounded-full bg-foreground/[0.08] px-1.5 py-0.5 text-[10px]">
                                     {item.productCount}
                                 </span>
                             </button>
@@ -311,8 +311,8 @@ export function CatalogPage() {
             ) : null}
 
             <div className="grid items-start gap-8 lg:grid-cols-[310px_minmax(0,1fr)]">
-                <aside className="sticky top-36 hidden overflow-hidden rounded-2xl border border-border/70 bg-card lg:block">
-                    <div className="border-b border-border/70 bg-muted/25 p-5">
+                <aside className="sticky top-36 hidden overflow-hidden rounded-2xl bg-card shadow-[0_16px_38px_-34px_rgba(15,23,42,.48)] ring-1 ring-black/[0.05] lg:block dark:bg-white/[0.025] dark:ring-white/[0.05]">
+                    <div className="bg-muted/35 p-5 dark:bg-white/[0.025]">
                         <p className="text-xs font-black uppercase tracking-[0.14em] text-primary">
                             {t("catalog.filterProducts")}
                         </p>
@@ -324,7 +324,7 @@ export function CatalogPage() {
                 </aside>
 
                 <section className="min-w-0">
-                    <div className="mb-6 rounded-2xl border border-border/70 bg-card p-3">
+                    <div className="mb-6 rounded-2xl bg-card p-3 shadow-[0_12px_30px_-28px_rgba(15,23,42,.45)] ring-1 ring-black/[0.05] dark:bg-white/[0.025] dark:ring-white/[0.05]">
                         <div className="flex flex-col gap-3 sm:flex-row">
                             <form
                                 onSubmit={submit}
@@ -369,7 +369,7 @@ export function CatalogPage() {
                                     <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out data-[state=open]:fade-in" />
 
                                     <Dialog.Content className="fixed inset-y-0 right-0 z-50 w-[90%] max-w-sm overflow-y-auto border-l bg-background shadow-2xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
-                                        <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-5 py-5 backdrop-blur">
+                                        <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/[0.95] px-5 py-5 backdrop-blur">
                                             <div>
                                                 <Dialog.Title className="text-lg font-black">
                                                     {t("catalog.filterProducts")}
@@ -393,7 +393,7 @@ export function CatalogPage() {
 
                                         <div className="p-5">{filterPanel}</div>
 
-                                        <div className="sticky bottom-0 border-t bg-background/95 p-5 backdrop-blur">
+                                        <div className="sticky bottom-0 border-t bg-background/[0.95] p-5 backdrop-blur">
                                             <Dialog.Close asChild>
                                                 <Button className="h-11 w-full rounded-xl">
                                                     {t("catalog.showProducts")}
@@ -475,7 +475,7 @@ export function CatalogPage() {
                     )}
 
                     {query.isLoading ? (
-                        <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
+                        <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
                             {Array.from({ length: 8 }).map((_, index) => (
                                 <Skeleton
                                     key={index}
@@ -506,7 +506,7 @@ export function CatalogPage() {
                                 </span>
                             </div>
 
-                            <div className="grid auto-rows-fr grid-cols-2 items-stretch gap-3 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
+                            <div className="grid auto-rows-fr grid-cols-1 items-stretch gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
                                 {query.data.items.map((product) => (
                                     <ProductCard
                                         key={product.id}
@@ -736,7 +736,7 @@ function FilterPanel({
 
 function Filter({ label, children }: { label: string; children: ReactNode }) {
     return (
-        <fieldset className="rounded-2xl border border-border/70 bg-gradient-to-br from-muted/35 to-background p-4 shadow-[0_10px_30px_-28px_rgba(15,23,42,.5)] transition hover:border-primary/20">
+        <fieldset className="rounded-2xl bg-muted/[0.32] p-4 ring-1 ring-black/[0.045] transition hover:bg-muted/[0.48] dark:bg-white/[0.025] dark:ring-white/[0.045]">
             <legend className="px-1 text-[10px] font-bold uppercase tracking-[0.14em] text-foreground">
                 {label}
             </legend>

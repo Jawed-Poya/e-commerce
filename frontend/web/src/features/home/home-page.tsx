@@ -2,15 +2,17 @@ import { useQuery } from "@tanstack/react-query";
 import {
     ArrowLeft,
     ArrowRight,
+    ArrowUpRight,
     BadgeCheck,
     BadgePercent,
     Boxes,
     Check,
-    ChevronRight,
     CircleHelp,
     HeartPulse,
+    Mail,
     MapPin,
     PackageCheck,
+    Phone,
     RotateCcw,
     ShieldCheck,
     ShoppingBag,
@@ -114,7 +116,7 @@ export function HomePage() {
     );
     const categories = buildCategoryTree(lookups.data?.categories ?? []).slice(
         0,
-        8,
+        6,
     );
     const featured = items.filter((item) => item.isFeatured);
     const featuredProducts = (featured.length >= 5 ? featured : items).slice(
@@ -131,6 +133,18 @@ export function HomePage() {
     const spotlightProduct =
         discountedProducts[0] ?? featuredProducts[0] ?? items[0];
     const hero = content.data ? localizedHero(content.data, language) : null;
+    const primaryBranch =
+        company?.branches.find((branch) => branch.isMain && branch.isActive) ??
+        company?.branches.find((branch) => branch.isActive);
+    const supportValue =
+        company?.phone ?? company?.email ?? primaryBranch?.phone ?? null;
+    const supportHref = company?.phone
+        ? `tel:${company.phone}`
+        : company?.email
+          ? `mailto:${company.email}`
+          : primaryBranch?.phone
+            ? `tel:${primaryBranch.phone}`
+            : null;
 
     const slides = useMemo<HeroSlide[]>(() => {
         const result: HeroSlide[] = [
@@ -204,208 +218,235 @@ export function HomePage() {
 
     return (
         <div className="mx-auto w-full max-w-[1480px] px-4 pb-12 sm:px-6 lg:px-8">
-            <section className="pt-5 sm:pt-7">
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-                    <article
-                        className="relative min-h-[470px] overflow-hidden rounded-3xl border border-border/70 bg-card shadow-[0_22px_60px_-42px_rgba(15,23,42,.35)]"
-                        onMouseEnter={() => setPaused(true)}
-                        onMouseLeave={() => setPaused(false)}
-                    >
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,color-mix(in_srgb,var(--primary)_12%,transparent),transparent_34%),linear-gradient(135deg,color-mix(in_srgb,var(--muted)_70%,transparent),transparent_55%)]" />
+            <section className="pt-4 sm:pt-7">
+                <article
+                    className="relative overflow-hidden rounded-[28px] bg-[#06231e] text-white shadow-[0_28px_80px_-52px_rgba(2,20,16,.85)] ring-1 ring-white/10 dark:bg-[#041713]"
+                    onMouseEnter={() => setPaused(true)}
+                    onMouseLeave={() => setPaused(false)}
+                >
+                    <div className="pointer-events-none absolute -start-32 -top-36 size-[420px] rounded-full bg-primary/20 blur-[110px]" />
+                    <div className="pointer-events-none absolute -bottom-52 end-1/4 size-[420px] rounded-full bg-cyan-500/10 blur-[120px]" />
 
-                        {content.isLoading ? (
-                            <HeroSkeleton />
-                        ) : (
-                            <div
-                                key={activeSlide.id}
-                                className="hero-copy-enter relative grid min-h-[470px] items-center gap-8 px-6 py-10 sm:px-10 lg:grid-cols-[minmax(0,.9fr)_minmax(360px,1.1fr)] lg:px-14"
-                            >
-                                <div className="relative z-10 max-w-xl">
-                                    <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/80 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-primary shadow-sm backdrop-blur">
-                                        <HeartPulse className="size-3.5" />
-                                        {activeSlide.eyebrow}
-                                    </div>
-
-                                    <h1 className="mt-5 text-4xl font-black leading-[1.04] tracking-[-0.055em] sm:text-5xl lg:text-[58px]">
-                                        {activeSlide.title}
-                                    </h1>
-
-                                    <p className="mt-5 max-w-lg text-sm leading-7 text-muted-foreground sm:text-base">
-                                        {activeSlide.description}
-                                    </p>
-
-                                    {activeSlide.product?.price != null ? (
-                                        <div className="mt-5 flex flex-wrap items-end gap-2">
-                                            <span className="text-3xl font-black tracking-[-0.05em] text-primary">
-                                                {formatMoney(
-                                                    activeSlide.product.price,
-                                                )}
-                                            </span>
-                                            {activeSlide.product.unitName ? (
-                                                <span className="pb-1 text-xs font-semibold text-muted-foreground">
-                                                    / {activeSlide.product.unitName}
-                                                </span>
-                                            ) : null}
-                                        </div>
-                                    ) : null}
-
-                                    <div className="mt-7 flex flex-wrap gap-3">
-                                        <Button
-                                            asChild
-                                            size="lg"
-                                            className="rounded-xl px-6 font-bold shadow-none"
-                                        >
-                                            <Link
-                                                viewTransition
-                                                to={activeSlide.primaryUrl}
-                                            >
-                                                {activeSlide.primaryText}
-                                                <ArrowRight className="size-4 rtl:rotate-180" />
-                                            </Link>
-                                        </Button>
-                                        <Button
-                                            asChild
-                                            size="lg"
-                                            variant="outline"
-                                            className="rounded-xl px-6 font-bold"
-                                        >
-                                            <Link
-                                                viewTransition
-                                                to={activeSlide.secondaryUrl}
-                                            >
-                                                {activeSlide.secondaryText}
-                                            </Link>
-                                        </Button>
-                                    </div>
-
-                                    <div className="mt-7 grid max-w-lg grid-cols-2 gap-3 text-xs sm:grid-cols-3">
-                                        <TrustPoint
-                                            icon={<Check />}
-                                            text={t("home.liveAvailability")}
-                                        />
-                                        <TrustPoint
-                                            icon={<PackageCheck />}
-                                            text={t("home.clearUnits")}
-                                        />
-                                        <TrustPoint
-                                            icon={<ShieldCheck />}
-                                            text={t("home.secureShopping")}
-                                            className="hidden sm:flex"
-                                        />
-                                    </div>
+                    {content.isLoading ? (
+                        <HeroSkeleton />
+                    ) : (
+                        <div
+                            key={activeSlide.id}
+                            className="hero-copy-enter relative grid min-h-[570px] md:min-h-[520px] md:grid-cols-[minmax(0,.92fr)_minmax(360px,1.08fr)]"
+                        >
+                            <div className="relative z-10 flex flex-col justify-center px-6 pb-28 pt-10 sm:px-10 md:px-12 md:pb-24 lg:px-16">
+                                <div className="inline-flex w-fit items-center gap-2 rounded-full bg-white/[0.055] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-cyan-200 ring-1 ring-white/[0.12] backdrop-blur">
+                                    <HeartPulse className="size-3.5" />
+                                    {activeSlide.eyebrow}
                                 </div>
 
-                                <div className="relative flex min-h-[300px] items-center justify-center lg:min-h-[420px]">
-                                    <div className="absolute inset-[8%] rounded-[42px] border border-border/60 bg-background/72 shadow-[0_28px_80px_-46px_rgba(15,23,42,.45)] backdrop-blur" />
-                                    <div className="absolute end-[12%] top-[13%] rounded-xl border border-border/60 bg-background/90 px-3 py-2 text-[10px] font-bold text-muted-foreground shadow-sm">
-                                        <span className="block text-primary">
-                                            {t("home.liveAvailability")}
+                                <h1 className="mt-6 max-w-2xl text-[39px] font-black leading-[1.02] tracking-[-0.055em] text-white sm:text-5xl lg:text-[64px]">
+                                    {activeSlide.title}
+                                </h1>
+
+                                <p className="mt-5 max-w-xl text-sm leading-7 text-white/[0.62] sm:text-base sm:leading-8">
+                                    {activeSlide.description}
+                                </p>
+
+                                {activeSlide.product?.price != null ? (
+                                    <div className="mt-5 flex flex-wrap items-end gap-2">
+                                        <span className="text-3xl font-black tracking-[-0.05em] text-white">
+                                            {formatMoney(
+                                                activeSlide.product.price,
+                                            )}
                                         </span>
-                                        {t("home.inStockNow")}
+                                        {activeSlide.product.unitName ? (
+                                            <span className="pb-1 text-xs font-semibold text-white/[0.55]">
+                                                / {activeSlide.product.unitName}
+                                            </span>
+                                        ) : null}
                                     </div>
-                                    <img
-                                        src={activeSlide.image}
-                                        alt={activeSlide.title}
-                                        className="hero-media-enter relative z-10 h-[290px] w-full object-contain p-6 drop-shadow-[0_30px_26px_rgba(15,23,42,.18)] sm:h-[350px] lg:h-[420px]"
+                                ) : null}
+
+                                <div className="mt-7 flex flex-col gap-3 min-[430px]:flex-row min-[430px]:flex-wrap">
+                                    <Button
+                                        asChild
+                                        size="lg"
+                                        className="w-full rounded-xl px-6 font-bold shadow-none min-[430px]:w-auto"
+                                    >
+                                        <Link
+                                            viewTransition
+                                            to={activeSlide.primaryUrl}
+                                        >
+                                            {activeSlide.primaryText}
+                                            <ArrowRight className="size-4 rtl:rotate-180" />
+                                        </Link>
+                                    </Button>
+                                    <Button
+                                        asChild
+                                        size="lg"
+                                        variant="outline"
+                                        className="w-full rounded-xl border-white/[0.18] bg-transparent px-6 font-bold text-white hover:bg-white/[0.08] hover:text-white min-[430px]:w-auto dark:border-white/[0.14]"
+                                    >
+                                        <Link
+                                            viewTransition
+                                            to={activeSlide.secondaryUrl}
+                                        >
+                                            {activeSlide.secondaryText}
+                                        </Link>
+                                    </Button>
+                                </div>
+
+                                <div className="mt-7 grid max-w-xl grid-cols-2 gap-x-3 gap-y-3 text-[11px] sm:grid-cols-3">
+                                    <TrustPoint
+                                        icon={<Check />}
+                                        text={t("home.liveAvailability")}
+                                        inverse
+                                    />
+                                    <TrustPoint
+                                        icon={<PackageCheck />}
+                                        text={t("home.clearUnits")}
+                                        inverse
+                                    />
+                                    <TrustPoint
+                                        icon={<ShieldCheck />}
+                                        text={t("home.secureShopping")}
+                                        className="hidden sm:flex"
+                                        inverse
                                     />
                                 </div>
                             </div>
-                        )}
 
-                        {slides.length > 1 ? (
-                            <div className="absolute bottom-5 start-6 z-20 flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => moveSlide(-1)}
-                                    aria-label={t("home.previousSlide")}
-                                    className="grid size-9 place-items-center rounded-full border border-border/70 bg-background/90 text-foreground shadow-sm backdrop-blur transition hover:border-primary/30 hover:text-primary"
-                                >
-                                    <ArrowLeft className="size-4 rtl:rotate-180" />
-                                </button>
-                                <div className="flex items-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-2.5 py-2 shadow-sm backdrop-blur">
-                                    {slides.map((slide, index) => (
-                                        <button
-                                            key={slide.id}
-                                            type="button"
-                                            aria-label={t("home.goToSlide", {
-                                                number: index + 1,
-                                            })}
-                                            onClick={() => setSlideIndex(index)}
-                                            className={cn(
-                                                "h-1.5 rounded-full transition-all",
-                                                index === slideIndex
-                                                    ? "w-7 bg-primary"
-                                                    : "w-1.5 bg-border",
-                                            )}
-                                        />
-                                    ))}
+                            <div className="relative min-h-[300px] px-5 pb-6 sm:px-8 md:min-h-[520px] md:px-8 md:py-12 lg:px-12">
+                                <div className="pointer-events-none absolute inset-x-[14%] bottom-[10%] top-[17%] rounded-[38px] ring-1 ring-white/15 md:inset-x-[11%] md:bottom-[13%] md:top-[13%]" />
+                                <div className="pointer-events-none absolute inset-x-[20%] bottom-[16%] top-[11%] rounded-[34px] ring-1 ring-white/[0.08] md:inset-x-[17%] md:bottom-[9%] md:top-[19%]" />
+
+                                <div className="hero-media-enter relative h-full min-h-[290px] overflow-hidden rounded-2xl bg-white/[0.06] shadow-[0_30px_65px_-35px_rgba(0,0,0,.9)] ring-1 ring-white/[0.12] md:min-h-0">
+                                    <img
+                                        src={activeSlide.image}
+                                        alt={activeSlide.title}
+                                        className={cn(
+                                            "size-full transition duration-700",
+                                            activeSlide.product
+                                                ? "bg-white/95 object-contain p-8 dark:bg-slate-950/80"
+                                                : "object-cover",
+                                        )}
+                                    />
+                                    {!activeSlide.product ? (
+                                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#031713]/35 via-transparent to-white/5" />
+                                    ) : null}
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => moveSlide(1)}
-                                    aria-label={t("home.nextSlide")}
-                                    className="grid size-9 place-items-center rounded-full border border-border/70 bg-background/90 text-foreground shadow-sm backdrop-blur transition hover:border-primary/30 hover:text-primary"
-                                >
-                                    <ArrowRight className="size-4 rtl:rotate-180" />
-                                </button>
                             </div>
-                        ) : null}
-                    </article>
+                        </div>
+                    )}
 
-                    <aside className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-                        <article className="relative overflow-hidden rounded-3xl border border-border/70 bg-slate-950 p-6 text-white dark:bg-black">
-                            <div className="absolute -end-16 -top-16 size-48 rounded-full bg-primary/35 blur-3xl" />
-                            <div className="relative">
-                                <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-300">
-                                    <Boxes className="size-4" />
-                                    {t("home.flexibleUnits")}
-                                </span>
-                                <h2 className="mt-4 text-2xl font-black leading-tight tracking-[-0.04em]">
-                                    {t("home.unitShoppingTitle")}
-                                </h2>
-                                <p className="mt-3 text-sm leading-6 text-white/65">
-                                    {t("home.unitShoppingDescription")}
-                                </p>
-                                <Button
-                                    asChild
-                                    variant="secondary"
-                                    className="mt-6 rounded-xl bg-white font-bold text-slate-950 hover:bg-white/90"
-                                >
-                                    <Link viewTransition to="/products">
-                                        {t("common.viewAll")}
-                                        <ArrowRight className="size-4 rtl:rotate-180" />
-                                    </Link>
-                                </Button>
+                    {slides.length > 1 ? (
+                        <div className="absolute bottom-5 start-5 z-20 flex items-center gap-2 sm:start-8">
+                            <button
+                                type="button"
+                                onClick={() => moveSlide(-1)}
+                                aria-label={t("home.previousSlide")}
+                                className="grid size-9 place-items-center rounded-full bg-white/[0.055] text-white ring-1 ring-white/[0.16] backdrop-blur transition hover:bg-white/[0.12]"
+                            >
+                                <ArrowLeft className="size-4 rtl:rotate-180" />
+                            </button>
+                            <div className="flex items-center gap-1.5 rounded-full bg-white/[0.055] px-2.5 py-2 ring-1 ring-white/[0.14] backdrop-blur">
+                                {slides.map((slide, index) => (
+                                    <button
+                                        key={slide.id}
+                                        type="button"
+                                        aria-label={t("home.goToSlide", {
+                                            number: index + 1,
+                                        })}
+                                        onClick={() => setSlideIndex(index)}
+                                        className={cn(
+                                            "h-1.5 rounded-full transition-all",
+                                            index === slideIndex
+                                                ? "w-7 bg-cyan-300"
+                                                : "w-1.5 bg-white/30",
+                                        )}
+                                    />
+                                ))}
                             </div>
-                        </article>
+                            <button
+                                type="button"
+                                onClick={() => moveSlide(1)}
+                                aria-label={t("home.nextSlide")}
+                                className="grid size-9 place-items-center rounded-full bg-white/[0.055] text-white ring-1 ring-white/[0.16] backdrop-blur transition hover:bg-white/[0.12]"
+                            >
+                                <ArrowRight className="size-4 rtl:rotate-180" />
+                            </button>
+                        </div>
+                    ) : null}
+                </article>
 
-                        <article className="rounded-3xl border border-border/70 bg-card p-5">
-                            <div className="flex items-start justify-between gap-4">
-                                <div>
-                                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-primary">
-                                        {t("home.customerSupport")}
-                                    </p>
-                                    <h2 className="mt-2 text-xl font-black tracking-[-0.03em]">
-                                        {t("home.needHelpChoosing")}
-                                    </h2>
-                                </div>
-                                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                                    <CircleHelp className="size-5" />
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <Link
+                        viewTransition
+                        to="/products"
+                        className="group flex min-h-40 items-start gap-4 rounded-2xl bg-muted/[0.45] p-5 shadow-[0_14px_32px_-30px_rgba(15,23,42,.5)] ring-1 ring-black/[0.045] transition hover:-translate-y-0.5 hover:bg-muted/[0.65] dark:bg-white/[0.035] dark:ring-white/[0.045]"
+                    >
+                        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                            <Boxes className="size-5" />
+                        </span>
+                        <span className="min-w-0">
+                            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-primary">
+                                {t("home.flexibleUnits")}
+                            </span>
+                            <span className="mt-2 block text-xl font-black tracking-[-0.03em]">
+                                {t("home.unitShoppingTitle")}
+                            </span>
+                            <span className="mt-2 block text-sm leading-6 text-muted-foreground">
+                                {t("home.unitShoppingDescription")}
+                            </span>
+                            <span className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-primary">
+                                {t("common.viewAll")}
+                                <ArrowRight className="size-3.5 transition group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
+                            </span>
+                        </span>
+                    </Link>
+
+                    {supportHref ? (
+                        <a
+                            href={supportHref}
+                            className="group flex min-h-40 items-start gap-4 rounded-2xl bg-muted/[0.45] p-5 shadow-[0_14px_32px_-30px_rgba(15,23,42,.5)] ring-1 ring-black/[0.045] transition hover:-translate-y-0.5 hover:bg-muted/[0.65] dark:bg-white/[0.035] dark:ring-white/[0.045]"
+                        >
+                            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                                {company?.phone || primaryBranch?.phone ? (
+                                    <Phone className="size-5" />
+                                ) : (
+                                    <Mail className="size-5" />
+                                )}
+                            </span>
+                            <span className="min-w-0">
+                                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-primary">
+                                    {t("home.customerSupport")}
                                 </span>
-                            </div>
-                            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                                {t("home.supportDescription")}
-                            </p>
-                            <div className="mt-5 flex items-center justify-between rounded-xl border border-border/70 bg-muted/25 px-3 py-3 text-sm">
-                                <span className="min-w-0 truncate font-bold">
-                                    {company?.phone ??
-                                        company?.email ??
-                                        t("common.account")}
+                                <span className="mt-2 block text-xl font-black tracking-[-0.03em]">
+                                    {t("home.needHelpChoosing")}
                                 </span>
-                                <ArrowRight className="size-4 shrink-0 text-primary rtl:rotate-180" />
-                            </div>
-                        </article>
-                    </aside>
+                                <span className="mt-2 block text-sm leading-6 text-muted-foreground">
+                                    {t("home.supportDescription")}
+                                </span>
+                                <span className="mt-4 inline-flex max-w-full items-center gap-2 text-xs font-black text-foreground">
+                                    <span className="truncate">{supportValue}</span>
+                                    <ArrowUpRight className="size-3.5 shrink-0 text-primary" />
+                                </span>
+                            </span>
+                        </a>
+                    ) : (
+                        <div className="flex min-h-40 items-start gap-4 rounded-2xl bg-muted/[0.45] p-5 ring-1 ring-black/[0.045] dark:bg-white/[0.035] dark:ring-white/[0.045]">
+                            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                                <CircleHelp className="size-5" />
+                            </span>
+                            <span>
+                                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-primary">
+                                    {t("home.customerSupport")}
+                                </span>
+                                <span className="mt-2 block text-xl font-black">
+                                    {t("home.needHelpChoosing")}
+                                </span>
+                                <span className="mt-2 block text-sm leading-6 text-muted-foreground">
+                                    {t("home.supportDescription")}
+                                </span>
+                            </span>
+                        </div>
+                    )}
                 </div>
             </section>
 
@@ -418,20 +459,24 @@ export function HomePage() {
                 />
 
                 {lookups.isLoading ? (
-                    <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
-                        {Array.from({ length: 8 }).map((_, index) => (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        {Array.from({ length: 6 }).map((_, index) => (
                             <Skeleton
                                 key={index}
-                                className="h-40 rounded-2xl"
+                                className={cn(
+                                    "h-72 rounded-2xl",
+                                    index < 2 && "lg:col-span-2 lg:h-80",
+                                )}
                             />
                         ))}
                     </div>
                 ) : (
-                    <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
-                        {categories.map((category) => (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        {categories.map((category, index) => (
                             <CategoryCard
                                 key={category.id}
                                 category={category}
+                                featured={index < 2}
                             />
                         ))}
                     </div>
@@ -449,7 +494,7 @@ export function HomePage() {
                 {products.isLoading ? (
                     <ProductGridSkeleton />
                 ) : featuredProducts.length ? (
-                    <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+                    <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
                         {featuredProducts.slice(0, 5).map((product) => (
                             <ProductCard key={product.id} product={product} />
                         ))}
@@ -464,11 +509,24 @@ export function HomePage() {
             </section>
 
             <section id="deals" className="pb-10 sm:pb-14">
-                <div className="grid overflow-hidden rounded-3xl border border-border/70 bg-card lg:grid-cols-[minmax(0,1.4fr)_minmax(340px,.6fr)]">
-                    <article className="relative min-h-[360px] overflow-hidden bg-slate-950 px-6 py-9 text-white dark:bg-black sm:px-10">
-                        <div className="absolute -end-20 -top-20 size-72 rounded-full bg-primary/35 blur-3xl" />
-                        <div className="relative z-10 max-w-[58%]">
-                            <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-300">
+                <div className="grid overflow-hidden rounded-[28px] bg-card shadow-[0_18px_50px_-40px_rgba(15,23,42,.5)] ring-1 ring-black/[0.05] dark:bg-white/[0.03] dark:ring-white/[0.05] lg:grid-cols-[minmax(0,1.35fr)_minmax(330px,.65fr)]">
+                    <article className="relative min-h-[520px] overflow-hidden bg-[#071c18] p-6 text-white sm:min-h-[420px] sm:p-9 lg:min-h-[390px]">
+                        {spotlightProduct ? (
+                            <img
+                                src={
+                                    imageUrl(
+                                        spotlightProduct.primaryImageUrl,
+                                    ) ?? "/placeholder-product.svg"
+                                }
+                                alt={spotlightProduct.name}
+                                className="absolute inset-0 size-full object-cover opacity-[0.42]"
+                            />
+                        ) : null}
+                        <div className="absolute inset-0 bg-gradient-to-r from-[#061c17] via-[#061c17]/[0.92] to-[#061c17]/[0.35] rtl:bg-gradient-to-l" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#061c17] via-transparent to-transparent" />
+
+                        <div className="relative z-10 flex h-full max-w-xl flex-col justify-end sm:justify-center">
+                            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/[0.07] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-200 ring-1 ring-white/[0.12]">
                                 <BadgePercent className="size-4" />
                                 {t("home.limitedOffers")}
                             </span>
@@ -476,7 +534,7 @@ export function HomePage() {
                                 {spotlightProduct?.name ??
                                     t("home.selectedForYou")}
                             </h2>
-                            <p className="mt-4 line-clamp-3 text-sm leading-7 text-white/65">
+                            <p className="mt-4 line-clamp-3 text-sm leading-7 text-white/[0.62]">
                                 {spotlightProduct?.shortDescription ??
                                     t("home.selectedDescription")}
                             </p>
@@ -496,42 +554,26 @@ export function HomePage() {
                                     </Button>
                                     {spotlightProduct.price != null ? (
                                         <span className="text-2xl font-black">
-                                            {formatMoney(spotlightProduct.price)}
+                                            {formatMoney(
+                                                spotlightProduct.price,
+                                            )}
                                         </span>
                                     ) : null}
                                 </div>
                             ) : null}
                         </div>
-
-                        {spotlightProduct ? (
-                            <Link
-                                viewTransition
-                                to={productPath(spotlightProduct)}
-                                className="absolute bottom-6 end-5 flex h-[78%] w-[38%] items-center justify-center rounded-3xl border border-white/10 bg-white p-6 shadow-2xl dark:bg-slate-900"
-                            >
-                                <img
-                                    src={
-                                        imageUrl(
-                                            spotlightProduct.primaryImageUrl,
-                                        ) ?? "/placeholder-product.svg"
-                                    }
-                                    alt={spotlightProduct.name}
-                                    className="size-full object-contain transition duration-500 hover:scale-[1.04]"
-                                />
-                            </Link>
-                        ) : null}
                     </article>
 
-                    <div className="grid divide-y divide-border/70">
+                    <div className="grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-1">
                         <InfoRow
                             icon={<MapPin />}
                             eyebrow={t("home.storeLocations")}
                             title={
-                                company?.branches?.[0]?.name ??
+                                primaryBranch?.name ??
                                 t("home.findNearestBranch")
                             }
                             description={
-                                company?.branches?.[0]?.address ??
+                                primaryBranch?.address ??
                                 company?.address ??
                                 t("home.branchDescription")
                             }
@@ -559,7 +601,7 @@ export function HomePage() {
                 {products.isLoading ? (
                     <ProductGridSkeleton />
                 ) : (
-                    <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+                    <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
                         {newestProducts.map((product) => (
                             <ProductCard key={product.id} product={product} />
                         ))}
@@ -567,13 +609,13 @@ export function HomePage() {
                 )}
             </section>
 
-            <section className="grid divide-y divide-border/70 overflow-hidden rounded-2xl border border-border/70 bg-card sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-4 rtl:sm:divide-x-reverse">
+            <section className="grid gap-3 rounded-2xl bg-muted/35 p-3 sm:grid-cols-2 lg:grid-cols-4 dark:bg-white/[0.025]">
                 {serviceItems.map((item) => {
                     const Icon = item.icon;
                     return (
                         <div
                             key={item.title}
-                            className="flex items-center gap-3 p-5"
+                            className="flex items-center gap-3 rounded-xl bg-background/[0.75] p-4 shadow-[0_12px_26px_-28px_rgba(15,23,42,.55)] dark:bg-white/[0.035]"
                         >
                             <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                                 <Icon className="size-5" />
@@ -598,19 +640,29 @@ function TrustPoint({
     icon,
     text,
     className,
+    inverse = false,
 }: {
     icon: ReactNode;
     text: string;
     className?: string;
+    inverse?: boolean;
 }) {
     return (
         <div
             className={cn(
-                "flex items-center gap-2 font-semibold text-muted-foreground",
+                "flex items-center gap-2 font-semibold",
+                inverse ? "text-white/[0.62]" : "text-muted-foreground",
                 className,
             )}
         >
-            <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary/10 text-primary [&>svg]:size-3.5">
+            <span
+                className={cn(
+                    "grid size-6 shrink-0 place-items-center rounded-full [&>svg]:size-3.5",
+                    inverse
+                        ? "bg-cyan-300/10 text-cyan-200"
+                        : "bg-primary/10 text-primary",
+                )}
+            >
                 {icon}
             </span>
             <span>{text}</span>
@@ -618,36 +670,88 @@ function TrustPoint({
     );
 }
 
-function CategoryCard({ category }: { category: CategoryNode }) {
+function CategoryCard({
+    category,
+    featured,
+}: {
+    category: CategoryNode;
+    featured: boolean;
+}) {
     const { t } = useI18n();
+    const categoryImage = imageUrl(category.imageUrl);
+    const categoryMeta = category.children.length
+        ? category.children
+              .slice(0, 2)
+              .map((child) => child.name)
+              .join(" · ")
+        : `${t("home.productCount", {
+              count: category.productCount,
+          })} · ${t("home.categoryProducts")}`;
+
+    if (featured) {
+        return (
+            <Link
+                viewTransition
+                to={`/products?categoryId=${category.id}`}
+                className="group relative min-h-[310px] overflow-hidden rounded-2xl bg-slate-900 shadow-[0_18px_48px_-34px_rgba(15,23,42,.7)] ring-1 ring-black/[0.06] sm:min-h-[330px] lg:col-span-2 dark:ring-white/[0.05]"
+            >
+                {categoryImage ? (
+                    <img
+                        src={categoryImage}
+                        alt={category.name}
+                        className="absolute inset-0 size-full object-cover transition duration-700 group-hover:scale-[1.045]"
+                    />
+                ) : (
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,color-mix(in_srgb,var(--primary)_38%,transparent),transparent_38%),linear-gradient(135deg,#102820,#071713)]" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/[0.78] via-black/[0.15] to-black/[0.05]" />
+                <span className="absolute end-5 top-5 grid size-11 place-items-center rounded-full bg-white/[0.12] text-white ring-1 ring-white/[0.18] backdrop-blur transition group-hover:bg-white group-hover:text-slate-950">
+                    <ArrowUpRight className="size-5" />
+                </span>
+                <span className="absolute inset-x-0 bottom-0 p-6 sm:p-7">
+                    <span className="block text-2xl font-black tracking-[-0.035em] text-white sm:text-3xl">
+                        {category.name}
+                    </span>
+                    <span className="mt-2 block max-w-md text-xs font-semibold leading-5 text-white/[0.65] sm:text-sm">
+                        {categoryMeta}
+                    </span>
+                </span>
+            </Link>
+        );
+    }
 
     return (
         <Link
             viewTransition
             to={`/products?categoryId=${category.id}`}
-            className="group flex min-h-40 flex-col overflow-hidden rounded-2xl border border-border/70 bg-card transition duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_16px_38px_-28px_rgba(15,23,42,.35)]"
+            className="group flex min-h-[310px] flex-col overflow-hidden rounded-2xl bg-muted/[0.38] p-5 shadow-[0_14px_34px_-30px_rgba(15,23,42,.48)] ring-1 ring-black/[0.05] transition duration-300 hover:-translate-y-0.5 hover:bg-muted/[0.58] dark:bg-white/[0.03] dark:ring-white/[0.045]"
         >
-            <span className="flex min-h-24 flex-1 items-center justify-center border-b border-border/60 bg-muted/25 p-4">
-                {category.imageUrl ? (
+            <span className="flex items-start gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-background text-foreground shadow-sm ring-1 ring-black/[0.05] transition group-hover:bg-primary group-hover:text-primary-foreground dark:bg-white/[0.055] dark:ring-white/[0.06]">
+                    <ArrowUpRight className="size-4" />
+                </span>
+                <span className="min-w-0 pt-1">
+                    <span className="block text-xl font-black tracking-[-0.03em]">
+                        {category.name}
+                    </span>
+                    <span className="mt-2 line-clamp-2 block text-xs leading-5 text-muted-foreground">
+                        {categoryMeta}
+                    </span>
+                </span>
+            </span>
+
+            <span className="mt-5 block min-h-0 flex-1 overflow-hidden rounded-xl bg-background/[0.80]">
+                {categoryImage ? (
                     <img
-                        src={imageUrl(category.imageUrl) ?? ""}
+                        src={categoryImage}
                         alt={category.name}
-                        className="h-20 w-full object-contain transition duration-500 group-hover:scale-105"
+                        className="size-full min-h-[170px] object-cover transition duration-700 group-hover:scale-[1.045]"
                     />
                 ) : (
-                    <ShoppingBag className="size-8 text-primary/70" />
+                    <span className="grid min-h-[170px] place-items-center bg-gradient-to-br from-primary/[0.12] to-muted text-primary">
+                        <ShoppingBag className="size-10" />
+                    </span>
                 )}
-            </span>
-            <span className="p-3">
-                <span className="line-clamp-2 text-sm font-bold leading-5 transition group-hover:text-primary">
-                    {category.name}
-                </span>
-                <span className="mt-1.5 flex items-center justify-between gap-2 text-[10px] font-semibold text-muted-foreground">
-                    {t("home.productCount", {
-                        count: category.productCount,
-                    })}
-                    <ChevronRight className="size-3.5 shrink-0 rtl:rotate-180" />
-                </span>
             </span>
         </Link>
     );
@@ -682,7 +786,7 @@ function SectionHeading({
             <Button
                 asChild
                 variant="outline"
-                className="hidden shrink-0 rounded-xl font-bold sm:inline-flex"
+                className="hidden shrink-0 rounded-xl border-black/[0.08] bg-transparent font-bold sm:inline-flex dark:border-white/[0.08]"
             >
                 <Link viewTransition to={to}>
                     {t("common.viewAll")}
@@ -712,7 +816,7 @@ function InfoRow({
         <Link
             viewTransition
             to={to}
-            className="group flex min-h-44 items-start gap-4 p-6 transition hover:bg-muted/35"
+            className="group flex min-h-44 items-start gap-4 rounded-2xl bg-muted/[0.38] p-5 transition hover:bg-muted/[0.58] dark:bg-white/[0.035]"
         >
             <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary [&>svg]:size-5">
                 {icon}
@@ -724,7 +828,7 @@ function InfoRow({
                 <span className="mt-2 block text-xl font-black tracking-[-0.03em]">
                     {title}
                 </span>
-                <span className="mt-2 block text-sm leading-6 text-muted-foreground">
+                <span className="mt-2 line-clamp-3 block text-sm leading-6 text-muted-foreground">
                     {description}
                 </span>
                 <span className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-primary">
@@ -746,7 +850,7 @@ function EmptyPanel({
     description: string;
 }) {
     return (
-        <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 px-6 py-16 text-center">
+        <div className="rounded-2xl bg-muted/30 px-6 py-16 text-center ring-1 ring-black/[0.045] dark:bg-white/[0.025] dark:ring-white/[0.045]">
             <span className="mx-auto grid size-12 place-items-center rounded-xl bg-muted text-muted-foreground">
                 {icon}
             </span>
@@ -760,9 +864,12 @@ function EmptyPanel({
 
 function ProductGridSkeleton() {
     return (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
             {Array.from({ length: 5 }).map((_, index) => (
-                <Skeleton key={index} className="h-[410px] rounded-2xl" />
+                <Skeleton
+                    key={index}
+                    className="h-[196px] rounded-2xl sm:h-[410px]"
+                />
             ))}
         </div>
     );
@@ -770,14 +877,14 @@ function ProductGridSkeleton() {
 
 function HeroSkeleton() {
     return (
-        <div className="grid min-h-[470px] items-center gap-8 px-8 py-10 lg:grid-cols-2">
+        <div className="grid min-h-[570px] items-center gap-8 px-8 py-10 md:min-h-[520px] md:grid-cols-2">
             <div className="space-y-5">
-                <Skeleton className="h-8 w-44 rounded-full" />
-                <Skeleton className="h-28 w-full rounded-2xl" />
-                <Skeleton className="h-20 w-full rounded-2xl" />
-                <Skeleton className="h-11 w-48 rounded-xl" />
+                <Skeleton className="h-8 w-44 rounded-full bg-white/10" />
+                <Skeleton className="h-28 w-full rounded-2xl bg-white/10" />
+                <Skeleton className="h-20 w-full rounded-2xl bg-white/10" />
+                <Skeleton className="h-11 w-48 rounded-xl bg-white/10" />
             </div>
-            <Skeleton className="h-[340px] rounded-3xl" />
+            <Skeleton className="h-[340px] rounded-3xl bg-white/10" />
         </div>
     );
 }
