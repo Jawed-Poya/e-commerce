@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { Controller, useFormContext } from "react-hook-form";
+import { Controller, useFormContext, useWatch } from "react-hook-form";
 import { ImagePlus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -24,6 +24,7 @@ import type {
 import { useI18n } from "@/i18n/i18n-provider";
 import { flattenTree } from "@/lib/utils";
 import { CustomerPricingFields, createCustomerPriceDrafts } from "./customer-pricing-fields";
+import { ProductUnitConversionsFields } from "./product-unit-conversions-fields";
 import {
     IMAGE_FILE_ACCEPT,
     isSupportedImageFile,
@@ -174,6 +175,10 @@ export function ProductDraftCard({
     }, [customerTypes, defaultCustomerTypeId, getValues, index, setValue]);
 
     const productErrors = errors.products?.[index];
+    const baseUnitId = useWatch({
+        control,
+        name: `products.${index}.unitId`,
+    });
 
     return (
         <Card className="overflow-hidden">
@@ -300,7 +305,7 @@ export function ProductDraftCard({
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label>{t("form.unit")}</Label>
+                            <Label>{t("productUnits.baseUnit")}</Label>
 
                             <Controller
                                 control={control}
@@ -317,6 +322,21 @@ export function ProductDraftCard({
                             />
                         </div>
                     </div>
+
+                    <Controller
+                        control={control}
+                        name={`products.${index}.unitConversions`}
+                        render={({ field }) => (
+                            <ProductUnitConversionsFields
+                                baseUnitId={baseUnitId}
+                                units={units}
+                                value={field.value ?? []}
+                                onChange={field.onChange}
+                                disabled={disabled}
+                                compact
+                            />
+                        )}
+                    />
 
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-1.5">

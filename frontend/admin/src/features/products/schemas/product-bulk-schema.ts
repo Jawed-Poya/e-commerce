@@ -80,6 +80,20 @@ export const ProductBulkItemSchema = z
         isActive: z.boolean(),
 
         slug: z.string().trim().max(250, "Slug cannot exceed 250 characters."),
+
+        unitConversions: z.array(
+            z.object({
+                id: z.number().int().positive().nullable(),
+                unitId: z.number().int().nonnegative(),
+                conversionFactor: z.number(),
+                barcode: z.string().max(100).nullable(),
+                priceOverride: z.number().nullable(),
+                oldPriceOverride: z.number().nullable(),
+                isDefault: z.boolean(),
+                isActive: z.boolean(),
+                sortOrder: z.number().int().nonnegative(),
+            }),
+        ),
         prices: z.array(z.object({
             customerTypeId: z.number().int().positive(),
             customerTypeName: z.string(),
