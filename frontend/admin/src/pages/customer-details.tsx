@@ -14,7 +14,8 @@ import { CustomerLedgerCard } from "@/features/company/customer-ledger-card";
 import { ReceiptActions } from "@/features/company/receipt-actions";
 import { customerService } from "@/features/customers/customer-service";
 import { useProductLookupsQuery } from "@/features/products/hooks/use-product-mutation";
-import { formatMoney, StatusBadge } from "./orders";
+import { OrderStatusBadge as StatusBadge } from "@/features/orders/components/order-status-badge";
+import { formatMoney } from "@/lib/format-money";
 
 export default function CustomerDetailsPage() {
     const id = Number(useParams().id);

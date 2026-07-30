@@ -8,29 +8,21 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ECommerce.Controllers;
 
-[ApiController]
 [Route("api/admin/reports")]
 [Authorize(Policy = AppPermissions.FinancialReportsView)]
 public sealed class FinancialReportsController(
     IFinancialReportService reports,
-    IFinancialDocumentService documents) : ControllerBase
+    IFinancialDocumentService documents) : ApiControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<ApiResponse<FinancialReportSummaryResponse>>> Get(
         [FromQuery] FinancialReportRequest request)
     {
-        try
-        {
-            using var operation = ServerOperation.CreateReadScope();
-            return Ok(ApiResponse<FinancialReportSummaryResponse>.Ok(
-                await TransientSqlRetry.ExecuteAsync(
-                    token => reports.GetReportAsync(request, cancellationToken: token),
-                    operation.Token)));
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(ApiResponse<object>.Fail(exception.Message));
-        }
+        using var operation = ServerOperation.CreateReadScope();
+        var report = await TransientSqlRetry.ExecuteAsync(
+            token => reports.GetReportAsync(request, cancellationToken: token),
+            operation.Token);
+        return Success(report);
     }
 
     [HttpGet("company-worth")]
@@ -40,18 +32,16 @@ public sealed class FinancialReportsController(
         [FromQuery] long? branchId,
         [FromQuery] string? currencyCode)
     {
-        try
-        {
-            using var operation = ServerOperation.CreateReadScope();
-            return Ok(ApiResponse<CompanyWorthResponse>.Ok(await TransientSqlRetry.ExecuteAsync(
-                token => reports.GetCompanyWorthAsync(
-                    asOfDate, periodStartDate, branchId, currencyCode, token),
-                operation.Token)));
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(ApiResponse<object>.Fail(exception.Message));
-        }
+        using var operation = ServerOperation.CreateReadScope();
+        var worth = await TransientSqlRetry.ExecuteAsync(
+            token => reports.GetCompanyWorthAsync(
+                asOfDate,
+                periodStartDate,
+                branchId,
+                currencyCode,
+                token),
+            operation.Token);
+        return Success(worth);
     }
 
     [HttpGet("customers/{customerId:long}/ledger")]
@@ -61,119 +51,94 @@ public sealed class FinancialReportsController(
         [FromQuery] DateTime? endDate,
         [FromQuery] string? currencyCode)
     {
-        try
-        {
-            using var operation = ServerOperation.CreateReadScope();
-            return Ok(ApiResponse<CustomerLedgerResponse>.Ok(await TransientSqlRetry.ExecuteAsync(
-                token => reports.GetCustomerLedgerAsync(
-                    customerId, startDate, endDate, currencyCode, token),
-                operation.Token)));
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(ApiResponse<object>.Fail(exception.Message));
-        }
-        catch (KeyNotFoundException exception)
-        {
-            return NotFound(ApiResponse<object>.Fail(exception.Message));
-        }
+        using var operation = ServerOperation.CreateReadScope();
+        var ledger = await TransientSqlRetry.ExecuteAsync(
+            token => reports.GetCustomerLedgerAsync(
+                customerId,
+                startDate,
+                endDate,
+                currencyCode,
+                token),
+            operation.Token);
+        return Success(ledger);
     }
 
     [HttpGet("export/excel")]
-    public async Task<IActionResult> ExportExcel([FromQuery] FinancialReportRequest request)
-    {
-        try
-        {
-            using var operation = ServerOperation.CreateDocumentScope();
-            var report = await TransientSqlRetry.ExecuteAsync(
-                token => reports.GetReportAsync(request, includeAllResults: true, cancellationToken: token),
-                operation.Token);
-            var companyName = await documents.GetCompanyNameAsync(operation.Token);
-            var content = documents.CreateFinancialReportExcel(report, companyName);
-            return File(content,
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                $"financial-report-{report.StartDate:yyyyMMdd}-{report.EndDate:yyyyMMdd}.xlsx");
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(ApiResponse<object>.Fail(exception.Message));
-        }
-    }
+    public Task<IActionResult> ExportExcel([FromQuery] FinancialReportRequest request) =>
+        ExportFinancialReportAsync(request, "excel");
 
     [HttpGet("export/pdf")]
-    public async Task<IActionResult> ExportPdf([FromQuery] FinancialReportRequest request)
-    {
-        try
-        {
-            using var operation = ServerOperation.CreateDocumentScope();
-            var report = await TransientSqlRetry.ExecuteAsync(
-                token => reports.GetReportAsync(request, includeAllResults: true, cancellationToken: token),
-                operation.Token);
-            var companyName = await documents.GetCompanyNameAsync(operation.Token);
-            var content = documents.CreateFinancialReportPdf(report, companyName);
-            return File(content, "application/pdf",
-                $"financial-report-{report.StartDate:yyyyMMdd}-{report.EndDate:yyyyMMdd}.pdf");
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(ApiResponse<object>.Fail(exception.Message));
-        }
-    }
+    public Task<IActionResult> ExportPdf([FromQuery] FinancialReportRequest request) =>
+        ExportFinancialReportAsync(request, "pdf");
 
     [HttpGet("customers/{customerId:long}/ledger/export/excel")]
-    public async Task<IActionResult> ExportCustomerLedgerExcel(
+    public Task<IActionResult> ExportCustomerLedgerExcel(
         long customerId,
         [FromQuery] DateTime? startDate,
         [FromQuery] DateTime? endDate,
-        [FromQuery] string? currencyCode)
-    {
-        try
-        {
-            using var operation = ServerOperation.CreateDocumentScope();
-            var ledger = await TransientSqlRetry.ExecuteAsync(
-                token => reports.GetCustomerLedgerAsync(customerId, startDate, endDate, currencyCode, token),
-                operation.Token);
-            var companyName = await documents.GetCompanyNameAsync(operation.Token);
-            var content = documents.CreateCustomerLedgerExcel(ledger, companyName);
-            return File(content,
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                $"customer-ledger-{customerId}-{ledger.StartDate:yyyyMMdd}-{ledger.EndDate:yyyyMMdd}.xlsx");
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(ApiResponse<object>.Fail(exception.Message));
-        }
-        catch (KeyNotFoundException exception)
-        {
-            return NotFound(ApiResponse<object>.Fail(exception.Message));
-        }
-    }
+        [FromQuery] string? currencyCode) =>
+        ExportCustomerLedgerAsync(customerId, startDate, endDate, currencyCode, "excel");
 
     [HttpGet("customers/{customerId:long}/ledger/export/pdf")]
-    public async Task<IActionResult> ExportCustomerLedgerPdf(
+    public Task<IActionResult> ExportCustomerLedgerPdf(
         long customerId,
         [FromQuery] DateTime? startDate,
         [FromQuery] DateTime? endDate,
-        [FromQuery] string? currencyCode)
+        [FromQuery] string? currencyCode) =>
+        ExportCustomerLedgerAsync(customerId, startDate, endDate, currencyCode, "pdf");
+
+    private async Task<IActionResult> ExportFinancialReportAsync(
+        FinancialReportRequest request,
+        string format)
     {
-        try
-        {
-            using var operation = ServerOperation.CreateDocumentScope();
-            var ledger = await TransientSqlRetry.ExecuteAsync(
-                token => reports.GetCustomerLedgerAsync(customerId, startDate, endDate, currencyCode, token),
-                operation.Token);
-            var companyName = await documents.GetCompanyNameAsync(operation.Token);
-            var content = documents.CreateCustomerLedgerPdf(ledger, companyName);
-            return File(content, "application/pdf",
-                $"customer-ledger-{customerId}-{ledger.StartDate:yyyyMMdd}-{ledger.EndDate:yyyyMMdd}.pdf");
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(ApiResponse<object>.Fail(exception.Message));
-        }
-        catch (KeyNotFoundException exception)
-        {
-            return NotFound(ApiResponse<object>.Fail(exception.Message));
-        }
+        using var operation = ServerOperation.CreateDocumentScope();
+        var report = await TransientSqlRetry.ExecuteAsync(
+            token => reports.GetReportAsync(
+                request,
+                includeAllResults: true,
+                cancellationToken: token),
+            operation.Token);
+        var companyName = await documents.GetCompanyNameAsync(operation.Token);
+        var fileStem = $"financial-report-{report.StartDate:yyyyMMdd}-{report.EndDate:yyyyMMdd}";
+
+        return format == "excel"
+            ? File(
+                documents.CreateFinancialReportExcel(report, companyName),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"{fileStem}.xlsx")
+            : File(
+                documents.CreateFinancialReportPdf(report, companyName),
+                "application/pdf",
+                $"{fileStem}.pdf");
+    }
+
+    private async Task<IActionResult> ExportCustomerLedgerAsync(
+        long customerId,
+        DateTime? startDate,
+        DateTime? endDate,
+        string? currencyCode,
+        string format)
+    {
+        using var operation = ServerOperation.CreateDocumentScope();
+        var ledger = await TransientSqlRetry.ExecuteAsync(
+            token => reports.GetCustomerLedgerAsync(
+                customerId,
+                startDate,
+                endDate,
+                currencyCode,
+                token),
+            operation.Token);
+        var companyName = await documents.GetCompanyNameAsync(operation.Token);
+        var fileStem = $"customer-ledger-{customerId}-{ledger.StartDate:yyyyMMdd}-{ledger.EndDate:yyyyMMdd}";
+
+        return format == "excel"
+            ? File(
+                documents.CreateCustomerLedgerExcel(ledger, companyName),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"{fileStem}.xlsx")
+            : File(
+                documents.CreateCustomerLedgerPdf(ledger, companyName),
+                "application/pdf",
+                $"{fileStem}.pdf");
     }
 }

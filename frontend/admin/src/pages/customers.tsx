@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { customerService } from "@/features/customers/customer-service";
 import { useProductLookupsQuery } from "@/features/products/hooks/use-product-mutation";
 import type { UpsertCustomerRequest } from "@/features/customers/customer-types";
-import { formatMoney } from "./orders";
+import { formatMoney } from "@/lib/format-money";
 
 const emptyForm = { firstName: "", lastName: "", phone: "", email: "", address: "", customerTypeId: "" };
 
