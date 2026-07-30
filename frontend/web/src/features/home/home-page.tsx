@@ -494,7 +494,7 @@ export function HomePage() {
                 {products.isLoading ? (
                     <ProductGridSkeleton />
                 ) : featuredProducts.length ? (
-                    <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+                    <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
                         {featuredProducts.slice(0, 5).map((product) => (
                             <ProductCard key={product.id} product={product} />
                         ))}
@@ -601,7 +601,7 @@ export function HomePage() {
                 {products.isLoading ? (
                     <ProductGridSkeleton />
                 ) : (
-                    <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+                    <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
                         {newestProducts.map((product) => (
                             <ProductCard key={product.id} product={product} />
                         ))}
@@ -864,7 +864,7 @@ function EmptyPanel({
 
 function ProductGridSkeleton() {
     return (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
             {Array.from({ length: 5 }).map((_, index) => (
                 <Skeleton
                     key={index}
