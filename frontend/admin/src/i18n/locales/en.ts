@@ -2,6 +2,8 @@ import { inventoryEn } from "@/features/inventory/i18n/inventory-translations";
 import { pricingEn } from "@/features/products/i18n/pricing-translations";
 
 import { companyEn } from "@/features/company/i18n/company-translations";
+import { financeEn } from "@/features/finance/i18n/finance-translations";
+import { ordersEn } from "@/features/orders/i18n/order-translations";
 
 export const en = {
   "language.en": "English", "language.ps": "Pashto", "language.dr": "Dari",
@@ -29,4 +31,6 @@ export const en = {
   ...inventoryEn,
   ...pricingEn,
   ...companyEn,
+  ...financeEn,
+  ...ordersEn,
 } as const;

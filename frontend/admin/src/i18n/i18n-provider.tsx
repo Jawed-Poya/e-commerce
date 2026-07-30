@@ -18,6 +18,7 @@ type TranslationKey = keyof typeof en;
 type TranslationResources = Record<TranslationKey, string>;
 
 const resources: Record<Language, TranslationResources> = { en, ps, dr };
+const locales: Record<Language, string> = { en: "en-US", dr: "fa-AF", ps: "ps-AF" };
 const englishValueToKey = new Map<string, TranslationKey>();
 const translatedValueToEnglish = new Map<string, string>();
 
@@ -45,10 +46,20 @@ export function translateLiteral(text: string, language: Language): string {
     return key ? resources[language][key] ?? canonical : canonical;
 }
 
+type TranslationValues = Record<string, string | number>;
+
+function interpolate(template: string, values: TranslationValues = {}) {
+    return template.replace(/\{(\w+)\}/g, (match, key: string) =>
+        values[key] === undefined ? match : String(values[key]),
+    );
+}
+
 interface I18nContextValue {
     language: Language;
+    locale: string;
     setLanguage: (language: Language) => void;
     t: (key: TranslationKey) => string;
+    tf: (key: TranslationKey, values?: TranslationValues) => string;
     tr: (text: string) => string;
 }
 
@@ -62,7 +73,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         localStorage.setItem("language", language);
-        document.documentElement.lang = language;
+        document.documentElement.lang = locales[language];
         document.documentElement.dir = language === "en" ? "ltr" : "rtl";
     }, [language]);
 
@@ -141,8 +152,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     const value = useMemo<I18nContextValue>(
         () => ({
             language,
+            locale: locales[language],
             setLanguage,
             t: (key) => resources[language][key] ?? en[key],
+            tf: (key, values) => interpolate(resources[language][key] ?? en[key], values),
             tr: (text) => translateLiteral(text, language),
         }),
         [language],

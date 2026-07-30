@@ -7,8 +7,8 @@ using ECommerce.Data;
 using ECommerce.Entities.Common;
 using ECommerce.Entities.Orders.Contracts;
 using ECommerce.Entities.Orders.Filters;
-using ECommerce.Entities.Products;
 using ECommerce.Options;
+using ECommerce.Shared;
 using ECommerce.Services.Customers;
 using ECommerce.Services.Inventory;
 using ECommerce.Services.Notifications;
@@ -29,7 +29,8 @@ public sealed class OrderService(
     IStoreNotificationService notifications,
     IAdminNotificationService adminNotifications,
     IStorefrontContentService storefrontContent,
-    IInventoryCostService inventoryCosts) : IOrderService
+    IInventoryCostService inventoryCosts,
+    IOrderInventoryService orderInventory) : IOrderService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -222,31 +223,10 @@ public sealed class OrderService(
             context.Orders.Add(order);
             await context.SaveChangesAsync(cancellationToken);
 
-            foreach (var product in products.Where(item => !item.UsesDisplayStock))
-            {
-                var quantity = orderItems.Where(item => item.ProductId == product.Id).Sum(item => item.Quantity);
-                var inventory = product.Inventory
-                    ?? throw new InvalidOperationException($"Inventory is not configured for '{product.Name}'.");
-                var quantityBefore = inventory.Quantity;
-                var reservedBefore = inventory.ReservedQuantity;
-
-                inventory.ReservedQuantity += quantity;
-
-                context.InventoryTransactions.Add(new InventoryTransaction
-                {
-                    ProductId = product.Id,
-                    Type = InventoryTransactionType.Reservation,
-                    Quantity = 0,
-                    QuantityBefore = quantityBefore,
-                    QuantityAfter = quantityBefore,
-                    ReservedBefore = reservedBefore,
-                    ReservedAfter = inventory.ReservedQuantity,
-                    ReferenceType = "Order",
-                    ReferenceId = order.Id,
-                    IdempotencyKey = $"order:{order.Id}:reserve:{product.Id}",
-                    Description = $"Stock reserved for order {order.OrderNumber}."
-                });
-            }
+            await orderInventory.ReserveAsync(
+                order,
+                userId: null,
+                cancellationToken: cancellationToken);
 
             var adminNotification = await adminNotifications.CreateOrderCreatedAsync(
                 order.Id,
@@ -392,7 +372,10 @@ public sealed class OrderService(
                 ?? throw new KeyNotFoundException("Order not found.");
 
             if (order.Status == request.Status)
+            {
+                await transaction.RollbackAsync(cancellationToken);
                 return MapDetails(order);
+            }
 
             EnsureValidStatusTransition(order, request.Status);
             var previousStatus = order.Status;
@@ -400,7 +383,8 @@ public sealed class OrderService(
 
             if (request.Status == OrderStatus.Cancelled)
             {
-                var restockedProducts = ReleaseReservedStock(order);
+                var restockedProducts = await orderInventory.ReleaseReservationsAsync(
+                    order, userId, cancellationToken);
                 foreach (var restocked in restockedProducts)
                 {
                     pendingNotifications.Add(await notifications.CreateStockIncreasedAsync(
@@ -433,7 +417,8 @@ public sealed class OrderService(
             }
             else if (request.Status == OrderStatus.Delivered)
             {
-                CommitReservedStock(order);
+                await orderInventory.CommitReservationsAsync(
+                    order, userId, cancellationToken);
                 order.FulfillmentStatus = FulfillmentStatus.Fulfilled;
 
                 var payment = order.Payments.OrderByDescending(item => item.Id).FirstOrDefault();
@@ -468,9 +453,29 @@ public sealed class OrderService(
 
             return MapDetails(order);
         }
+        catch (DbUpdateException exception) when (SqlServerExceptionClassifier.IsUniqueConstraintViolation(
+                   exception,
+                   "IX_InventoryTransactions_TenantId_IdempotencyKey"))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            context.ChangeTracker.Clear();
+
+            // A concurrent request may have completed the same transition first.
+            // Return the committed state instead of exposing a SQL index error.
+            var current = await LoadOrderAsync(id, false, cancellationToken);
+            if (current?.Status == request.Status) return MapDetails(current);
+
+            throw new InvalidOperationException(
+                "This order inventory action was already processed. Refresh the order and try again.");
+        }
         catch (DbUpdateConcurrencyException)
         {
             await transaction.RollbackAsync(cancellationToken);
+            context.ChangeTracker.Clear();
+
+            var current = await LoadOrderAsync(id, false, cancellationToken);
+            if (current?.Status == request.Status) return MapDetails(current);
+
             throw new InvalidOperationException(
                 "Inventory changed while the order was being updated. Refresh and try again.");
         }
@@ -738,92 +743,6 @@ public sealed class OrderService(
             query = query.AsNoTracking();
 
         return await query.FirstOrDefaultAsync(order => order.Id == id, cancellationToken);
-    }
-
-    private IReadOnlyCollection<RestockedProduct> ReleaseReservedStock(OrderEntity order)
-    {
-        var inventoryItems = order.Items.Where(item => item.AffectsInventory).ToArray();
-        if (inventoryItems.Length == 0) return [];
-
-        var productIds = inventoryItems.Select(item => item.ProductId).Distinct().ToArray();
-        var inventories = context.ProductInventories
-            .Where(item => productIds.Contains(item.ProductId))
-            .ToDictionary(item => item.ProductId);
-        var restockedProducts = new List<RestockedProduct>();
-
-        foreach (var item in inventoryItems)
-        {
-            if (!inventories.TryGetValue(item.ProductId, out var inventory) ||
-                inventory.ReservedQuantity < item.Quantity)
-                throw new InvalidOperationException($"Reserved stock is inconsistent for '{item.ProductName}'.");
-
-            var reservedBefore = inventory.ReservedQuantity;
-            var previousAvailable = inventory.Quantity - reservedBefore;
-            inventory.ReservedQuantity -= item.Quantity;
-            var newAvailable = inventory.Quantity - inventory.ReservedQuantity;
-            restockedProducts.Add(new RestockedProduct(item.ProductId, previousAvailable, newAvailable));
-
-            context.InventoryTransactions.Add(new InventoryTransaction
-            {
-                ProductId = item.ProductId,
-                Type = InventoryTransactionType.ReservationRelease,
-                Quantity = 0,
-                QuantityBefore = inventory.Quantity,
-                QuantityAfter = inventory.Quantity,
-                ReservedBefore = reservedBefore,
-                ReservedAfter = inventory.ReservedQuantity,
-                ReferenceType = "Order",
-                ReferenceId = order.Id,
-                IdempotencyKey = $"order:{order.Id}:release:{item.ProductId}",
-                Description = $"Reservation released for cancelled order {order.OrderNumber}."
-            });
-        }
-
-        return restockedProducts;
-    }
-
-    private sealed record RestockedProduct(
-        long ProductId,
-        decimal PreviousAvailable,
-        decimal NewAvailable);
-
-    private void CommitReservedStock(OrderEntity order)
-    {
-        var inventoryItems = order.Items.Where(item => item.AffectsInventory).ToArray();
-        if (inventoryItems.Length == 0) return;
-
-        var productIds = inventoryItems.Select(item => item.ProductId).Distinct().ToArray();
-        var inventories = context.ProductInventories
-            .Where(item => productIds.Contains(item.ProductId))
-            .ToDictionary(item => item.ProductId);
-
-        foreach (var item in inventoryItems)
-        {
-            if (!inventories.TryGetValue(item.ProductId, out var inventory) ||
-                inventory.ReservedQuantity < item.Quantity ||
-                inventory.Quantity < item.Quantity)
-                throw new InvalidOperationException($"Reserved stock is inconsistent for '{item.ProductName}'.");
-
-            var quantityBefore = inventory.Quantity;
-            var reservedBefore = inventory.ReservedQuantity;
-            inventory.Quantity -= item.Quantity;
-            inventory.ReservedQuantity -= item.Quantity;
-
-            context.InventoryTransactions.Add(new InventoryTransaction
-            {
-                ProductId = item.ProductId,
-                Type = InventoryTransactionType.Sale,
-                Quantity = -item.Quantity,
-                QuantityBefore = quantityBefore,
-                QuantityAfter = inventory.Quantity,
-                ReservedBefore = reservedBefore,
-                ReservedAfter = inventory.ReservedQuantity,
-                ReferenceType = "Order",
-                ReferenceId = order.Id,
-                IdempotencyKey = $"order:{order.Id}:sale:{item.ProductId}",
-                Description = $"Stock sold for delivered order {order.OrderNumber}."
-            });
-        }
     }
 
     private static void EnsureValidStatusTransition(OrderEntity order, OrderStatus target)
