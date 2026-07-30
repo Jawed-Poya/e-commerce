@@ -223,7 +223,7 @@ export function CatalogPage() {
     );
 
     return (
-        <div className="mx-auto w-full max-w-[1500px] px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+        <div className="mx-auto w-full max-w-[1480px] px-4 py-7 sm:px-6 lg:px-8 lg:py-10">
             <nav className="mb-6 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Link viewTransition
                     to="/"
@@ -237,18 +237,18 @@ export function CatalogPage() {
                 <span className="text-foreground">{t("catalog.shop")}</span>
             </nav>
 
-            <section className="relative mb-8 overflow-hidden rounded-[28px] border bg-gradient-to-br from-primary/10 via-background to-orange-500/5 px-6 py-9 sm:px-9 lg:px-12 lg:py-12">
-                <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-primary/10 blur-3xl" />
-                <div className="pointer-events-none absolute -bottom-28 left-1/3 size-64 rounded-full bg-orange-500/10 blur-3xl" />
+            <section className="relative mb-7 overflow-hidden rounded-2xl border border-border/70 bg-card px-6 py-8 sm:px-9 lg:px-10 lg:py-10">
+                <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-primary/8 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-28 left-1/3 size-64 rounded-full bg-brand-orange/8 blur-3xl" />
 
                 <div className="relative flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
                     <div>
-                        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/70 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-primary shadow-sm backdrop-blur">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/7 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
                             <PackageSearch className="size-3.5" />
                             {t("catalog.curated")}
                         </div>
 
-                        <h1 className="mt-5 max-w-3xl text-4xl font-black tracking-[-0.045em] sm:text-5xl lg:text-6xl">
+                        <h1 className="mt-4 max-w-3xl text-4xl font-black tracking-[-0.045em] sm:text-5xl">
                             {t("catalog.heroTitle")}
                         </h1>
 
@@ -258,7 +258,7 @@ export function CatalogPage() {
                     </div>
 
                     {!query.isLoading && query.data && (
-                        <div className="w-fit rounded-2xl border bg-background/80 px-5 py-4 shadow-sm backdrop-blur">
+                        <div className="w-fit rounded-xl border border-border/70 bg-background px-5 py-4">
                             <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                                 {t("catalog.availableNow")}
                             </span>
@@ -276,7 +276,7 @@ export function CatalogPage() {
             </section>
 
             {rootCategories.length > 0 ? (
-                <div className="mb-7 overflow-x-auto rounded-2xl border bg-card/80 p-2 shadow-sm backdrop-blur">
+                <div className="mb-7 overflow-x-auto rounded-xl border border-border/70 bg-card p-2">
                     <div className="flex min-w-max items-center gap-2">
                         <button
                             type="button"
@@ -311,8 +311,8 @@ export function CatalogPage() {
             ) : null}
 
             <div className="grid items-start gap-8 lg:grid-cols-[310px_minmax(0,1fr)]">
-                <aside className="sticky top-36 hidden overflow-hidden rounded-[24px] border border-border/70 bg-card shadow-[0_24px_60px_-42px_rgba(15,23,42,.55)] lg:block">
-                    <div className="border-b bg-gradient-to-br from-primary/8 to-transparent p-5">
+                <aside className="sticky top-36 hidden overflow-hidden rounded-2xl border border-border/70 bg-card lg:block">
+                    <div className="border-b border-border/70 bg-muted/25 p-5">
                         <p className="text-xs font-black uppercase tracking-[0.14em] text-primary">
                             {t("catalog.filterProducts")}
                         </p>
@@ -324,11 +324,11 @@ export function CatalogPage() {
                 </aside>
 
                 <section className="min-w-0">
-                    <div className="mb-6 rounded-[22px] border border-border/70 bg-card/90 p-3 shadow-[0_18px_48px_-38px_rgba(15,23,42,.55)] backdrop-blur">
+                    <div className="mb-6 rounded-2xl border border-border/70 bg-card p-3">
                         <div className="flex flex-col gap-3 sm:flex-row">
                             <form
                                 onSubmit={submit}
-                                className="group flex h-12 min-w-0 flex-1 items-center rounded-xl border bg-muted/30 p-1 transition-all focus-within:border-primary focus-within:bg-background focus-within:ring-4 focus-within:ring-primary/10"
+                                className="group flex h-12 min-w-0 flex-1 items-center rounded-xl border bg-background p-1 transition focus-within:border-primary focus-within:ring-3 focus-within:ring-primary/10"
                             >
                                 <Search className="ml-3 size-4.5 shrink-0 text-muted-foreground transition-colors group-focus-within:text-primary" />
 
@@ -475,7 +475,7 @@ export function CatalogPage() {
                     )}
 
                     {query.isLoading ? (
-                        <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                        <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
                             {Array.from({ length: 8 }).map((_, index) => (
                                 <Skeleton
                                     key={index}
@@ -506,7 +506,7 @@ export function CatalogPage() {
                                 </span>
                             </div>
 
-                            <div className="grid auto-rows-fr items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                            <div className="grid auto-rows-fr grid-cols-2 items-stretch gap-3 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
                                 {query.data.items.map((product) => (
                                     <ProductCard
                                         key={product.id}

@@ -1,4 +1,11 @@
-import { ArrowUpRight, Check, Heart, ShoppingBag, Star } from "lucide-react";
+import {
+    ArrowUpRight,
+    Check,
+    Heart,
+    PackageCheck,
+    ShoppingBag,
+    Star,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { useI18n } from "../../i18n/i18n-provider";
@@ -16,7 +23,6 @@ export function ProductCard({ product }: { product: Product }) {
     const { t } = useI18n();
     const liked = cart.wishlist.includes(product.id);
     const primary = imageUrl(product.primaryImageUrl) || "/placeholder-product.svg";
-    const alternate = product.images.find((image) => image.url !== product.primaryImageUrl);
     const hasPrice = product.price != null;
     const hasDiscount =
         product.oldPrice != null &&
@@ -28,6 +34,7 @@ export function ProductCard({ product }: { product: Product }) {
 
     const addToCart = () => {
         if (product.price == null) return;
+
         cart.addItem({
             id: product.id,
             name: product.name,
@@ -44,8 +51,8 @@ export function ProductCard({ product }: { product: Product }) {
     };
 
     return (
-        <article className="group relative grid h-full min-w-0 grid-cols-[118px_minmax(0,1fr)] gap-3 overflow-hidden rounded-[22px] border border-border/80 bg-card p-3 shadow-[0_12px_38px_-32px_rgba(15,23,42,.6)] transition duration-300 hover:border-primary/30 hover:shadow-[0_24px_64px_-42px_rgba(15,23,42,.72)] dark:border-white/11 dark:shadow-[0_16px_44px_-34px_rgba(0,0,0,.9)] sm:flex sm:flex-col sm:gap-0 sm:p-0 sm:hover:-translate-y-1">
-            <div className="relative min-h-[160px] overflow-hidden rounded-[17px] border border-border/65 bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:border-white/10 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:aspect-[4/3] sm:min-h-0 sm:rounded-none sm:border-x-0 sm:border-t-0">
+        <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border/75 bg-card transition duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_18px_45px_-28px_rgba(15,23,42,.35)] dark:border-white/10">
+            <div className="relative aspect-[4/3] overflow-hidden border-b border-border/70 bg-muted/25 dark:border-white/10">
                 <Link
                     viewTransition
                     to={productPath(product)}
@@ -58,30 +65,17 @@ export function ProductCard({ product }: { product: Product }) {
                     alt={product.name}
                     loading="lazy"
                     decoding="async"
-                    className={cn(
-                        "size-full object-contain p-3.5 drop-shadow-md transition duration-500 ease-out sm:p-7 sm:group-hover:scale-[1.045]",
-                        alternate && "sm:group-hover:opacity-0",
-                    )}
+                    className="size-full object-contain p-5 transition duration-500 ease-out group-hover:scale-[1.04] sm:p-7"
                 />
 
-                {alternate ? (
-                    <img
-                        src={imageUrl(alternate.url) ?? primary}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        className="absolute inset-0 hidden size-full scale-[1.035] object-contain p-7 opacity-0 drop-shadow-md transition duration-500 ease-out sm:block sm:group-hover:scale-100 sm:group-hover:opacity-100"
-                    />
-                ) : null}
-
-                <div className="absolute start-2.5 top-2.5 z-20 flex flex-wrap gap-1.5 sm:start-3 sm:top-3">
+                <div className="absolute start-3 top-3 z-20 flex flex-wrap gap-1.5">
                     {hasDiscount ? (
-                        <Badge className="rounded-lg border-0 bg-brand-orange px-2.5 py-1 text-[10px] font-black text-white shadow-md">
+                        <Badge className="rounded-md border-0 bg-brand-orange px-2 py-1 text-[10px] font-black text-white shadow-sm">
                             -{discount}%
                         </Badge>
                     ) : null}
                     {product.isFeatured ? (
-                        <Badge className="hidden rounded-lg border border-primary/20 bg-background/90 px-2.5 py-1 text-[10px] font-black text-primary shadow-sm backdrop-blur sm:inline-flex">
+                        <Badge className="rounded-md border border-border/70 bg-background/90 px-2 py-1 text-[10px] font-bold text-foreground shadow-sm backdrop-blur">
                             {t("product.featured")}
                         </Badge>
                     ) : null}
@@ -93,47 +87,50 @@ export function ProductCard({ product }: { product: Product }) {
                     size="icon"
                     onClick={() => cart.toggleWishlist(product.id)}
                     className={cn(
-                        "absolute end-2.5 top-2.5 z-30 size-8 rounded-full border-white/70 bg-background/92 text-muted-foreground shadow-md backdrop-blur transition hover:border-brand-orange/30 hover:text-brand-orange sm:end-3 sm:top-3 sm:size-9",
-                        liked && "border-brand-orange bg-brand-orange text-white hover:bg-brand-orange/90 hover:text-white",
+                        "absolute end-3 top-3 z-30 size-9 rounded-full border-border/70 bg-background/90 text-muted-foreground shadow-sm backdrop-blur transition hover:border-brand-orange/30 hover:text-brand-orange",
+                        liked &&
+                            "border-brand-orange bg-brand-orange text-white hover:bg-brand-orange/90 hover:text-white",
                     )}
                     aria-label={liked ? t("wishlist.remove") : t("wishlist.add")}
                 >
-                    <Heart className={cn("size-3.5", liked && "fill-current")} />
+                    <Heart className={cn("size-4", liked && "fill-current")} />
                 </Button>
 
                 <Link
                     viewTransition
                     to={productPath(product)}
-                    className="absolute inset-x-3 bottom-3 z-30 hidden translate-y-2 items-center justify-between rounded-xl border border-white/75 bg-background/92 px-3 py-2.5 text-xs font-black opacity-0 shadow-lg backdrop-blur transition duration-300 sm:flex sm:group-hover:translate-y-0 sm:group-hover:opacity-100 dark:border-white/12"
+                    className="absolute inset-x-3 bottom-3 z-20 hidden translate-y-2 items-center justify-between rounded-lg border border-border/70 bg-background/95 px-3 py-2.5 text-xs font-bold opacity-0 shadow-md backdrop-blur transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 sm:flex"
                 >
                     {t("home.viewProduct")}
                     <ArrowUpRight className="size-4 text-primary" />
                 </Link>
             </div>
 
-            <div className="flex min-w-0 flex-1 flex-col py-0.5 sm:p-4">
-                <div className="flex items-center justify-between gap-2">
-                    <p className="min-w-0 truncate text-[10px] font-black uppercase tracking-[0.14em] text-primary">
+            <div className="flex min-w-0 flex-1 flex-col p-3.5 sm:p-4">
+                <div className="flex min-w-0 items-center justify-between gap-2">
+                    <p className="min-w-0 truncate text-[10px] font-bold uppercase tracking-[0.12em] text-primary">
                         {product.categoryName}
                     </p>
-                    <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-muted-foreground">
+                    <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-semibold text-muted-foreground">
                         <Star className="size-3.5 fill-amber-400 text-amber-400" />
-                        {product.reviewCount > 0 ? product.averageRating.toFixed(1) : "—"}
+                        {product.reviewCount > 0
+                            ? product.averageRating.toFixed(1)
+                            : "—"}
                     </span>
                 </div>
 
                 <Link
                     viewTransition
                     to={productPath(product)}
-                    className="mt-1.5 line-clamp-2 text-sm font-black leading-5 tracking-[-0.02em] transition hover:text-primary sm:min-h-12 sm:text-[15px] sm:leading-6"
+                    className="mt-2 line-clamp-2 min-h-10 text-sm font-bold leading-5 tracking-[-0.015em] transition hover:text-primary sm:min-h-12 sm:text-[15px] sm:leading-6"
                 >
                     {product.name}
                 </Link>
 
-                <div className="mt-2 flex items-center gap-1.5 text-[10px] font-bold">
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] font-semibold">
                     <span
                         className={cn(
-                            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1",
+                            "inline-flex items-center gap-1.5 rounded-md px-2 py-1",
                             product.stock > 0
                                 ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                                 : "bg-destructive/10 text-destructive",
@@ -141,33 +138,46 @@ export function ProductCard({ product }: { product: Product }) {
                     >
                         {product.stock > 0 ? <Check className="size-3" /> : null}
                         {product.stock > 0
-                            ? `${t("product.availableCount", { count: product.stock })}${product.unitName ? ` ${product.unitName}` : ""}`
+                            ? t("product.inStock")
                             : t("product.unavailable")}
                     </span>
+
+                    {product.unitName ? (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-border/70 bg-muted/30 px-2 py-1 text-muted-foreground">
+                            <PackageCheck className="size-3" />
+                            {product.unitName}
+                        </span>
+                    ) : null}
                 </div>
 
-                <div className="mt-auto pt-3">
+                <div className="mt-auto pt-4">
                     <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
-                        <span className="text-lg font-black tracking-[-0.04em] text-foreground sm:text-2xl">
-                            {hasPrice ? formatMoney(product.price!) : t("product.noPrice")}
+                        <span className="text-xl font-black tracking-[-0.04em] text-foreground sm:text-2xl">
+                            {hasPrice
+                                ? formatMoney(product.price!)
+                                : t("product.noPrice")}
                         </span>
-                        {hasPrice && product.unitName ? <span className="text-[10px] font-bold text-muted-foreground">/ {product.unitName}</span> : null}
                         {hasDiscount ? (
-                            <>
-                                <span className="text-xs font-semibold text-muted-foreground line-through decoration-destructive/70 decoration-2">
-                                    {formatMoney(product.oldPrice!)}
-                                </span>
-                                <span className="rounded-full bg-brand-orange/10 px-2 py-0.5 text-[9px] font-black text-brand-orange">
-                                    {t("common.save")} {discount}%
-                                </span>
-                            </>
+                            <span className="text-xs font-semibold text-muted-foreground line-through decoration-destructive/70 decoration-2">
+                                {formatMoney(product.oldPrice!)}
+                            </span>
                         ) : null}
                     </div>
+
+                    <p className="mt-1 min-h-4 text-[10px] font-medium text-muted-foreground">
+                        {hasPrice && product.unitName
+                            ? t("product.perUnit", { unit: product.unitName })
+                            : product.stock > 0
+                              ? t("product.availableCount", {
+                                    count: product.stock,
+                                })
+                              : ""}
+                    </p>
 
                     <div className="mt-3 flex gap-2">
                         <Button
                             type="button"
-                            className="h-10 flex-1 rounded-xl px-3 text-xs font-bold shadow-sm transition active:scale-[0.98] sm:h-11 sm:text-sm"
+                            className="h-10 flex-1 rounded-lg px-3 text-xs font-bold shadow-none sm:h-11 sm:text-sm"
                             disabled={product.stock < 1 || !hasPrice}
                             onClick={addToCart}
                         >
@@ -178,8 +188,18 @@ export function ProductCard({ product }: { product: Product }) {
                                   ? t("product.addToCart")
                                   : t("product.noPrice")}
                         </Button>
-                        <Button asChild type="button" variant="outline" size="icon" className="size-10 shrink-0 rounded-xl sm:hidden">
-                            <Link viewTransition to={productPath(product)} aria-label={`View ${product.name}`}>
+                        <Button
+                            asChild
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="size-10 shrink-0 rounded-lg sm:size-11"
+                        >
+                            <Link
+                                viewTransition
+                                to={productPath(product)}
+                                aria-label={`View ${product.name}`}
+                            >
                                 <ArrowUpRight className="size-4" />
                             </Link>
                         </Button>
