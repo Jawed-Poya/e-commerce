@@ -15,6 +15,8 @@ import type {
 import { useCreateBulkProductsMutation } from "./use-product-mutation";
 import { ProductBulkFormSchema } from "../schemas/product-bulk-schema";
 import { useNavigate } from "react-router-dom";
+import { useI18n } from "@/i18n/i18n-provider";
+import { validateUnitConversions } from "../components/product-unit-conversions-fields";
 import {
     isSupportedImageFile,
     MAXIMUM_IMAGE_FILE_SIZE,
@@ -73,6 +75,7 @@ function createProductDraft(file: File): ProductBulkItemFormValues {
 
         slug: slugify(defaultName),
         prices: [],
+        unitConversions: [],
     };
 }
 
@@ -99,6 +102,7 @@ function getErrorMessage(error: unknown) {
 export function useBulkProductForm() {
     const createMutation = useCreateBulkProductsMutation();
     const navigate = useNavigate();
+    const { t } = useI18n();
 
     const form = useForm<ProductBulkFormValues>({
         resolver: zodResolver(ProductBulkFormSchema) as Resolver<ProductBulkFormValues>,
@@ -213,6 +217,17 @@ export function useBulkProductForm() {
 
     const submitProducts: SubmitHandler<ProductBulkFormValues> = useCallback(
         async (values) => {
+            for (const product of values.products) {
+                const unitError = validateUnitConversions(
+                    product.unitId,
+                    product.unitConversions,
+                );
+                if (unitError) {
+                    toast.error(`${product.name}: ${t(unitError)}`);
+                    return;
+                }
+            }
+
             const request: CreateBulkProductsRequest = {
                 products: values.products.map(
                     ({ clientId, previewUrl, ...product }) => product,
@@ -237,7 +252,7 @@ export function useBulkProductForm() {
                 // The toast already displays the API error.
             }
         },
-        [createMutation, navigate, resetProducts],
+        [createMutation, navigate, resetProducts, t],
     );
 
     useEffect(() => {

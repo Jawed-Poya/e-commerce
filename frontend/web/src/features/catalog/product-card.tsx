@@ -74,7 +74,7 @@ export function ProductCard({ product }: { product: Product }) {
                         alt={product.name}
                         loading="lazy"
                         decoding="async"
-                        className="size-full min-h-[196px] object-cover object-center transition duration-500 ease-out group-hover:scale-[1.035]"
+                        className="size-full min-h-[196px] object-cover object-center grayscale transition duration-500 ease-out group-hover:scale-[1.035] group-hover:grayscale-0 group-focus-within:grayscale-0 group-active:grayscale-0"
                     />
                     {hasDiscount ? (
                         <Badge className="absolute start-2 top-2 z-20 rounded-md border-0 bg-brand-orange px-2 py-1 text-[9px] font-black text-white shadow-sm">
@@ -192,7 +192,7 @@ export function ProductCard({ product }: { product: Product }) {
                         alt={product.name}
                         loading="lazy"
                         decoding="async"
-                        className="size-full object-cover object-center transition duration-500 ease-out group-hover:scale-[1.04]"
+                        className="size-full object-cover object-center grayscale transition duration-500 ease-out group-hover:scale-[1.04] group-hover:grayscale-0 group-focus-within:grayscale-0 group-active:grayscale-0"
                     />
 
                     <div className="absolute start-3 top-3 z-20 flex flex-wrap gap-1.5">

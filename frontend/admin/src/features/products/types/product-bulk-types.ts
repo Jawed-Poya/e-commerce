@@ -1,3 +1,5 @@
+import type { ProductUnitConversionInput } from "@/services/product.service";
+
 export interface ProductLookupOption {
     id: number;
     name: string;
@@ -50,6 +52,7 @@ export interface ProductBulkItemFormValues {
     slug: string;
 
     prices: ProductBulkPriceFormValue[];
+    unitConversions: ProductUnitConversionInput[];
 }
 
 export interface ProductBulkFormValues {

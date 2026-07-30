@@ -219,12 +219,6 @@ export function CartPage() {
                                                 <Trash2 className="size-4" />
                                             </Button>
                                         </div>
-                                        {(minimumCartQuantity(item) > 1 || item.maximumValue != null) && (
-                                            <p className="mt-2 text-[10px] text-muted-foreground">
-                                                {t("product.minimumQuantity", { count: minimumCartQuantity(item) })} ·{" "}
-                                                {t("product.maximumQuantity", { count: maximumCartQuantity(item) })}
-                                            </p>
-                                        )}
                                     </div>
 
                                     <div className="hidden min-w-32 flex-col items-end justify-between py-1 sm:flex">
