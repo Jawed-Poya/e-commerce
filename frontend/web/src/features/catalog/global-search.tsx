@@ -145,10 +145,10 @@ export function GlobalSearch({
             <form
                 onSubmit={goToResults}
                 className={cn(
-                    "group flex w-full items-center border border-input bg-muted/35 transition-all duration-200 focus-within:border-primary/60 focus-within:bg-background focus-within:shadow-[0_16px_40px_-28px_rgba(15,23,42,.6)] focus-within:ring-4 focus-within:ring-primary/10",
+                    "group flex w-full items-center border border-input bg-background transition duration-200 focus-within:border-primary/60 focus-within:ring-3 focus-within:ring-primary/10",
                     compact
-                        ? "h-11 rounded-2xl p-1"
-                        : "h-12 rounded-2xl p-1 shadow-sm",
+                        ? "h-11 rounded-xl p-1"
+                        : "h-11 rounded-xl p-1 shadow-sm",
                 )}
             >
                 <Search className="ms-3 size-4.5 shrink-0 text-muted-foreground transition-colors group-focus-within:text-primary" />
@@ -222,8 +222,8 @@ export function GlobalSearch({
                     type="submit"
                     size={compact ? "sm" : "default"}
                     className={cn(
-                        "shrink-0 rounded-xl font-semibold shadow-sm",
-                        compact ? "h-9 px-4" : "h-10 px-5",
+                        "shrink-0 rounded-lg font-semibold shadow-none",
+                        compact ? "h-9 px-4" : "h-9 px-5",
                     )}
                 >
                     {compact ? (
@@ -235,7 +235,7 @@ export function GlobalSearch({
             </form>
 
             {showDropdown ? (
-                <div className="absolute inset-x-0 top-[calc(100%+10px)] z-50 overflow-hidden rounded-[22px] border border-border/80 bg-popover/98 dark:border-white/12 text-popover-foreground shadow-[0_28px_80px_-30px_rgba(15,23,42,.55)] backdrop-blur-xl">
+                <div className="absolute inset-x-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-xl border border-border/80 bg-popover/98 text-popover-foreground shadow-[0_24px_70px_-28px_rgba(15,23,42,.45)] backdrop-blur-xl">
                     <div className="flex items-center justify-between gap-3 border-b bg-muted/25 px-4 py-3">
                         <div className="min-w-0 flex-1">
                             <p className="text-xs font-black uppercase tracking-[0.15em] text-primary">

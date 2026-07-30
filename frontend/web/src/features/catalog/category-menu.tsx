@@ -43,10 +43,10 @@ export function CategoryMegaMenu() {
             <DropdownMenu.Trigger asChild>
                 <Button
                     variant="secondary"
-                    className="group me-2 h-10 min-w-52 justify-between rounded-xl border border-primary/15 bg-primary/8 px-3.5 font-bold text-primary shadow-none transition-all hover:border-primary/25 hover:bg-primary/15 hover:text-primary data-[state=open]:border-primary data-[state=open]:bg-primary data-[state=open]:text-primary-foreground dark:bg-primary/10"
+                    className="group h-9 min-w-48 justify-between rounded-lg border border-primary/15 bg-primary px-3.5 font-bold text-primary-foreground shadow-none transition hover:brightness-105 data-[state=open]:brightness-95"
                 >
                     <span className="flex items-center gap-2.5">
-                        <span className="grid size-7 place-items-center rounded-lg border border-primary/10 bg-background/80 shadow-sm transition-colors group-data-[state=open]:border-white/10 group-data-[state=open]:bg-white/15 group-data-[state=open]:text-white">
+                        <span className="grid size-6 place-items-center rounded-md bg-white/12">
                             <Menu className="size-4" />
                         </span>
                         {t("category.browse")}
@@ -61,7 +61,7 @@ export function CategoryMegaMenu() {
                     align="start"
                     sideOffset={10}
                     collisionPadding={16}
-                    className="z-50 w-[min(1020px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border/80 bg-background/95 text-foreground shadow-[0_32px_90px_-28px_rgba(15,23,42,0.35)] backdrop-blur-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 dark:shadow-[0_32px_90px_-20px_rgba(0,0,0,0.65)]"
+                    className="z-50 w-[min(1020px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border/80 bg-background/98 text-foreground shadow-[0_24px_70px_-24px_rgba(15,23,42,0.32)] backdrop-blur-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
                 >
                     {lookups.isLoading ? (
                         <CategoryLoading />
