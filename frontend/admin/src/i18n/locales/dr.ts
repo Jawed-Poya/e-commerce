@@ -2,6 +2,8 @@ import type { en } from "./en";
 import { inventoryDr } from "@/features/inventory/i18n/inventory-translations";
 import { pricingDr } from "@/features/products/i18n/pricing-translations";
 import { companyDr } from "@/features/company/i18n/company-translations";
+import { financeDr } from "@/features/finance/i18n/finance-translations";
+import { ordersDr } from "@/features/orders/i18n/order-translations";
 
 export const dr: Record<keyof typeof en, string> = {
   "language.en": "انگلیسی", "language.ps": "پشتو", "language.dr": "دری",
@@ -29,4 +31,6 @@ export const dr: Record<keyof typeof en, string> = {
   ...inventoryDr,
   ...pricingDr,
   ...companyDr,
+  ...financeDr,
+  ...ordersDr,
 };

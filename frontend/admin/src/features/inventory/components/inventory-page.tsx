@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
@@ -38,6 +38,7 @@ import type {
 import { ProductPagination } from "@/features/products/components/product-pagination";
 import { useProductLookupsQuery } from "@/features/products/hooks/use-product-mutation";
 import { useI18n } from "@/i18n/i18n-provider";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
 import { resolveProductImageUrl } from "@/services/product.service";
 
@@ -343,13 +344,4 @@ function transactionOptions(t: ReturnType<typeof useI18n>["t"]): TransactionOpti
 function formatNumber(value: number | undefined) {
     if (value === undefined) return "0";
     return value.toLocaleString(undefined, { maximumFractionDigits: 3 });
-}
-
-function useDebouncedValue<T>(value: T, delay: number) {
-    const [debounced, setDebounced] = useState(value);
-    useEffect(() => {
-        const timeout = window.setTimeout(() => setDebounced(value), delay);
-        return () => window.clearTimeout(timeout);
-    }, [delay, value]);
-    return debounced;
 }

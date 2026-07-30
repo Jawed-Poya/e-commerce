@@ -4,10 +4,7 @@ import type {
     CompanyBranch,
     CompanyProfile,
     CompanySettings,
-    CompanyWorth,
     CustomerLedger,
-    FinancialReport,
-    FinancialReportFilters,
     PublicCompanyProfile,
     TrashItem,
 } from "./company-types";
@@ -47,22 +44,12 @@ export const companyService = {
     updateBranch: async (id: number, request: UpsertCompanyBranch) =>
         (await apiClient.put<CompanyBranch>(`/company/branches/${id}`, request)).data,
 
-    financialReport: async (filters: FinancialReportFilters) =>
-        (await apiClient.get<FinancialReport>("/admin/reports", filters)).data,
-    companyWorth: async (params: {
-        asOfDate?: string;
-        periodStartDate?: string;
-        branchId?: string | number;
-        currencyCode?: string;
-    }) => (await apiClient.get<CompanyWorth>("/admin/reports/company-worth", params)).data,
     customerLedger: async (
         customerId: number,
         params: { startDate?: string; endDate?: string; currencyCode?: string },
     ) =>
         (await apiClient.get<CustomerLedger>(`/admin/reports/customers/${customerId}/ledger`, params)).data,
 
-    exportFinancialReport: (format: "excel" | "pdf", filters: FinancialReportFilters) =>
-        apiClient.download(`/admin/reports/export/${format}`, filters),
     exportCustomerLedger: (
         customerId: number,
         format: "excel" | "pdf",
