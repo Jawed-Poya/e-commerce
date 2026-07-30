@@ -74,6 +74,13 @@ function currentUnit(item: DocumentItem) {
 }
 
 function selectedBounds(item: DocumentItem, mode: "purchase" | "sale") {
+    if (mode === "purchase") {
+        return {
+            minimum: 0.001,
+            maximum: Number.POSITIVE_INFINITY,
+        };
+    }
+
     const product = item.product;
     const unit = currentUnit(item);
     const factor = Math.max(unit?.conversionFactor ?? 1, 0.000001);
@@ -81,9 +88,11 @@ function selectedBounds(item: DocumentItem, mode: "purchase" | "sale") {
     const configuredMaximum = product?.maximumValue != null
         ? product.maximumValue / factor
         : Number.MAX_SAFE_INTEGER;
-    const availableMaximum = mode === "sale"
-        ? unit?.availableQuantity ?? product?.availableQuantity ?? Number.MAX_SAFE_INTEGER
-        : Number.MAX_SAFE_INTEGER;
+    const availableMaximum =
+        unit?.availableQuantity ??
+        product?.availableQuantity ??
+        Number.MAX_SAFE_INTEGER;
+
     return {
         minimum,
         maximum: Math.min(configuredMaximum, availableMaximum),
@@ -147,14 +156,19 @@ export function DocumentLines({ items, setItems, mode }: DocumentLinesProps) {
         }
 
         const unit = defaultUnit(product);
-        const minimum = Math.max((product.minimumValue ?? 1) / unit.conversionFactor, 0.001);
+        const initialQuantity = mode === "purchase"
+            ? 1
+            : Math.max(
+                  (product.minimumValue ?? 1) / unit.conversionFactor,
+                  0.001,
+              );
         update(index, {
             product,
             productId: product.id,
             unitId: unit.unitId || null,
             unitName: unit.unitName,
             conversionFactor: unit.conversionFactor,
-            quantity: minimum,
+            quantity: initialQuantity,
             amount: mode === "sale" ? unit.defaultPrice ?? 0 : 0,
         });
     };
@@ -162,12 +176,17 @@ export function DocumentLines({ items, setItems, mode }: DocumentLinesProps) {
     const selectUnit = (index: number, unit: OperationProductUnit) => {
         const product = items[index]?.product;
         if (!product) return;
-        const minimum = Math.max((product.minimumValue ?? 1) / unit.conversionFactor, 0.001);
+        const initialQuantity = mode === "purchase"
+            ? 1
+            : Math.max(
+                  (product.minimumValue ?? 1) / unit.conversionFactor,
+                  0.001,
+              );
         update(index, {
             unitId: unit.unitId || null,
             unitName: unit.unitName,
             conversionFactor: unit.conversionFactor,
-            quantity: minimum,
+            quantity: initialQuantity,
             amount: mode === "sale" ? unit.defaultPrice ?? 0 : 0,
         });
     };

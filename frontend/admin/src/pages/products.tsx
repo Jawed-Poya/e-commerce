@@ -25,6 +25,7 @@ import { ProductFiltersDialog, type AppliedProductFilters } from "@/features/pro
 import { ProductPagination } from "@/features/products/components/product-pagination";
 import { DeleteButton } from "@/components/delete-button";
 import { CustomerPricingFields, activePriceInputs, createCustomerPriceDrafts, validatePriceDrafts } from "@/features/products/components/customer-pricing-fields";
+import { ProductUnitConversionsFields, validateUnitConversions } from "@/features/products/components/product-unit-conversions-fields";
 import {
     IMAGE_FILE_ACCEPT,
     isSupportedImageFile,
@@ -104,6 +105,19 @@ export default function ProductsPage() {
                 primaryImageUrl: item.images.find(image => image.isPrimary)?.url ?? null,
                 images: item.images,
                 prices: activePriceInputs(createCustomerPriceDrafts(lookups.customerTypes, lookups.defaultCustomerTypeId, item.prices.map(price => ({ ...price, enabled: true })))),
+                unitConversions: item.unitConversions
+                    .filter((unit) => !unit.isBaseUnit)
+                    .map((unit) => ({
+                        id: unit.id,
+                        unitId: unit.unitId,
+                        conversionFactor: unit.conversionFactor,
+                        barcode: unit.barcode,
+                        priceOverride: unit.priceOverride,
+                        oldPriceOverride: unit.oldPriceOverride,
+                        isDefault: unit.isDefault,
+                        isActive: unit.isActive,
+                        sortOrder: unit.sortOrder,
+                    })),
             })));
             setActiveEditor(0);
             setOpen(true);
@@ -122,6 +136,11 @@ export default function ProductsPage() {
             if (error) return toast.error(`${draft.name}: ${error}`);
             if (draft.usesDisplayStock && draft.displayStockQuantity == null) return toast.error(`${draft.name}: enter the quantity customers should see.`);
             if (draft.displayStockQuantity != null && draft.displayStockQuantity < 0) return toast.error(`${draft.name}: display quantity cannot be negative.`);
+            const unitError = validateUnitConversions(
+                draft.unitId,
+                draft.unitConversions ?? [],
+            );
+            if (unitError) return toast.error(`${draft.name}: ${t(unitError)}`);
         }
         setSaving(true);
         try {
@@ -209,8 +228,18 @@ export default function ProductsPage() {
                         <div className="grid gap-4 md:grid-cols-3">
                             <LookupSelect label={`${t("update.category")} *`} value={item.categoryId} options={lookups?.categories ?? []} onChange={categoryId => change(item.id, { categoryId: categoryId! })} required searchText={t("update.searchOption")} emptyText={t("update.noMatch")} />
                             <LookupSelect label={t("form.brand")} value={item.brandId} options={lookups?.brands ?? []} onChange={brandId => change(item.id, { brandId })} searchText={t("update.searchOption")} emptyText={t("update.noMatch")} />
-                            <LookupSelect label={t("form.unit")} value={item.unitId} options={lookups?.units ?? []} onChange={unitId => change(item.id, { unitId })} searchText={t("update.searchOption")} emptyText={t("update.noMatch")} />
+                            <LookupSelect label={t("productUnits.baseUnit")} value={item.unitId} options={lookups?.units ?? []} onChange={unitId => change(item.id, { unitId })} searchText={t("update.searchOption")} emptyText={t("update.noMatch")} />
                         </div>
+                        <ProductUnitConversionsFields
+                            baseUnitId={item.unitId}
+                            units={lookups?.units ?? []}
+                            value={item.unitConversions ?? []}
+                            onChange={(unitConversions) =>
+                                change(item.id, { unitConversions })
+                            }
+                            disabled={saving}
+                            compact
+                        />
                         <div className="grid gap-4 md:grid-cols-2"><div className="space-y-2"><Label>{t("form.minimum")}</Label><Input type="number" min={0} value={item.minimumValue ?? ""} onChange={e => change(item.id, { minimumValue: e.target.value ? Number(e.target.value) : null })} /></div><div className="space-y-2"><Label>{t("form.maximum")}</Label><Input type="number" min={0} value={item.maximumValue ?? ""} onChange={e => change(item.id, { maximumValue: e.target.value ? Number(e.target.value) : null })} /></div></div>
                         <div className="rounded-xl border bg-muted/20 p-4">
                             <ToggleCard title="Display stock" description="Show an orderable quantity without changing physical inventory." checked={item.usesDisplayStock} onChange={usesDisplayStock => change(item.id, { usesDisplayStock, displayStockQuantity: usesDisplayStock ? item.displayStockQuantity : null })} />

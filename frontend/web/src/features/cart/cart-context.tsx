@@ -54,16 +54,12 @@ export function cartLineKey(productId: number, unitId?: number | null) {
 
 type QuantityLimitedProduct = Pick<CartProduct, "stock" | "minimumValue" | "maximumValue">;
 
-export function minimumCartQuantity(product: QuantityLimitedProduct) {
-  return product.minimumValue != null && product.minimumValue > 0
-    ? product.minimumValue
-    : 1;
+export function minimumCartQuantity(_product: QuantityLimitedProduct) {
+  return 1;
 }
 
 export function maximumCartQuantity(product: QuantityLimitedProduct) {
-  const stock = Math.max(0, product.stock);
-  if (product.maximumValue == null || product.maximumValue <= 0) return stock;
-  return Math.min(stock, product.maximumValue);
+  return Math.max(0, product.stock);
 }
 
 export function cartQuantityStep(product: QuantityLimitedProduct) {

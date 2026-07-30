@@ -159,12 +159,6 @@ export function ProductPage() {
   const oldPrice = selectedUnit?.oldPrice ?? p.oldPrice;
   const hasPrice = price != null;
   const stock = selectedUnit?.availableQuantity ?? p.stock;
-  const convertedMinimum = p.minimumValue != null
-    ? Math.ceil((p.minimumValue / factor) * 1000) / 1000
-    : null;
-  const convertedMaximum = p.maximumValue != null
-    ? Math.floor((p.maximumValue / factor) * 1000) / 1000
-    : null;
 
   const active =
     p.images.find((x) => x.id === selected) ??
@@ -172,8 +166,8 @@ export function ProductPage() {
     p.images[0];
 
   const liked = cart.wishlist.includes(p.id);
-  const minimumQuantity = minimumCartQuantity({ stock, minimumValue: convertedMinimum, maximumValue: convertedMaximum });
-  const maximumQuantity = maximumCartQuantity({ stock, minimumValue: convertedMinimum, maximumValue: convertedMaximum });
+  const minimumQuantity = minimumCartQuantity({ stock });
+  const maximumQuantity = maximumCartQuantity({ stock });
   const canAddToCart = hasPrice && maximumQuantity >= minimumQuantity;
   const notificationLabel =
     notificationPermission === "granted"
@@ -195,8 +189,8 @@ export function ProductPage() {
       unitName: selectedUnit?.unitName ?? p.unitName,
       conversionFactor: factor,
       slug: p.slug,
-      minimumValue: convertedMinimum,
-      maximumValue: convertedMaximum,
+      minimumValue: null,
+      maximumValue: null,
     });
 
   return (
@@ -443,10 +437,6 @@ export function ProductPage() {
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span>{t("product.minimumQuantity", { count: minimumQuantity })}</span>
-              <span aria-hidden="true">·</span>
-              <span>{t("product.maximumQuantity", { count: maximumQuantity })}</span>
-              <span aria-hidden="true">·</span>
               <span>{t("product.alertTrackingDescription")}</span>
             </div>
 

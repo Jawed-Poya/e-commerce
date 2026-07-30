@@ -880,14 +880,6 @@ public sealed class OrderService(
     {
         if (quantity <= 0)
             throw new ArgumentException($"Quantity for '{product.Name}' must be greater than zero.");
-
-        if (product.MinimumValue.HasValue && quantity < product.MinimumValue.Value)
-            throw new InvalidOperationException(
-                $"The minimum order quantity for '{product.Name}' is {product.MinimumValue.Value}.");
-
-        if (product.MaximumValue.HasValue && quantity > product.MaximumValue.Value)
-            throw new InvalidOperationException(
-                $"The maximum order quantity for '{product.Name}' is {product.MaximumValue.Value}.");
     }
 
     private static SelectedProductUnit ResolveSelectedUnit(Product product, long? requestedUnitId)
