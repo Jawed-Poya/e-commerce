@@ -23,6 +23,7 @@ public sealed record InventorySummaryResponse(
 public sealed record InventoryListItemResponse(
     long ProductId,
     string Name,
+    string? Strength,
     string? Barcode,
     string CategoryName,
     string? UnitName,
@@ -32,10 +33,31 @@ public sealed record InventoryListItemResponse(
     decimal AvailableQuantity,
     decimal MinimumQuantity,
     DateOnly? ExpireDate,
+    int ActiveLotCount,
     InventoryStockStatus Status,
     bool IsExpiringSoon,
     string? PrimaryImageUrl,
     DateTime UpdatedAt
+);
+
+public sealed record InventoryLotResponse(
+    long Id,
+    long ProductId,
+    string ProductName,
+    string? Strength,
+    string? Barcode,
+    long WarehouseId,
+    string WarehouseName,
+    string? LotNumber,
+    decimal Quantity,
+    decimal ReservedQuantity,
+    decimal AvailableQuantity,
+    decimal? UnitCost,
+    DateOnly? ManufacturedAt,
+    DateOnly? ExpiresAt,
+    bool IsExpired,
+    bool IsExpiringSoon,
+    DateTime CreatedAt
 );
 
 public sealed record InventoryTransactionResponse(

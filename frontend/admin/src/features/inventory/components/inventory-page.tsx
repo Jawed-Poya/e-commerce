@@ -11,6 +11,7 @@ import {
     Eye,
     History,
     LoaderCircle,
+    Layers3,
     PackageCheck,
     PackageSearch,
     RefreshCw,
@@ -29,6 +30,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/page-header";
 import { InventoryAdjustDialog } from "@/features/inventory/components/inventory-adjust-dialog";
 import { InventorySettingsDialog } from "@/features/inventory/components/inventory-settings-dialog";
+import { InventoryLotsDialog } from "@/features/inventory/components/inventory-lots-dialog";
 import { inventoryKeys, useInventoryOverview, useInventoryTransactions } from "@/features/inventory/hooks/use-inventory";
 import type {
     InventoryListItem,
@@ -83,6 +85,7 @@ function InventoryOverview() {
     const [pageSize, setPageSize] = useState(20);
     const [adjusting, setAdjusting] = useState<InventoryListItem | null>(null);
     const [editingSettings, setEditingSettings] = useState<InventoryListItem | null>(null);
+    const [viewingLots, setViewingLots] = useState<InventoryListItem | null>(null);
     const { data: lookups } = useProductLookupsQuery();
     const { data, isLoading, isError, isFetching } = useInventoryOverview({ search: debouncedSearch || undefined, status, categoryId, sortBy, sortDescending: sortBy === "updatedAt", page, pageSize });
     const products = data?.products.items ?? [];
@@ -148,7 +151,7 @@ function InventoryOverview() {
                     {products.map(item => <div key={item.productId} className="rounded-xl border bg-background p-4">
                         <div className="flex items-start gap-3">
                             {resolveProductImageUrl(item.primaryImageUrl) ? <img src={resolveProductImageUrl(item.primaryImageUrl)!} alt="" className="size-12 shrink-0 rounded-lg border bg-muted object-cover" /> : <div className="flex size-12 shrink-0 items-center justify-center rounded-lg border bg-muted"><Boxes className="size-4 text-muted-foreground" /></div>}
-                            <div className="min-w-0 flex-1"><p className="truncate font-semibold">{item.name}</p><p className="mt-1 truncate text-xs text-muted-foreground">{item.barcode || t("inventory.noBarcode")} · {item.categoryName}</p><div className="mt-2"><StockStatusBadge item={item} /></div></div>
+                            <div className="min-w-0 flex-1"><p className="truncate font-semibold">{item.name}</p><p className="mt-1 truncate text-xs text-muted-foreground">{[item.strength, item.barcode || t("inventory.noBarcode"), item.categoryName].filter(Boolean).join(" · ")}</p><div className="mt-2"><StockStatusBadge item={item} /></div></div>
                         </div>
                         <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
                             <MobileValue label={t("inventory.onHand")} value={formatNumber(item.quantity)} />
@@ -156,7 +159,7 @@ function InventoryOverview() {
                             <MobileValue label={t("inventory.available")} value={formatNumber(item.availableQuantity)} strong />
                             <MobileValue label={t("inventory.reorderPoint")} value={formatNumber(item.minimumQuantity)} />
                         </div>
-                        <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3"><Expiry item={item} /><div className="flex shrink-0 gap-1"><Button variant="outline" size="icon-sm" aria-label={t("inventory.adjustStock")} onClick={() => setAdjusting(item)}><SlidersHorizontal className="size-4" /></Button><Button variant="outline" size="icon-sm" aria-label={t("inventory.settingsTitle")} onClick={() => setEditingSettings(item)}><Settings2 className="size-4" /></Button><Button variant="ghost" size="icon-sm" aria-label={t("details.open")} onClick={() => navigate(`/products/${item.productId}`)}><Eye className="size-4" /></Button></div></div>
+                        <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3"><div><Expiry item={item} /><p className="mt-1 text-[10px] text-muted-foreground">{item.activeLotCount} active lot{item.activeLotCount === 1 ? "" : "s"}</p></div><div className="flex shrink-0 gap-1"><Button variant="outline" size="icon-sm" aria-label="View stock lots" onClick={() => setViewingLots(item)}><Layers3 className="size-4" /></Button><Button variant="outline" size="icon-sm" aria-label={t("inventory.adjustStock")} onClick={() => setAdjusting(item)}><SlidersHorizontal className="size-4" /></Button><Button variant="outline" size="icon-sm" aria-label={t("inventory.settingsTitle")} onClick={() => setEditingSettings(item)}><Settings2 className="size-4" /></Button><Button variant="ghost" size="icon-sm" aria-label={t("details.open")} onClick={() => navigate(`/products/${item.productId}`)}><Eye className="size-4" /></Button></div></div>
                     </div>)}
                 </div>
 
@@ -177,14 +180,14 @@ function InventoryOverview() {
                             {isError && <MessageRow colSpan={8} message={t("inventory.loadError")} destructive />}
                             {!isLoading && !isError && products.length === 0 && <MessageRow colSpan={8} message={t("inventory.empty")} />}
                             {products.map(item => <TableRow key={item.productId} className="group cursor-pointer" onDoubleClick={() => navigate(`/products/${item.productId}`)}>
-                                <TableCell><div className="flex items-center gap-3">{resolveProductImageUrl(item.primaryImageUrl) ? <img src={resolveProductImageUrl(item.primaryImageUrl)!} alt="" className="size-10 border bg-muted object-cover" /> : <div className="flex size-10 items-center justify-center border bg-muted"><Boxes className="size-4 text-muted-foreground" /></div>}<div className="min-w-0"><p className="truncate font-medium">{item.name}</p><p className="mt-0.5 truncate text-[11px] text-muted-foreground">{item.barcode || t("inventory.noBarcode")} · {item.categoryName}{item.unitName ? ` · ${item.unitName}` : ""}</p></div></div></TableCell>
+                                <TableCell><div className="flex items-center gap-3">{resolveProductImageUrl(item.primaryImageUrl) ? <img src={resolveProductImageUrl(item.primaryImageUrl)!} alt="" className="size-10 border bg-muted object-cover" /> : <div className="flex size-10 items-center justify-center border bg-muted"><Boxes className="size-4 text-muted-foreground" /></div>}<div className="min-w-0"><p className="truncate font-medium">{item.name}</p><p className="mt-0.5 truncate text-[11px] text-muted-foreground">{[item.strength, item.barcode || t("inventory.noBarcode"), item.categoryName, item.unitName].filter(Boolean).join(" · ")}</p></div></div></TableCell>
                                 <TableCell><StockStatusBadge item={item} /></TableCell>
                                 <NumberCell value={item.quantity} />
                                 <NumberCell value={item.reservedQuantity} muted={item.reservedQuantity === 0} />
                                 <TableCell className="text-end"><div className="font-semibold tabular-nums">{formatNumber(item.availableQuantity)}</div><StockLevel available={item.availableQuantity} minimum={item.minimumQuantity} /></TableCell>
                                 <NumberCell value={item.minimumQuantity} muted={item.minimumQuantity === 0} />
-                                <TableCell><Expiry item={item} /></TableCell>
-                                <TableCell onDoubleClick={event => event.stopPropagation()}><div className="flex justify-end gap-1"><Button variant="outline" size="icon-sm" aria-label={t("inventory.adjustStock")} onClick={() => setAdjusting(item)}><SlidersHorizontal className="size-4" /></Button><Button variant="outline" size="icon-sm" aria-label={t("inventory.settingsTitle")} onClick={() => setEditingSettings(item)}><Settings2 className="size-4" /></Button><Button variant="ghost" size="icon-sm" aria-label={t("details.open")} onClick={() => navigate(`/products/${item.productId}`)}><Eye className="size-4" /></Button></div></TableCell>
+                                <TableCell><Expiry item={item} /><p className="mt-1 text-[10px] text-muted-foreground">{item.activeLotCount} active lot{item.activeLotCount === 1 ? "" : "s"}</p></TableCell>
+                                <TableCell onDoubleClick={event => event.stopPropagation()}><div className="flex justify-end gap-1"><Button variant="outline" size="icon-sm" aria-label="View stock lots" onClick={() => setViewingLots(item)}><Layers3 className="size-4" /></Button><Button variant="outline" size="icon-sm" aria-label={t("inventory.adjustStock")} onClick={() => setAdjusting(item)}><SlidersHorizontal className="size-4" /></Button><Button variant="outline" size="icon-sm" aria-label={t("inventory.settingsTitle")} onClick={() => setEditingSettings(item)}><Settings2 className="size-4" /></Button><Button variant="ghost" size="icon-sm" aria-label={t("details.open")} onClick={() => navigate(`/products/${item.productId}`)}><Eye className="size-4" /></Button></div></TableCell>
                             </TableRow>)}
                         </TableBody>
                     </Table>
@@ -197,6 +200,7 @@ function InventoryOverview() {
         {isFetching && !isLoading && <FetchingNotice text={t("inventory.refreshing")} />}
         <InventoryAdjustDialog item={adjusting} open={Boolean(adjusting)} onOpenChange={open => !open && setAdjusting(null)} />
         <InventorySettingsDialog item={editingSettings} open={Boolean(editingSettings)} onOpenChange={open => !open && setEditingSettings(null)} />
+        <InventoryLotsDialog item={viewingLots} open={Boolean(viewingLots)} onOpenChange={open => !open && setViewingLots(null)} />
     </div>;
 }
 

@@ -11,6 +11,7 @@ import { productKeys } from "@/keys/product-keys";
 export const inventoryKeys = {
     all: ["inventory"] as const,
     overview: (filters: InventoryFilters) => [...inventoryKeys.all, "overview", filters] as const,
+    lots: (productId: number) => [...inventoryKeys.all, "lots", productId] as const,
     transactions: (filters: InventoryTransactionFilters) => [...inventoryKeys.all, "transactions", filters] as const,
 };
 
@@ -20,6 +21,15 @@ export function useInventoryOverview(filters: InventoryFilters) {
         queryFn: async () => (await inventoryService.getOverview(filters)).data,
         placeholderData: previous => previous,
         staleTime: 30_000,
+    });
+}
+
+export function useInventoryLots(productId: number | null) {
+    return useQuery({
+        queryKey: inventoryKeys.lots(productId ?? 0),
+        queryFn: async () => (await inventoryService.getLots(productId!)).data,
+        enabled: productId !== null && productId > 0,
+        staleTime: 15_000,
     });
 }
 

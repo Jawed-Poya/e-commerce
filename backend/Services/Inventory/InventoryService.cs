@@ -28,12 +28,19 @@ public sealed class InventoryService(
                 HealthyProducts = group.Count(x => x.Inventory != null && x.Inventory.Quantity - x.Inventory.ReservedQuantity > x.Inventory.MinimumQuantity),
                 LowStockProducts = group.Count(x => x.Inventory != null && x.Inventory.Quantity - x.Inventory.ReservedQuantity > 0 && x.Inventory.Quantity - x.Inventory.ReservedQuantity <= x.Inventory.MinimumQuantity),
                 OutOfStockProducts = group.Count(x => x.Inventory == null || x.Inventory.Quantity - x.Inventory.ReservedQuantity <= 0),
-                ExpiringSoonProducts = group.Count(x => x.Inventory != null && x.Inventory.Quantity - x.Inventory.ReservedQuantity > 0 && x.Inventory.ExpireDate.HasValue && x.Inventory.ExpireDate.Value >= today && x.Inventory.ExpireDate.Value <= expiringThreshold),
                 TotalQuantity = group.Sum(x => x.Inventory == null ? 0 : x.Inventory.Quantity),
                 ReservedQuantity = group.Sum(x => x.Inventory == null ? 0 : x.Inventory.ReservedQuantity),
                 AvailableQuantity = group.Sum(x => x.Inventory == null ? 0 : x.Inventory.Quantity - x.Inventory.ReservedQuantity)
             })
             .SingleOrDefaultAsync(ct) ?? new InventorySummaryProjection();
+
+        var expiringSoonProducts = await context.InventoryLots.AsNoTracking()
+            .Where(lot => lot.Quantity > 0 &&
+                lot.ExpiresAt.HasValue && lot.ExpiresAt.Value >= today &&
+                lot.ExpiresAt.Value <= expiringThreshold)
+            .Select(lot => lot.ProductId)
+            .Distinct()
+            .CountAsync(ct);
 
         var query = baseQuery;
         var search = filter.Search?.Trim();
@@ -92,6 +99,7 @@ public sealed class InventoryService(
             {
                 ProductId = x.Id,
                 Name = x.Name,
+                Strength = x.Strength,
                 Barcode = x.Barcode,
                 CategoryName = x.Category.Name,
                 UnitName = x.Unit == null ? null : x.Unit.Name,
@@ -105,23 +113,40 @@ public sealed class InventoryService(
             })
             .ToListAsync(ct);
 
+        var pageProductIds = rows.Select(row => row.ProductId).ToArray();
+        var lotSummaries = pageProductIds.Length == 0
+            ? new Dictionary<long, LotSummaryProjection>()
+            : await context.InventoryLots.AsNoTracking()
+                .Where(lot => pageProductIds.Contains(lot.ProductId) && lot.Quantity > 0)
+                .GroupBy(lot => lot.ProductId)
+                .Select(group => new LotSummaryProjection
+                {
+                    ProductId = group.Key,
+                    ActiveLotCount = group.Count(),
+                    EarliestExpiry = group.Where(lot => lot.ExpiresAt.HasValue)
+                        .Min(lot => lot.ExpiresAt)
+                })
+                .ToDictionaryAsync(item => item.ProductId, ct);
+
         var items = rows.Select(row =>
         {
             var available = row.Quantity - row.ReservedQuantity;
             var status = available <= 0
                 ? InventoryStockStatus.OutOfStock
                 : available <= row.MinimumQuantity ? InventoryStockStatus.LowStock : InventoryStockStatus.Healthy;
-            var isExpiringSoon = row.ExpireDate.HasValue && row.ExpireDate.Value >= today && row.ExpireDate.Value <= expiringThreshold && available > 0;
+            lotSummaries.TryGetValue(row.ProductId, out var lotSummary);
+            var expireDate = lotSummary?.EarliestExpiry ?? row.ExpireDate;
+            var isExpiringSoon = expireDate.HasValue && expireDate.Value >= today && expireDate.Value <= expiringThreshold && available > 0;
             return new InventoryListItemResponse(
-                row.ProductId, row.Name, row.Barcode, row.CategoryName, row.UnitName, row.IsActive,
-                row.Quantity, row.ReservedQuantity, available, row.MinimumQuantity, row.ExpireDate,
-                status, isExpiringSoon, row.PrimaryImageUrl, row.UpdatedAt);
+                row.ProductId, row.Name, row.Strength, row.Barcode, row.CategoryName, row.UnitName, row.IsActive,
+                row.Quantity, row.ReservedQuantity, available, row.MinimumQuantity, expireDate,
+                lotSummary?.ActiveLotCount ?? 0, status, isExpiringSoon, row.PrimaryImageUrl, row.UpdatedAt);
         }).ToList();
 
         return new InventoryOverviewResponse(
             new InventorySummaryResponse(
                 totals.TotalProducts, totals.ActiveProducts, totals.HealthyProducts, totals.LowStockProducts,
-                totals.OutOfStockProducts, totals.ExpiringSoonProducts, totals.TotalQuantity,
+                totals.OutOfStockProducts, expiringSoonProducts, totals.TotalQuantity,
                 totals.ReservedQuantity, totals.AvailableQuantity),
             new PagedResult<InventoryListItemResponse>
             {
@@ -172,6 +197,45 @@ public sealed class InventoryService(
             PageSize = pageSize,
             TotalCount = totalCount
         };
+    }
+
+    public async Task<IReadOnlyList<InventoryLotResponse>> GetLotsAsync(
+        long productId,
+        CancellationToken ct = default)
+    {
+        var productExists = await context.Products.AsNoTracking()
+            .AnyAsync(product => product.Id == productId, ct);
+        if (!productExists)
+            throw new KeyNotFoundException("Product not found.");
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var expiringThreshold = today.AddDays(30);
+        return await context.InventoryLots.AsNoTracking()
+            .Where(lot => lot.ProductId == productId &&
+                (lot.Quantity > 0 || lot.ReservedQuantity > 0))
+            .OrderBy(lot => lot.ExpiresAt == null)
+            .ThenBy(lot => lot.ExpiresAt)
+            .ThenBy(lot => lot.CreatedAt)
+            .Select(lot => new InventoryLotResponse(
+                lot.Id,
+                lot.ProductId,
+                lot.Product.Name,
+                lot.Product.Strength,
+                lot.Product.Barcode,
+                lot.WarehouseId,
+                lot.Warehouse.Name,
+                lot.LotNumber,
+                lot.Quantity,
+                lot.ReservedQuantity,
+                lot.Quantity - lot.ReservedQuantity,
+                lot.UnitCost,
+                lot.ManufacturedAt,
+                lot.ExpiresAt,
+                lot.ExpiresAt.HasValue && lot.ExpiresAt.Value < today,
+                lot.ExpiresAt.HasValue && lot.ExpiresAt.Value >= today &&
+                    lot.ExpiresAt.Value <= expiringThreshold,
+                lot.CreatedAt))
+            .ToListAsync(ct);
     }
 
     public async Task<StockResult?> GetAsync(long productId, CancellationToken ct = default) =>
@@ -240,41 +304,46 @@ public sealed class InventoryService(
             return await GetAsync(productId, ct) ?? throw new KeyNotFoundException("Product inventory not found.");
 
         await using var transaction = await context.Database.BeginTransactionAsync(ct);
-        var before = await context.ProductInventories.AsNoTracking().SingleOrDefaultAsync(x => x.ProductId == productId, ct);
-        if (before is null)
+        var inventory = await context.ProductInventories
+            .FromSqlInterpolated($"SELECT * FROM [ProductInventories] WITH (UPDLOCK, ROWLOCK) WHERE [ProductId] = {productId}")
+            .SingleOrDefaultAsync(ct);
+        if (inventory is null)
         {
             if (!await context.Products.AnyAsync(x => x.Id == productId, ct))
                 throw new KeyNotFoundException("Product not found.");
 
-            before = new ProductInventory { ProductId = productId, Quantity = 0, ReservedQuantity = 0, MinimumQuantity = 0 };
-            context.ProductInventories.Add(before);
-            await context.SaveChangesAsync(ct);
-            context.Entry(before).State = EntityState.Detached;
+            inventory = new ProductInventory
+            {
+                ProductId = productId,
+                Quantity = 0,
+                ReservedQuantity = 0,
+                MinimumQuantity = 0
+            };
+            context.ProductInventories.Add(inventory);
         }
 
-        var affected = await context.ProductInventories.Where(x => x.ProductId == productId
-                && x.Quantity + quantityDelta >= 0
-                && x.ReservedQuantity + reservedDelta >= 0
-                && x.ReservedQuantity + reservedDelta <= x.Quantity + quantityDelta)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(x => x.Quantity, x => x.Quantity + quantityDelta)
-                .SetProperty(x => x.ReservedQuantity, x => x.ReservedQuantity + reservedDelta), ct);
+        var quantityBefore = inventory.Quantity;
+        var reservedBefore = inventory.ReservedQuantity;
+        var quantityAfter = quantityBefore + quantityDelta;
+        var reservedAfter = reservedBefore + reservedDelta;
+        if (quantityAfter < 0 || reservedAfter < 0 || reservedAfter > quantityAfter)
+            throw new InvalidOperationException("Insufficient available or reserved stock.");
 
-        if (affected != 1) throw new InvalidOperationException("Insufficient available or reserved stock.");
-
-        var after = await context.ProductInventories.AsNoTracking().SingleAsync(x => x.ProductId == productId, ct);
+        inventory.Quantity = quantityAfter;
+        inventory.ReservedQuantity = reservedAfter;
+        inventory.UpdatedAt = DateTime.UtcNow;
         context.InventoryTransactions.Add(new InventoryTransaction
         {
             ProductId = productId, Quantity = quantityDelta, Type = type, Description = description,
-            QuantityBefore = before.Quantity, QuantityAfter = after.Quantity,
-            ReservedBefore = before.ReservedQuantity, ReservedAfter = after.ReservedQuantity,
+            QuantityBefore = quantityBefore, QuantityAfter = quantityAfter,
+            ReservedBefore = reservedBefore, ReservedAfter = reservedAfter,
             ReferenceType = referenceId.HasValue ? "Order" : null, ReferenceId = referenceId,
             IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey.Trim(),
             PerformedByUserId = userId
         });
 
-        var availableBefore = before.Quantity - before.ReservedQuantity;
-        var availableAfter = after.Quantity - after.ReservedQuantity;
+        var availableBefore = quantityBefore - reservedBefore;
+        var availableAfter = quantityAfter - reservedAfter;
         PendingStoreNotification? pendingNotification = null;
         if (availableAfter > availableBefore)
         {
@@ -288,7 +357,7 @@ public sealed class InventoryService(
         await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await notifications.PublishAsync([pendingNotification], ct);
-        return new StockResult(productId, after.Quantity, after.ReservedQuantity, after.Quantity - after.ReservedQuantity);
+        return new StockResult(productId, quantityAfter, reservedAfter, quantityAfter - reservedAfter);
     }
 
     private static void RequirePositive(decimal quantity)
@@ -303,16 +372,23 @@ public sealed class InventoryService(
         public int HealthyProducts { get; init; }
         public int LowStockProducts { get; init; }
         public int OutOfStockProducts { get; init; }
-        public int ExpiringSoonProducts { get; init; }
         public decimal TotalQuantity { get; init; }
         public decimal ReservedQuantity { get; init; }
         public decimal AvailableQuantity { get; init; }
+    }
+
+    private sealed class LotSummaryProjection
+    {
+        public long ProductId { get; init; }
+        public int ActiveLotCount { get; init; }
+        public DateOnly? EarliestExpiry { get; init; }
     }
 
     private sealed class InventoryRowProjection
     {
         public long ProductId { get; init; }
         public string Name { get; init; } = string.Empty;
+        public string? Strength { get; init; }
         public string? Barcode { get; init; }
         public string CategoryName { get; init; } = string.Empty;
         public string? UnitName { get; init; }
