@@ -63,6 +63,7 @@ public class ProductService : IProductService
             var search = filter.Search.Trim();
             products = products.Where(product =>
                 product.Name.Contains(search) ||
+                (product.Strength != null && product.Strength.Contains(search)) ||
                 (product.Barcode != null && product.Barcode.Contains(search)) ||
                 product.UnitConversions.Any(unit => unit.IsActive && unit.Barcode != null && unit.Barcode.Contains(search)));
         }
@@ -99,6 +100,7 @@ public class ProductService : IProductService
             Id = product.Id,
             Name = product.Name,
             Barcode = product.Barcode,
+            Strength = product.Strength,
             ShortDescription = product.ShortDescription,
             Description = product.Description,
             Slug = product.Slug,
@@ -201,6 +203,7 @@ public class ProductService : IProductService
                 product.Id,
                 product.Name,
                 product.Barcode,
+                product.Strength,
                 product.ShortDescription,
                 product.Description,
                 product.Slug,
@@ -337,6 +340,7 @@ public class ProductService : IProductService
                 var product = products[item.Id];
                 product.Name = item.Name.Trim();
                 product.Barcode = NormalizeOptional(item.Barcode);
+                product.Strength = NormalizeOptional(item.Strength);
                 product.ShortDescription = NormalizeOptional(item.ShortDescription);
                 product.Description = NormalizeOptional(item.Description);
                 product.Slug = NormalizeOptional(item.Slug);
@@ -537,6 +541,7 @@ public class ProductService : IProductService
             Id = product.Id,
             Name = product.Name,
             Barcode = product.Barcode,
+            Strength = product.Strength,
             Description = product.Description,
             ShortDescription = product.ShortDescription,
             Slug = product.Slug,
@@ -654,6 +659,7 @@ public class ProductService : IProductService
 
         entity.Name = model.Name;
         entity.Barcode = model.Barcode;
+        entity.Strength = model.Strength;
         entity.Slug = model.Slug;
         entity.ShortDescription = model.ShortDescription;
         entity.Description = model.Description;
@@ -802,6 +808,7 @@ public class ProductService : IProductService
                 {
                     Name = item.Name,
                     Barcode = item.Barcode,
+                    Strength = NormalizeOptional(item.Request.Strength),
                     ShortDescription =
                         item.ShortDescription,
                     Description = item.Description,
@@ -1306,6 +1313,7 @@ public class ProductService : IProductService
         public long Id { get; init; }
         public string Name { get; init; } = string.Empty;
         public string? Barcode { get; init; }
+        public string? Strength { get; init; }
         public string? ShortDescription { get; init; }
         public string? Description { get; init; }
         public string? Slug { get; init; }

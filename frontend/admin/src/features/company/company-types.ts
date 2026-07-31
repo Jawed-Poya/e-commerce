@@ -13,6 +13,8 @@ export interface CompanySettings {
     baseFontSize: number;
     trashRetentionDays: number;
     notificationRetentionDays: number;
+    maximumPurchaseLines: number;
+    maximumManualSaleLines: number;
     allowUserClaimManagement: boolean;
 }
 

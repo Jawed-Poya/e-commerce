@@ -63,6 +63,7 @@ import {
 } from "@/features/operations/operations-hooks";
 import { operationsService } from "@/features/operations/operations-service";
 import { companyService } from "@/features/company/company-service";
+import { useI18n } from "@/i18n/i18n-provider";
 import type {
     DocumentItem,
     Purchase,
@@ -83,6 +84,7 @@ const emptySupplier = () => ({
 export default function PurchasesPage() {
     const queryClient = useQueryClient();
     const { formatMoney } = useCompany();
+    const { tr } = useI18n();
     const { user } = useAdminAuth();
     const canManage = hasPermission(user, Permissions.PurchasesManage);
     const [search, setSearch] = useState("");
@@ -94,6 +96,10 @@ export default function PurchasesPage() {
     const { data: suppliers, isLoading: suppliersLoading } = useOperationQuery(
         operationKeys.suppliers,
         () => operationsService.suppliersResponse("", 100),
+    );
+    const { data: operationPolicy } = useOperationQuery(
+        operationKeys.policy,
+        operationsService.policy,
     );
 
     const [tab, setTab] = useState<"purchases" | "suppliers">("purchases");
@@ -165,21 +171,32 @@ export default function PurchasesPage() {
     const submit = async () => {
         if (!canManage) return;
         const documentItems = getSubmittableDocumentLines(items);
+        const configuredLineLimit = operationPolicy?.maximumPurchaseLines ?? 50;
+        const effectiveLineLimit = operationPolicy?.canOverrideLineLimits
+            ? 500
+            : configuredLineLimit;
+        if (documentItems.length > effectiveLineLimit) {
+            return toast.error(
+                operationPolicy?.canOverrideLineLimits
+                    ? tr("A document cannot contain more than 500 product lines.")
+                    : `${tr("The configured product-line limit is")} ${configuredLineLimit}.`,
+            );
+        }
         if (!documentItems.length) {
-            return toast.error("Add at least one product.");
+            return toast.error(tr("Add at least one product."));
         }
         if (documentItems.some((item) => !isDocumentLineComplete(item))) {
-            return toast.error("Complete every purchase line.");
+            return toast.error(tr("Complete every purchase line."));
         }
         if (
             new Set(documentItems.map((item) => item.productId)).size !==
             documentItems.length
         ) {
-            return toast.error("Each product may appear only once.");
+            return toast.error(tr("Each product may appear only once."));
         }
         if (form.paidAmount < 0 || form.paidAmount > total) {
             return toast.error(
-                "Opening payment must be between zero and the purchase total.",
+                tr("Opening payment must be between zero and the purchase total."),
             );
         }
 
@@ -501,7 +518,13 @@ export default function PurchasesPage() {
                     </div>
 
                     <Separator />
-                    <DocumentLines items={items} setItems={setItems} mode="purchase" />
+                    <DocumentLines
+                        items={items}
+                        setItems={setItems}
+                        mode="purchase"
+                        maximumLines={operationPolicy?.maximumPurchaseLines ?? 50}
+                        canOverrideLineLimit={operationPolicy?.canOverrideLineLimits ?? false}
+                    />
                     <Separator />
 
                     <DocumentSettlementLayout

@@ -40,6 +40,11 @@ export const ProductBulkItemSchema = z
             .trim()
             .max(100, "Barcode cannot exceed 100 characters."),
 
+        strength: z
+            .string()
+            .trim()
+            .max(100, "Strength cannot exceed 100 characters."),
+
         shortDescription: z
             .string()
             .trim()

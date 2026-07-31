@@ -17,6 +17,9 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(x => x.Barcode)
             .HasMaxLength(100);
 
+        builder.Property(x => x.Strength)
+            .HasMaxLength(100);
+
         builder.Property(x => x.ShortDescription)
             .HasMaxLength(500);
 

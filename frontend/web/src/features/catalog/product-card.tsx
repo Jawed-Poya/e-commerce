@@ -119,6 +119,10 @@ export function ProductCard({ product }: { product: Product }) {
                         {product.name}
                     </Link>
 
+                    {product.strength ? (
+                        <p className="mt-1 text-[10px] font-bold text-primary/80">{product.strength}</p>
+                    ) : null}
+
                     <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[9px] font-bold">
                         <span
                             className={cn(
@@ -257,6 +261,10 @@ export function ProductCard({ product }: { product: Product }) {
                     >
                         {product.name}
                     </Link>
+
+                    {product.strength ? (
+                        <p className="mt-1 text-xs font-bold text-primary/80">{product.strength}</p>
+                    ) : null}
 
                     <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] font-semibold">
                         <span
