@@ -11,3 +11,10 @@ AGENTS.md
 
 # Local performance-test output
 performance-results/
+
+# Ignore Markdown documentation except README files
+*.[mM][dD]
+!README.md
+!README.MD
+!**/README.md
+!**/README.MD
