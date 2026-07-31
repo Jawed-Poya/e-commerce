@@ -17,19 +17,7 @@ public sealed class ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExce
         }
         catch (Exception exception)
         {
-            var (status, message, level) = exception switch
-            {
-                UnauthorizedAccessException => (StatusCodes.Status403Forbidden, exception.Message.Length > 0 ? exception.Message : "You do not have permission to perform this action.", LogLevel.Warning),
-                KeyNotFoundException => (StatusCodes.Status404NotFound, exception.Message, LogLevel.Information),
-                ArgumentException => (StatusCodes.Status400BadRequest, exception.Message, LogLevel.Information),
-                DbUpdateException dbException when SqlServerExceptionClassifier.IsUniqueConstraintViolation(dbException) =>
-                    (StatusCodes.Status409Conflict, "This action was already completed or the value must be unique. Refresh and try again.", LogLevel.Warning),
-                DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "The record changed while you were editing it. Refresh and try again.", LogLevel.Warning),
-                DbUpdateException => (StatusCodes.Status409Conflict, "The data could not be saved because it conflicts with the current database state.", LogLevel.Warning),
-                OperationCanceledException => (StatusCodes.Status408RequestTimeout, "The request took too long and was cancelled. Please try again.", LogLevel.Warning),
-                InvalidOperationException => (StatusCodes.Status409Conflict, exception.Message, LogLevel.Warning),
-                _ => (StatusCodes.Status500InternalServerError, "An unexpected server error occurred.", LogLevel.Error)
-            };
+            var (status, message, level) = MapException(exception);
 
             logger.Log(level, exception, "API request failed with status {StatusCode}: {Method} {Path}", status, context.Request.Method, context.Request.Path);
             if (context.Response.HasStarted) throw;
@@ -40,4 +28,21 @@ public sealed class ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExce
             await context.Response.WriteAsJsonAsync(ApiResponse<object>.Fail(message), CancellationToken.None);
         }
     }
+
+    public static int GetStatusCode(Exception exception) => MapException(exception).Status;
+
+    private static (int Status, string Message, LogLevel Level) MapException(Exception exception) =>
+        exception switch
+        {
+            UnauthorizedAccessException => (StatusCodes.Status403Forbidden, exception.Message.Length > 0 ? exception.Message : "You do not have permission to perform this action.", LogLevel.Warning),
+            KeyNotFoundException => (StatusCodes.Status404NotFound, exception.Message, LogLevel.Information),
+            ArgumentException => (StatusCodes.Status400BadRequest, exception.Message, LogLevel.Information),
+            DbUpdateException dbException when SqlServerExceptionClassifier.IsUniqueConstraintViolation(dbException) =>
+                (StatusCodes.Status409Conflict, "This action was already completed or the value must be unique. Refresh and try again.", LogLevel.Warning),
+            DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "The record changed while you were editing it. Refresh and try again.", LogLevel.Warning),
+            DbUpdateException => (StatusCodes.Status409Conflict, "The data could not be saved because it conflicts with the current database state.", LogLevel.Warning),
+            OperationCanceledException => (StatusCodes.Status408RequestTimeout, "The request took too long and was cancelled. Please try again.", LogLevel.Warning),
+            InvalidOperationException => (StatusCodes.Status409Conflict, exception.Message, LogLevel.Warning),
+            _ => (StatusCodes.Status500InternalServerError, "An unexpected server error occurred.", LogLevel.Error)
+        };
 }
