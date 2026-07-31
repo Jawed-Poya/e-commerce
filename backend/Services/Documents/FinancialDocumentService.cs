@@ -679,11 +679,15 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
             cancellationToken)
             ?? throw new InvalidOperationException("Company profile has not been configured.");
 
-        if (source.Equals("orders", StringComparison.OrdinalIgnoreCase) || source.Equals("order", StringComparison.OrdinalIgnoreCase))
+        var normalizedSource = NormalizeReceiptSource(source);
+
+        if (normalizedSource == "orders")
         {
             var order = await context.Orders.AsNoTracking()
-                .Where(item => item.Id == id && item.Status != OrderStatus.Cancelled &&
-                    (!companyContext.BranchId.HasValue || item.BranchId == companyContext.BranchId.Value))
+                .Where(item => item.Id == id &&
+                    (!companyContext.BranchId.HasValue ||
+                     item.BranchId == companyContext.BranchId.Value ||
+                     item.BranchId == null))
                 .Select(item => new
                 {
                     item.Id, item.OrderNumber, item.CreatedAt, item.Currency, item.Subtotal, item.DiscountTotal,
@@ -706,11 +710,13 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
                 order.PaymentMethod, order.Notes, order.Items);
         }
 
-        if (source.Equals("manual-sales", StringComparison.OrdinalIgnoreCase) || source.Equals("sale", StringComparison.OrdinalIgnoreCase))
+        if (normalizedSource == "manual-sales")
         {
             var sale = await context.InventorySales.AsNoTracking()
                 .Where(item => item.Id == id &&
-                    (!companyContext.BranchId.HasValue || item.BranchId == companyContext.BranchId.Value))
+                    (!companyContext.BranchId.HasValue ||
+                     item.BranchId == companyContext.BranchId.Value ||
+                     item.BranchId == null))
                 .Select(item => new
                 {
                     item.Id, item.SaleNumber, item.SaleDate, item.CurrencyCode, item.Subtotal, item.Discount, item.Tax,
@@ -721,7 +727,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
                         : item.CustomerName ?? "Walk-in customer",
                     CustomerPhone = item.Customer != null ? item.Customer.Phone : item.CustomerPhone,
                     CustomerAddress = item.Customer != null ? item.Customer.Address : null,
-                    Items = item.Items.Select(line => new ReceiptItemResponse(line.Product.Name, line.EnteredQuantity > 0 ? line.EnteredQuantity : line.Quantity, line.SelectedUnitName ?? (line.Product.Unit != null ? line.Product.Unit.Name : null), line.EnteredUnitPrice > 0 ? line.EnteredUnitPrice : line.UnitPrice, 0, 0, line.LineTotal)).ToArray()
+                    Items = item.Items.Select(line => new ReceiptItemResponse(line.Product.Strength == null ? line.Product.Name : line.Product.Name + " — " + line.Product.Strength, line.EnteredQuantity > 0 ? line.EnteredQuantity : line.Quantity, line.SelectedUnitName ?? (line.Product.Unit != null ? line.Product.Unit.Name : null), line.EnteredUnitPrice > 0 ? line.EnteredUnitPrice : line.UnitPrice, 0, 0, line.LineTotal)).ToArray()
                 }).SingleOrDefaultAsync(cancellationToken)
                 ?? throw new KeyNotFoundException("Manual sale was not found.");
 
@@ -735,6 +741,14 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
 
         throw new ArgumentException("Receipt source must be 'orders' or 'manual-sales'.");
     }
+
+    private static string NormalizeReceiptSource(string source) =>
+        source.Trim().ToLowerInvariant() switch
+        {
+            "order" or "orders" => "orders",
+            "sale" or "sales" or "manual-sale" or "manual-sales" => "manual-sales",
+            _ => throw new ArgumentException("Receipt source must be 'orders' or 'manual-sales'.")
+        };
 
     private long? ResolveBranchId(long? requestedBranchId)
     {
