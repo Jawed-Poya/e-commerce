@@ -131,7 +131,11 @@ export function DocumentLines({
     const { tr } = useI18n();
     const linesContainerRef = useRef<HTMLDivElement>(null);
     const pendingScrollIndexRef = useRef<number | null>(null);
-    const selectedIds = new Set(items.map((item) => item.productId).filter(Boolean));
+    const selectedIds = new Set(
+        mode === "sale"
+            ? items.map((item) => item.productId).filter(Boolean)
+            : [],
+    );
     const safeMaximumLines = Math.max(1, Math.min(maximumLines || 1, 500));
     const effectiveMaximumLines = canOverrideLineLimit ? 500 : safeMaximumLines;
     const atLineLimit = items.length >= effectiveMaximumLines;
@@ -202,6 +206,7 @@ export function DocumentLines({
         product: OperationProduct | null,
     ) => {
         if (
+            mode === "sale" &&
             product &&
             product.id !== currentProductId &&
             selectedIds.has(product.id)

@@ -66,6 +66,43 @@ public sealed class PurchaseItemRequest
     public DateOnly? ExpireDate { get; set; }
 }
 public sealed record PurchaseListItem(long Id, string PurchaseNumber, string? ReferenceNumber, DateOnly PurchaseDate, string? SupplierName, int ItemCount, decimal Total, decimal PaidAmount, decimal RemainingAmount, DocumentPaymentStatus PaymentStatus, PurchaseStatus Status, DateTime CreatedAt);
+public sealed record PurchaseItemDetailsResponse(
+    long Id,
+    long ProductId,
+    string ProductName,
+    string? Strength,
+    string? Barcode,
+    decimal Quantity,
+    decimal UnitCost,
+    decimal EnteredQuantity,
+    long? SelectedUnitId,
+    string? SelectedUnitName,
+    decimal UnitConversionFactor,
+    decimal EnteredUnitCost,
+    decimal LineTotal,
+    string? LotNumber,
+    DateOnly? ExpireDate);
+
+public sealed record PurchaseDetailsResponse(
+    long Id,
+    string PurchaseNumber,
+    string? ReferenceNumber,
+    DateOnly PurchaseDate,
+    long? SupplierId,
+    string? SupplierName,
+    PurchaseStatus Status,
+    DocumentPaymentStatus PaymentStatus,
+    decimal Subtotal,
+    decimal Discount,
+    decimal Tax,
+    decimal OtherCost,
+    decimal Total,
+    decimal PaidAmount,
+    decimal RemainingAmount,
+    string CurrencyCode,
+    string? Notes,
+    DateTime CreatedAt,
+    IReadOnlyList<PurchaseItemDetailsResponse> Items);
 
 public sealed class CreateInventorySaleRequest
 {

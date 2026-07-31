@@ -174,6 +174,54 @@ public sealed class OperationsService(
             .ToListAsync(ct);
     }
 
+    public async Task<PurchaseDetailsResponse> GetPurchaseAsync(long id, CancellationToken ct)
+    {
+        var purchase = await context.Purchases.AsNoTracking()
+            .Where(item => item.Id == id &&
+                (!companyContext.BranchId.HasValue || item.BranchId == companyContext.BranchId.Value))
+            .Select(item => new PurchaseDetailsResponse(
+                item.Id,
+                item.PurchaseNumber,
+                item.ReferenceNumber,
+                item.PurchaseDate,
+                item.SupplierId,
+                item.Supplier == null ? null : item.Supplier.Name,
+                item.Status,
+                item.PaymentStatus,
+                item.Subtotal,
+                item.Discount,
+                item.Tax,
+                item.OtherCost,
+                item.Total,
+                item.PaidAmount,
+                item.Total > item.PaidAmount ? item.Total - item.PaidAmount : 0,
+                item.CurrencyCode,
+                item.Notes,
+                item.CreatedAt,
+                item.Items
+                    .OrderBy(line => line.Id)
+                    .Select(line => new PurchaseItemDetailsResponse(
+                        line.Id,
+                        line.ProductId,
+                        line.Product.Name,
+                        line.Product.Strength,
+                        line.Product.Barcode,
+                        line.Quantity,
+                        line.UnitCost,
+                        line.EnteredQuantity,
+                        line.SelectedUnitId,
+                        line.SelectedUnitName,
+                        line.UnitConversionFactor,
+                        line.EnteredUnitCost,
+                        line.LineTotal,
+                        line.LotNumber,
+                        line.ExpireDate))
+                    .ToList()))
+            .SingleOrDefaultAsync(ct);
+
+        return purchase ?? throw new KeyNotFoundException("Purchase not found.");
+    }
+
     public async Task<PurchaseListItem> CreatePurchaseAsync(CreatePurchaseRequest request, string? userId, bool canOverrideLineLimits, CancellationToken ct)
     {
         var clientRequestId = Clean(request.ClientRequestId);
@@ -189,7 +237,7 @@ public sealed class OperationsService(
 
         await EnsureLineLimitAsync(request.Items.Count, isPurchase: true, canOverrideLineLimits, ct);
         ValidatePurchase(request);
-        EnsureNoDuplicateProducts(request.Items.Select(item => item.ProductId), "purchase");
+        EnsureDistinctPurchaseLots(request.Items);
         var items = request.Items.ToList();
         var productIds = items.Select(item => item.ProductId).Distinct().ToArray();
         var products = await LoadProductsForUnitsAsync(productIds, ct);
@@ -279,17 +327,18 @@ public sealed class OperationsService(
         foreach (var line in normalizedItems)
         {
             await ApplyStockMovement(line.Request.ProductId, line.BaseQuantity, InventoryTransactionType.Purchase, "Purchase", purchase.Id, purchase.PurchaseNumber, userId, line.Request.ExpireDate, ct);
-            context.InventoryLots.Add(new InventoryLot
-            {
-                ProductId = line.Request.ProductId,
-                WarehouseId = warehouseId,
-                LotNumber = Clean(line.Request.LotNumber) ?? purchase.PurchaseNumber,
-                Quantity = line.BaseQuantity,
-                ReservedQuantity = 0,
-                UnitCost = line.BaseUnitCost,
-                ExpiresAt = line.Request.ExpireDate
-            });
+            await AddOrMergeInventoryLotAsync(
+                line.Request.ProductId,
+                warehouseId,
+                Clean(line.Request.LotNumber) ?? purchase.PurchaseNumber,
+                line.Request.ExpireDate,
+                line.BaseQuantity,
+                line.BaseUnitCost,
+                ct);
         }
+        await context.SaveChangesAsync(ct);
+        foreach (var productId in normalizedItems.Select(line => line.Request.ProductId).Distinct())
+            await RefreshInventoryExpiryAsync(productId, ct);
         await context.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return MapPurchase(purchase, supplierName);
@@ -454,6 +503,12 @@ public sealed class OperationsService(
             await ApplyStockMovement(line.Request.ProductId, -line.BaseQuantity, InventoryTransactionType.Sale, "ManualSale", sale.Id, sale.SaleNumber, userId, null, ct);
             await ConsumeInventoryLotsAsync(line.Request.ProductId, line.BaseQuantity, ct);
         }
+        await context.SaveChangesAsync(ct);
+        foreach (var productId in normalizedItems
+            .Where(line => !line.Product.UsesDisplayStock)
+            .Select(line => line.Request.ProductId)
+            .Distinct())
+            await RefreshInventoryExpiryAsync(productId, ct);
         await context.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return MapSale(sale, registeredCustomerName ?? request.CustomerName ?? "Walk-in customer");
@@ -749,6 +804,64 @@ public sealed class OperationsService(
             .Select(item => item.MainCurrencyCode)
             .FirstOrDefaultAsync(ct) ?? "USD";
 
+    private async Task AddOrMergeInventoryLotAsync(
+        long productId,
+        long warehouseId,
+        string lotNumber,
+        DateOnly? expiresAt,
+        decimal quantity,
+        decimal unitCost,
+        CancellationToken ct)
+    {
+        var lot = await context.InventoryLots.SingleOrDefaultAsync(item =>
+            item.ProductId == productId &&
+            item.WarehouseId == warehouseId &&
+            item.LotNumber == lotNumber &&
+            item.ExpiresAt == expiresAt,
+            ct);
+
+        if (lot is null)
+        {
+            context.InventoryLots.Add(new InventoryLot
+            {
+                ProductId = productId,
+                WarehouseId = warehouseId,
+                LotNumber = lotNumber,
+                Quantity = quantity,
+                ReservedQuantity = 0,
+                UnitCost = unitCost,
+                ExpiresAt = expiresAt
+            });
+            return;
+        }
+
+        var previousQuantity = lot.Quantity;
+        var combinedQuantity = previousQuantity + quantity;
+        var previousCost = lot.UnitCost ?? unitCost;
+        lot.UnitCost = combinedQuantity <= 0
+            ? unitCost
+            : decimal.Round(
+                ((previousQuantity * previousCost) + (quantity * unitCost)) / combinedQuantity,
+                4,
+                MidpointRounding.AwayFromZero);
+        lot.Quantity = combinedQuantity;
+        lot.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private async Task RefreshInventoryExpiryAsync(long productId, CancellationToken ct)
+    {
+        var inventory = await context.ProductInventories.SingleOrDefaultAsync(
+            item => item.ProductId == productId,
+            ct);
+        if (inventory is null) return;
+
+        inventory.ExpireDate = await context.InventoryLots.AsNoTracking()
+            .Where(item => item.ProductId == productId &&
+                item.Quantity - item.ReservedQuantity > 0 &&
+                item.ExpiresAt.HasValue)
+            .MinAsync(item => item.ExpiresAt, ct);
+    }
+
     private async Task ConsumeInventoryLotsAsync(long productId, decimal quantity, CancellationToken ct)
     {
         var remaining = quantity;
@@ -809,6 +922,24 @@ public sealed class OperationsService(
         if (displayOnly is not null)
             throw new ArgumentException(
                 "Display-stock products cannot be added to purchases because they do not update physical inventory.");
+    }
+
+    private static void EnsureDistinctPurchaseLots(IEnumerable<PurchaseItemRequest> items)
+    {
+        var duplicates = items
+            .GroupBy(item => new
+            {
+                item.ProductId,
+                LotNumber = Clean(item.LotNumber)?.ToUpperInvariant() ?? string.Empty,
+                item.ExpireDate
+            })
+            .Where(group => group.Count() > 1)
+            .ToArray();
+
+        if (duplicates.Length > 0)
+            throw new ArgumentException(
+                "The same product, lot number, and expiry date can appear only once in a purchase. " +
+                "Use separate lines only when the lot number or expiry date is different.");
     }
 
     private static void EnsureNoDuplicateProducts(IEnumerable<long> productIds, string documentName)

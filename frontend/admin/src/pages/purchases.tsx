@@ -4,6 +4,7 @@ import {
     CreditCard,
     LoaderCircle,
     FileText, PackagePlus,
+    ListTree,
     Pencil,
     Save,
     Truck,
@@ -57,6 +58,7 @@ import {
     PaymentBadge,
     PaymentLedgerDialog,
 } from "@/features/operations/components/payment-ledger-dialog";
+import { PurchaseDetailsDialog } from "@/features/operations/components/purchase-details-dialog";
 import {
     operationKeys,
     useOperationQuery,
@@ -108,6 +110,7 @@ export default function PurchasesPage() {
     const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
     const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
     const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
+    const [detailsPurchase, setDetailsPurchase] = useState<Purchase | null>(null);
     const [saving, setSaving] = useState(false);
     const [exportingPdf, setExportingPdf] = useState(false);
     const [items, setItems] = useState<DocumentItem[]>([newDocumentItem()]);
@@ -188,11 +191,17 @@ export default function PurchasesPage() {
         if (documentItems.some((item) => !isDocumentLineComplete(item))) {
             return toast.error(tr("Complete every purchase line."));
         }
-        if (
-            new Set(documentItems.map((item) => item.productId)).size !==
-            documentItems.length
-        ) {
-            return toast.error(tr("Each product may appear only once."));
+        const lotKeys = documentItems.map((item) =>
+            [
+                item.productId,
+                (item.lotNumber ?? "").trim().toLocaleUpperCase(),
+                item.expireDate ?? "",
+            ].join("|"),
+        );
+        if (new Set(lotKeys).size !== lotKeys.length) {
+            return toast.error(
+                tr("The same product, lot number, and expiry date may appear only once."),
+            );
         }
         if (form.paidAmount < 0 || form.paidAmount > total) {
             return toast.error(
@@ -367,19 +376,26 @@ export default function PurchasesPage() {
                                                 <PaymentBadge status={purchase.paymentStatus} />
                                             </TableCell>
                                             <TableCell>
-                                                {purchase.paymentStatus !== "Paid" ||
-                                                purchase.paidAmount > 0 ? (
+                                                <div className="flex justify-end gap-2">
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
-                                                        onClick={() =>
-                                                            setSelectedPurchase(purchase)
-                                                        }
+                                                        onClick={() => setDetailsPurchase(purchase)}
                                                     >
-                                                        <CreditCard className="me-2 size-4" />
-                                                        Payments
+                                                        <ListTree className="me-2 size-4" />
+                                                        Details
                                                     </Button>
-                                                ) : null}
+                                                    {purchase.paymentStatus !== "Paid" || purchase.paidAmount > 0 ? (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => setSelectedPurchase(purchase)}
+                                                        >
+                                                            <CreditCard className="me-2 size-4" />
+                                                            Payments
+                                                        </Button>
+                                                    ) : null}
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))
@@ -742,6 +758,12 @@ export default function PurchasesPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <PurchaseDetailsDialog
+                purchase={detailsPurchase}
+                open={Boolean(detailsPurchase)}
+                onOpenChange={(open) => !open && setDetailsPurchase(null)}
+            />
 
             {selectedPurchase ? (
                 <PaymentLedgerDialog
