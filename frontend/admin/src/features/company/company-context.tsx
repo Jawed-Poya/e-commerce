@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, type PropsWithChildren } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { companyService, resolveCompanyAssetUrl } from "./company-service";
+import { apiBaseUrl } from "@/api/axios";
 import type { PublicCompanyProfile } from "./company-types";
 import { useI18n } from "@/i18n/i18n-provider";
 import { resolveCompanyFontStack, resolveCompanyHeadingStack } from "@/features/company/company-fonts";
@@ -45,15 +46,26 @@ export function CompanyProvider({ children }: PropsWithChildren) {
         root.style.setProperty("--company-heading-font-ps", resolveCompanyHeadingStack("ps", settings.pashtoFontFamily));
         root.style.setProperty("--company-base-font-size", `${settings.baseFontSize}px`);
         document.title = `${company.name} · Admin`;
-        if (company.faviconUrl) {
+        const favicon = resolveCompanyAssetUrl(company.faviconUrl);
+        const logo = resolveCompanyAssetUrl(company.logoUrl);
+        if (favicon) {
             let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
             if (!link) {
                 link = document.createElement("link");
                 link.rel = "icon";
                 document.head.appendChild(link);
             }
-            link.href = resolveCompanyAssetUrl(company.faviconUrl) ?? company.faviconUrl;
+            link.href = favicon;
         }
+        const touchIcon = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+        if (touchIcon && (favicon || logo)) touchIcon.href = favicon || logo || touchIcon.href;
+        const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+        if (manifest) {
+            manifest.href = `${apiBaseUrl}/company/manifest.webmanifest?app=admin`;
+            manifest.crossOrigin = "anonymous";
+        }
+        document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+            ?.setAttribute("content", settings.adminPrimaryColor);
     }, [company]);
 
     const value = useMemo<CompanyContextValue>(() => ({

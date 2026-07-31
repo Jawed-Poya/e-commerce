@@ -1,3 +1,4 @@
+import { StoreVisitTracker } from "../../features/analytics/store-visit-tracker";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
     BadgeCheck,
@@ -431,6 +432,7 @@ export function StoreLayout() {
             </header>
 
             <main>
+                <StoreVisitTracker />
                 <Outlet />
             </main>
 
