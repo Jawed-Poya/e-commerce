@@ -27,4 +27,14 @@ public class ActivityLog : BaseEntity
     public string? IpAddress { get; set; }
 
     public string? UserAgent { get; set; }
+
+    public string? UserName { get; set; }
+    public string? HttpMethod { get; set; }
+    public string? Path { get; set; }
+    public int? StatusCode { get; set; }
+    public long? DurationMs { get; set; }
+    public string? RequestId { get; set; }
+    public string? DeviceType { get; set; }
+    public string? Browser { get; set; }
+    public string? OperatingSystem { get; set; }
 }

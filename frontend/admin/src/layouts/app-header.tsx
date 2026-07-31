@@ -8,6 +8,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useI18n, type Language } from "@/i18n/i18n-provider";
 import { AdminNotificationCenter } from "@/features/notifications/admin-notification-center";
 import { useCompany } from "@/features/company/company-context";
+import { OfflineStatus } from "@/features/offline/offline-status";
 
 const languages: Language[] = ["en", "ps", "dr"];
 
@@ -19,7 +20,7 @@ function AppHeader() {
         <div className="flex items-center gap-3"><SidebarTrigger /><Separator orientation="vertical" className="h-6" /><div className="min-w-0"><h1 className="truncate text-sm font-semibold">{company?.name ?? t("nav.dashboard")}</h1><p className="hidden truncate text-[10px] text-muted-foreground sm:block">Single-company commerce system</p></div></div>
         <div className="flex items-center gap-1">
             <DropdownMenu><DropdownMenuTrigger render={<Button variant="ghost" className="h-8 gap-2 px-2" />}><Languages className="size-4" /><span className="hidden text-xs sm:inline">{t(`language.${language}`)}</span><ChevronDown className="size-3.5 text-muted-foreground" /></DropdownMenuTrigger><DropdownMenuContent className="w-44" align="end">{languages.map((item) => <DropdownMenuItem key={item} onClick={() => setLanguage(item)}>{t(`language.${item}`)}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>
-            <ThemeToggle /><AdminNotificationCenter /><HeaderNavUser />
+            <OfflineStatus /><ThemeToggle /><AdminNotificationCenter /><HeaderNavUser />
         </div>
     </header>;
 }

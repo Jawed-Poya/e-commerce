@@ -1,5 +1,6 @@
 import * as React from "react";
 import {
+    Activity,
     BarChart3,
     BriefcaseBusiness,
     Building2,
@@ -164,6 +165,12 @@ const navigation: ProtectedGroup[] = [
                 url: "/system/roles",
                 icon: <Crown />,
                 permission: Permissions.RolesManage,
+            },
+            {
+                titleKey: "nav.auditLogs",
+                url: "/audit",
+                icon: <Activity />,
+                permission: Permissions.AuditLogsView,
             },
             {
                 titleKey: "nav.trash",

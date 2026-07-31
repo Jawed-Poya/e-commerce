@@ -23,6 +23,7 @@ type I18nContextValue = {
     direction: "ltr" | "rtl";
     setLanguage: (language: Language) => void;
     t: (key: string, values?: Record<string, string | number>) => string;
+    formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string;
 };
 
 const I18nContext = createContext<I18nContextValue | null>(null);
@@ -42,6 +43,8 @@ export function I18nProvider({ children }: PropsWithChildren) {
         document.documentElement.dir = direction;
     }, [direction, language]);
 
+    const locale = language === "dr" ? "fa-AF" : language === "ps" ? "ps-AF" : "en-US";
+
     const setLanguage = useCallback((next: Language) => {
         localStorage.setItem(languageKey, next);
         setLanguageState(next);
@@ -51,16 +54,26 @@ export function I18nProvider({ children }: PropsWithChildren) {
         (key: string, values?: Record<string, string | number>) => {
             let text = messages[language][key] ?? messages.en[key] ?? key;
             Object.entries(values ?? {}).forEach(([name, value]) => {
-                text = text.replaceAll(`{${name}}`, String(value));
+                const localizedValue =
+                    typeof value === "number"
+                        ? new Intl.NumberFormat(locale).format(value)
+                        : value;
+                text = text.replaceAll(`{${name}}`, String(localizedValue));
             });
             return text;
         },
-        [language],
+        [language, locale],
+    );
+
+    const formatNumber = useCallback(
+        (value: number, options?: Intl.NumberFormatOptions) =>
+            new Intl.NumberFormat(locale, options).format(value),
+        [locale],
     );
 
     const value = useMemo(
-        () => ({ language, direction, setLanguage, t }),
-        [direction, language, setLanguage, t],
+        () => ({ language, direction, setLanguage, t, formatNumber }),
+        [direction, formatNumber, language, setLanguage, t],
     );
 
     return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

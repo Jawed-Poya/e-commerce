@@ -210,6 +210,12 @@ export const router = createBrowserRouter([
                         ),
                     },
                     {
+                        path: "audit",
+                        lazy: lazyAllowed(Permissions.AuditLogsView, () =>
+                            import("@/features/audit/audit-page").then((module) => module.default),
+                        ),
+                    },
+                    {
                         path: "system/general-types",
                         lazy: lazyAllowed(Permissions.SystemManage, () =>
                             import("@/pages/general-types").then((module) => module.default),

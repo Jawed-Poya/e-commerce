@@ -33,6 +33,7 @@ export const Permissions = {
     FinancialReportsView: "company.reports.view",
     CompanyTrashManage: "company.trash.manage",
     CompanySettingsManage: "company.settings.manage",
+    AuditLogsView: "company.audit-logs.view",
 } as const;
 
 export function isSystemAdministrator(
@@ -70,6 +71,7 @@ export function getDefaultAdminRoute(
     if (set.has(Permissions.RolesManage)) return "/system/roles";
     if (set.has(Permissions.FinancialReportsView)) return "/reports";
     if (set.has(Permissions.CompanyProfileManage)) return "/company";
+    if (set.has(Permissions.AuditLogsView)) return "/audit";
     if (set.has(Permissions.SystemManage)) return "/system/general-types";
     return "/dashboard";
 }

@@ -27,7 +27,7 @@ import { useI18n } from "../../i18n/i18n-provider";
 
 export function CartPage() {
     const cart = useCart();
-    const { t } = useI18n();
+    const { t, formatNumber } = useI18n();
     const configuration = useQuery({
         queryKey: ["checkout-configuration"],
         queryFn: getCheckoutConfiguration,
@@ -138,7 +138,7 @@ export function CartPage() {
 
                                         {item.quantity > 1 && (
                                             <span className="absolute bottom-2 right-2 grid min-w-6 place-items-center rounded-full bg-background/90 px-1.5 text-[10px] font-bold leading-6 shadow-sm backdrop-blur sm:hidden">
-                                                ×{item.quantity}
+                                                ×{formatNumber(item.quantity)}
                                             </span>
                                         )}
                                     </Link>
@@ -150,7 +150,7 @@ export function CartPage() {
                                         >
                                             {item.name}
                                         </Link>
-                                        {item.unitName ? <span className="mt-1 inline-flex w-fit rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-[10px] font-bold text-primary">{item.quantity} {item.unitName}</span> : null}
+                                        {item.unitName ? <span className="mt-1 inline-flex w-fit rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-[10px] font-bold text-primary">{formatNumber(item.quantity)} {item.unitName}</span> : null}
 
                                         <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
                                             {formatMoney(item.price)} {item.unitName ? `/ ${item.unitName}` : t("cart.each")}
