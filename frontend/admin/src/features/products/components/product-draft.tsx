@@ -256,6 +256,19 @@ export function ProductDraftCard({
                                 message={productErrors?.barcode?.message}
                             />
                         </div>
+
+                        <div className="space-y-1.5 md:col-span-2">
+                            <Label htmlFor={`products-${index}-strength`}>
+                                {t("products.strength")}
+                            </Label>
+                            <Input
+                                id={`products-${index}-strength`}
+                                disabled={disabled}
+                                placeholder={t("products.strengthPlaceholder")}
+                                {...register(`products.${index}.strength`)}
+                            />
+                            <FieldError message={productErrors?.strength?.message} />
+                        </div>
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-3">

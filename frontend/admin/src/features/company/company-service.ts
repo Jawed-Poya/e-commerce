@@ -39,6 +39,8 @@ export const companyService = {
     },
     updateSettings: async (request: CompanySettings) =>
         (await apiClient.put<CompanyProfile>("/company/settings", request)).data,
+    updateOperationLimits: async (request: Pick<CompanySettings, "maximumPurchaseLines" | "maximumManualSaleLines">) =>
+        (await apiClient.put<CompanyProfile>("/company/operation-limits", request)).data,
     createBranch: async (request: UpsertCompanyBranch) =>
         (await apiClient.post<CompanyBranch>("/company/branches", request)).data,
     updateBranch: async (id: number, request: UpsertCompanyBranch) =>

@@ -102,8 +102,7 @@ builder.Services.AddAuthorization(options =>
     {
         options.AddPolicy(permission, policy =>
             policy.RequireAssertion(context =>
-                context.User.IsInRole(AppRoles.Admin) ||
-                context.User.HasClaim(AuthClaims.Permission, permission)));
+                AppPermissions.IsGranted(context.User, permission)));
     }
 });
 
@@ -135,5 +134,6 @@ app.UseMiddleware<ActivityAuditMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<StoreNotificationHub>("/hubs/store-notifications");
+app.ValidateAdminEndpointAuthorization();
 
 app.Run();

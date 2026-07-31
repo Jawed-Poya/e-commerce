@@ -4,8 +4,9 @@ using ECommerce.Entities;
 namespace ECommerce.Services.Auditing;
 
 /// <summary>
-/// Persists audit records in batches. A failed database write is retried with
-/// the same batch so a transient SQL error does not silently discard activity.
+/// Persists audit records outside the request transaction. Normal operation
+/// retries until SQL Server becomes available. During graceful shutdown the
+/// retry window is bounded so the process cannot hang forever.
 /// </summary>
 public sealed class ActivityLogWriterHostedService(
     ActivityLogQueue queue,
@@ -16,52 +17,71 @@ public sealed class ActivityLogWriterHostedService(
     {
         var batch = new List<ActivityLog>(100);
 
-        while (!stoppingToken.IsCancellationRequested)
+        await foreach (var item in queue.Reader.ReadAllAsync())
         {
-            try
-            {
-                batch.Add(await queue.Reader.ReadAsync(stoppingToken));
-                while (batch.Count < 100 && queue.Reader.TryRead(out var item))
-                    batch.Add(item);
+            batch.Add(item);
+            while (batch.Count < 100 && queue.Reader.TryRead(out var queued))
+                batch.Add(queued);
 
-                await PersistWithRetryAsync(batch, stoppingToken);
-                batch.Clear();
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            var persisted = await PersistWithRetryAsync(batch, stoppingToken);
+            if (!persisted)
             {
-                break;
+                logger.LogCritical(
+                    "Audit writer stopped with {Count} records that could not be persisted before shutdown.",
+                    batch.Count);
             }
+            batch.Clear();
         }
     }
 
-    private async Task PersistWithRetryAsync(
+    public override Task StopAsync(CancellationToken cancellationToken)
+    {
+        queue.Complete();
+        return base.StopAsync(cancellationToken);
+    }
+
+    private async Task<bool> PersistWithRetryAsync(
         IReadOnlyCollection<ActivityLog> batch,
-        CancellationToken cancellationToken)
+        CancellationToken stoppingToken)
     {
         var delay = TimeSpan.FromSeconds(1);
+        var shutdownAttempts = 0;
 
-        while (!cancellationToken.IsCancellationRequested)
+        while (true)
         {
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                 context.ActivityLogs.AddRange(batch);
-                await context.SaveChangesAsync(cancellationToken);
-                return;
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
+
+                // Bound a single SQL attempt even if the provider or network is
+                // unresponsive. The next iteration retries the same batch.
+                using var attemptTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                await context.SaveChangesAsync(attemptTimeout.Token);
+                return true;
             }
             catch (Exception exception)
             {
+                if (stoppingToken.IsCancellationRequested && ++shutdownAttempts >= 3)
+                {
+                    logger.LogError(
+                        exception,
+                        "Failed to persist {Count} audit records after {Attempts} shutdown attempts.",
+                        batch.Count,
+                        shutdownAttempts);
+                    return false;
+                }
+
+                var retryDelay = stoppingToken.IsCancellationRequested
+                    ? TimeSpan.FromSeconds(Math.Min(delay.TotalSeconds, 2))
+                    : delay;
                 logger.LogError(
                     exception,
                     "Failed to persist {Count} activity records. Retrying in {DelaySeconds} seconds.",
                     batch.Count,
-                    delay.TotalSeconds);
-                await Task.Delay(delay, cancellationToken);
+                    retryDelay.TotalSeconds);
+                await Task.Delay(retryDelay, CancellationToken.None);
                 delay = TimeSpan.FromSeconds(Math.Min(delay.TotalSeconds * 2, 30));
             }
         }

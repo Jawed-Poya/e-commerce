@@ -11,12 +11,13 @@ namespace ECommerce.Controllers;
 
 [ApiController]
 [Route("api/admin/notifications")]
-[Authorize(Policy = AppPermissions.OrdersView)]
+[Authorize]
 public sealed class AdminNotificationsController(
     IAdminNotificationService notifications,
     AdminNotificationBroker broker,
     ICompanyContext companyContext) : ControllerBase
 {
+    [Authorize(Policy = AppPermissions.OrdersView)]
     [HttpGet]
     public async Task<ActionResult<ApiResponse<AdminNotificationsResponse>>> Get(
         [FromQuery] DateTime? after,
@@ -27,6 +28,7 @@ public sealed class AdminNotificationsController(
         return Ok(ApiResponse<AdminNotificationsResponse>.Ok(result));
     }
 
+    [Authorize(Policy = AppPermissions.NotificationsManage)]
     [HttpDelete("{id:long}")]
     public async Task<ActionResult<ApiResponse<object>>> Delete(long id, CancellationToken cancellationToken)
     {
@@ -34,6 +36,7 @@ public sealed class AdminNotificationsController(
         return Ok(ApiResponse<object>.Ok(new { }, "Notification deleted."));
     }
 
+    [Authorize(Policy = AppPermissions.NotificationsManage)]
     [HttpDelete]
     public async Task<ActionResult<ApiResponse<object>>> Clear(CancellationToken cancellationToken)
     {
@@ -41,6 +44,7 @@ public sealed class AdminNotificationsController(
         return Ok(ApiResponse<object>.Ok(new { count }, "Notifications cleared."));
     }
 
+    [Authorize(Policy = AppPermissions.OrdersView)]
     [HttpGet("stream")]
     public async Task Stream()
     {

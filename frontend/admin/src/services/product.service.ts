@@ -11,6 +11,7 @@ export interface ProductListItem {
     id: number;
     name: string;
     barcode: string | null;
+    strength: string | null;
     shortDescription: string | null;
     description: string | null;
     slug: string | null;
@@ -123,6 +124,7 @@ export interface CreateSingleProductInput {
     galleryImages?: File[];
     name: string;
     barcode?: string | null;
+    strength?: string | null;
     shortDescription?: string | null;
     description?: string | null;
     slug?: string | null;
@@ -145,7 +147,7 @@ export interface CreateSingleProductResult {
 }
 
 export type BulkUpdateProduct = Pick<ProductListItem,
-    "id" | "name" | "barcode" | "categoryId" | "brandId" | "unitId" |
+    "id" | "name" | "barcode" | "strength" | "categoryId" | "brandId" | "unitId" |
     "shortDescription" | "description" | "slug" | "minimumValue" |
     "maximumValue" | "usesDisplayStock" | "displayStockQuantity" | "isFeatured" | "isActive" | "primaryImageUrl" | "images"> & { image?: File; galleryImages?: File[]; removedImageIds?: number[]; prices: ProductPriceInput[]; unitConversions?: ProductUnitConversionInput[] };
 
@@ -164,6 +166,7 @@ export const productService = {
         product.galleryImages?.forEach(image => formData.append(`${prefix}.GalleryImages`, image, image.name));
         append(formData, `${prefix}.Name`, product.name.trim());
         append(formData, `${prefix}.Barcode`, product.barcode?.trim() || null);
+        append(formData, `${prefix}.Strength`, product.strength?.trim() || null);
         append(formData, `${prefix}.ShortDescription`, product.shortDescription?.trim() || null);
         append(formData, `${prefix}.Description`, product.description?.trim() || null);
         append(formData, `${prefix}.Slug`, product.slug?.trim() || null);
@@ -205,6 +208,7 @@ export const productService = {
             append(formData, `${prefix}.Id`, product.id);
             append(formData, `${prefix}.Name`, product.name.trim());
             append(formData, `${prefix}.Barcode`, product.barcode?.trim());
+            append(formData, `${prefix}.Strength`, product.strength?.trim());
             append(formData, `${prefix}.ShortDescription`, product.shortDescription?.trim());
             append(formData, `${prefix}.Description`, product.description?.trim());
             append(formData, `${prefix}.Slug`, product.slug?.trim());

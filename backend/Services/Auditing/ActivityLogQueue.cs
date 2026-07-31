@@ -4,8 +4,9 @@ using ECommerce.Entities;
 namespace ECommerce.Services.Auditing;
 
 /// <summary>
-/// Keeps request logging off the response path while applying back-pressure
-/// instead of silently dropping security/audit records during traffic spikes.
+/// Keeps audit writes off the response path while applying back-pressure.
+/// The writer is completed during graceful shutdown so pending records can be
+/// drained instead of disappearing when the API process stops.
 /// </summary>
 public sealed class ActivityLogQueue
 {
@@ -20,6 +21,10 @@ public sealed class ActivityLogQueue
 
     public ValueTask EnqueueAsync(ActivityLog item, CancellationToken cancellationToken = default) =>
         _channel.Writer.WriteAsync(item, cancellationToken);
+
+    public bool TryEnqueue(ActivityLog item) => _channel.Writer.TryWrite(item);
+
+    public void Complete() => _channel.Writer.TryComplete();
 
     public ChannelReader<ActivityLog> Reader => _channel.Reader;
 }

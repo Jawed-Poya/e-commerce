@@ -51,11 +51,25 @@ class ApiClient {
     }
 
     private async getBlob(url: string, params?: object) {
-        const response = await axiosInstance.get<Blob>(url, {
-            params,
-            responseType: "blob",
-            timeout: 600_000,
-        });
+        let response;
+        try {
+            response = await axiosInstance.get<Blob>(url, {
+                params,
+                responseType: "blob",
+                timeout: 600_000,
+            });
+        } catch (error) {
+            const candidate = error as { response?: { data?: unknown }; message?: string };
+            if (candidate.response?.data instanceof Blob) {
+                try {
+                    const body = JSON.parse(await candidate.response.data.text()) as { message?: string };
+                    if (body.message) candidate.message = body.message;
+                } catch {
+                    // Keep the original transport error when the response is not JSON.
+                }
+            }
+            throw candidate;
+        }
         const disposition = response.headers["content-disposition"] as string | undefined;
         const encoded = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
         const quoted = disposition?.match(/filename="?([^";]+)"?/i)?.[1];

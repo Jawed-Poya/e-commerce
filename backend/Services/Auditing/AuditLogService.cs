@@ -92,6 +92,7 @@ public sealed class AuditLogService(
                 (x.UserName != null && x.UserName.Contains(clean)) ||
                 x.EntityName.Contains(clean) ||
                 x.Description.Contains(clean) ||
+                (x.Changes != null && x.Changes.Contains(clean)) ||
                 (x.Path != null && x.Path.Contains(clean)) ||
                 (x.IpAddress != null && x.IpAddress.Contains(clean)));
 
@@ -99,7 +100,7 @@ public sealed class AuditLogService(
         var total = await query.CountAsync(ct);
         var items = await query.OrderByDescending(x => x.CreatedAt)
             .Skip((paging.Page - 1) * paging.PageSize).Take(paging.PageSize)
-            .Select(x => new ActivityLogResponse(x.Id, x.CreatedAt, x.UserName, x.Action.ToString(), x.EntityName, x.EntityId, x.Description, x.HttpMethod, x.Path, x.StatusCode, x.DurationMs, x.IpAddress, x.DeviceType, x.Browser, x.OperatingSystem))
+            .Select(x => new ActivityLogResponse(x.Id, x.CreatedAt, x.UserName, x.Action.ToString(), x.EntityName, x.EntityId, x.Description, x.Changes, x.HttpMethod, x.Path, x.StatusCode, x.DurationMs, x.IpAddress, x.DeviceType, x.Browser, x.OperatingSystem))
             .ToListAsync(ct);
         return new AuditPageResponse<ActivityLogResponse>(items, total, paging.Page, paging.PageSize);
     }

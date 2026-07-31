@@ -22,6 +22,8 @@ public static class AppPermissions
     public const string ProductsView = "products.view";
     public const string ProductsManage = "products.manage";
     public const string ProductPricingManage = "product-pricing.manage";
+    public const string ReviewsView = "reviews.view";
+    public const string ReviewsManage = "reviews.manage";
 
     public const string InventoryView = "inventory.view";
     public const string InventoryManage = "inventory.manage";
@@ -48,6 +50,8 @@ public static class AppPermissions
     public const string PayrollManage = "payroll.manage";
     public const string ExpensesView = "expenses.view";
     public const string ExpensesManage = "expenses.manage";
+    public const string OperationLineLimitsManage = "operations.line-limits.manage";
+    public const string OperationLineLimitsOverride = "operations.line-limits.override";
 
     public const string CompanyProfileManage = "company.profile.manage";
     public const string CompanyBranchesManage = "company.branches.manage";
@@ -56,7 +60,10 @@ public static class AppPermissions
     public const string CompanyTrashManage = "company.trash.manage";
     public const string CompanySettingsManage = "company.settings.manage";
     public const string AuditLogsView = "company.audit-logs.view";
+    public const string NotificationsManage = "company.notifications.manage";
 
+    public const string GeneralTypesManage = "system.general-types.manage";
+    public const string StorefrontManage = "system.storefront.manage";
     public const string SystemManage = "system.manage";
 
     public static readonly IReadOnlyCollection<string> All =
@@ -65,6 +72,8 @@ public static class AppPermissions
         ProductsView,
         ProductsManage,
         ProductPricingManage,
+        ReviewsView,
+        ReviewsManage,
         InventoryView,
         InventoryManage,
         OrdersView,
@@ -86,6 +95,8 @@ public static class AppPermissions
         PayrollManage,
         ExpensesView,
         ExpensesManage,
+        OperationLineLimitsManage,
+        OperationLineLimitsOverride,
         CompanyProfileManage,
         CompanyBranchesManage,
         CompanyClaimsManage,
@@ -93,8 +104,28 @@ public static class AppPermissions
         CompanyTrashManage,
         CompanySettingsManage,
         AuditLogsView,
+        NotificationsManage,
+        GeneralTypesManage,
+        StorefrontManage,
         SystemManage
     ];
+
+
+    public static readonly IReadOnlyDictionary<string, IReadOnlyCollection<string>> LegacyPermissionParents =
+        new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.Ordinal)
+        {
+            [ReviewsView] = [ProductsManage],
+            [ReviewsManage] = [ProductsManage],
+            [NotificationsManage] = [OrdersManage],
+            [GeneralTypesManage] = [SystemManage],
+            [StorefrontManage] = [SystemManage]
+        };
+
+    public static bool IsGranted(System.Security.Claims.ClaimsPrincipal user, string permission) =>
+        user.IsInRole(AppRoles.Admin) ||
+        user.HasClaim(AuthClaims.Permission, permission) ||
+        (LegacyPermissionParents.TryGetValue(permission, out var parents) &&
+         parents.Any(parent => user.HasClaim(AuthClaims.Permission, parent)));
 
     public static readonly IReadOnlyDictionary<string, IReadOnlyCollection<PermissionDefinition>> Groups =
         new Dictionary<string, IReadOnlyCollection<PermissionDefinition>>
@@ -107,7 +138,9 @@ public static class AppPermissions
             [
                 new(ProductsView, "View products", "View products and product details."),
                 new(ProductsManage, "Manage products", "Create, update, activate, and delete products."),
-                new(ProductPricingManage, "Manage pricing", "Manage default and customer-type prices.")
+                new(ProductPricingManage, "Manage pricing", "Manage default and customer-type prices."),
+                new(ReviewsView, "View product reviews", "View customer product reviews and moderation status."),
+                new(ReviewsManage, "Manage product reviews", "Approve, hide, and delete customer product reviews.")
             ],
             ["Inventory"] =
             [
@@ -137,7 +170,9 @@ public static class AppPermissions
                 new(PayrollView, "View payroll", "View staff salary payments."),
                 new(PayrollManage, "Manage payroll", "Record salary payments and adjustments."),
                 new(ExpensesView, "View expenses", "View expense categories and transactions."),
-                new(ExpensesManage, "Manage expenses", "Create expense categories and record expenses.")
+                new(ExpensesManage, "Manage expenses", "Create expense categories and record expenses."),
+                new(OperationLineLimitsManage, "Manage operation line limits", "Configure the maximum number of product lines allowed in purchases and manual sales."),
+                new(OperationLineLimitsOverride, "Override operation line limits", "Create purchases and manual sales that exceed the configured line limits when business operations require it.")
             ],
             ["Company administration"] =
             [
@@ -147,14 +182,17 @@ public static class AppPermissions
                 new(FinancialReportsView, "View financial reports", "View revenue, cost, profit, cash flow, ledgers, and company worth reports."),
                 new(CompanyTrashManage, "Manage trash", "Restore or permanently purge company records."),
                 new(CompanySettingsManage, "Manage company settings", "Configure currency, branding, fonts, and retention policies."),
-                new(AuditLogsView, "View audit and visit logs", "Review administrator activity and storefront customer visits.")
+                new(AuditLogsView, "View audit and visit logs", "Review administrator activity and storefront customer visits."),
+                new(NotificationsManage, "Manage admin notifications", "Delete individual notifications or clear the company notification inbox.")
             ],
             ["Administration"] =
             [
                 new(UsersView, "View users", "View administrator and staff accounts."),
                 new(UsersManage, "Manage users", "Create, edit, activate, and reset user passwords."),
                 new(RolesManage, "Manage roles and permissions", "Create roles and assign permission claims."),
-                new(SystemManage, "Manage system settings", "Manage general types and system-level configuration.")
+                new(GeneralTypesManage, "Manage general types", "Create and maintain categories, brands, units, customer types, and reusable types."),
+                new(StorefrontManage, "Manage storefront content", "Update storefront hero content and promotional media."),
+                new(SystemManage, "Manage all system settings", "Legacy broad permission that also grants general-types and storefront management.")
             ]
         };
 }

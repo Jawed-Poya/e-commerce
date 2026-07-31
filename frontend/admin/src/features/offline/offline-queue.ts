@@ -1,8 +1,9 @@
 import type { ApiResponse } from "@/api/api-client";
 import apiClient from "@/api/api-client";
 
-const DatabaseName = "pharmacy-admin-offline";
-const StoreName = "pending-mutations";
+import { OfflineStores, withOfflineStore } from "./offline-database";
+import { getOfflineOwnerKey } from "./offline-owner";
+
 const ChangedEvent = "pharmacy-offline-queue-changed";
 
 export interface PendingMutation {
@@ -13,71 +14,50 @@ export interface PendingMutation {
     createdAt: string;
     attempts: number;
     lastError: string | null;
+    ownerKey?: string;
 }
 
 export type QueueableResponse<T> = ApiResponse<T> & {
     offlineQueued?: boolean;
 };
 
-function openDatabase(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DatabaseName, 1);
-        request.onupgradeneeded = () => {
-            const db = request.result;
-            if (!db.objectStoreNames.contains(StoreName)) {
-                db.createObjectStore(StoreName, { keyPath: "id" });
-            }
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-}
-
-async function withStore<T>(
-    mode: IDBTransactionMode,
-    action: (store: IDBObjectStore) => IDBRequest<T>,
-): Promise<T> {
-    const db = await openDatabase();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(StoreName, mode);
-        const request = action(transaction.objectStore(StoreName));
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-        transaction.oncomplete = () => db.close();
-        transaction.onerror = () => reject(transaction.error);
-    });
-}
-
 function emitChanged() {
     window.dispatchEvent(new CustomEvent(ChangedEvent));
 }
 
 async function addPending(item: PendingMutation) {
-    await withStore("readwrite", (store) => store.put(item));
+    await withOfflineStore(OfflineStores.PendingMutations, "readwrite", (store) => store.put(item));
     emitChanged();
 }
 
 async function removePending(id: string) {
-    await withStore("readwrite", (store) => store.delete(id));
+    await withOfflineStore(OfflineStores.PendingMutations, "readwrite", (store) => store.delete(id));
     emitChanged();
 }
 
 async function updatePending(item: PendingMutation) {
-    await withStore("readwrite", (store) => store.put(item));
+    await withOfflineStore(OfflineStores.PendingMutations, "readwrite", (store) => store.put(item));
     emitChanged();
 }
 
 export async function getPendingMutations(): Promise<PendingMutation[]> {
-    const items = await withStore<PendingMutation[]>("readonly", (store) =>
+    const ownerKey = getOfflineOwnerKey();
+    if (!ownerKey) return [];
+
+    const items = await withOfflineStore<PendingMutation[]>(OfflineStores.PendingMutations, "readonly", (store) =>
         store.getAll(),
     );
-    return items.sort((left, right) =>
-        left.createdAt.localeCompare(right.createdAt),
-    );
+    const migrated = items.filter((item) => !item.ownerKey);
+    await Promise.all(migrated.map((item) => updatePending({ ...item, ownerKey })));
+
+    return items
+        .filter((item) => !item.ownerKey || item.ownerKey === ownerKey)
+        .map((item) => item.ownerKey ? item : { ...item, ownerKey })
+        .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
 }
 
 export async function getPendingMutationCount() {
-    return withStore<number>("readonly", (store) => store.count());
+    return (await getPendingMutations()).length;
 }
 
 export async function discardPendingMutation(id: string) {
@@ -124,6 +104,7 @@ export async function postQueueable<T>(
         createdAt: new Date().toISOString(),
         attempts: 0,
         lastError: null,
+        ownerKey: getOfflineOwnerKey() ?? undefined,
     });
 
     return {

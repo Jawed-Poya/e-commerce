@@ -5,6 +5,8 @@ export const Permissions = {
     ProductsView: "products.view",
     ProductsManage: "products.manage",
     ProductPricingManage: "product-pricing.manage",
+    ReviewsView: "reviews.view",
+    ReviewsManage: "reviews.manage",
     InventoryView: "inventory.view",
     InventoryManage: "inventory.manage",
     OrdersView: "orders.view",
@@ -26,6 +28,8 @@ export const Permissions = {
     PayrollManage: "payroll.manage",
     ExpensesView: "expenses.view",
     ExpensesManage: "expenses.manage",
+    OperationLineLimitsManage: "operations.line-limits.manage",
+    OperationLineLimitsOverride: "operations.line-limits.override",
     SystemManage: "system.manage",
     CompanyProfileManage: "company.profile.manage",
     CompanyBranchesManage: "company.branches.manage",
@@ -34,6 +38,9 @@ export const Permissions = {
     CompanyTrashManage: "company.trash.manage",
     CompanySettingsManage: "company.settings.manage",
     AuditLogsView: "company.audit-logs.view",
+    NotificationsManage: "company.notifications.manage",
+    GeneralTypesManage: "system.general-types.manage",
+    StorefrontManage: "system.storefront.manage",
 } as const;
 
 export function isSystemAdministrator(
@@ -42,13 +49,22 @@ export function isSystemAdministrator(
     return Boolean(user?.roles.some((role) => role.toLowerCase() === "admin"));
 }
 
+const legacyPermissionParents: Readonly<Record<string, readonly string[]>> = {
+    [Permissions.ReviewsView]: [Permissions.ProductsManage],
+    [Permissions.ReviewsManage]: [Permissions.ProductsManage],
+    [Permissions.NotificationsManage]: [Permissions.OrdersManage],
+    [Permissions.GeneralTypesManage]: [Permissions.SystemManage],
+    [Permissions.StorefrontManage]: [Permissions.SystemManage],
+};
+
 export function hasPermission(
     user: Pick<AuthUser, "roles" | "permissions"> | null | undefined,
     permission: string,
 ) {
-    return Boolean(
-        isSystemAdministrator(user) || user?.permissions.includes(permission),
-    );
+    if (isSystemAdministrator(user)) return true;
+    const granted = new Set(user?.permissions ?? []);
+    return granted.has(permission) ||
+        (legacyPermissionParents[permission]?.some((parent) => granted.has(parent)) ?? false);
 }
 
 export function getDefaultAdminRoute(
@@ -59,6 +75,7 @@ export function getDefaultAdminRoute(
     const set = new Set(permissions);
     if (set.has(Permissions.DashboardView)) return "/dashboard";
     if (set.has(Permissions.ProductsView)) return "/products";
+    if (set.has(Permissions.ReviewsView) || set.has(Permissions.ProductsManage)) return "/reviews";
     if (set.has(Permissions.InventoryView)) return "/inventory";
     if (set.has(Permissions.OperationsView)) return "/operations";
     if (set.has(Permissions.PurchasesView)) return "/operations/purchases";
@@ -72,6 +89,7 @@ export function getDefaultAdminRoute(
     if (set.has(Permissions.FinancialReportsView)) return "/reports";
     if (set.has(Permissions.CompanyProfileManage)) return "/company";
     if (set.has(Permissions.AuditLogsView)) return "/audit";
-    if (set.has(Permissions.SystemManage)) return "/system/general-types";
+    if (set.has(Permissions.GeneralTypesManage) || set.has(Permissions.SystemManage)) return "/system/general-types";
+    if (set.has(Permissions.StorefrontManage)) return "/system/storefront";
     return "/dashboard";
 }

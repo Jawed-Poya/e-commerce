@@ -30,6 +30,9 @@ public sealed class CreateBulkProductItemRequest
     [StringLength(100)]
     public string? Barcode { get; set; }
 
+    [StringLength(100)]
+    public string? Strength { get; set; }
+
     [StringLength(500)]
     public string? ShortDescription { get; set; }
 

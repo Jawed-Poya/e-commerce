@@ -70,7 +70,7 @@ public sealed class ProductReviewsController(IProductReviewService reviews) : Co
         }
     }
 
-    [Authorize(Policy = AppPermissions.ProductsManage)]
+    [Authorize(Policy = AppPermissions.ReviewsView)]
     [HttpGet("api/admin/reviews")]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AdminProductReviewResponse>>>> GetAdmin(
         [FromQuery] bool? approved,
@@ -80,7 +80,7 @@ public sealed class ProductReviewsController(IProductReviewService reviews) : Co
             await reviews.GetForAdminAsync(approved, cancellationToken)));
     }
 
-    [Authorize(Policy = AppPermissions.ProductsManage)]
+    [Authorize(Policy = AppPermissions.ReviewsManage)]
     [HttpPatch("api/admin/reviews/{reviewId:long}/approval")]
     public async Task<ActionResult<ApiResponse<AdminProductReviewResponse>>> SetApproval(
         long reviewId,
@@ -99,7 +99,7 @@ public sealed class ProductReviewsController(IProductReviewService reviews) : Co
         }
     }
 
-    [Authorize(Policy = AppPermissions.ProductsManage)]
+    [Authorize(Policy = AppPermissions.ReviewsManage)]
     [HttpDelete("api/admin/reviews/{reviewId:long}")]
     public async Task<ActionResult<ApiResponse<object>>> Delete(
         long reviewId,

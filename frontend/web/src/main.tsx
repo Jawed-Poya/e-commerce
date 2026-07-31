@@ -8,6 +8,7 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
 import { AppProviders } from "./app/providers";
+import { registerStorefrontServiceWorker } from "./app/register-service-worker";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -17,8 +18,4 @@ createRoot(document.getElementById("root")!).render(
   </StrictMode>,
 );
 
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("/service-worker.js");
-  });
-}
+registerStorefrontServiceWorker();

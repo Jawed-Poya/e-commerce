@@ -8,6 +8,7 @@ import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 
 import { AdminProviders } from "@/app/providers";
+import { registerAdminServiceWorker } from "@/app/register-service-worker";
 import "@/index.css";
 import { router } from "@/routes/routes";
 
@@ -20,8 +21,4 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 );
 
 
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
-    window.addEventListener("load", () => {
-        void navigator.serviceWorker.register("/service-worker.js");
-    });
-}
+registerAdminServiceWorker();

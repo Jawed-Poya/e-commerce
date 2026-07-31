@@ -15,6 +15,8 @@ public sealed record CompanySettingsResponse(
     int BaseFontSize,
     int TrashRetentionDays,
     int NotificationRetentionDays,
+    int MaximumPurchaseLines,
+    int MaximumManualSaleLines,
     bool AllowUserClaimManagement);
 
 public sealed record CompanyBranchResponse(
@@ -77,6 +79,10 @@ public sealed record UpdateCompanySettingsRequest(
     int TrashRetentionDays,
     int NotificationRetentionDays,
     bool AllowUserClaimManagement);
+
+public sealed record UpdateOperationLimitsRequest(
+    int MaximumPurchaseLines,
+    int MaximumManualSaleLines);
 
 public sealed record UpsertCompanyBranchRequest(
     string Name,

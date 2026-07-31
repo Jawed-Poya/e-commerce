@@ -12,6 +12,7 @@ namespace ECommerce.Controllers;
 public sealed class ReceiptsController(IFinancialDocumentService documents) : ControllerBase
 {
     [HttpGet("{source}/{id:long}/pdf")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> Pdf(
         string source,
         long id,
@@ -41,6 +42,7 @@ public sealed class ReceiptsController(IFinancialDocumentService documents) : Co
     }
 
     [HttpGet("{source}/{id:long}/image")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> Image(
         string source,
         long id,
@@ -73,13 +75,12 @@ public sealed class ReceiptsController(IFinancialDocumentService documents) : Co
     {
         var permission = source.Trim().ToLowerInvariant() switch
         {
-            "orders" => AppPermissions.OrdersView,
-            "manual-sales" => AppPermissions.ManualSalesView,
+            "order" or "orders" => AppPermissions.OrdersView,
+            "sale" or "sales" or "manual-sale" or "manual-sales" => AppPermissions.ManualSalesView,
             _ => null
         };
 
-        return permission is not null &&
-            (User.IsInRole(AppRoles.Admin) || User.HasClaim(AuthClaims.Permission, permission));
+        return permission is not null && AppPermissions.IsGranted(User, permission);
     }
 
     private static string SafeFileName(string value)

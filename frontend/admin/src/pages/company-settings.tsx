@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, CheckCircle2, ImagePlus, LoaderCircle, MapPin, MonitorSmartphone, Pencil, Plus, Save, Settings2, UploadCloud, X } from "lucide-react";
+import { Building2, CheckCircle2, ImagePlus, ListChecks, LoaderCircle, MapPin, MonitorSmartphone, Pencil, Plus, Save, Settings2, UploadCloud, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { apiOrigin } from "@/api/axios";
@@ -37,6 +37,7 @@ export default function CompanySettingsPage() {
     const { tr } = useI18n();
     const canManageProfile = hasPermission(user, Permissions.CompanyProfileManage);
     const canManageSettings = hasPermission(user, Permissions.CompanySettingsManage);
+    const canManageOperationLimits = hasPermission(user, Permissions.OperationLineLimitsManage);
     const canManageBranches = hasPermission(user, Permissions.CompanyBranchesManage);
     const profileQuery = useQuery({ queryKey: ["company", "profile"], queryFn: companyService.profile });
     const [profile, setProfile] = useState<UpdateCompanyProfile | null>(null);
@@ -100,6 +101,14 @@ export default function CompanySettingsPage() {
         },
         onError: (error) => toast.error(tr(message(error))),
     });
+    const saveOperationLimits = useMutation({
+        mutationFn: companyService.updateOperationLimits,
+        onSuccess: (updated) => {
+            applyCompany(updated);
+            toast.success(tr("Operation line limits updated."));
+        },
+        onError: (error) => toast.error(tr(message(error))),
+    });
     const saveBranch = useMutation({
         mutationFn: () => editingBranch
             ? companyService.updateBranch(editingBranch.id, branch)
@@ -138,7 +147,18 @@ export default function CompanySettingsPage() {
           }
         : null;
     const profileChanged = Boolean(savedProfile && JSON.stringify(profile) !== JSON.stringify(savedProfile));
-    const settingsChanged = Boolean(profileQuery.data && JSON.stringify(settings) !== JSON.stringify(profileQuery.data.settings));
+    const editableSettings = ({ maximumPurchaseLines: _purchase, maximumManualSaleLines: _sale, ...value }: CompanySettings) => value;
+    const settingsChanged = Boolean(
+        profileQuery.data &&
+        settings &&
+        JSON.stringify(editableSettings(settings)) !== JSON.stringify(editableSettings(profileQuery.data.settings)),
+    );
+    const operationLimitsChanged = Boolean(
+        profileQuery.data &&
+        settings &&
+        (settings.maximumPurchaseLines !== profileQuery.data.settings.maximumPurchaseLines ||
+            settings.maximumManualSaleLines !== profileQuery.data.settings.maximumManualSaleLines),
+    );
     const previewMoney = new Intl.NumberFormat("en-US", {
         minimumFractionDigits: settings?.currencyDecimalPlaces ?? 2,
         maximumFractionDigits: settings?.currencyDecimalPlaces ?? 2,
@@ -175,8 +195,8 @@ export default function CompanySettingsPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Company settings"
-                description="Manage one company profile, branches, currency, appearance, and operational preferences."
+                title={tr("Company settings")}
+                description={tr("Manage one company profile, branches, currency, appearance, and operational preferences.")}
             />
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(380px,.8fr)]">
@@ -264,6 +284,80 @@ export default function CompanySettingsPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            <Card className="shadow-none">
+                <CardHeader className="border-b bg-muted/20">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <ListChecks className="size-5 text-primary" />
+                                {tr("Operation product-line limits")}
+                            </CardTitle>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {tr("Control how many products a normal purchase or manual sale can contain. Users with the override permission can continue up to the 500-line safety limit.")}
+                            </p>
+                        </div>
+                        <Badge variant="outline">{tr("System safety limit")}: 500</Badge>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-5">
+                    <form
+                        className="space-y-5"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            saveOperationLimits.mutate({
+                                maximumPurchaseLines: settings.maximumPurchaseLines,
+                                maximumManualSaleLines: settings.maximumManualSaleLines,
+                            });
+                        }}
+                    >
+                        <fieldset disabled={!canManageOperationLimits} className="space-y-5">
+                            <div className="grid gap-5 md:grid-cols-2">
+                                <Field label={tr("Maximum purchase lines")}>
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        max={500}
+                                        value={settings.maximumPurchaseLines}
+                                        onChange={(event) => setSettings({
+                                            ...settings,
+                                            maximumPurchaseLines: clampLineLimit(event.target.value),
+                                        })}
+                                    />
+                                </Field>
+                                <Field label={tr("Maximum manual-sale lines")}>
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        max={500}
+                                        value={settings.maximumManualSaleLines}
+                                        onChange={(event) => setSettings({
+                                            ...settings,
+                                            maximumManualSaleLines: clampLineLimit(event.target.value),
+                                        })}
+                                    />
+                                </Field>
+                            </div>
+                            <div className="flex flex-col gap-3 rounded-xl bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                <p className="text-xs leading-5 text-muted-foreground">
+                                    {tr("The configured limit applies to normal users. Assign")} <span className="font-semibold text-foreground">{tr("Operation line-limit override")}</span> {tr("only to trusted supervisors.")}
+                                </p>
+                                <Button
+                                    type="submit"
+                                    className="shrink-0"
+                                    disabled={saveOperationLimits.isPending || !operationLimitsChanged}
+                                >
+                                    {saveOperationLimits.isPending ? <LoaderCircle className="animate-spin" /> : <Save />}
+                                    {saveOperationLimits.isPending ? tr("Saving…") : tr("Save line limits")}
+                                </Button>
+                            </div>
+                            {!canManageOperationLimits ? (
+                                <p className="text-xs text-muted-foreground">{tr("You can view these limits but do not have permission to change them.")}</p>
+                            ) : null}
+                        </fieldset>
+                    </form>
+                </CardContent>
+            </Card>
 
             <Card className="shadow-none">
                 <CardHeader className="border-b bg-muted/20"><CardTitle className="flex items-center gap-2"><Settings2 className="size-5 text-primary" /> Currency, appearance, and retention</CardTitle></CardHeader>
@@ -472,6 +566,12 @@ function BrandAssetUploader({
             </div>
         </div>
     );
+}
+
+function clampLineLimit(value: string) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) return 1;
+    return Math.max(1, Math.min(parsed, 500));
 }
 
 function nullable(value: string) {

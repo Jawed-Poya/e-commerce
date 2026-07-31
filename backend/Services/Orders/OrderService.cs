@@ -144,7 +144,9 @@ public sealed class OrderService(
                     AffectsInventory = !product.UsesDisplayStock,
                     Discount = 0,
                     Tax = 0,
-                    ProductName = product.Name,
+                    ProductName = string.IsNullOrWhiteSpace(product.Strength)
+                        ? product.Name
+                        : $"{product.Name} — {product.Strength}",
                     ProductBarcode = selectedUnit.Barcode ?? product.Barcode,
                     Currency = currency
                 });

@@ -18,6 +18,7 @@ public sealed record ActivityLogResponse(
     string EntityName,
     long? EntityId,
     string Description,
+    string? Changes,
     string? HttpMethod,
     string? Path,
     int? StatusCode,
