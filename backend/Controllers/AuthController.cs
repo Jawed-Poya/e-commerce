@@ -1,6 +1,7 @@
 using ECommerce.Entities;
 using ECommerce.Entities.Users.Contracts;
 using ECommerce.Services.Auth;
+using ECommerce.Services.Auditing;
 using ECommerce.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +10,7 @@ namespace ECommerce.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public sealed class AuthController(IAuthService auth) : ControllerBase
+public sealed class AuthController(IAuthService auth, IAuditLogService audit) : ControllerBase
 {
     [HttpPost("customer/register")]
     public async Task<ActionResult<ApiResponse<AuthResponse>>> RegisterCustomer(
@@ -19,6 +20,14 @@ public sealed class AuthController(IAuthService auth) : ControllerBase
         {
             using var operation = ServerOperation.CreateWriteScope();
             var response = await auth.RegisterCustomerAsync(request, operation.Token);
+            await audit.RecordAuthenticationAsync(
+                response.User.UserId,
+                response.User.FullName,
+                response.User.CustomerId,
+                ActivityAction.Create,
+                "Customer account",
+                HttpContext,
+                CancellationToken.None);
             return StatusCode(StatusCodes.Status201Created,
                 ApiResponse<AuthResponse>.Ok(response, "Customer account created successfully."));
         }
@@ -39,9 +48,16 @@ public sealed class AuthController(IAuthService auth) : ControllerBase
         try
         {
             using var operation = ServerOperation.CreateReadScope();
-            return Ok(ApiResponse<AuthResponse>.Ok(
-                await auth.LoginCustomerAsync(request, operation.Token),
-                "Welcome back."));
+            var response = await auth.LoginCustomerAsync(request, operation.Token);
+            await audit.RecordAuthenticationAsync(
+                response.User.UserId,
+                response.User.FullName,
+                response.User.CustomerId,
+                ActivityAction.Login,
+                "Storefront",
+                HttpContext,
+                CancellationToken.None);
+            return Ok(ApiResponse<AuthResponse>.Ok(response, "Welcome back."));
         }
         catch (InvalidOperationException exception)
         {
@@ -56,9 +72,16 @@ public sealed class AuthController(IAuthService auth) : ControllerBase
         try
         {
             using var operation = ServerOperation.CreateReadScope();
-            return Ok(ApiResponse<AuthResponse>.Ok(
-                await auth.LoginAdminAsync(request, operation.Token),
-                "Admin login successful."));
+            var response = await auth.LoginAdminAsync(request, operation.Token);
+            await audit.RecordAuthenticationAsync(
+                response.User.UserId,
+                response.User.FullName,
+                response.User.CustomerId,
+                ActivityAction.Login,
+                "Admin panel",
+                HttpContext,
+                CancellationToken.None);
+            return Ok(ApiResponse<AuthResponse>.Ok(response, "Admin login successful."));
         }
         catch (UnauthorizedAccessException exception)
         {

@@ -55,6 +55,7 @@ public static class AppPermissions
     public const string FinancialReportsView = "company.reports.view";
     public const string CompanyTrashManage = "company.trash.manage";
     public const string CompanySettingsManage = "company.settings.manage";
+    public const string AuditLogsView = "company.audit-logs.view";
 
     public const string SystemManage = "system.manage";
 
@@ -91,6 +92,7 @@ public static class AppPermissions
         FinancialReportsView,
         CompanyTrashManage,
         CompanySettingsManage,
+        AuditLogsView,
         SystemManage
     ];
 
@@ -144,7 +146,8 @@ public static class AppPermissions
                 new(CompanyClaimsManage, "Manage user permissions", "Assign permissions that the current administrator is allowed to manage."),
                 new(FinancialReportsView, "View financial reports", "View revenue, cost, profit, cash flow, ledgers, and company worth reports."),
                 new(CompanyTrashManage, "Manage trash", "Restore or permanently purge company records."),
-                new(CompanySettingsManage, "Manage company settings", "Configure currency, branding, fonts, and retention policies.")
+                new(CompanySettingsManage, "Manage company settings", "Configure currency, branding, fonts, and retention policies."),
+                new(AuditLogsView, "View audit and visit logs", "Review administrator activity and storefront customer visits.")
             ],
             ["Administration"] =
             [

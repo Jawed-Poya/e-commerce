@@ -4,6 +4,7 @@ using ECommerce.Data;
 using ECommerce.Entities.Users;
 using ECommerce.Options;
 using ECommerce.Services.Auth;
+using ECommerce.Services.Auditing;
 using ECommerce.Services.Customers;
 using ECommerce.Services.Company;
 using ECommerce.Services.Dashboard;
@@ -58,6 +59,10 @@ public static class DependencyInjection
         services.AddScoped<IStorefrontContentService, StorefrontContentService>();
         services.AddScoped<IProductReviewService, ProductReviewService>();
         services.AddScoped<IOperationsService, OperationsService>();
+        services.AddScoped<IAuditLogService, AuditLogService>();
+        services.AddSingleton<ActivityLogQueue>();
+        services.AddHostedService<ActivityLogWriterHostedService>();
+        services.AddHostedService<AuditCleanupHostedService>();
 
         return services;
     }
@@ -67,6 +72,7 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         services.Configure<CommerceOptions>(configuration.GetSection(CommerceOptions.SectionName));
+        services.Configure<AuditOptions>(configuration.GetSection(AuditOptions.SectionName));
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<SeedAdminOptions>(configuration.GetSection(SeedAdminOptions.SectionName));
 

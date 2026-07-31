@@ -7,6 +7,7 @@ using ECommerce.Services.Notifications;
 using ECommerce.Services.Company;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -115,8 +116,14 @@ var app = builder.Build();
 
 await app.InitializeDatabaseAsync();
 
-// The development frontends use the HTTP launch profile by default. Redirecting
-// those API requests to another HTTPS origin can drop the Authorization header.
+// Resolve the original client IP and scheme before redirects and audit logging.
+// The development frontends use the HTTP launch profile by default, so HTTPS
+// redirection remains disabled only in development.
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+    ForwardLimit = 1
+});
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 app.UseStaticFiles();
@@ -124,6 +131,7 @@ app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseCors("CorsPolicy");
 app.UseAuthentication();
 app.UseMiddleware<CompanyContextMiddleware>();
+app.UseMiddleware<ActivityAuditMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<StoreNotificationHub>("/hubs/store-notifications");

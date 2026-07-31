@@ -80,6 +80,10 @@ export async function getPendingMutationCount() {
     return withStore<number>("readonly", (store) => store.count());
 }
 
+export async function discardPendingMutation(id: string) {
+    await removePending(id);
+}
+
 export function subscribeToOfflineQueue(listener: () => void) {
     window.addEventListener(ChangedEvent, listener);
     return () => window.removeEventListener(ChangedEvent, listener);

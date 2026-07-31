@@ -1,7 +1,8 @@
-const API_URL =
-    import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5188/api";
+export const apiBaseUrl = (
+    import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5188/api"
+).replace(/\/+$/, "");
 
-export const apiOrigin = new URL(API_URL).origin;
+export const apiOrigin = new URL(apiBaseUrl, window.location.origin).origin;
 export const customerTokenKey = "easycart-customer-token";
 
 type ApiEnvelope<T> = {
@@ -74,7 +75,7 @@ export async function apiGet<T>(
         string | number | boolean | (string | number)[] | undefined
     >,
 ) {
-    const url = new URL(`${API_URL}${path}`);
+    const url = new URL(`${apiBaseUrl}${path}`);
 
     Object.entries(params ?? {}).forEach(([key, value]) => {
         if (Array.isArray(value)) {
@@ -93,7 +94,7 @@ export async function apiGet<T>(
 
 export async function apiPost<T>(path: string, body?: unknown) {
     return readResponse<T>(
-        await fetch(`${API_URL}${path}`, {
+        await fetch(`${apiBaseUrl}${path}`, {
             method: "POST",
             headers: requestHeaders(true),
             body: body === undefined ? undefined : JSON.stringify(body),
@@ -103,7 +104,7 @@ export async function apiPost<T>(path: string, body?: unknown) {
 
 export async function apiPut<T>(path: string, body?: unknown) {
     return readResponse<T>(
-        await fetch(`${API_URL}${path}`, {
+        await fetch(`${apiBaseUrl}${path}`, {
             method: "PUT",
             headers: requestHeaders(true),
             body: body === undefined ? undefined : JSON.stringify(body),
@@ -113,7 +114,7 @@ export async function apiPut<T>(path: string, body?: unknown) {
 
 export async function apiPatch<T>(path: string, body?: unknown) {
     return readResponse<T>(
-        await fetch(`${API_URL}${path}`, {
+        await fetch(`${apiBaseUrl}${path}`, {
             method: "PATCH",
             headers: requestHeaders(true),
             body: body === undefined ? undefined : JSON.stringify(body),
@@ -123,7 +124,7 @@ export async function apiPatch<T>(path: string, body?: unknown) {
 
 export async function apiDelete<T>(path: string) {
     return readResponse<T>(
-        await fetch(`${API_URL}${path}`, {
+        await fetch(`${apiBaseUrl}${path}`, {
             method: "DELETE",
             headers: requestHeaders(),
         }),
