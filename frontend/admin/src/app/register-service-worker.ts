@@ -8,11 +8,20 @@ function canRegisterServiceWorker() {
 }
 
 /**
- * Registers in development too. The worker uses network-first caching for Vite
- * modules, so live code is never hidden by stale cache while already-loaded
- * admin routes remain available if the frontend process stops.
+ * Vite development modules must never be controlled by the production PWA
+ * worker. A stale development registration keeps retrying localhost assets
+ * after the dev server stops and produces ERR_CONNECTION_REFUSED noise.
  */
 export function registerAdminServiceWorker() {
+    if (!("serviceWorker" in navigator)) return;
+
+    if (import.meta.env.DEV) {
+        window.addEventListener("load", () => {
+            void clearDevelopmentPwaState();
+        });
+        return;
+    }
+
     if (!canRegisterServiceWorker()) return;
 
     window.addEventListener("load", () => {
@@ -28,6 +37,33 @@ export function registerAdminServiceWorker() {
                 console.warn("Admin PWA registration failed.", error);
             });
     });
+}
+
+async function clearDevelopmentPwaState() {
+    try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        const removed = await Promise.all(
+            registrations
+                .filter((registration) => new URL(registration.scope).origin === window.location.origin)
+                .map((registration) => registration.unregister()),
+        );
+
+        if ("caches" in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((key) => caches.delete(key)));
+        }
+
+        const reloadKey = "admin-pwa-dev-reset";
+        const mustReleaseController = navigator.serviceWorker.controller !== null || removed.some(Boolean);
+        if (mustReleaseController && sessionStorage.getItem(reloadKey) !== "done") {
+            sessionStorage.setItem(reloadKey, "done");
+            window.location.reload();
+            return;
+        }
+        sessionStorage.removeItem(reloadKey);
+    } catch (error) {
+        console.warn("Could not clear the stale admin development PWA state.", error);
+    }
 }
 
 function scheduleCriticalRoutePreload(registration: ServiceWorkerRegistration) {
@@ -58,7 +94,6 @@ function scheduleCriticalRoutePreload(registration: ServiceWorkerRegistration) {
 
     window.setTimeout(preload, 1_500);
 }
-
 
 async function warmLoadedResources(registration: ServiceWorkerRegistration) {
     const urls = new Set<string>(["/", "/index.html", window.location.pathname]);
