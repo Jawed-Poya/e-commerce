@@ -42,6 +42,10 @@ import {
     newDocumentItem,
 } from "@/features/operations/components/document-lines";
 import {
+    getSubmittableDocumentLines,
+    isDocumentLineComplete,
+} from "@/features/operations/document-line-state";
+import {
     AmountInputRow,
     DocumentSettlementLayout,
     MoneySummaryRow,
@@ -117,17 +121,20 @@ export default function ManualSalesPage() {
 
     const submit = async () => {
         if (!canManage) return;
-        if (
-            items.some(
-                (item) => !item.productId || item.quantity <= 0 || item.amount < 0,
-            )
-        ) {
+        const documentItems = getSubmittableDocumentLines(items);
+        if (!documentItems.length) {
+            return toast.error("Add at least one product.");
+        }
+        if (documentItems.some((item) => !isDocumentLineComplete(item))) {
             return toast.error("Complete every sale line.");
         }
-        if (new Set(items.map((item) => item.productId)).size !== items.length) {
+        if (
+            new Set(documentItems.map((item) => item.productId)).size !==
+            documentItems.length
+        ) {
             return toast.error("Each product may appear only once.");
         }
-        for (const item of items) {
+        for (const item of documentItems) {
             const product = item.product;
             if (!product) continue;
             if (
@@ -175,7 +182,7 @@ export default function ManualSalesPage() {
                 paymentMethod: form.paymentMethod,
                 paymentReferenceNumber: nullable(form.paymentReferenceNumber),
                 notes: nullable(form.notes),
-                items: items.map((item) => ({
+                items: documentItems.map((item) => ({
                     productId: item.productId,
                     unitId: item.unitId,
                     quantity: item.quantity,
