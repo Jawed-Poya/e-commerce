@@ -154,7 +154,7 @@ public sealed class CompanyController(
     public async Task<ActionResult<ApiResponse<CompanyProfileResponse>>> UpdateOperationLimits(
         UpdateOperationLimitsRequest request)
     {
-        using var operation = ServerOperation.CreateDefaultScope();
+        using var operation = ServerOperation.CreateWriteScope();
         var updated = await company.UpdateOperationLimitsAsync(request, operation.Token);
         return Ok(ApiResponse<CompanyProfileResponse>.Ok(updated, "Operation line limits updated."));
     }
