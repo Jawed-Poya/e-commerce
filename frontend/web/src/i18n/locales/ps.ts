@@ -431,4 +431,5 @@ export const ps: Messages = {
     "home.productCount": "{count} محصولات",
     "home.storeLocations": "د پلورنځي ځایونه",
     "home.supportDescription": "د محصول موجودۍ، امر یا سپارلو مرستې لپاره د پلورنځي له ټیم سره اړیکه ونیسئ.",
+    "pwa.offlineDescription": 'آفلاین حالت: مخکې پرانیستل شوې پاڼې او محصولات شته. نوې معلومات انټرنېټ ته اړتیا لري.',
 };
