@@ -48,38 +48,13 @@ public class ApplicationDbContext
         nameof(StorefrontContent)
     };
 
-    private static readonly HashSet<string> MutationAuditTypes = new(StringComparer.Ordinal)
+    private static readonly HashSet<string> MutationAuditExcludedTypes = new(StringComparer.Ordinal)
     {
-        nameof(Product),
-        nameof(ProductImage),
-        nameof(ProductPrice),
-        nameof(ProductUnitConversion),
-        nameof(ProductInventory),
-        nameof(ProductVariant),
-        nameof(InventoryTransaction),
-        nameof(InventoryLot),
-        nameof(Warehouse),
-        nameof(Customer),
-        nameof(CustomerAddress),
-        nameof(Order),
-        nameof(OrderItem),
-        nameof(Payment),
-        nameof(OrderStatusHistory),
-        nameof(GeneralType),
-        nameof(Supplier),
-        nameof(Purchase),
-        nameof(PurchaseItem),
-        nameof(PurchasePayment),
-        nameof(InventorySale),
-        nameof(InventorySaleItem),
-        nameof(InventorySalePayment),
-        nameof(Staff),
-        nameof(StaffSalaryPayment),
-        nameof(StaffSalaryInstallment),
-        nameof(ExpenseCategory),
-        nameof(Expense),
-        nameof(ProductReview),
-        nameof(StorefrontContent)
+        // These tables are themselves logging/infrastructure records. Auditing
+        // them would recursively create more audit rows.
+        nameof(ActivityLog),
+        nameof(CustomerVisitLog),
+        nameof(TrashRecord)
     };
 
     private static readonly HashSet<string> IgnoredAuditProperties = new(StringComparer.OrdinalIgnoreCase)
@@ -343,7 +318,7 @@ public class ApplicationDbContext
             return [];
 
         return ChangeTracker.Entries<API.Entities.Common.BaseEntity>()
-            .Where(entry => MutationAuditTypes.Contains(entry.Entity.GetType().Name))
+            .Where(entry => !MutationAuditExcludedTypes.Contains(entry.Metadata.ClrType.Name))
             .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
             .Select(entry => CreatePendingMutationAudit(entry, httpContext))
             .Where(item => item is not null)
@@ -355,15 +330,22 @@ public class ApplicationDbContext
         EntityEntry<API.Entities.Common.BaseEntity> entry,
         HttpContext httpContext)
     {
+        var deletionProperty = entry.Property(nameof(API.Entities.Common.BaseEntity.IsDeleted));
+        var restored = entry.State == EntityState.Modified &&
+            deletionProperty.IsModified &&
+            Equals(deletionProperty.OriginalValue, true) &&
+            Equals(deletionProperty.CurrentValue, false);
         var deleted = entry.State == EntityState.Deleted ||
             (entry.State == EntityState.Modified &&
              entry.Entity.IsDeleted &&
-             entry.Property(nameof(API.Entities.Common.BaseEntity.IsDeleted)).IsModified);
-        var action = deleted
-            ? ActivityAction.Delete
-            : entry.State == EntityState.Added
-                ? ActivityAction.Create
-                : ActivityAction.Update;
+             deletionProperty.IsModified);
+        var action = restored
+            ? ActivityAction.Restore
+            : deleted
+                ? ActivityAction.Delete
+                : entry.State == EntityState.Added
+                    ? ActivityAction.Create
+                    : ActivityAction.Update;
 
         var changes = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         foreach (var property in entry.Properties)
@@ -384,12 +366,12 @@ public class ApplicationDbContext
                 : new { oldValue = original, newValue = current };
         }
 
-        if (action == ActivityAction.Update && changes.Count == 0)
+        if ((action is ActivityAction.Update or ActivityAction.Restore) && changes.Count == 0)
             return null;
 
         var userAgent = httpContext.Request.Headers.UserAgent.ToString();
         var device = ClientDeviceParser.Parse(userAgent);
-        var entityName = entry.Entity.GetType().Name;
+        var entityName = entry.Metadata.ClrType.Name;
         return new PendingMutationAudit(
             entry,
             new ActivityLog
@@ -498,7 +480,7 @@ public class ApplicationDbContext
                 entry.Entity.IsDeleted = true;
                 entry.Entity.DeletedAt ??= now;
                 entry.Entity.UpdatedAt = now;
-                if (TrashRootTypes.Contains(entry.Entity.GetType().Name))
+                if (TrashRootTypes.Contains(entry.Metadata.ClrType.Name))
                     trash.Add(CreateTrashRecord(entry.Entity, now));
             }
             else if (entry.State == EntityState.Modified)

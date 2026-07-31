@@ -22,6 +22,15 @@ public enum ActivityAction
     CancelOrder = 13,
 
     ChangePassword = 14,
+    Restore = 15,
+    Archive = 16,
+    Activate = 17,
+    Deactivate = 18,
+    Import = 19,
+    Export = 20,
+    Print = 21,
+    Sync = 22,
+    Assign = 23,
 
     Other = 99
 }
