@@ -36,6 +36,7 @@ public sealed class Purchase : BaseEntity
     public decimal PaidAmount { get; set; }
     public string CurrencyCode { get; set; } = "USD";
     public string? ReferenceNumber { get; set; }
+    public string? ClientRequestId { get; set; }
     public string? Notes { get; set; }
     public string? CreatedByUserId { get; set; }
     public ICollection<PurchaseItem> Items { get; set; } = [];
@@ -89,6 +90,8 @@ public sealed class InventorySale : BaseEntity
     public decimal Total { get; set; }
     public decimal PaidAmount { get; set; }
     public string CurrencyCode { get; set; } = "USD";
+    public string? ReferenceNumber { get; set; }
+    public string? ClientRequestId { get; set; }
     public string? Notes { get; set; }
     public string? CreatedByUserId { get; set; }
     public ICollection<InventorySaleItem> Items { get; set; } = [];

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
     CreditCard,
@@ -85,9 +85,11 @@ export default function PurchasesPage() {
     const { formatMoney } = useCompany();
     const { user } = useAdminAuth();
     const canManage = hasPermission(user, Permissions.PurchasesManage);
+    const [search, setSearch] = useState("");
+    const deferredSearch = useDeferredValue(search.trim());
     const { data: purchases, isLoading } = useOperationQuery(
-        operationKeys.purchases,
-        operationsService.purchases,
+        operationKeys.purchases(deferredSearch),
+        () => operationsService.purchases(deferredSearch),
     );
     const { data: suppliers, isLoading: suppliersLoading } = useOperationQuery(
         operationKeys.suppliers,
@@ -183,7 +185,7 @@ export default function PurchasesPage() {
 
         setSaving(true);
         try {
-            await operationsService.createPurchase({
+            const response = await operationsService.createPurchase({
                 ...form,
                 supplierId: selectedSupplier?.id ?? null,
                 paymentReferenceNumber: nullable(form.paymentReferenceNumber),
@@ -199,11 +201,15 @@ export default function PurchasesPage() {
                 })),
             });
             await Promise.all([
-                queryClient.invalidateQueries({ queryKey: operationKeys.purchases }),
+                queryClient.invalidateQueries({ queryKey: operationKeys.purchaseRoot }),
                 queryClient.invalidateQueries({ queryKey: operationKeys.summary }),
                 queryClient.invalidateQueries({ queryKey: ["inventory"] }),
             ]);
-            toast.success("Purchase received and inventory updated.");
+            toast.success(
+                response.offlineQueued
+                    ? response.message
+                    : "Purchase received and inventory updated.",
+            );
             setPurchaseOpen(false);
             resetPurchase();
         } catch (error) {
@@ -288,6 +294,14 @@ export default function PurchasesPage() {
             </div>
 
             {tab === "purchases" ? (
+                <div className="space-y-3">
+                    <div className="max-w-xl">
+                        <Input
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Search purchase, supplier bill, supplier, product, barcode or lot…"
+                        />
+                    </div>
                 <Card>
                     <CardContent className="p-0">
                         <Table>
@@ -311,7 +325,12 @@ export default function PurchasesPage() {
                                     purchases.map((purchase) => (
                                         <TableRow key={purchase.id}>
                                             <TableCell className="font-medium">
-                                                {purchase.purchaseNumber}
+                                                <p>{purchase.purchaseNumber}</p>
+                                                {purchase.referenceNumber ? (
+                                                    <p className="text-xs font-normal text-muted-foreground">
+                                                        Bill: {purchase.referenceNumber}
+                                                    </p>
+                                                ) : null}
                                             </TableCell>
                                             <TableCell>{date(purchase.purchaseDate)}</TableCell>
                                             <TableCell>
@@ -357,6 +376,7 @@ export default function PurchasesPage() {
                         </Table>
                     </CardContent>
                 </Card>
+                </div>
             ) : (
                 <Card>
                     <CardContent className="p-0">
@@ -466,7 +486,7 @@ export default function PurchasesPage() {
                                 }
                             />
                         </Field>
-                        <Field label="Supplier reference">
+                        <Field label="Supplier bill / invoice number">
                             <Input
                                 value={form.referenceNumber}
                                 onChange={(event) =>
@@ -724,7 +744,7 @@ export default function PurchasesPage() {
                         )
                     }
                     onDocumentUpdated={setSelectedPurchase}
-                    invalidate={[operationKeys.purchases, operationKeys.summary]}
+                    invalidate={[operationKeys.purchaseRoot, operationKeys.summary]}
                     canManage={canManage}
                 />
             ) : null}
