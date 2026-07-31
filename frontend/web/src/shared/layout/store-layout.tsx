@@ -218,7 +218,7 @@ export function StoreLayout() {
     return (
         <div className="min-h-screen bg-background pb-20 text-foreground md:pb-0">
             <header className="sticky top-0 z-40 bg-background/[0.95] shadow-[0_1px_0_rgba(15,23,42,.07)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/88 dark:shadow-[0_1px_0_rgba(255,255,255,.055)]">
-                <div className="hidden bg-slate-950 text-white sm:block dark:bg-black">
+                <div className="hidden bg-[var(--brand-surface-strong)] text-white sm:block">
                     <div className="mx-auto flex h-9 w-full max-w-[1480px] items-center justify-between gap-4 px-4 text-[11px] sm:px-6 lg:px-8">
                         <div className="flex min-w-0 items-center gap-2 font-semibold text-white/80">
                             <ShieldCheck className="size-3.5 shrink-0 text-emerald-400" />
@@ -407,7 +407,7 @@ export function StoreLayout() {
                 <Outlet />
             </main>
 
-            <footer className="mt-20 bg-card dark:bg-[#081713]">
+            <footer className="mt-20 bg-card">
                 <div className="mx-auto grid w-full max-w-[1480px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-[1.2fr_.72fr_.72fr_1.15fr] lg:px-8">
                     <div>
                         <Logo />

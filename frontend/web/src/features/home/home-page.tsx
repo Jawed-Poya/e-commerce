@@ -220,12 +220,12 @@ export function HomePage() {
         <div className="mx-auto w-full max-w-[1480px] px-4 pb-12 sm:px-6 lg:px-8">
             <section className="pt-4 sm:pt-7">
                 <article
-                    className="relative overflow-hidden rounded-[28px] bg-[#06231e] text-white shadow-[0_28px_80px_-52px_rgba(2,20,16,.85)] ring-1 ring-white/10 dark:bg-[#041713]"
+                    className="relative overflow-hidden rounded-[28px] bg-[var(--brand-surface-strong)] text-white shadow-[0_28px_80px_-52px_rgba(2,20,16,.85)] ring-1 ring-white/10"
                     onMouseEnter={() => setPaused(true)}
                     onMouseLeave={() => setPaused(false)}
                 >
                     <div className="pointer-events-none absolute -start-32 -top-36 size-[420px] rounded-full bg-primary/20 blur-[110px]" />
-                    <div className="pointer-events-none absolute -bottom-52 end-1/4 size-[420px] rounded-full bg-cyan-500/10 blur-[120px]" />
+                    <div className="pointer-events-none absolute -bottom-52 end-1/4 size-[420px] rounded-full bg-primary/10 blur-[120px]" />
 
                     {content.isLoading ? (
                         <HeroSkeleton />
@@ -235,7 +235,7 @@ export function HomePage() {
                             className="hero-copy-enter relative grid min-h-[570px] md:min-h-[520px] md:grid-cols-[minmax(0,.92fr)_minmax(360px,1.08fr)]"
                         >
                             <div className="relative z-10 flex flex-col justify-center px-6 pb-28 pt-10 sm:px-10 md:px-12 md:pb-24 lg:px-16">
-                                <div className="inline-flex w-fit items-center gap-2 rounded-full bg-white/[0.055] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-cyan-200 ring-1 ring-white/[0.12] backdrop-blur">
+                                <div className="inline-flex w-fit items-center gap-2 rounded-full bg-white/[0.055] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--brand-highlight)] ring-1 ring-white/[0.12] backdrop-blur">
                                     <HeartPulse className="size-3.5" />
                                     {activeSlide.eyebrow}
                                 </div>
@@ -328,7 +328,7 @@ export function HomePage() {
                                         )}
                                     />
                                     {!activeSlide.product ? (
-                                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#031713]/35 via-transparent to-white/5" />
+                                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-white/5" />
                                     ) : null}
                                 </div>
                             </div>
@@ -357,7 +357,7 @@ export function HomePage() {
                                         className={cn(
                                             "h-1.5 rounded-full transition-all",
                                             index === slideIndex
-                                                ? "w-7 bg-cyan-300"
+                                                ? "w-7 bg-[var(--brand-highlight)]"
                                                 : "w-1.5 bg-white/30",
                                         )}
                                     />
@@ -510,7 +510,7 @@ export function HomePage() {
 
             <section id="deals" className="pb-10 sm:pb-14">
                 <div className="grid overflow-hidden rounded-[28px] bg-card shadow-[0_18px_50px_-40px_rgba(15,23,42,.5)] ring-1 ring-black/[0.05] dark:bg-white/[0.03] dark:ring-white/[0.05] lg:grid-cols-[minmax(0,1.35fr)_minmax(330px,.65fr)]">
-                    <article className="relative min-h-[520px] overflow-hidden bg-[#071c18] p-6 text-white sm:min-h-[420px] sm:p-9 lg:min-h-[390px]">
+                    <article className="relative min-h-[520px] overflow-hidden bg-[var(--brand-surface-strong)] p-6 text-white sm:min-h-[420px] sm:p-9 lg:min-h-[390px]">
                         {spotlightProduct ? (
                             <img
                                 src={
@@ -522,11 +522,11 @@ export function HomePage() {
                                 className="absolute inset-0 size-full object-cover opacity-[0.42]"
                             />
                         ) : null}
-                        <div className="absolute inset-0 bg-gradient-to-r from-[#061c17] via-[#061c17]/[0.92] to-[#061c17]/[0.35] rtl:bg-gradient-to-l" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#061c17] via-transparent to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/70 to-black/25 rtl:bg-gradient-to-l" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent" />
 
                         <div className="relative z-10 flex h-full max-w-xl flex-col justify-end sm:justify-center">
-                            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/[0.07] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-200 ring-1 ring-white/[0.12]">
+                            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/[0.07] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--brand-highlight)] ring-1 ring-white/[0.12]">
                                 <BadgePercent className="size-4" />
                                 {t("home.limitedOffers")}
                             </span>
@@ -659,7 +659,7 @@ function TrustPoint({
                 className={cn(
                     "grid size-6 shrink-0 place-items-center rounded-full [&>svg]:size-3.5",
                     inverse
-                        ? "bg-cyan-300/10 text-cyan-200"
+                        ? "bg-white/[0.07] text-[var(--brand-highlight)]"
                         : "bg-primary/10 text-primary",
                 )}
             >
@@ -702,7 +702,7 @@ function CategoryCard({
                         className="absolute inset-0 size-full object-cover transition duration-700 group-hover:scale-[1.045]"
                     />
                 ) : (
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,color-mix(in_srgb,var(--primary)_38%,transparent),transparent_38%),linear-gradient(135deg,#102820,#071713)]" />
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,color-mix(in_srgb,var(--brand-highlight)_32%,transparent),transparent_38%),linear-gradient(135deg,var(--brand-surface),var(--brand-surface-strong))]" />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/[0.78] via-black/[0.15] to-black/[0.05]" />
                 <span className="absolute end-5 top-5 grid size-11 place-items-center rounded-full bg-white/[0.12] text-white ring-1 ring-white/[0.18] backdrop-blur transition group-hover:bg-white group-hover:text-slate-950">

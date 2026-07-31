@@ -75,7 +75,7 @@ export function OrderTrackingPage() {
                         </div>
                         <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">{recentOrders.length}</span>
                     </div>
-                    <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+                    <div className="mt-4 grid max-h-72 gap-2 overflow-y-auto pe-1 [scrollbar-width:thin]">
                         {recentOrders.map((order) => (
                             <button
                                 key={order.orderNumber}
@@ -85,11 +85,16 @@ export function OrderTrackingPage() {
                                     setPhone(order.phone);
                                     setSearchParams({ orderNumber: order.orderNumber, phone: order.phone });
                                 }}
-                                className="min-w-56 rounded-xl border bg-background p-3 text-start transition hover:border-primary/40 hover:bg-primary/5"
+                                className="group flex w-full items-center justify-between gap-4 rounded-xl border bg-background p-3 text-start transition hover:border-primary/35 hover:bg-primary/[0.06]"
                             >
-                                <span className="block truncate text-sm font-black text-primary">{order.orderNumber}</span>
-                                <span className="mt-1 block text-xs text-muted-foreground">
-                                    {new Date(order.createdAt).toLocaleDateString(locale)} · {formatMoney(order.total, order.currency)}
+                                <span className="min-w-0">
+                                    <span className="block truncate text-sm font-black text-primary">{order.orderNumber}</span>
+                                    <span className="mt-1 block text-xs text-muted-foreground">
+                                        {new Date(order.createdAt).toLocaleDateString(locale)} · {order.status}
+                                    </span>
+                                </span>
+                                <span className="shrink-0 text-sm font-black tabular-nums text-foreground transition group-hover:text-primary">
+                                    {formatMoney(order.total, order.currency)}
                                 </span>
                             </button>
                         ))}

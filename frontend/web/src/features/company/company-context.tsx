@@ -5,6 +5,7 @@ import { useI18n } from "../../i18n/i18n-provider";
 import { apiGet, imageUrl } from "../../shared/api/api-client";
 import { configureMoney } from "../../shared/lib/money";
 import { resolveCompanyFontStack, resolveCompanyHeadingStack } from "./company-fonts";
+import { applyStorefrontTheme } from "./storefront-theme";
 
 export interface CompanySettings {
     mainCurrencyCode: string;
@@ -54,13 +55,6 @@ interface CompanyContextValue {
 
 const CompanyContext = createContext<CompanyContextValue | null>(null);
 
-function readableText(hex: string) {
-    const value = hex.replace("#", "");
-    if (value.length !== 6) return "#ffffff";
-    const [r, g, b] = [0, 2, 4].map((index) => Number.parseInt(value.slice(index, index + 2), 16));
-    return (r * 299 + g * 587 + b * 114) / 1000 > 155 ? "#0f172a" : "#ffffff";
-}
-
 export function CompanyProvider({ children }: PropsWithChildren) {
     const { language } = useI18n();
     const query = useQuery({
@@ -75,9 +69,11 @@ export function CompanyProvider({ children }: PropsWithChildren) {
         if (!company) return;
         const { settings } = company;
         const root = document.documentElement;
-        root.style.setProperty("--primary", settings.storefrontPrimaryColor);
-        root.style.setProperty("--primary-foreground", readableText(settings.storefrontPrimaryColor));
-        root.style.setProperty("--brand-orange", settings.storefrontSecondaryColor);
+        applyStorefrontTheme(
+            root,
+            settings.storefrontPrimaryColor,
+            settings.storefrontSecondaryColor,
+        );
         root.style.setProperty("--company-font-en", resolveCompanyFontStack("en", settings.englishFontFamily));
         root.style.setProperty("--company-font-dr", resolveCompanyFontStack("dr", settings.dariFontFamily));
         root.style.setProperty("--company-font-ps", resolveCompanyFontStack("ps", settings.pashtoFontFamily));
