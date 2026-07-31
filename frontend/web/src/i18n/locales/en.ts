@@ -430,4 +430,5 @@ export const en: Messages = {
     "home.productCount": "{count} products",
     "home.storeLocations": "Store locations",
     "home.supportDescription": "Contact the store team for product availability, order, or delivery assistance.",
+    "pwa.offlineDescription": 'Offline mode: previously opened pages and products remain available. New data needs a connection.',
 };

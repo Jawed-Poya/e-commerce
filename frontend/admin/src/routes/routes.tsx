@@ -1,9 +1,11 @@
 import type { ComponentType } from "react";
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Outlet, type RouteObject } from "react-router-dom";
 
 import { PermissionRoute } from "@/features/auth/permission-route";
 import { Permissions } from "@/features/auth/permissions";
 import { ProtectedRoute } from "@/features/auth/protected-route";
+import { OfflineBanner } from "@/components/navigation/offline-banner";
+import { RouteProgress } from "@/components/navigation/route-progress";
 import AppLayout from "@/layouts/app-layout";
 
 function lazyPage(load: () => Promise<ComponentType>) {
@@ -29,7 +31,17 @@ function lazyAllowed(
 const loadNotFound = () =>
     import("@/pages/not-found").then((module) => module.default);
 
-export const router = createBrowserRouter([
+function RouterShell() {
+    return (
+        <>
+            <RouteProgress />
+            <OfflineBanner />
+            <Outlet />
+        </>
+    );
+}
+
+const routes: RouteObject[] = [
     {
         path: "/login",
         lazy: lazyPage(() =>
@@ -252,5 +264,12 @@ export const router = createBrowserRouter([
     {
         path: "*",
         lazy: lazyPage(loadNotFound),
+    },
+];
+
+export const router = createBrowserRouter([
+    {
+        element: <RouterShell />,
+        children: routes,
     },
 ]);

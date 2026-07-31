@@ -1,8 +1,20 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Outlet, type RouteObject } from "react-router-dom";
 import { StoreLayout } from "../shared/layout/store-layout";
 import { NotFoundPage } from "../shared/components/not-found-page";
+import { OfflineBanner } from "../shared/components/navigation/offline-banner";
+import { RouteProgress } from "../shared/components/navigation/route-progress";
 
-export const router = createBrowserRouter([
+function RouterShell() {
+  return (
+    <>
+      <RouteProgress />
+      <OfflineBanner />
+      <Outlet />
+    </>
+  );
+}
+
+const routes: RouteObject[] = [
   {
     path: "/",
     element: <StoreLayout />,
@@ -76,5 +88,12 @@ export const router = createBrowserRouter([
       },
       { path: "*", element: <NotFoundPage /> },
     ],
+  },
+];
+
+export const router = createBrowserRouter([
+  {
+    element: <RouterShell />,
+    children: routes,
   },
 ]);

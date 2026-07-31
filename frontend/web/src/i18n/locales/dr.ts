@@ -431,4 +431,5 @@ export const dr: Messages = {
     "home.productCount": "{count} محصول",
     "home.storeLocations": "موقعیت‌های فروشگاه",
     "home.supportDescription": "برای موجودی محصول، سفارش یا کمک در تحویل با تیم فروشگاه تماس بگیرید.",
+    "pwa.offlineDescription": 'حالت آفلاین: صفحه\u200cها و محصولاتی که قبلاً باز شده\u200cاند در دسترس می\u200cمانند. اطلاعات جدید به اتصال نیاز دارد.',
 };
