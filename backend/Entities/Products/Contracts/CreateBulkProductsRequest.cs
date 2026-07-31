@@ -45,6 +45,9 @@ public sealed class CreateBulkProductItemRequest
     [Range(0, int.MaxValue)]
     public int? MaximumValue { get; set; }
 
+    [Range(typeof(decimal), "0", "999999999999999.999", ErrorMessage = "Minimum stock quantity cannot be negative.")]
+    public decimal MinimumStockQuantity { get; set; }
+
     public bool UsesDisplayStock { get; set; }
 
     [Range(typeof(decimal), "0", "999999999999999.999", ErrorMessage = "Display quantity cannot be negative.")]

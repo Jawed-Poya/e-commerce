@@ -48,6 +48,8 @@ public sealed class BulkUpdateProductItemRequest
     public long? UnitId { get; set; }
     public int? MinimumValue { get; set; }
     public int? MaximumValue { get; set; }
+    [Range(typeof(decimal), "0", "999999999999999.999", ErrorMessage = "Minimum stock quantity cannot be negative.")]
+    public decimal MinimumStockQuantity { get; set; }
     public bool UsesDisplayStock { get; set; }
     public decimal? DisplayStockQuantity { get; set; }
     public bool IsFeatured { get; set; }

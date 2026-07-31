@@ -99,6 +99,7 @@ export default function ProductsPage() {
                 unitId: item.unitId,
                 minimumValue: item.minimumValue,
                 maximumValue: item.maximumValue,
+                minimumStockQuantity: item.inventory?.minimumQuantity ?? 0,
                 usesDisplayStock: item.usesDisplayStock,
                 displayStockQuantity: item.displayStockQuantity,
                 isFeatured: item.isFeatured,
@@ -135,6 +136,7 @@ export default function ProductsPage() {
             const priceDrafts = createCustomerPriceDrafts(lookups.customerTypes, lookups.defaultCustomerTypeId, draft.prices.map(price => ({ ...price, enabled: true })));
             const error = validatePriceDrafts(priceDrafts);
             if (error) return toast.error(`${draft.name}: ${error}`);
+            if (draft.minimumStockQuantity < 0) return toast.error(`${draft.name}: reorder point cannot be negative.`);
             if (draft.usesDisplayStock && draft.displayStockQuantity == null) return toast.error(`${draft.name}: enter the quantity customers should see.`);
             if (draft.displayStockQuantity != null && draft.displayStockQuantity < 0) return toast.error(`${draft.name}: display quantity cannot be negative.`);
             const unitError = validateUnitConversions(
@@ -225,7 +227,7 @@ export default function ProductsPage() {
                         <GalleryImagePicker existingImages={item.images.filter(image => !image.isPrimary && !(item.removedImageIds ?? []).includes(image.id))} files={item.galleryImages ?? []} onChange={galleryImages => change(item.id, { galleryImages })} onRemoveExisting={imageId => change(item.id, { removedImageIds: [...(item.removedImageIds ?? []), imageId] })} />
                     </div>
                     <div className="space-y-4"><h3 className="font-semibold">{t("update.productNumber")} #{index + 1}</h3>
-                        <div className="grid gap-4 md:grid-cols-2"><div className="space-y-2"><Label>{t("form.name")} *</Label><Input value={item.name} onChange={e => change(item.id, { name: e.target.value })} /></div><div className="space-y-2"><Label>{t("update.barcode")}</Label><Input value={item.barcode ?? ""} onChange={e => change(item.id, { barcode: e.target.value || null })} /></div><div className="space-y-2 md:col-span-2"><Label>{t("products.strength")}</Label><Input value={item.strength ?? ""} placeholder={t("products.strengthPlaceholder")} onChange={e => change(item.id, { strength: e.target.value || null })} /></div></div>
+                        <div className="grid gap-4 md:grid-cols-2"><div className="space-y-2"><Label>{t("form.name")} *</Label><Input value={item.name} onChange={e => change(item.id, { name: e.target.value })} /></div><div className="space-y-2"><Label>{t("update.barcode")}</Label><Input value={item.barcode ?? ""} onChange={e => change(item.id, { barcode: e.target.value || null })} /></div><div className="space-y-2"><Label>{t("products.strength")}</Label><Input value={item.strength ?? ""} placeholder={t("products.strengthPlaceholder")} onChange={e => change(item.id, { strength: e.target.value || null })} /></div><div className="space-y-2"><Label>{t("inventory.reorderPoint")}</Label><Input type="number" min={0} step="0.001" value={item.minimumStockQuantity} onChange={e => change(item.id, { minimumStockQuantity: e.target.value === "" ? 0 : Number(e.target.value) })} /><p className="text-xs text-muted-foreground">{t("inventory.reorderHelp")}</p></div></div>
                         <div className="grid gap-4 md:grid-cols-3">
                             <LookupSelect label={`${t("update.category")} *`} value={item.categoryId} options={lookups?.categories ?? []} onChange={categoryId => change(item.id, { categoryId: categoryId! })} required searchText={t("update.searchOption")} emptyText={t("update.noMatch")} />
                             <LookupSelect label={t("form.brand")} value={item.brandId} options={lookups?.brands ?? []} onChange={brandId => change(item.id, { brandId })} searchText={t("update.searchOption")} emptyText={t("update.noMatch")} />

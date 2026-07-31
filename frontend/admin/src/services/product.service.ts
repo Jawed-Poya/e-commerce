@@ -133,6 +133,7 @@ export interface CreateSingleProductInput {
     unitId?: number | null;
     minimumValue?: number | null;
     maximumValue?: number | null;
+    minimumStockQuantity: number;
     usesDisplayStock: boolean;
     displayStockQuantity?: number | null;
     isFeatured: boolean;
@@ -149,7 +150,7 @@ export interface CreateSingleProductResult {
 export type BulkUpdateProduct = Pick<ProductListItem,
     "id" | "name" | "barcode" | "strength" | "categoryId" | "brandId" | "unitId" |
     "shortDescription" | "description" | "slug" | "minimumValue" |
-    "maximumValue" | "usesDisplayStock" | "displayStockQuantity" | "isFeatured" | "isActive" | "primaryImageUrl" | "images"> & { image?: File; galleryImages?: File[]; removedImageIds?: number[]; prices: ProductPriceInput[]; unitConversions?: ProductUnitConversionInput[] };
+    "maximumValue" | "usesDisplayStock" | "displayStockQuantity" | "isFeatured" | "isActive" | "primaryImageUrl" | "images"> & { minimumStockQuantity: number; image?: File; galleryImages?: File[]; removedImageIds?: number[]; prices: ProductPriceInput[]; unitConversions?: ProductUnitConversionInput[] };
 
 function append(formData: FormData, key: string, value: string | number | boolean | null | undefined) {
     if (value !== null && value !== undefined) formData.append(key, String(value));
@@ -175,6 +176,7 @@ export const productService = {
         append(formData, `${prefix}.UnitId`, product.unitId);
         append(formData, `${prefix}.MinimumValue`, product.minimumValue);
         append(formData, `${prefix}.MaximumValue`, product.maximumValue);
+        append(formData, `${prefix}.MinimumStockQuantity`, product.minimumStockQuantity);
         append(formData, `${prefix}.UsesDisplayStock`, product.usesDisplayStock);
         append(formData, `${prefix}.DisplayStockQuantity`, product.usesDisplayStock ? product.displayStockQuantity ?? 0 : null);
         append(formData, `${prefix}.IsFeatured`, product.isFeatured);
@@ -217,6 +219,7 @@ export const productService = {
             append(formData, `${prefix}.UnitId`, product.unitId);
             append(formData, `${prefix}.MinimumValue`, product.minimumValue);
             append(formData, `${prefix}.MaximumValue`, product.maximumValue);
+            append(formData, `${prefix}.MinimumStockQuantity`, product.minimumStockQuantity);
             append(formData, `${prefix}.UsesDisplayStock`, product.usesDisplayStock);
             append(formData, `${prefix}.DisplayStockQuantity`, product.usesDisplayStock ? product.displayStockQuantity ?? 0 : null);
             append(formData, `${prefix}.IsFeatured`, product.isFeatured);
