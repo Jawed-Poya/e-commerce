@@ -358,10 +358,11 @@ public sealed class FinancialReportService(
         string? currencyCode,
         CancellationToken cancellationToken = default)
     {
+        // Customers are company-wide records. Their ledger can include online orders,
+        // manual sales, and receipts from multiple branches, so lookup visibility must
+        // match the customer details page instead of the currently selected branch.
         var customer = await context.Customers.AsNoTracking()
-            .Where(item => item.Id == customerId &&
-                (!companyContext.BranchId.HasValue ||
-                    item.BranchId == companyContext.BranchId.Value))
+            .Where(item => item.Id == customerId)
             .Select(item => new
             {
                 item.Id,
