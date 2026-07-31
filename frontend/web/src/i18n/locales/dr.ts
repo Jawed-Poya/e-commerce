@@ -1,4 +1,5 @@
 import type { Messages } from "../types";
+import { en } from "./en";
 
 export const dr: Messages = {
     ...en,
@@ -43,12 +44,14 @@ export const dr: Messages = {
     "home.safeReliable": "امن و قابل اعتماد",
     "home.pharmacyEyebrow": "خدمات داروخانه، ساده‌تر",
     "home.pharmacyHeroTitle": "محصولات صحی قابل اعتماد، با نظم روشن.",
-    "home.pharmacyHeroDescription": "داروها، محصولات سلامتی و مراقبت شخصی را با قیمت‌گذاری شفاف واحدها، موجودی زنده و سفارش امن مرور کنید.",
+    "home.pharmacyHeroDescription":
+        "داروها، محصولات سلامتی و مراقبت شخصی را با قیمت‌گذاری شفاف واحدها، موجودی زنده و سفارش امن مرور کنید.",
     "home.shopPharmacy": "خرید از داروخانه",
     "home.clearUnits": "واحدهای فروش روشن",
     "home.flexibleUnits": "واحدهای انعطاف‌پذیر داروخانه",
     "home.unitShoppingTitle": "واحد مناسب سفارش خود را انتخاب کنید.",
-    "home.unitShoppingDescription": "موجودی در یک واحد پایه نگهداری می‌شود، اما مشتری می‌تواند بر اساس دانه، ورق، جعبه، بوتل یا هر واحد تنظیم‌شده خرید کند.",
+    "home.unitShoppingDescription":
+        "موجودی در یک واحد پایه نگهداری می‌شود، اما مشتری می‌تواند بر اساس دانه، ورق، جعبه، بوتل یا هر واحد تنظیم‌شده خرید کند.",
     "home.easyReturns": "بازگشت آسان",
     "home.simplePolicy": "قوانین ساده",
     "home.secureShopping": "خرید امن",
@@ -62,31 +65,39 @@ export const dr: Messages = {
     "home.flashDealsDescription": "محصولات محبوب با قیمت کاهش‌یافته.",
     "home.browseCollection": "مجموعه ما را ببینید",
     "home.shopByCategory": "خرید بر اساس دسته‌بندی",
-    "home.categoryDescription": "با مرور دسته‌بندی‌های اصلی سریع‌تر محصول مورد نیاز خود را پیدا کنید.",
+    "home.categoryDescription":
+        "با مرور دسته‌بندی‌های اصلی سریع‌تر محصول مورد نیاز خود را پیدا کنید.",
     "home.exploreCategory": "مشاهده دسته‌بندی",
     "home.featuredCatalog": "ویژه از کاتالوگ",
     "home.selectedForYou": "محصولاتی که ویژه برای شما انتخاب شده‌اند.",
-    "home.selectedDescription": "تصاویر، قیمت فعلی، موجودی و جزئیات مهم محصول را در یک جا ببینید.",
+    "home.selectedDescription":
+        "تصاویر، قیمت فعلی، موجودی و جزئیات مهم محصول را در یک جا ببینید.",
     "home.viewProduct": "مشاهده محصول",
     "home.newArrivals": "محصولات تازه",
     "home.freshProducts": "محصولات تازه به‌طور منظم اضافه می‌شوند",
-    "home.freshDescription": "جدیدترین محصولات افزوده‌شده به کاتالوگ را ببینید.",
+    "home.freshDescription":
+        "جدیدترین محصولات افزوده‌شده به کاتالوگ را ببینید.",
     "home.freeDelivery": "تحویل رایگان",
     "home.qualifyingOrders": "برای سفارش‌های واجد شرایط بالاتر از {amount}",
     "home.everyOrderFree": "تحویل رایگان برای همه سفارش‌ها",
     "home.flatDelivery": "هزینه ثابت تحویل {amount}",
-    "home.deliveryDescription": "از تحویل آسان برای خریدهای واجد شرایط استفاده کنید.",
+    "home.deliveryDescription":
+        "از تحویل آسان برای خریدهای واجد شرایط استفاده کنید.",
     "home.featuredProducts": "محصولات ویژه",
     "home.justForYou": "فقط برای شما",
-    "home.justForYouDescription": "محصولات منتخب از تازه‌ترین موارد کاتالوگ را کشف کنید.",
+    "home.justForYouDescription":
+        "محصولات منتخب از تازه‌ترین موارد کاتالوگ را کشف کنید.",
     "home.productsUnavailable": "محصولات فعلاً در دسترس نیستند",
-    "home.productsUnavailableDescription": "کاتالوگ محصولات موقتاً در دسترس نیست. بعداً دوباره تلاش کنید.",
+    "home.productsUnavailableDescription":
+        "کاتالوگ محصولات موقتاً در دسترس نیست. بعداً دوباره تلاش کنید.",
     "footer.title": "با EasyCart هوشمندانه‌تر خرید کنید",
-    "footer.description": "محصولات قابل اعتماد، خرید امن و تجربه‌ای ساده برای هر سفارش.",
+    "footer.description":
+        "محصولات قابل اعتماد، خرید امن و تجربه‌ای ساده برای هر سفارش.",
     "footer.secureCheckout": "پرداخت امن",
     "footer.fastDelivery": "تحویل سریع",
     "footer.easyReturns": "بازگشت آسان",
-    "footer.about": "محصولات قابل اعتماد، موجودی قابل مشاهده و تجربه خرید آسان.",
+    "footer.about":
+        "محصولات قابل اعتماد، موجودی قابل مشاهده و تجربه خرید آسان.",
     "footer.shop": "فروشگاه",
     "footer.customerCare": "خدمات مشتری",
     "footer.allProducts": "همه محصولات",
@@ -101,12 +112,15 @@ export const dr: Messages = {
     "notifications.description": "تغییر قیمت و موجودی محصولات دنبال‌شده.",
     "notifications.live": "زنده",
     "notifications.fallback": "پشتیبان",
-    "notifications.enableDescription": "اعلان مرورگر را فعال کنید تا هنگام باز بودن EasyCart خبر بگیرید.",
+    "notifications.enableDescription":
+        "اعلان مرورگر را فعال کنید تا هنگام باز بودن EasyCart خبر بگیرید.",
     "notifications.enable": "فعال‌سازی اعلان",
     "notifications.emptyTitle": "هنوز اعلانی نیست",
-    "notifications.emptyDescription": "یک محصول را باز کنید یا در علاقه‌مندی‌ها ذخیره کنید تا آن را دنبال کنیم.",
+    "notifications.emptyDescription":
+        "یک محصول را باز کنید یا در علاقه‌مندی‌ها ذخیره کنید تا آن را دنبال کنیم.",
     "product.notFound": "محصول یافت نشد",
-    "product.notFoundDescription": "این محصول شاید حذف شده یا دیگر در دسترس نباشد.",
+    "product.notFoundDescription":
+        "این محصول شاید حذف شده یا دیگر در دسترس نباشد.",
     "product.featured": "ویژه",
     "product.inStock": "موجود",
     "product.unavailable": "ناموجود",
@@ -116,7 +130,8 @@ export const dr: Messages = {
     "product.alertsEnabled": "اعلان‌ها فعال است",
     "product.alertsBlocked": "اعلان‌ها مسدود است",
     "product.alertsUnavailable": "اعلان در دسترس نیست",
-    "product.alertTrackingDescription": "تغییر قیمت و موجودی در اعلان‌های EasyCart شما دنبال می‌شود.",
+    "product.alertTrackingDescription":
+        "تغییر قیمت و موجودی در اعلان‌های EasyCart شما دنبال می‌شود.",
     "product.minimumQuantity": "حداقل {count}",
     "product.maximumQuantity": "حداکثر {count}",
     "product.saved": "ذخیره شد",
@@ -127,7 +142,8 @@ export const dr: Messages = {
     "product.brand": "برند",
     "product.unit": "واحد",
     "product.chooseSellingUnit": "واحد فروش را انتخاب کنید",
-    "product.unitConversionHelp": "موجودی همیشه با واحد اساسی نگهداری و به‌صورت خودکار تبدیل می‌شود.",
+    "product.unitConversionHelp":
+        "موجودی همیشه با واحد اساسی نگهداری و به‌صورت خودکار تبدیل می‌شود.",
     "product.baseUnit": "واحد اساسی: {unit}",
     "product.baseInventoryUnit": "واحد اساسی موجودی",
     "product.unitEquation": "۱ {unit} = {factor} {baseUnit}",
@@ -173,15 +189,18 @@ export const dr: Messages = {
     "mobile.mainMenu": "منوی اصلی",
     "mobile.shopByCategory": "خرید بر اساس دسته‌بندی",
     "mobile.needHelp": "به کمک در خرید نیاز دارید؟",
-    "mobile.helpDescription": "برای راهنمایی محصول و سفارش با پشتیبانی تماس بگیرید.",
-    "product.defaultDescription": "محصولی با انتخاب دقیق، قیمت شفاف و موجودی زنده.",
+    "mobile.helpDescription":
+        "برای راهنمایی محصول و سفارش با پشتیبانی تماس بگیرید.",
+    "product.defaultDescription":
+        "محصولی با انتخاب دقیق، قیمت شفاف و موجودی زنده.",
     "product.currentPrice": "قیمت فعلی",
     "product.availability": "موجودی",
     "product.availableCount": "{count} موجود",
     "product.soldOut": "تمام شده",
     "product.readyToOrder": "موجود و آماده سفارش",
     "product.stockDescription": "فعلاً {count} عدد برای خرید موجود است.",
-    "product.unavailableDescription": "این محصول فعلاً قابل سفارش نیست. بعداً دوباره بررسی کنید.",
+    "product.unavailableDescription":
+        "این محصول فعلاً قابل سفارش نیست. بعداً دوباره بررسی کنید.",
     "product.views": "{count} بازدید",
     "product.defaultTierPrice": "قیمت پیش‌فرض / {type}",
     "product.tierPrice": "قیمت {type}",
@@ -199,7 +218,8 @@ export const dr: Messages = {
     "catalog.shop": "فروشگاه",
     "catalog.curated": "بازار منتخب",
     "catalog.heroTitle": "محصول مناسب خود را پیدا کنید.",
-    "catalog.heroDescription": "کاتالوگ کامل را با قیمت روشن، موجودی زنده، جزئیات مفید و فیلترهای انعطاف‌پذیر مرور کنید.",
+    "catalog.heroDescription":
+        "کاتالوگ کامل را با قیمت روشن، موجودی زنده، جزئیات مفید و فیلترهای انعطاف‌پذیر مرور کنید.",
     "catalog.availableNow": "فعلاً موجود",
     "catalog.productsInCatalog": "محصول در کاتالوگ",
     "catalog.any": "همه",
@@ -225,7 +245,8 @@ export const dr: Messages = {
     "catalog.maximum": "حداکثر",
     "catalog.unavailableTitle": "کاتالوگ در دسترس نیست",
     "catalog.noMatches": "محصولی مطابق جستجو یافت نشد",
-    "catalog.noMatchesDescription": "جستجو را تغییر دهید یا یکی از فیلترها را حذف کنید.",
+    "catalog.noMatchesDescription":
+        "جستجو را تغییر دهید یا یکی از فیلترها را حذف کنید.",
     "cart.title": "سبد خرید",
     "cart.emptyTitle": "سبد خرید شما خالی است",
     "cart.emptyDescription": "محصولات افزوده‌شده در اینجا نمایش داده می‌شوند.",
@@ -242,7 +263,8 @@ export const dr: Messages = {
     "auth.signInTitle": "ورود به حساب شما",
     "auth.createTitle": "ایجاد حساب مشتری",
     "auth.loginDescription": "ایمیل یا شماره تلفن خود را وارد کنید.",
-    "auth.registerDescription": "حساب شما با نوع مشتری عمومی ساخته می‌شود و مدیر می‌تواند آن را تغییر دهد.",
+    "auth.registerDescription":
+        "حساب شما با نوع مشتری عمومی ساخته می‌شود و مدیر می‌تواند آن را تغییر دهد.",
     "auth.identifier": "ایمیل یا تلفن",
     "auth.phone": "شماره تلفن",
     "auth.wait": "لطفاً منتظر بمانید...",
@@ -251,12 +273,14 @@ export const dr: Messages = {
     "account.customerAccount": "حساب مشتری",
     "account.customerType": "نوع مشتری",
     "account.typeDescription": "این نوع، قیمت محصولات شما را تعیین می‌کند.",
-    "account.phoneDescription": "برای شناسایی و پیگیری سفارش‌ها استفاده می‌شود.",
+    "account.phoneDescription":
+        "برای شناسایی و پیگیری سفارش‌ها استفاده می‌شود.",
     "account.orders": "سفارش‌ها",
     "account.ordersDescription": "سفارش‌های متصل به این حساب.",
     "account.orderHistory": "تاریخچه سفارش",
     "account.orderNumbers": "شماره‌های سفارش شما",
-    "account.orderNumbersDescription": "دیگر نیازی نیست شماره سفارش‌ها را دستی نگهداری کنید.",
+    "account.orderNumbersDescription":
+        "دیگر نیازی نیست شماره سفارش‌ها را دستی نگهداری کنید.",
     "account.loadingOrders": "در حال بارگذاری سفارش‌ها...",
     "account.ordersError": "سفارش‌های شما بارگذاری نشد.",
     "account.noOrders": "هنوز سفارشی ندارید",
@@ -265,7 +289,8 @@ export const dr: Messages = {
     "checkout.title": "پرداخت",
     "checkout.secure": "پرداخت امن",
     "checkout.completeOrder": "سفارش خود را تکمیل کنید",
-    "checkout.serverCheck": "پیش از ثبت سفارش، قیمت و موجودی دوباره توسط سرور بررسی می‌شود.",
+    "checkout.serverCheck":
+        "پیش از ثبت سفارش، قیمت و موجودی دوباره توسط سرور بررسی می‌شود.",
     "checkout.signedIn": "واردشده به نام {name} · قیمت {type}",
     "checkout.backToCart": "بازگشت به سبد",
     "checkout.recipient": "نام گیرنده",
@@ -276,18 +301,22 @@ export const dr: Messages = {
     "checkout.country": "کشور",
     "checkout.postalCode": "کد پستی",
     "checkout.bankReference": "شماره مرجع انتقال بانکی",
-    "checkout.completeRequired": "تمام معلومات ضروری تماس و تحویل را تکمیل کنید.",
+    "checkout.completeRequired":
+        "تمام معلومات ضروری تماس و تحویل را تکمیل کنید.",
     "checkout.enterReference": "شماره مرجع انتقال بانکی را وارد کنید.",
     "checkout.contact": "اطلاعات تماس",
-    "checkout.contactDescription": "برای به‌روزرسانی سفارش و تحویل استفاده می‌شود.",
+    "checkout.contactDescription":
+        "برای به‌روزرسانی سفارش و تحویل استفاده می‌شود.",
     "checkout.address": "آدرس تحویل",
     "checkout.addressDescription": "یک نسخه از این آدرس با سفارش ذخیره می‌شود.",
     "checkout.paymentMethod": "روش پرداخت",
-    "checkout.paymentDescription": "پرداخت هنگام تحویل یا انتقال بانکی را انتخاب کنید.",
+    "checkout.paymentDescription":
+        "پرداخت هنگام تحویل یا انتقال بانکی را انتخاب کنید.",
     "checkout.cash": "پرداخت هنگام تحویل",
     "checkout.cashDescription": "هنگام رسیدن سفارش به تحویل‌دهنده پرداخت کنید.",
     "checkout.bank": "انتقال بانکی",
-    "checkout.bankDescription": "انتقال را انجام دهید و منتظر تأیید مدیر بمانید.",
+    "checkout.bankDescription":
+        "انتقال را انجام دهید و منتظر تأیید مدیر بمانید.",
     "checkout.notes": "یادداشت سفارش",
     "checkout.notesDescription": "راهنمای اختیاری برای مدیر یا تحویل‌دهنده.",
     "checkout.orderSummary": "خلاصه سفارش",
@@ -305,7 +334,8 @@ export const dr: Messages = {
     "orders.continueShopping": "ادامه خرید",
     "orders.trackingEyebrow": "پیگیری سفارش",
     "orders.trackingTitle": "وضعیت سفارش خود را بررسی کنید",
-    "orders.trackingDescription": "شماره سفارش و همان شماره تلفنی را وارد کنید که هنگام پرداخت استفاده کردید.",
+    "orders.trackingDescription":
+        "شماره سفارش و همان شماره تلفنی را وارد کنید که هنگام پرداخت استفاده کردید.",
     "orders.trackAction": "پیگیری",
     "orders.loading": "سفارش در حال بارگذاری است...",
     "orders.loadError": "سفارش بارگذاری نشد.",
@@ -313,12 +343,16 @@ export const dr: Messages = {
     "orders.noTimeline": "هنوز به‌روزرسانی در خط زمانی وجود ندارد.",
     "orders.received": "سفارش دریافت شد",
     "orders.thankYou": "از سفارش شما سپاسگزاریم.",
-    "orders.reservedDescription": "محصولات شما رزرو شده‌اند. تیم مدیریت سفارش را بررسی و برای پردازش آماده می‌کند.",
+    "orders.reservedDescription":
+        "محصولات شما رزرو شده‌اند. تیم مدیریت سفارش را بررسی و برای پردازش آماده می‌کند.",
     "orders.submittedTitle": "سفارش شما ثبت شد",
-    "orders.submittedDescription": "برای پیگیری، از شماره سفارش و شماره تلفن پرداخت استفاده کنید.",
+    "orders.submittedDescription":
+        "برای پیگیری، از شماره سفارش و شماره تلفن پرداخت استفاده کنید.",
     "orders.yourNumber": "شماره سفارش شما",
-    "orders.savedAccount": "این سفارش در تاریخچه سفارش‌های حساب شما ذخیره شده است.",
-    "orders.savedBrowser": "این سفارش در این مرورگر ذخیره شده است. شماره را نیز کپی کنید.",
+    "orders.savedAccount":
+        "این سفارش در تاریخچه سفارش‌های حساب شما ذخیره شده است.",
+    "orders.savedBrowser":
+        "این سفارش در این مرورگر ذخیره شده است. شماره را نیز کپی کنید.",
     "orders.orderStatus": "وضعیت سفارش",
     "orders.orderTotal": "مجموع سفارش",
     "orders.bankReview": "بررسی انتقال بانکی",
@@ -344,25 +378,33 @@ export const dr: Messages = {
     "category.exploreRelated": "محصولات و زیردسته‌های مرتبط را مرور کنید.",
     "category.viewAll": "مشاهده همه",
     "category.browseName": "مرور {name}",
-    "category.noSubcategories": "این دسته‌بندی هنوز زیردسته ندارد؛ می‌توانید همه محصولات موجود را ببینید.",
-    "category.productsInsteadOfSubcategories": "این دسته زیردسته ندارد، بنابراین محصولات موجود نمایش داده می‌شوند.",
+    "category.noSubcategories":
+        "این دسته‌بندی هنوز زیردسته ندارد؛ می‌توانید همه محصولات موجود را ببینید.",
+    "category.productsInsteadOfSubcategories":
+        "این دسته زیردسته ندارد، بنابراین محصولات موجود نمایش داده می‌شوند.",
     "category.subcategories": "زیردسته‌ها",
     "category.noProductsConfigured": "هنوز محصولی در این دسته موجود نیست.",
     "category.viewProducts": "مشاهده محصولات",
     "category.loading": "دسته‌بندی‌ها در حال بارگذاری…",
     "category.preparing": "کاتالوگ محصولات آماده می‌شود.",
     "category.empty": "دسته‌بندی موجود نیست",
-    "category.emptyHelp": "پس از تنظیم دسته‌بندی‌ها در کاتالوگ، در اینجا نمایش داده می‌شوند.",
+    "category.emptyHelp":
+        "پس از تنظیم دسته‌بندی‌ها در کاتالوگ، در اینجا نمایش داده می‌شوند.",
     "auth.optionalAccount": "حساب مشتری اختیاری",
     "auth.heroTitle": "قیمت مناسب، سفارش‌ها و اعلان‌های شما در یک‌جا.",
-    "auth.heroDescription": "خرید بدون حساب نیز ممکن است. ورود به سیستم نوع مشتری، قیمت اختصاصی و تاریخچه سفارش‌های شما را نگهداری می‌کند.",
+    "auth.heroDescription":
+        "خرید بدون حساب نیز ممکن است. ورود به سیستم نوع مشتری، قیمت اختصاصی و تاریخچه سفارش‌های شما را نگهداری می‌کند.",
     "auth.pricingBenefit": "قیمت بر اساس نوع مشتری",
-    "auth.pricingBenefitHelp": "ویژه، عمده، کارمند یا هر نوعی که فروشگاه تنظیم کند.",
+    "auth.pricingBenefitHelp":
+        "ویژه، عمده، کارمند یا هر نوعی که فروشگاه تنظیم کند.",
     "auth.checkoutBenefit": "پرداخت تأییدشده توسط سرور",
-    "auth.checkoutBenefitHelp": "قیمت و موجودی همیشه دوباره توسط سرور محاسبه می‌شود.",
+    "auth.checkoutBenefitHelp":
+        "قیمت و موجودی همیشه دوباره توسط سرور محاسبه می‌شود.",
     "auth.historyBenefit": "تاریخچه سفارش‌ها",
-    "auth.historyBenefitHelp": "شماره سفارش‌های شما پس از پرداخت نیز محفوظ می‌ماند.",
-    "auth.optionalHelp": "داشتن حساب اختیاری است؛ هر زمان می‌توانید این صفحه را ببندید و به‌صورت مهمان خرید کنید.",
+    "auth.historyBenefitHelp":
+        "شماره سفارش‌های شما پس از پرداخت نیز محفوظ می‌ماند.",
+    "auth.optionalHelp":
+        "داشتن حساب اختیاری است؛ هر زمان می‌توانید این صفحه را ببندید و به‌صورت مهمان خرید کنید.",
     "auth.requestError": "درخواست حساب تکمیل نشد.",
     "auth.optionalEmail": "اختیاری، اما پیشنهاد می‌شود",
     "auth.identifierPlaceholder": "you@example.com یا +93 …",
@@ -373,7 +415,8 @@ export const dr: Messages = {
     "cart.each": "برای هر واحد",
     "cart.itemTotal": "مجموع قلم",
     "cart.quantityInput": "تعداد {name}",
-    "cart.checkoutDisclaimer": "مالیات و جزئیات تحویل هنگام پرداخت نهایی می‌شود.",
+    "cart.checkoutDisclaimer":
+        "مالیات و جزئیات تحویل هنگام پرداخت نهایی می‌شود.",
     "catalog.searchAction": "جستجو",
     "catalog.filterProducts": "فیلتر محصولات",
     "catalog.filterDescription": "کاتالوگ را با جزئیات محصول محدود کنید.",
@@ -386,12 +429,15 @@ export const dr: Messages = {
     "catalog.clearAll": "پاک‌کردن همه",
     "catalog.showingPage": "نمایش {count} محصول در این صفحه",
     "catalog.pageOf": "صفحه {page} از {pages}",
-    "catalog.loadError": "محصولات فعلاً بارگذاری نشد. کمی بعد دوباره تلاش کنید.",
+    "catalog.loadError":
+        "محصولات فعلاً بارگذاری نشد. کمی بعد دوباره تلاش کنید.",
     "checkout.loadingBank": "راهنمای بانک در حال بارگذاری…",
     "checkout.bankMissing": "اطلاعات حساب بانکی تنظیم نشده است.",
     "checkout.itemsCount": "{count} قلم",
-    "checkout.inventoryVerified": "سرور قیمت فعلی را بررسی و موجودی را به‌صورت اتمی رزرو می‌کند.",
-    "checkout.adminApproval": "تأیید نهایی پرداخت و وضعیت تحویل توسط تیم مدیریت انجام می‌شود.",
+    "checkout.inventoryVerified":
+        "سرور قیمت فعلی را بررسی و موجودی را به‌صورت اتمی رزرو می‌کند.",
+    "checkout.adminApproval":
+        "تأیید نهایی پرداخت و وضعیت تحویل توسط تیم مدیریت انجام می‌شود.",
     "account.guestTracking": "پیگیری مهمان",
     "notFound.backHome": "بازگشت به خانه",
     "common.shopNow": "اکنون خرید کنید",
@@ -401,7 +447,8 @@ export const dr: Messages = {
     "home.goToSlide": "رفتن به اسلاید {number}",
     "home.nextSlide": "اسلاید بعدی",
     "home.noCategoryProducts": "محصولات به‌زودی اضافه می‌شوند",
-    "home.noCategoryProductsHelp": "دسته‌بندی را باز کنید تا محصولات موجود و موارد آینده را ببینید.",
+    "home.noCategoryProductsHelp":
+        "دسته‌بندی را باز کنید تا محصولات موجود و موارد آینده را ببینید.",
     "home.openCategory": "باز کردن {category}",
     "home.previousSlide": "اسلاید قبلی",
     "home.subcategories": "مرور زیردسته‌ها",
@@ -413,7 +460,8 @@ export const dr: Messages = {
     "search.noCategories": "دسته‌بندی مطابق پیدا نشد",
     "search.products": "محصولات",
     "search.typeMore": "برای جستجو تایپ کنید",
-    "search.typeMoreHelp": "حداقل دو حرف وارد کنید تا نتایج زنده محصول و دسته‌بندی نمایش داده شود.",
+    "search.typeMoreHelp":
+        "حداقل دو حرف وارد کنید تا نتایج زنده محصول و دسته‌بندی نمایش داده شود.",
     "search.viewAll": "مشاهده همه نتایج جستجو",
     "footer.contactNow": "تماس با ما",
     "header.cartEmpty": "سبد خرید خالی است",
@@ -421,15 +469,19 @@ export const dr: Messages = {
     "header.savedItems": "موارد ذخیره‌شده شما",
     "header.selectLocation": "محل تحویل را انتخاب کنید",
     "header.signInRegister": "ورود / ثبت‌نام",
-    "home.branchDescription": "برای تأیید نزدیک‌ترین شعبه فعال و محدوده تحویل با شرکت تماس بگیرید.",
+    "home.branchDescription":
+        "برای تأیید نزدیک‌ترین شعبه فعال و محدوده تحویل با شرکت تماس بگیرید.",
     "home.customerSupport": "پشتیبانی مشتری",
     "home.deliveryTracking": "همراه با پیگیری سفارش",
     "home.findNearestBranch": "نزدیک‌ترین شعبه را پیدا کنید",
-    "home.heroFallbackDescription": "محصولات قابل اعتماد را با قیمت روشن، موجودی زنده، پرداخت امن و تحویل مطمئن خریداری کنید.",
+    "home.heroFallbackDescription":
+        "محصولات قابل اعتماد را با قیمت روشن، موجودی زنده، پرداخت امن و تحویل مطمئن خریداری کنید.",
     "home.heroFallbackTitle": "راهی بهتر برای خرید روزانه.",
     "home.needHelpChoosing": "برای انتخاب محصول کمک نیاز دارید؟",
     "home.productCount": "{count} محصول",
     "home.storeLocations": "موقعیت‌های فروشگاه",
-    "home.supportDescription": "برای موجودی محصول، سفارش یا کمک در تحویل با تیم فروشگاه تماس بگیرید.",
-    "pwa.offlineDescription": 'حالت آفلاین: صفحه\u200cها و محصولاتی که قبلاً باز شده\u200cاند در دسترس می\u200cمانند. اطلاعات جدید به اتصال نیاز دارد.',
+    "home.supportDescription":
+        "برای موجودی محصول، سفارش یا کمک در تحویل با تیم فروشگاه تماس بگیرید.",
+    "pwa.offlineDescription":
+        "حالت آفلاین: صفحه\u200cها و محصولاتی که قبلاً باز شده\u200cاند در دسترس می\u200cمانند. اطلاعات جدید به اتصال نیاز دارد.",
 };

@@ -1,4 +1,5 @@
 import type { Messages } from "../types";
+import { en } from "./en";
 
 export const ps: Messages = {
     ...en,
@@ -43,12 +44,14 @@ export const ps: Messages = {
     "home.safeReliable": "خوندي او باوري",
     "home.pharmacyEyebrow": "د درملتون پاملرنه، په ساده ډول",
     "home.pharmacyHeroTitle": "باوري روغتیايي توکي، په روښانه ترتیب.",
-    "home.pharmacyHeroDescription": "درمل، روغتیايي او شخصي پاملرنې توکي د روښانه واحدي بیو، ژوندۍ موجودۍ او خوندي فرمایش سره وپلټئ.",
+    "home.pharmacyHeroDescription":
+        "درمل، روغتیايي او شخصي پاملرنې توکي د روښانه واحدي بیو، ژوندۍ موجودۍ او خوندي فرمایش سره وپلټئ.",
     "home.shopPharmacy": "له درملتونه پېرود",
     "home.clearUnits": "روښانه د پلور واحدونه",
     "home.flexibleUnits": "انعطاف منونکي د درملتون واحدونه",
     "home.unitShoppingTitle": "د خپل فرمایش لپاره مناسب واحد وټاکئ.",
-    "home.unitShoppingDescription": "موجودي په یوه بنسټیز واحد کې ساتل کېږي، خو پېرودونکي کولی شي په دانه، پټه، بکس، بوتل یا هر تنظیم شوي واحد واخلي.",
+    "home.unitShoppingDescription":
+        "موجودي په یوه بنسټیز واحد کې ساتل کېږي، خو پېرودونکي کولی شي په دانه، پټه، بکس، بوتل یا هر تنظیم شوي واحد واخلي.",
     "home.easyReturns": "اسانه بېرته ستنول",
     "home.simplePolicy": "ساده تګلاره",
     "home.secureShopping": "خوندي پېرود",
@@ -66,7 +69,8 @@ export const ps: Messages = {
     "home.exploreCategory": "کټګوري وګورئ",
     "home.featuredCatalog": "له کتلاګ څخه ځانګړي",
     "home.selectedForYou": "ستاسو لپاره ځانګړي ټاکل شوي محصولات.",
-    "home.selectedDescription": "انځورونه، اوسنی نرخ، موجودي او مهم معلومات په یوه ځای کې وګورئ.",
+    "home.selectedDescription":
+        "انځورونه، اوسنی نرخ، موجودي او مهم معلومات په یوه ځای کې وګورئ.",
     "home.viewProduct": "محصول وګورئ",
     "home.newArrivals": "نوي محصولات",
     "home.freshProducts": "تازه محصولات په منظم ډول اضافه کېږي",
@@ -78,11 +82,14 @@ export const ps: Messages = {
     "home.deliveryDescription": "د وړ پېرودونو لپاره اسانه سپارنه ترلاسه کړئ.",
     "home.featuredProducts": "ځانګړي محصولات",
     "home.justForYou": "یوازې ستاسو لپاره",
-    "home.justForYouDescription": "د کتلاګ له تازه محصولاتو غوره شوي توکي ومومئ.",
+    "home.justForYouDescription":
+        "د کتلاګ له تازه محصولاتو غوره شوي توکي ومومئ.",
     "home.productsUnavailable": "محصولات اوس شتون نه لري",
-    "home.productsUnavailableDescription": "کتلاګ موقتي شتون نه لري. وروسته بیا هڅه وکړئ.",
+    "home.productsUnavailableDescription":
+        "کتلاګ موقتي شتون نه لري. وروسته بیا هڅه وکړئ.",
     "footer.title": "له EasyCart سره هوښیار پېرود وکړئ",
-    "footer.description": "باوري محصولات، خوندي پېرود او د هر امر لپاره ساده تجربه.",
+    "footer.description":
+        "باوري محصولات، خوندي پېرود او د هر امر لپاره ساده تجربه.",
     "footer.secureCheckout": "خوندي تادیه",
     "footer.fastDelivery": "چټک سپارل",
     "footer.easyReturns": "اسانه بېرته ستنول",
@@ -101,12 +108,15 @@ export const ps: Messages = {
     "notifications.description": "د تعقیب شوو محصولاتو نرخ او موجودي بدلونونه.",
     "notifications.live": "ژوندی",
     "notifications.fallback": "بدیل",
-    "notifications.enableDescription": "د براوزر خبرتیاوې فعالې کړئ تر څو د EasyCart د پرانیستي پاتې کېدو پر مهال خبر شئ.",
+    "notifications.enableDescription":
+        "د براوزر خبرتیاوې فعالې کړئ تر څو د EasyCart د پرانیستي پاتې کېدو پر مهال خبر شئ.",
     "notifications.enable": "خبرتیاوې فعالې کړئ",
     "notifications.emptyTitle": "لا خبرتیا نشته",
-    "notifications.emptyDescription": "یو محصول پرانیزئ یا یې په خوښو کې وساتئ تر څو موږ یې تعقیب کړو.",
+    "notifications.emptyDescription":
+        "یو محصول پرانیزئ یا یې په خوښو کې وساتئ تر څو موږ یې تعقیب کړو.",
     "product.notFound": "محصول ونه موندل شو",
-    "product.notFoundDescription": "دا محصول ښايي لرې شوی وي یا نور شتون ونه لري.",
+    "product.notFoundDescription":
+        "دا محصول ښايي لرې شوی وي یا نور شتون ونه لري.",
     "product.featured": "ځانګړی",
     "product.inStock": "موجود",
     "product.unavailable": "ناموجود",
@@ -116,7 +126,8 @@ export const ps: Messages = {
     "product.alertsEnabled": "خبرتیاوې فعالې دي",
     "product.alertsBlocked": "خبرتیاوې بندې دي",
     "product.alertsUnavailable": "خبرتیاوې نشته",
-    "product.alertTrackingDescription": "د نرخ او موجودۍ بدلونونه ستاسو د EasyCart په خبرتیاوو کې څارل کېږي.",
+    "product.alertTrackingDescription":
+        "د نرخ او موجودۍ بدلونونه ستاسو د EasyCart په خبرتیاوو کې څارل کېږي.",
     "product.minimumQuantity": "لږ تر لږه {count}",
     "product.maximumQuantity": "تر ډېره {count}",
     "product.saved": "وساتل شو",
@@ -127,7 +138,8 @@ export const ps: Messages = {
     "product.brand": "برانډ",
     "product.unit": "واحد",
     "product.chooseSellingUnit": "د پلور واحد وټاکئ",
-    "product.unitConversionHelp": "موجودي تل په بنسټیز واحد کې ساتل کېږي او په اوتومات ډول بدلېږي.",
+    "product.unitConversionHelp":
+        "موجودي تل په بنسټیز واحد کې ساتل کېږي او په اوتومات ډول بدلېږي.",
     "product.baseUnit": "بنسټیز واحد: {unit}",
     "product.baseInventoryUnit": "د موجودۍ بنسټیز واحد",
     "product.unitEquation": "۱ {unit} = {factor} {baseUnit}",
@@ -151,7 +163,8 @@ export const ps: Messages = {
     "reviews.delete": "ارزونه ړنګه کړئ",
     "pwa.install": "اپ نصب کړئ",
     "notFound.title": "پاڼه ونه موندل شوه",
-    "notFound.description": "هغه پاڼه چې لټوئ ښايي انتقال شوې وي یا نور شتون ونه لري.",
+    "notFound.description":
+        "هغه پاڼه چې لټوئ ښايي انتقال شوې وي یا نور شتون ونه لري.",
 
     "common.free": "وړیا",
     "common.close": "تړل",
@@ -173,15 +186,18 @@ export const ps: Messages = {
     "mobile.mainMenu": "اصلي مېنو",
     "mobile.shopByCategory": "د کټګورۍ له مخې پېرود",
     "mobile.needHelp": "په پېرود کې مرستې ته اړتیا لرئ؟",
-    "mobile.helpDescription": "د محصول او امر د مرستې لپاره له ملاتړ سره اړیکه ونیسئ.",
-    "product.defaultDescription": "په دقت ټاکل شوی محصول له روښانه نرخ او ژوندۍ موجودۍ سره.",
+    "mobile.helpDescription":
+        "د محصول او امر د مرستې لپاره له ملاتړ سره اړیکه ونیسئ.",
+    "product.defaultDescription":
+        "په دقت ټاکل شوی محصول له روښانه نرخ او ژوندۍ موجودۍ سره.",
     "product.currentPrice": "اوسنی نرخ",
     "product.availability": "موجودي",
     "product.availableCount": "{count} موجود",
     "product.soldOut": "خلاص شوی",
     "product.readyToOrder": "موجود او امر ته چمتو",
     "product.stockDescription": "اوس {count} توکي د پېرود لپاره شته.",
-    "product.unavailableDescription": "دا محصول اوس نه شي امر کېدای. وروسته بیا وګورئ.",
+    "product.unavailableDescription":
+        "دا محصول اوس نه شي امر کېدای. وروسته بیا وګورئ.",
     "product.views": "{count} کتنې",
     "product.defaultTierPrice": "{type} / اصلي نرخ",
     "product.tierPrice": "د {type} نرخ",
@@ -191,7 +207,8 @@ export const ps: Messages = {
     "wishlist.remove": "له خوښو لرې کول",
     "wishlist.savedProducts": "ساتل شوي محصولات",
     "wishlist.emptyTitle": "ستاسو د خوښو لېست تش دی.",
-    "wishlist.emptyDescription": "د زړه تڼۍ وکاروئ او محصول د وروسته لپاره وساتئ.",
+    "wishlist.emptyDescription":
+        "د زړه تڼۍ وکاروئ او محصول د وروسته لپاره وساتئ.",
     "wishlist.explore": "محصولات وګورئ",
     "wishlist.savedForLater": "د وروسته لپاره ساتل شوي",
     "wishlist.loading": "ساتل شوي محصولات بارېږي...",
@@ -199,7 +216,8 @@ export const ps: Messages = {
     "catalog.shop": "پلورنځی",
     "catalog.curated": "ټاکل شوی بازار",
     "catalog.heroTitle": "ستاسو لپاره مناسب محصولات ومومئ.",
-    "catalog.heroDescription": "بشپړ کتلاګ له روښانه نرخونو، ژوندۍ موجودۍ، ګټورو معلوماتو او انعطاف منونکو فلټرونو سره وګورئ.",
+    "catalog.heroDescription":
+        "بشپړ کتلاګ له روښانه نرخونو، ژوندۍ موجودۍ، ګټورو معلوماتو او انعطاف منونکو فلټرونو سره وګورئ.",
     "catalog.availableNow": "اوس موجود",
     "catalog.productsInCatalog": "محصولات په کتلاګ کې",
     "catalog.any": "هر یو",
@@ -242,7 +260,8 @@ export const ps: Messages = {
     "auth.signInTitle": "خپل حساب ته ننوځئ",
     "auth.createTitle": "د مشتری حساب جوړ کړئ",
     "auth.loginDescription": "خپل برېښنالیک یا تلیفون وکاروئ.",
-    "auth.registerDescription": "تاسو به د عمومي مشتری په ډول پیل وکړئ او مدیر یې وروسته بدلولی شي.",
+    "auth.registerDescription":
+        "تاسو به د عمومي مشتری په ډول پیل وکړئ او مدیر یې وروسته بدلولی شي.",
     "auth.identifier": "برېښنالیک یا تلیفون",
     "auth.phone": "د تلیفون شمېره",
     "auth.wait": "لطفاً انتظار وکړئ...",
@@ -256,7 +275,8 @@ export const ps: Messages = {
     "account.ordersDescription": "له دې حساب سره تړلي امرونه.",
     "account.orderHistory": "د امر تاریخ",
     "account.orderNumbers": "ستاسو د امر شمېرې",
-    "account.orderNumbersDescription": "نور اړتیا نشته چې د امر شمېرې په لاس وساتئ.",
+    "account.orderNumbersDescription":
+        "نور اړتیا نشته چې د امر شمېرې په لاس وساتئ.",
     "account.loadingOrders": "امرونه بارېږي...",
     "account.ordersError": "ستاسو امرونه بار نه شول.",
     "account.noOrders": "لا امر نشته",
@@ -265,7 +285,8 @@ export const ps: Messages = {
     "checkout.title": "تادیه",
     "checkout.secure": "خوندي تادیه",
     "checkout.completeOrder": "خپل امر بشپړ کړئ",
-    "checkout.serverCheck": "د امر له جوړېدو مخکې نرخ او موجودي د سرور له خوا بیا کتل کېږي.",
+    "checkout.serverCheck":
+        "د امر له جوړېدو مخکې نرخ او موجودي د سرور له خوا بیا کتل کېږي.",
     "checkout.signedIn": "د {name} په نوم ننوتی · د {type} نرخ",
     "checkout.backToCart": "ټوکرۍ ته بېرته",
     "checkout.recipient": "د ترلاسه کوونکي نوم",
@@ -305,7 +326,8 @@ export const ps: Messages = {
     "orders.continueShopping": "پېرود ته دوام",
     "orders.trackingEyebrow": "د امر تعقیب",
     "orders.trackingTitle": "د خپل امر حالت وګورئ",
-    "orders.trackingDescription": "د امر شمېره او هغه تلیفون شمېره ولیکئ چې د تادیې پر مهال مو کارولې وه.",
+    "orders.trackingDescription":
+        "د امر شمېره او هغه تلیفون شمېره ولیکئ چې د تادیې پر مهال مو کارولې وه.",
     "orders.trackAction": "تعقیب",
     "orders.loading": "امر بارېږي...",
     "orders.loadError": "امر ونه بارېد.",
@@ -313,12 +335,16 @@ export const ps: Messages = {
     "orders.noTimeline": "تر اوسه د مهالویش تازه معلومات نشته.",
     "orders.received": "امر ترلاسه شو",
     "orders.thankYou": "ستاسو له امر څخه مننه.",
-    "orders.reservedDescription": "ستاسو محصولات خوندي شوي. د مدیریت ټیم به امر وڅېړي او پروسس ته به یې ولېږي.",
+    "orders.reservedDescription":
+        "ستاسو محصولات خوندي شوي. د مدیریت ټیم به امر وڅېړي او پروسس ته به یې ولېږي.",
     "orders.submittedTitle": "ستاسو امر ثبت شو",
-    "orders.submittedDescription": "د حالت د تعقیب لپاره د امر شمېره او د تادیې تلیفون شمېره وکاروئ.",
+    "orders.submittedDescription":
+        "د حالت د تعقیب لپاره د امر شمېره او د تادیې تلیفون شمېره وکاروئ.",
     "orders.yourNumber": "ستاسو د امر شمېره",
-    "orders.savedAccount": "دا امر ستاسو د حساب د امرونو په تاریخ کې خوندي شوی.",
-    "orders.savedBrowser": "دا امر په دې براوزر کې خوندي شوی. شمېره هم کاپي کولی شئ.",
+    "orders.savedAccount":
+        "دا امر ستاسو د حساب د امرونو په تاریخ کې خوندي شوی.",
+    "orders.savedBrowser":
+        "دا امر په دې براوزر کې خوندي شوی. شمېره هم کاپي کولی شئ.",
     "orders.orderStatus": "د امر حالت",
     "orders.orderTotal": "د امر ټول",
     "orders.bankReview": "د بانکي لېږد ارزونه",
@@ -344,25 +370,33 @@ export const ps: Messages = {
     "category.exploreRelated": "اړوند محصولات او فرعي کټګورۍ وګورئ.",
     "category.viewAll": "ټول وګورئ",
     "category.browseName": "{name} وګورئ",
-    "category.noSubcategories": "دا کټګوري لا فرعي کټګورۍ نه لري؛ ټول موجود محصولات بیا هم کتلی شئ.",
-    "category.productsInsteadOfSubcategories": "دا کټګوري فرعي کټګورۍ نه لري، نو موجود محصولات ښودل کېږي.",
+    "category.noSubcategories":
+        "دا کټګوري لا فرعي کټګورۍ نه لري؛ ټول موجود محصولات بیا هم کتلی شئ.",
+    "category.productsInsteadOfSubcategories":
+        "دا کټګوري فرعي کټګورۍ نه لري، نو موجود محصولات ښودل کېږي.",
     "category.subcategories": "فرعي کټګورۍ",
     "category.noProductsConfigured": "تر اوسه په دې کټګورۍ کې محصول نشته.",
     "category.viewProducts": "محصولات وګورئ",
     "category.loading": "کټګورۍ پورته کېږي…",
     "category.preparing": "د محصولاتو کتلاګ چمتو کېږي.",
     "category.empty": "کټګورۍ نشته",
-    "category.emptyHelp": "کله چې کټګورۍ په کتلاګ کې تنظیم شي، دلته به ښکاره شي.",
+    "category.emptyHelp":
+        "کله چې کټګورۍ په کتلاګ کې تنظیم شي، دلته به ښکاره شي.",
     "auth.optionalAccount": "د پېرودونکي اختیاري حساب",
     "auth.heroTitle": "ستاسو مناسب نرخ، سپارښتنې او خبرتیاوې په یوه ځای کې.",
-    "auth.heroDescription": "له حساب پرته هم پېرود کولی شئ. ننوتل ستاسو د پېرودونکي ډول، ځانګړی نرخ او د سپارښتنو تاریخ ساتي.",
+    "auth.heroDescription":
+        "له حساب پرته هم پېرود کولی شئ. ننوتل ستاسو د پېرودونکي ډول، ځانګړی نرخ او د سپارښتنو تاریخ ساتي.",
     "auth.pricingBenefit": "د پېرودونکي ډول نرخ",
-    "auth.pricingBenefitHelp": "VIP، عمده، کارکوونکی یا هر ډول چې پلورنځی یې تنظیم کړي.",
+    "auth.pricingBenefitHelp":
+        "VIP، عمده، کارکوونکی یا هر ډول چې پلورنځی یې تنظیم کړي.",
     "auth.checkoutBenefit": "د سرور له خوا تایید شوې تادیه",
-    "auth.checkoutBenefitHelp": "نرخونه او موجودي تل د سرور له خوا بیا حسابېږي.",
+    "auth.checkoutBenefitHelp":
+        "نرخونه او موجودي تل د سرور له خوا بیا حسابېږي.",
     "auth.historyBenefit": "د سپارښتنو تاریخ",
-    "auth.historyBenefitHelp": "ستاسو د سپارښتنو شمېرې له تادیې وروسته هم خوندي وي.",
-    "auth.optionalHelp": "حساب اختیاري دی؛ هر وخت دا پاڼه تړلی او د مېلمه په توګه پېرود ته دوام ورکولی شئ.",
+    "auth.historyBenefitHelp":
+        "ستاسو د سپارښتنو شمېرې له تادیې وروسته هم خوندي وي.",
+    "auth.optionalHelp":
+        "حساب اختیاري دی؛ هر وخت دا پاڼه تړلی او د مېلمه په توګه پېرود ته دوام ورکولی شئ.",
     "auth.requestError": "د حساب غوښتنه بشپړه نه شوه.",
     "auth.optionalEmail": "اختیاري، خو سپارښتنه کېږي",
     "auth.identifierPlaceholder": "you@example.com یا +93 …",
@@ -373,7 +407,8 @@ export const ps: Messages = {
     "cart.each": "هر یو",
     "cart.itemTotal": "د توکي ټول",
     "cart.quantityInput": "د {name} شمېر",
-    "cart.checkoutDisclaimer": "مالیات او د سپارلو جزئیات د تادیې پر مهال تاییدېږي.",
+    "cart.checkoutDisclaimer":
+        "مالیات او د سپارلو جزئیات د تادیې پر مهال تاییدېږي.",
     "catalog.searchAction": "لټون",
     "catalog.filterProducts": "محصولات فلټر کړئ",
     "catalog.filterDescription": "کتلاګ د محصول د جزئیاتو له مخې محدود کړئ.",
@@ -390,8 +425,10 @@ export const ps: Messages = {
     "checkout.loadingBank": "د بانک لارښوونې پورته کېږي…",
     "checkout.bankMissing": "د بانکي حساب معلومات نه دي تنظیم شوي.",
     "checkout.itemsCount": "{count} توکي",
-    "checkout.inventoryVerified": "سرور اوسني نرخونه تاییدوي او موجودي په اټومي ډول ساتي.",
-    "checkout.adminApproval": "وروستی د تادیې تایید او د سپارلو حالت د ادارې ټیم اداره کوي.",
+    "checkout.inventoryVerified":
+        "سرور اوسني نرخونه تاییدوي او موجودي په اټومي ډول ساتي.",
+    "checkout.adminApproval":
+        "وروستی د تادیې تایید او د سپارلو حالت د ادارې ټیم اداره کوي.",
     "account.guestTracking": "د مېلمه تعقیب",
     "notFound.backHome": "کور ته بېرته",
     "common.shopNow": "اوس پېرود وکړئ",
@@ -401,7 +438,8 @@ export const ps: Messages = {
     "home.goToSlide": "{number} سلایډ ته لاړ شئ",
     "home.nextSlide": "بل سلایډ",
     "home.noCategoryProducts": "محصولات به ژر اضافه شي",
-    "home.noCategoryProductsHelp": "کټګوري پرانیزئ څو موجود او راتلونکي توکي وګورئ.",
+    "home.noCategoryProductsHelp":
+        "کټګوري پرانیزئ څو موجود او راتلونکي توکي وګورئ.",
     "home.openCategory": "{category} پرانیزئ",
     "home.previousSlide": "مخکینی سلایډ",
     "home.subcategories": "فرعي کټګورۍ وګورئ",
@@ -413,7 +451,8 @@ export const ps: Messages = {
     "search.noCategories": "سمون لرونکې کټګوري ونه موندل شوه",
     "search.products": "محصولات",
     "search.typeMore": "د لټون لپاره ولیکئ",
-    "search.typeMoreHelp": "د محصول او کټګورۍ د ژوندیو پایلو لپاره لږ تر لږه دوه توري ولیکئ.",
+    "search.typeMoreHelp":
+        "د محصول او کټګورۍ د ژوندیو پایلو لپاره لږ تر لږه دوه توري ولیکئ.",
     "search.viewAll": "د لټون ټولې پایلې وګورئ",
     "footer.contactNow": "اړیکه ونیسئ",
     "header.cartEmpty": "ټوکرۍ تشه ده",
@@ -421,15 +460,19 @@ export const ps: Messages = {
     "header.savedItems": "ستاسو خوندي شوي توکي",
     "header.selectLocation": "د سپارلو ځای وټاکئ",
     "header.signInRegister": "ننوتل / نوم‌لیکنه",
-    "home.branchDescription": "د نږدې فعالې څانګې او د سپارلو سیمې د تایید لپاره له شرکت سره اړیکه ونیسئ.",
+    "home.branchDescription":
+        "د نږدې فعالې څانګې او د سپارلو سیمې د تایید لپاره له شرکت سره اړیکه ونیسئ.",
     "home.customerSupport": "د پېرودونکي ملاتړ",
     "home.deliveryTracking": "د امر تعقیب هم لري",
     "home.findNearestBranch": "تر ټولو نږدې څانګه ومومئ",
-    "home.heroFallbackDescription": "باوري محصولات له روښانه بیو، ژوندۍ موجودۍ، خوندي تادیې او باوري سپارلو سره واخلئ.",
+    "home.heroFallbackDescription":
+        "باوري محصولات له روښانه بیو، ژوندۍ موجودۍ، خوندي تادیې او باوري سپارلو سره واخلئ.",
     "home.heroFallbackTitle": "د ورځني پېرود لپاره غوره لاره.",
     "home.needHelpChoosing": "د محصول په ټاکلو کې مرستې ته اړتیا لرئ؟",
     "home.productCount": "{count} محصولات",
     "home.storeLocations": "د پلورنځي ځایونه",
-    "home.supportDescription": "د محصول موجودۍ، امر یا سپارلو مرستې لپاره د پلورنځي له ټیم سره اړیکه ونیسئ.",
-    "pwa.offlineDescription": 'آفلاین حالت: مخکې پرانیستل شوې پاڼې او محصولات شته. نوې معلومات انټرنېټ ته اړتیا لري.',
+    "home.supportDescription":
+        "د محصول موجودۍ، امر یا سپارلو مرستې لپاره د پلورنځي له ټیم سره اړیکه ونیسئ.",
+    "pwa.offlineDescription":
+        "آفلاین حالت: مخکې پرانیستل شوې پاڼې او محصولات شته. نوې معلومات انټرنېټ ته اړتیا لري.",
 };
