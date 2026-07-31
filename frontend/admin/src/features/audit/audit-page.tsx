@@ -1,12 +1,20 @@
 import { useDeferredValue, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Globe2, LoaderCircle, Search, ShieldCheck } from "lucide-react";
+import { Activity, ChevronDown, Globe2, ListFilter, LoaderCircle, Search, ShieldCheck } from "lucide-react";
 
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
     Table,
     TableBody,
@@ -17,7 +25,7 @@ import {
 } from "@/components/ui/table";
 import { useI18n } from "@/i18n/i18n-provider";
 import { auditService } from "./audit-service";
-import type { ActivityLogItem, CustomerVisitItem } from "./audit-types";
+import { AuditActions, type ActivityAction, type ActivityLogItem, type CustomerVisitItem } from "./audit-types";
 
 const PageSize = 50;
 
@@ -25,14 +33,15 @@ export default function AuditPage() {
     const { tr } = useI18n();
     const [view, setView] = useState<"activities" | "visits">("activities");
     const [search, setSearch] = useState("");
+    const [action, setAction] = useState<ActivityAction | "">("");
     const [page, setPage] = useState(1);
     const deferredSearch = useDeferredValue(search.trim());
 
-    useEffect(() => setPage(1), [view, deferredSearch]);
+    useEffect(() => setPage(1), [view, deferredSearch, action]);
 
     const activities = useQuery({
-        queryKey: ["audit", "activities", deferredSearch, page],
-        queryFn: async () => (await auditService.activities(deferredSearch, page, PageSize)).data,
+        queryKey: ["audit", "activities", deferredSearch, action, page],
+        queryFn: async () => (await auditService.activities(deferredSearch, action, page, PageSize)).data,
         enabled: view === "activities",
     });
     const visits = useQuery({
@@ -72,18 +81,50 @@ export default function AuditPage() {
                         {tr("Customer visits")}
                     </Button>
                 </div>
-                <div className="relative w-full lg:max-w-md">
-                    <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        className="ps-9"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder={tr(
-                            view === "activities"
-                                ? "Search user, action, route or IP…"
-                                : "Search customer, page, browser or IP…",
-                        )}
-                    />
+                <div className="flex w-full flex-col gap-2 sm:flex-row lg:max-w-2xl lg:justify-end">
+                    {view === "activities" ? (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger
+                                render={
+                                    <Button
+                                        variant="outline"
+                                        className="justify-between sm:min-w-44"
+                                    />
+                                }
+                            >
+                                <span className="flex items-center gap-2">
+                                    <ListFilter className="size-4" />
+                                    {action ? tr(action) : tr("All actions")}
+                                </span>
+                                <ChevronDown className="size-4 text-muted-foreground" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="max-h-80 min-w-56 overflow-y-auto">
+                                <DropdownMenuLabel>{tr("Filter by action")}</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => setAction("")}>
+                                    {tr("All actions")}
+                                </DropdownMenuItem>
+                                {AuditActions.map((item) => (
+                                    <DropdownMenuItem key={item} onClick={() => setAction(item)}>
+                                        <ActionBadge action={item} />
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : null}
+                    <div className="relative min-w-0 flex-1">
+                        <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            className="ps-9"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder={tr(
+                                view === "activities"
+                                    ? "Search user, action, route or IP…"
+                                    : "Search customer, page, browser or IP…",
+                            )}
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -147,7 +188,7 @@ function ActivityTable({ items }: { items: ActivityLogItem[] }) {
                                 <p className="text-xs text-muted-foreground">{formatDate(item.createdAt, locale)}</p>
                             </TableCell>
                             <TableCell>
-                                <Badge variant="outline">{tr(item.action)}</Badge>
+                                <ActionBadge action={item.action} />
                                 <p className="mt-1 text-xs text-muted-foreground">{tr(item.entityName)}{item.entityId ? ` #${item.entityId}` : ""}</p>
                             </TableCell>
                             <TableCell className="max-w-md">
@@ -155,7 +196,8 @@ function ActivityTable({ items }: { items: ActivityLogItem[] }) {
                                     <Badge variant={item.statusCode && item.statusCode >= 400 ? "destructive" : "secondary"}>{item.httpMethod ?? "API"} {item.statusCode ?? "—"}</Badge>
                                     <span className="text-xs text-muted-foreground">{item.durationMs ?? 0} ms</span>
                                 </div>
-                                <p className="mt-1 truncate text-xs text-muted-foreground" title={item.path ?? ""}>{item.path ?? item.description}</p>
+                                <p className="mt-1 text-xs font-medium text-foreground">{tr(item.description)}</p>
+                                <p className="mt-1 truncate text-xs text-muted-foreground" title={item.path ?? ""}>{item.path ?? "—"}</p>
                                 {item.changes ? (
                                     <details className="mt-2 rounded-lg bg-muted/45 p-2 text-xs">
                                         <summary className="cursor-pointer select-none font-medium text-foreground">
@@ -177,6 +219,26 @@ function ActivityTable({ items }: { items: ActivityLogItem[] }) {
                 </TableBody>
             </Table>
         </div>
+    );
+}
+
+function ActionBadge({ action }: { action: string }) {
+    const { tr } = useI18n();
+    const className =
+        action === "Create" || action === "Restore" || action === "Activate"
+            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+            : action === "Update" || action === "Assign" || action === "Sync"
+                ? "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300"
+                : action === "Delete" || action === "Reject" || action === "Deactivate" || action === "CancelOrder"
+                    ? "border-destructive/30 bg-destructive/10 text-destructive"
+                    : action === "Login" || action === "Approve" || action === "PlaceOrder"
+                        ? "border-primary/30 bg-primary/10 text-primary"
+                        : "border-border bg-muted/50 text-muted-foreground";
+
+    return (
+        <Badge variant="outline" className={className}>
+            {tr(action === "Create" ? "Add" : action)}
+        </Badge>
     );
 }
 

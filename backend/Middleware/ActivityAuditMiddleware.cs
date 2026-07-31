@@ -106,14 +106,28 @@ public sealed class ActivityAuditMiddleware(
     private static ActivityAction ToAction(string method, PathString path, QueryString query)
     {
         var route = path.Value ?? string.Empty;
-        if (route.Contains("approve", StringComparison.OrdinalIgnoreCase)) return ActivityAction.Approve;
-        if (route.Contains("reject", StringComparison.OrdinalIgnoreCase)) return ActivityAction.Reject;
-        if (route.Contains("change-password", StringComparison.OrdinalIgnoreCase)) return ActivityAction.ChangePassword;
-        if (route.Contains("export", StringComparison.OrdinalIgnoreCase) ||
-            route.Contains("download", StringComparison.OrdinalIgnoreCase)) return ActivityAction.Download;
-        if (route.Contains("upload", StringComparison.OrdinalIgnoreCase) ||
-            route.Contains("assets", StringComparison.OrdinalIgnoreCase)) return ActivityAction.Upload;
+
+        if (Contains(route, "logout", "sign-out", "signout")) return ActivityAction.Logout;
+        if (Contains(route, "login", "sign-in", "signin")) return ActivityAction.Login;
+        if (Contains(route, "change-password", "reset-password", "password/change")) return ActivityAction.ChangePassword;
+        if (Contains(route, "restore", "undelete")) return ActivityAction.Restore;
+        if (Contains(route, "unarchive")) return ActivityAction.Restore;
+        if (Contains(route, "archive")) return ActivityAction.Archive;
+        if (Contains(route, "deactivate", "disable")) return ActivityAction.Deactivate;
+        if (Contains(route, "activate", "enable")) return ActivityAction.Activate;
+        if (Contains(route, "approve")) return ActivityAction.Approve;
+        if (Contains(route, "reject", "decline")) return ActivityAction.Reject;
+        if (Contains(route, "cancel") && Contains(route, "order")) return ActivityAction.CancelOrder;
+        if (method == "POST" && Contains(route, "checkout", "place-order")) return ActivityAction.PlaceOrder;
+        if (method != "GET" && Contains(route, "assign", "permission", "claim")) return ActivityAction.Assign;
+        if (Contains(route, "synchronize", "synchronise", "sync")) return ActivityAction.Sync;
+        if (Contains(route, "import")) return ActivityAction.Import;
+        if (Contains(route, "export")) return ActivityAction.Export;
+        if (Contains(route, "print")) return ActivityAction.Print;
+        if (Contains(route, "download")) return ActivityAction.Download;
+        if (Contains(route, "upload", "assets")) return ActivityAction.Upload;
         if (method == "GET") return query.HasValue ? ActivityAction.Search : ActivityAction.View;
+
         return method switch
         {
             "POST" => ActivityAction.Create,
@@ -122,6 +136,10 @@ public sealed class ActivityAuditMiddleware(
             _ => ActivityAction.Other
         };
     }
+
+    private static bool Contains(string value, params string[] candidates) =>
+        candidates.Any(candidate =>
+            value.Contains(candidate, StringComparison.OrdinalIgnoreCase));
 
     private static long? TryGetCustomerId(ClaimsPrincipal principal) =>
         long.TryParse(principal.FindFirstValue(AuthClaims.CustomerId), out var customerId)

@@ -83,18 +83,32 @@ public sealed class AuditLogService(
         await context.SaveChangesAsync(ct);
     }
 
-    public async Task<AuditPageResponse<ActivityLogResponse>> GetActivityLogsAsync(string? search, int page, int pageSize, CancellationToken ct)
+    public async Task<AuditPageResponse<ActivityLogResponse>> GetActivityLogsAsync(string? search, string? action, int page, int pageSize, CancellationToken ct)
     {
         var query = context.ActivityLogs.AsNoTracking();
+        var cleanAction = Clean(action, 50);
+        if (cleanAction is not null &&
+            Enum.TryParse<ActivityAction>(cleanAction, ignoreCase: true, out var parsedAction))
+        {
+            query = query.Where(x => x.Action == parsedAction);
+        }
+
         var clean = Clean(search, 200);
         if (clean is not null)
+        {
+            var hasSearchAction = Enum.TryParse<ActivityAction>(
+                clean.Equals("add", StringComparison.OrdinalIgnoreCase) ? nameof(ActivityAction.Create) : clean,
+                ignoreCase: true,
+                out var searchAction);
             query = query.Where(x =>
+                (hasSearchAction && x.Action == searchAction) ||
                 (x.UserName != null && x.UserName.Contains(clean)) ||
                 x.EntityName.Contains(clean) ||
                 x.Description.Contains(clean) ||
                 (x.Changes != null && x.Changes.Contains(clean)) ||
                 (x.Path != null && x.Path.Contains(clean)) ||
                 (x.IpAddress != null && x.IpAddress.Contains(clean)));
+        }
 
         var paging = Normalize(page, pageSize);
         var total = await query.CountAsync(ct);

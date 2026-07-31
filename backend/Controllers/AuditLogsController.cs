@@ -14,12 +14,14 @@ public sealed class AuditLogsController(IAuditLogService service) : ApiControlle
     [HttpGet("activities")]
     public async Task<ActionResult<ApiResponse<AuditPageResponse<ActivityLogResponse>>>> Activities(
         [FromQuery] string? search,
+        [FromQuery] string? action,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         CancellationToken cancellationToken = default)
     {
         var result = await service.GetActivityLogsAsync(
             search,
+            action,
             page,
             pageSize,
             cancellationToken);

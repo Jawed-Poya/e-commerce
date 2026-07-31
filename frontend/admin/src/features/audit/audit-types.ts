@@ -39,3 +39,32 @@ export interface CustomerVisitItem {
     language: string | null;
     isAuthenticated: boolean;
 }
+
+export const AuditActions = [
+    "Create",
+    "Update",
+    "Delete",
+    "Restore",
+    "Login",
+    "Logout",
+    "View",
+    "Search",
+    "Upload",
+    "Download",
+    "Import",
+    "Export",
+    "Print",
+    "Approve",
+    "Reject",
+    "PlaceOrder",
+    "CancelOrder",
+    "ChangePassword",
+    "Archive",
+    "Activate",
+    "Deactivate",
+    "Sync",
+    "Assign",
+    "Other",
+] as const;
+
+export type AuditAction = (typeof AuditActions)[number];

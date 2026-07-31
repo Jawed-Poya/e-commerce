@@ -4,9 +4,10 @@ import type { ActivityLogItem, AuditPage, CustomerVisitItem } from "./audit-type
 const base = "/admin/audit-logs";
 
 export const auditService = {
-    activities: (search = "", page = 1, pageSize = 50) =>
+    activities: (search = "", action = "", page = 1, pageSize = 50) =>
         apiClient.get<AuditPage<ActivityLogItem>>(`${base}/activities`, {
             search: search || undefined,
+            action: action || undefined,
             page,
             pageSize,
         }),
