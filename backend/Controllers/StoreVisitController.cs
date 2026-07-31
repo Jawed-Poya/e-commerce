@@ -1,3 +1,4 @@
+using ECommerce.Entities;
 using ECommerce.Entities.Auditing.Contracts;
 using ECommerce.Services.Auditing;
 using ECommerce.Shared;
