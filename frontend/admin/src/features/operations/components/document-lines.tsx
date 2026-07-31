@@ -40,6 +40,8 @@ interface DocumentLinesProps {
     items: DocumentItem[];
     setItems: React.Dispatch<React.SetStateAction<DocumentItem[]>>;
     mode: "purchase" | "sale";
+    maximumLines: number;
+    canOverrideLineLimit: boolean;
 }
 
 const emptyItem = createEmptyDocumentItem;
@@ -84,19 +86,12 @@ function selectedBounds(item: DocumentItem, mode: "purchase" | "sale") {
 
     const product = item.product;
     const unit = currentUnit(item);
-    const factor = Math.max(unit?.conversionFactor ?? 1, 0.000001);
-    const minimum = Math.max((product?.minimumValue ?? 1) / factor, 0.001);
-    const configuredMaximum = product?.maximumValue != null
-        ? product.maximumValue / factor
-        : Number.MAX_SAFE_INTEGER;
-    const availableMaximum =
-        unit?.availableQuantity ??
-        product?.availableQuantity ??
-        Number.MAX_SAFE_INTEGER;
-
     return {
-        minimum,
-        maximum: Math.min(configuredMaximum, availableMaximum),
+        minimum: 0.001,
+        maximum:
+            unit?.availableQuantity ??
+            product?.availableQuantity ??
+            Number.MAX_SAFE_INTEGER,
     };
 }
 
@@ -125,12 +120,21 @@ function quantityError(
     return null;
 }
 
-export function DocumentLines({ items, setItems, mode }: DocumentLinesProps) {
+export function DocumentLines({
+    items,
+    setItems,
+    mode,
+    maximumLines,
+    canOverrideLineLimit,
+}: DocumentLinesProps) {
     const { formatMoney } = useCompany();
     const { tr } = useI18n();
     const linesContainerRef = useRef<HTMLDivElement>(null);
     const pendingScrollIndexRef = useRef<number | null>(null);
     const selectedIds = new Set(items.map((item) => item.productId).filter(Boolean));
+    const safeMaximumLines = Math.max(1, Math.min(maximumLines || 1, 500));
+    const effectiveMaximumLines = canOverrideLineLimit ? 500 : safeMaximumLines;
+    const atLineLimit = items.length >= effectiveMaximumLines;
 
     const summary = useMemo(() => {
         const ready = items.filter(
@@ -169,11 +173,21 @@ export function DocumentLines({ items, setItems, mode }: DocumentLinesProps) {
             ),
         );
 
-    const add = () =>
+    const add = () => {
+        if (atLineLimit) {
+            toast.error(
+                canOverrideLineLimit
+                    ? tr("A document cannot contain more than 500 product lines.")
+                    : `${tr("The configured product-line limit is")} ${safeMaximumLines}.`,
+            );
+            return;
+        }
+
         setItems((current) => {
             pendingScrollIndexRef.current = current.length;
             return [...current, emptyItem()];
         });
+    };
 
     const remove = (index: number) =>
         setItems((current) =>
@@ -206,13 +220,7 @@ export function DocumentLines({ items, setItems, mode }: DocumentLinesProps) {
         }
 
         const unit = defaultUnit(product);
-        const initialQuantity =
-            mode === "purchase"
-                ? 1
-                : Math.max(
-                      (product.minimumValue ?? 1) / unit.conversionFactor,
-                      0.001,
-                  );
+        const initialQuantity = 1;
         update(index, {
             product,
             productId: product.id,
@@ -228,13 +236,7 @@ export function DocumentLines({ items, setItems, mode }: DocumentLinesProps) {
         const product = items[index]?.product;
         if (!product) return;
 
-        const initialQuantity =
-            mode === "purchase"
-                ? 1
-                : Math.max(
-                      (product.minimumValue ?? 1) / unit.conversionFactor,
-                      0.001,
-                  );
+        const initialQuantity = 1;
         update(index, {
             unitId: unit.unitId || null,
             unitName: unit.unitName,
@@ -256,6 +258,9 @@ export function DocumentLines({ items, setItems, mode }: DocumentLinesProps) {
                             </h3>
                             <Badge variant="secondary">
                                 {items.length} {tr("lines")}
+                            </Badge>
+                            <Badge variant={atLineLimit ? "destructive" : "outline"}>
+                                {items.length}/{effectiveMaximumLines} {tr("line limit")}
                             </Badge>
                             {summary.ready > 0 ? (
                                 <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
@@ -281,6 +286,11 @@ export function DocumentLines({ items, setItems, mode }: DocumentLinesProps) {
                                 ? tr("receiving details.")
                                 : tr("selling price.")}
                         </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            {canOverrideLineLimit
+                                ? tr("You can override the configured line limit up to the system safety limit of 500 lines.")
+                                : `${tr("Configured maximum")}: ${safeMaximumLines} ${tr("lines")}.`}
+                        </p>
                     </div>
 
                     <div className="flex items-center justify-between gap-3 sm:justify-end">
@@ -297,6 +307,7 @@ export function DocumentLines({ items, setItems, mode }: DocumentLinesProps) {
                             size="lg"
                             className="min-w-32 shadow-sm"
                             onClick={add}
+                            disabled={atLineLimit}
                         >
                             <Plus className="me-1 size-4" />
                             {tr("Add product")}
@@ -468,7 +479,7 @@ export function DocumentLines({ items, setItems, mode }: DocumentLinesProps) {
                                                         )),
                                             );
                                         }}
-                                        getLabel={(product) => product.name}
+                                        getLabel={(product) => product.strength ? `${product.name} — ${product.strength}` : product.name}
                                         getDescription={(product) => {
                                             const defaultSellingUnit =
                                                 defaultUnit(product);

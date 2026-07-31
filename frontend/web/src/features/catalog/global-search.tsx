@@ -335,7 +335,7 @@ export function GlobalSearch({
                                                     {product.name}
                                                 </span>
                                                 <span className="mt-1 block truncate text-[11px] text-muted-foreground">
-                                                    {product.categoryName} · {product.stock} {t("product.availability")}
+                                                    {[product.strength, product.categoryName].filter(Boolean).join(" · ")} · {product.stock} {t("product.availability")}
                                                 </span>
                                             </span>
                                             <span className="shrink-0 text-sm font-black">

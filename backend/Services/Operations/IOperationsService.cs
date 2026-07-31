@@ -5,16 +5,17 @@ namespace ECommerce.Services.Operations;
 public interface IOperationsService
 {
     Task<OperationSummary> GetSummaryAsync(CancellationToken ct);
+    Task<OperationPolicyResponse> GetPolicyAsync(bool canOverrideLineLimits, CancellationToken ct);
     Task<IReadOnlyList<OperationProductLookup>> GetProductLookupsAsync(string? search, int take, CancellationToken ct);
     Task<IReadOnlyList<OperationCustomerLookup>> GetCustomerLookupsAsync(string? search, int take, CancellationToken ct);
     Task<IReadOnlyList<SupplierResponse>> GetSuppliersAsync(string? search, int take, CancellationToken ct);
     Task<SupplierResponse> SaveSupplierAsync(long? id, CreateSupplierRequest request, CancellationToken ct);
     Task<IReadOnlyList<PurchaseListItem>> GetPurchasesAsync(string? search, CancellationToken ct);
-    Task<PurchaseListItem> CreatePurchaseAsync(CreatePurchaseRequest request, string? userId, CancellationToken ct);
+    Task<PurchaseListItem> CreatePurchaseAsync(CreatePurchaseRequest request, string? userId, bool canOverrideLineLimits, CancellationToken ct);
     Task<IReadOnlyList<DocumentPaymentResponse>> GetPurchasePaymentsAsync(long purchaseId, CancellationToken ct);
     Task<PurchaseListItem> AddPurchasePaymentAsync(long purchaseId, RecordDocumentPaymentRequest request, string? userId, CancellationToken ct);
     Task<IReadOnlyList<InventorySaleListItem>> GetSalesAsync(string? search, CancellationToken ct);
-    Task<InventorySaleListItem> CreateSaleAsync(CreateInventorySaleRequest request, string? userId, CancellationToken ct);
+    Task<InventorySaleListItem> CreateSaleAsync(CreateInventorySaleRequest request, string? userId, bool canOverrideLineLimits, CancellationToken ct);
     Task<IReadOnlyList<DocumentPaymentResponse>> GetSalePaymentsAsync(long saleId, CancellationToken ct);
     Task<InventorySaleListItem> AddSalePaymentAsync(long saleId, RecordDocumentPaymentRequest request, string? userId, CancellationToken ct);
     Task<IReadOnlyList<StaffResponse>> GetStaffAsync(CancellationToken ct);

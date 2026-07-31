@@ -314,6 +314,12 @@ export function ProductPage() {
               {p.name}
             </h1>
 
+            {p.strength ? (
+              <p className="mt-2 text-sm font-black uppercase tracking-[0.08em] text-primary sm:text-base">
+                {p.strength}
+              </p>
+            ) : null}
+
             <p className="mt-4 text-sm leading-7 text-muted-foreground sm:mt-5 sm:text-base sm:leading-8">
               {p.shortDescription || t("product.defaultDescription")}
             </p>
