@@ -82,6 +82,8 @@ export function CompanyProvider({ children }: PropsWithChildren) {
         root.style.setProperty("--company-heading-font-ps", resolveCompanyHeadingStack("ps", settings.pashtoFontFamily));
         root.style.setProperty("--company-base-font-size", `${settings.baseFontSize}px`);
         root.dataset.language = language;
+        root.lang = language === "dr" ? "fa-AF" : language === "ps" ? "ps-AF" : "en";
+        document.body.dataset.language = language;
         document.title = company.name;
         configureMoney(
             settings.mainCurrencyCode,

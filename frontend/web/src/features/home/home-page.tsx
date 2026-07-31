@@ -3,7 +3,6 @@ import {
     ArrowLeft,
     ArrowRight,
     ArrowUpRight,
-    BadgeCheck,
     BadgePercent,
     Boxes,
     Check,
@@ -13,11 +12,8 @@ import {
     MapPin,
     PackageCheck,
     Phone,
-    RotateCcw,
-    ShieldCheck,
     ShoppingBag,
     Sparkles,
-    Truck,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -53,28 +49,7 @@ interface HeroSlide {
     product?: Product;
 }
 
-const serviceItems = [
-    {
-        icon: ShieldCheck,
-        title: "home.secureShopping",
-        description: "home.protectedCheckout",
-    },
-    {
-        icon: Truck,
-        title: "home.fastDelivery",
-        description: "home.deliveryTracking",
-    },
-    {
-        icon: RotateCcw,
-        title: "home.easyReturns",
-        description: "home.simplePolicy",
-    },
-    {
-        icon: BadgeCheck,
-        title: "home.trustedCatalog",
-        description: "home.updatedInfo",
-    },
-] as const;
+
 
 export function HomePage() {
     const location = useLocation();
@@ -217,7 +192,7 @@ export function HomePage() {
     };
 
     return (
-        <div className="mx-auto w-full max-w-[1480px] px-4 pb-12 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-[1480px] px-4 sm:px-6 lg:px-8">
             <section className="pt-4 sm:pt-7">
                 <article
                     className="relative overflow-hidden rounded-[28px] bg-[var(--brand-surface-strong)] text-white shadow-[0_28px_80px_-52px_rgba(2,20,16,.85)] ring-1 ring-white/10"
@@ -590,7 +565,7 @@ export function HomePage() {
                 </div>
             </section>
 
-            <section className="pb-10 sm:pb-14">
+            <section>
                 <SectionHeading
                     eyebrow={t("home.freshProducts")}
                     title={t("home.newArrivals")}
@@ -607,30 +582,6 @@ export function HomePage() {
                         ))}
                     </div>
                 )}
-            </section>
-
-            <section className="grid gap-3 rounded-2xl bg-muted/35 p-3 sm:grid-cols-2 lg:grid-cols-4 dark:bg-white/[0.025]">
-                {serviceItems.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                        <div
-                            key={item.title}
-                            className="flex items-center gap-3 rounded-xl bg-background/[0.75] p-4 shadow-[0_12px_26px_-28px_rgba(15,23,42,.55)] dark:bg-white/[0.035]"
-                        >
-                            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                                <Icon className="size-5" />
-                            </span>
-                            <div>
-                                <p className="text-sm font-bold">
-                                    {t(item.title)}
-                                </p>
-                                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                                    {t(item.description)}
-                                </p>
-                            </div>
-                        </div>
-                    );
-                })}
             </section>
         </div>
     );
