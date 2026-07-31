@@ -469,17 +469,22 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
         var (start, end) = ResolvePeriod(filter, 30);
         var currency = ResolveCurrency(filter.CurrencyCode, company.CurrencyCode);
         var search = CleanSearch(filter.Search);
-        var query = context.Purchases.AsNoTracking()
+        var purchaseQuery = context.Purchases.AsNoTracking()
             .Where(item => item.PurchaseDate >= start && item.PurchaseDate <= end &&
                 item.CurrencyCode == currency && item.Status != PurchaseStatus.Cancelled &&
                 (!filter.BranchId.HasValue || item.BranchId == filter.BranchId.Value));
         if (search is not null)
-            query = query.Where(item =>
+            purchaseQuery = purchaseQuery.Where(item =>
                 item.PurchaseNumber.Contains(search) ||
                 (item.ReferenceNumber != null && item.ReferenceNumber.Contains(search)) ||
-                (item.Supplier != null && item.Supplier.Name.Contains(search)));
+                (item.Supplier != null && item.Supplier.Name.Contains(search)) ||
+                item.Items.Any(line =>
+                    line.Product.Name.Contains(search) ||
+                    (line.Product.Strength != null && line.Product.Strength.Contains(search)) ||
+                    (line.Product.Barcode != null && line.Product.Barcode.Contains(search)) ||
+                    (line.LotNumber != null && line.LotNumber.Contains(search))));
 
-        var purchases = await query
+        var purchases = await purchaseQuery
             .OrderByDescending(item => item.PurchaseDate)
             .Select(item => new PurchaseDocumentRow(
                 item.PurchaseDate,
@@ -493,36 +498,70 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
                 context.Branches.Where(branch => branch.Id == item.BranchId).Select(branch => branch.Name).FirstOrDefault()))
             .ToArrayAsync(cancellationToken);
 
+        var lineQuery = context.PurchaseItems.AsNoTracking()
+            .Where(line => line.Purchase.PurchaseDate >= start && line.Purchase.PurchaseDate <= end &&
+                line.Purchase.CurrencyCode == currency && line.Purchase.Status != PurchaseStatus.Cancelled &&
+                (!filter.BranchId.HasValue || line.Purchase.BranchId == filter.BranchId.Value));
+        if (search is not null)
+            lineQuery = lineQuery.Where(line =>
+                line.Purchase.PurchaseNumber.Contains(search) ||
+                (line.Purchase.ReferenceNumber != null && line.Purchase.ReferenceNumber.Contains(search)) ||
+                (line.Purchase.Supplier != null && line.Purchase.Supplier.Name.Contains(search)) ||
+                line.Product.Name.Contains(search) ||
+                (line.Product.Strength != null && line.Product.Strength.Contains(search)) ||
+                (line.Product.Barcode != null && line.Product.Barcode.Contains(search)) ||
+                (line.LotNumber != null && line.LotNumber.Contains(search)));
+
+        var lines = await lineQuery
+            .OrderByDescending(line => line.Purchase.PurchaseDate)
+            .ThenByDescending(line => line.PurchaseId)
+            .ThenBy(line => line.Id)
+            .Select(line => new PurchaseLineDocumentRow(
+                line.Purchase.PurchaseDate,
+                line.Purchase.PurchaseNumber,
+                line.Purchase.Supplier != null ? line.Purchase.Supplier.Name : "Direct purchase",
+                line.Product.Name,
+                line.Product.Strength,
+                line.Product.Barcode,
+                line.LotNumber,
+                line.ExpireDate,
+                line.EnteredQuantity,
+                line.SelectedUnitName,
+                line.EnteredUnitCost,
+                line.LineTotal,
+                context.Branches.Where(branch => branch.Id == line.Purchase.BranchId).Select(branch => branch.Name).FirstOrDefault()))
+            .ToArrayAsync(cancellationToken);
+
         var total = purchases.Sum(item => item.Total);
         var paid = purchases.Sum(item => item.Paid);
         var model = new OperationalPdfModel(
             company,
-            "Purchases and supplier payables",
-            "Received inventory, supplier balances, and payment status",
+            "Purchases and received items",
+            "Supplier documents with product, strength, lot, expiry, quantity, and line cost",
             (start, end),
             [
                 new("Purchases", purchases.Length.ToString("N0"), Navy),
                 new("Purchased", Money(total, currency), Navy),
                 new("Paid", Money(paid, currency), Green),
                 new("Supplier balance", Money(Math.Max(0, total - paid), currency), total > paid ? Red : Green),
-                new("Items received", purchases.Sum(item => item.ItemCount).ToString("N0"), Slate)
+                new("Item lines", lines.Length.ToString("N0"), Slate)
             ],
-            ["Date", "Purchase", "Supplier", "Items", "Total", "Paid", "Balance", "Payment", "Status", "Branch"],
-            purchases.Select(item => new[]
+            ["Date", "Purchase", "Supplier", "Product / strength", "Lot", "Expiry", "Qty / unit", "Unit cost", "Line total", "Branch"],
+            lines.Select(item => new[]
             {
                 item.Date.ToString("yyyy-MM-dd"),
                 item.Reference,
                 item.Supplier,
-                item.ItemCount.ToString("N0"),
-                Money(item.Total, currency),
-                Money(item.Paid, currency),
-                Money(Math.Max(0, item.Total - item.Paid), currency),
-                item.PaymentStatus,
-                item.Status,
+                item.Strength is null ? item.Product : $"{item.Product} · {item.Strength}",
+                item.LotNumber ?? "—",
+                item.ExpireDate?.ToString("yyyy-MM-dd") ?? "—",
+                $"{item.Quantity:N3} {item.UnitName ?? "base"}",
+                Money(item.UnitCost, currency),
+                Money(item.LineTotal, currency),
                 item.Branch ?? "Company"
             }).ToArray(),
-            [.75f, 1f, 1.5f, .55f, 1f, 1f, 1f, .85f, .75f, 1f],
-            [3, 4, 5, 6]);
+            [.65f, .9f, 1.2f, 1.65f, .85f, .8f, .95f, .9f, .95f, .9f],
+            [6, 7, 8]);
 
         return CreateOperationalPdf(model);
     }
@@ -1407,6 +1446,21 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
         decimal Paid,
         string PaymentStatus,
         string Status,
+        string? Branch);
+
+    private sealed record PurchaseLineDocumentRow(
+        DateOnly Date,
+        string Reference,
+        string Supplier,
+        string Product,
+        string? Strength,
+        string? Barcode,
+        string? LotNumber,
+        DateOnly? ExpireDate,
+        decimal Quantity,
+        string? UnitName,
+        decimal UnitCost,
+        decimal LineTotal,
         string? Branch);
 
     private sealed record PayrollDocumentRow(

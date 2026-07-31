@@ -56,6 +56,11 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
     [HttpGet("purchases")]
     public async Task<IActionResult> Purchases([FromQuery] string? search, CancellationToken ct) => Ok(ApiResponse<IReadOnlyList<PurchaseListItem>>.Ok(await service.GetPurchasesAsync(search, ct)));
 
+    [Authorize(Policy = AppPermissions.PurchasesView)]
+    [HttpGet("purchases/{id:long}")]
+    public Task<IActionResult> Purchase(long id, CancellationToken ct) =>
+        Handle(async () => ApiResponse<PurchaseDetailsResponse>.Ok(await service.GetPurchaseAsync(id, ct)));
+
     [Authorize(Policy = AppPermissions.PurchasesManage)]
     [HttpPost("purchases")]
     public Task<IActionResult> CreatePurchase(CreatePurchaseRequest request, CancellationToken ct) => Handle(async () => ApiResponse<PurchaseListItem>.Ok(await service.CreatePurchaseAsync(request, UserId(), HasAnyPermission(AppPermissions.OperationLineLimitsOverride), ct), "Purchase received and stock updated."));

@@ -8,7 +8,7 @@ import {
   readReferenceItems,
   writeCachedValue,
 } from "@/features/offline/offline-reference-cache";
-import type { DocumentPayment, Expense, ExpenseCategory, ManualSale, OperationCustomer, OperationPolicy, OperationProduct, OperationSummary, Purchase, SalaryPayment, Staff, Supplier } from "./operations-types";
+import type { DocumentPayment, Expense, ExpenseCategory, ManualSale, OperationCustomer, OperationPolicy, OperationProduct, OperationSummary, Purchase, PurchaseDetails, SalaryPayment, Staff, Supplier } from "./operations-types";
 
 const base = "/admin/operations";
 
@@ -110,6 +110,7 @@ export const operationsService = {
     () => apiClient.get<Purchase[]>(`${base}/purchases`, { search: search || undefined }),
     (item, clean) => [item.purchaseNumber, item.referenceNumber, item.supplierName].some((value) => normalize(value ?? "").includes(clean)),
   ),
+  purchase: (id: number) => apiClient.get<PurchaseDetails>(`${base}/purchases/${id}`),
   createPurchase: (body: Record<string, unknown>) => postQueueable<Purchase>(`${base}/purchases`, body, "Purchase"),
   purchasePayments: (id: number) => apiClient.get<DocumentPayment[]>(`${base}/purchases/${id}/payments`),
   addPurchasePayment: (id: number, body: unknown) => apiClient.post<Purchase>(`${base}/purchases/${id}/payments`, body),
