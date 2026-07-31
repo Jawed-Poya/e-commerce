@@ -40,7 +40,7 @@ public class GeneralTypesController : ControllerBase
         return Ok(await _service.GetByIdAsync(id));
     }
 
-    [Authorize(Policy = AppPermissions.SystemManage)]
+    [Authorize(Policy = AppPermissions.GeneralTypesManage)]
     [HttpPost]
     [Consumes("application/json")]
     public async Task<IActionResult> CreateJson(
@@ -49,7 +49,7 @@ public class GeneralTypesController : ControllerBase
         return Ok(await _service.CreateAsync(model));
     }
 
-    [Authorize(Policy = AppPermissions.SystemManage)]
+    [Authorize(Policy = AppPermissions.GeneralTypesManage)]
     [HttpPost]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> Create(
@@ -93,7 +93,7 @@ public class GeneralTypesController : ControllerBase
         }
     }
 
-    [Authorize(Policy = AppPermissions.SystemManage)]
+    [Authorize(Policy = AppPermissions.GeneralTypesManage)]
     [HttpPut("{id:long}")]
     [Consumes("application/json")]
     public async Task<IActionResult> UpdateJson(
@@ -122,7 +122,7 @@ public class GeneralTypesController : ControllerBase
         return NoContent();
     }
 
-    [Authorize(Policy = AppPermissions.SystemManage)]
+    [Authorize(Policy = AppPermissions.GeneralTypesManage)]
     [HttpPut("{id:long}")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> Update(
@@ -186,7 +186,7 @@ public class GeneralTypesController : ControllerBase
         }
     }
 
-    [Authorize(Policy = AppPermissions.SystemManage)]
+    [Authorize(Policy = AppPermissions.GeneralTypesManage)]
     [HttpDelete("{id:long}")]
     public async Task<IActionResult> Delete(long id)
     {
