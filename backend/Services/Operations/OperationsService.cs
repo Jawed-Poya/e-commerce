@@ -34,6 +34,21 @@ public sealed class OperationsService(
         return new OperationSummary(purchases, sales, expenses, salaries, low);
     }
 
+    public async Task<OperationPolicyResponse> GetPolicyAsync(
+        bool canOverrideLineLimits,
+        CancellationToken ct)
+    {
+        var settings = await context.TenantSettings.AsNoTracking()
+            .Where(item => item.TenantId == companyContext.CompanyId)
+            .Select(item => new { item.MaximumPurchaseLines, item.MaximumManualSaleLines })
+            .SingleOrDefaultAsync(ct);
+
+        return new OperationPolicyResponse(
+            Math.Clamp(settings?.MaximumPurchaseLines ?? 50, 1, 500),
+            Math.Clamp(settings?.MaximumManualSaleLines ?? 50, 1, 500),
+            canOverrideLineLimits);
+    }
+
     public async Task<IReadOnlyList<OperationProductLookup>> GetProductLookupsAsync(string? search, int take, CancellationToken ct)
     {
         var defaultTypeId = await defaultCustomerTypeResolver.GetIdAsync(ct);
@@ -51,12 +66,13 @@ public sealed class OperationsService(
         if (clean is not null)
             query = query.Where(product =>
                 product.Name.Contains(clean) ||
+                (product.Strength != null && product.Strength.Contains(clean)) ||
                 (product.Barcode != null && product.Barcode.Contains(clean)) ||
                 product.UnitConversions.Any(unit => unit.IsActive && unit.Barcode != null && unit.Barcode.Contains(clean)));
 
         var products = await query
             .OrderBy(product => product.Name)
-            .Take(Math.Clamp(take, 1, 50))
+            .Take(Math.Clamp(take, 1, 500))
             .ToListAsync(ct);
 
         return products.Select(product =>
@@ -70,6 +86,7 @@ public sealed class OperationsService(
             return new OperationProductLookup(
                 product.Id,
                 product.Name,
+                product.Strength,
                 product.Barcode,
                 availableBaseQuantity,
                 basePrice,
@@ -90,7 +107,7 @@ public sealed class OperationsService(
         if (clean is not null)
             query = query.Where(x => x.FirstName.Contains(clean) || (x.LastName != null && x.LastName.Contains(clean)) || x.Phone.Contains(clean) || (x.Email != null && x.Email.Contains(clean)));
 
-        return await query.OrderByDescending(x => x.CreatedAt).Take(Math.Clamp(take, 1, 50))
+        return await query.OrderByDescending(x => x.CreatedAt).Take(Math.Clamp(take, 1, 500))
             .Select(x => new OperationCustomerLookup(
                 x.Id,
                 (x.FirstName + " " + (x.LastName ?? "")).Trim(),
@@ -108,7 +125,7 @@ public sealed class OperationsService(
         if (clean is not null)
             query = query.Where(x => x.Name.Contains(clean) || (x.Phone != null && x.Phone.Contains(clean)) || (x.ContactPerson != null && x.ContactPerson.Contains(clean)));
 
-        return await query.OrderByDescending(x => x.IsActive).ThenBy(x => x.Name).Take(Math.Clamp(take, 1, 100))
+        return await query.OrderByDescending(x => x.IsActive).ThenBy(x => x.Name).Take(Math.Clamp(take, 1, 500))
             .Select(x => new SupplierResponse(x.Id, x.Name, x.ContactPerson, x.Phone, x.Email, x.Address, x.TaxNumber, x.IsActive))
             .ToListAsync(ct);
     }
@@ -157,7 +174,7 @@ public sealed class OperationsService(
             .ToListAsync(ct);
     }
 
-    public async Task<PurchaseListItem> CreatePurchaseAsync(CreatePurchaseRequest request, string? userId, CancellationToken ct)
+    public async Task<PurchaseListItem> CreatePurchaseAsync(CreatePurchaseRequest request, string? userId, bool canOverrideLineLimits, CancellationToken ct)
     {
         var clientRequestId = Clean(request.ClientRequestId);
         if (clientRequestId is not null)
@@ -170,6 +187,7 @@ public sealed class OperationsService(
                 return MapPurchase(existing, existing.Supplier?.Name);
         }
 
+        await EnsureLineLimitAsync(request.Items.Count, isPurchase: true, canOverrideLineLimits, ct);
         ValidatePurchase(request);
         EnsureNoDuplicateProducts(request.Items.Select(item => item.ProductId), "purchase");
         var items = request.Items.ToList();
@@ -322,7 +340,7 @@ public sealed class OperationsService(
             .ToListAsync(ct);
     }
 
-    public async Task<InventorySaleListItem> CreateSaleAsync(CreateInventorySaleRequest request, string? userId, CancellationToken ct)
+    public async Task<InventorySaleListItem> CreateSaleAsync(CreateInventorySaleRequest request, string? userId, bool canOverrideLineLimits, CancellationToken ct)
     {
         var clientRequestId = Clean(request.ClientRequestId);
         if (clientRequestId is not null)
@@ -340,6 +358,7 @@ public sealed class OperationsService(
             }
         }
 
+        await EnsureLineLimitAsync(request.Items.Count, isPurchase: false, canOverrideLineLimits, ct);
         if (request.Items.Count == 0) throw new ArgumentException("At least one sale item is required.");
         if (request.Items.Any(x => x.ProductId <= 0 || x.Quantity <= 0 || x.UnitPrice < 0)) throw new ArgumentException("Every sale item requires a product, positive quantity, and non-negative price.");
         if (request.Discount < 0 || request.Tax < 0) throw new ArgumentException("Discount and tax cannot be negative.");
@@ -708,10 +727,6 @@ public sealed class OperationsService(
 
     private static void ValidateSaleQuantity(Product product, decimal baseQuantity, SelectedOperationUnit selectedUnit)
     {
-        if (product.MinimumValue.HasValue && baseQuantity < product.MinimumValue.Value)
-            throw new ArgumentException($"The minimum sale quantity for '{product.Name}' is {product.MinimumValue.Value:N3} {product.Unit?.Name ?? "base unit"}.");
-        if (product.MaximumValue.HasValue && baseQuantity > product.MaximumValue.Value)
-            throw new ArgumentException($"The maximum sale quantity for '{product.Name}' is {product.MaximumValue.Value:N3} {product.Unit?.Name ?? "base unit"}.");
 
         var availableBaseQuantity = product.UsesDisplayStock
             ? Math.Max(0, product.DisplayStockQuantity ?? 0)
@@ -801,6 +816,36 @@ public sealed class OperationsService(
         var ids = productIds.ToArray();
         if (ids.Length != ids.Distinct().Count())
             throw new ArgumentException($"A product can be selected only once in a {documentName}. Remove the duplicate line and update the original quantity instead.");
+    }
+
+
+    private async Task EnsureLineLimitAsync(
+        int lineCount,
+        bool isPurchase,
+        bool canOverrideLineLimits,
+        CancellationToken ct)
+    {
+        const int safetyMaximum = 500;
+        if (lineCount > safetyMaximum)
+            throw new ArgumentException($"A document cannot contain more than {safetyMaximum} product lines.");
+
+        if (canOverrideLineLimits) return;
+
+        var limits = await context.TenantSettings.AsNoTracking()
+            .Where(item => item.TenantId == companyContext.CompanyId)
+            .Select(item => new { item.MaximumPurchaseLines, item.MaximumManualSaleLines })
+            .SingleOrDefaultAsync(ct);
+        var maximum = isPurchase
+            ? limits?.MaximumPurchaseLines ?? 50
+            : limits?.MaximumManualSaleLines ?? 50;
+        maximum = Math.Clamp(maximum, 1, 500);
+
+        if (lineCount > maximum)
+        {
+            var document = isPurchase ? "purchase" : "manual sale";
+            throw new ArgumentException(
+                $"This {document} contains {lineCount} product lines. The company limit is {maximum}. Remove lines or ask an administrator for the operation line-limit override permission.");
+        }
     }
 
     private static void ValidatePurchase(CreatePurchaseRequest request)

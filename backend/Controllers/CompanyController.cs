@@ -149,6 +149,16 @@ public sealed class CompanyController(
         return Ok(ApiResponse<CompanyProfileResponse>.Ok(updated, "Company settings updated."));
     }
 
+    [Authorize(Policy = AppPermissions.OperationLineLimitsManage)]
+    [HttpPut("operation-limits")]
+    public async Task<ActionResult<ApiResponse<CompanyProfileResponse>>> UpdateOperationLimits(
+        UpdateOperationLimitsRequest request)
+    {
+        using var operation = ServerOperation.CreateDefaultScope();
+        var updated = await company.UpdateOperationLimitsAsync(request, operation.Token);
+        return Ok(ApiResponse<CompanyProfileResponse>.Ok(updated, "Operation line limits updated."));
+    }
+
     [Authorize(Policy = AppPermissions.CompanyBranchesManage)]
     [HttpPost("branches")]
     public async Task<ActionResult<ApiResponse<CompanyBranchResponse>>> CreateBranch(UpsertCompanyBranchRequest request)

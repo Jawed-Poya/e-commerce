@@ -11,18 +11,24 @@ using ECommerce.Entities.Products;
 using ECommerce.Entities.Storefront;
 using ECommerce.Entities.Tenancy;
 using ECommerce.Services.Company;
+using ECommerce.Services.Auditing;
+using ECommerce.Shared;
 using System.Linq.Expressions;
 using System.Security.Claims;
 using System.Text.Json;
+using System.Threading.Channels;
 using ECommerce.Entities.Users;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 public class ApplicationDbContext
     : IdentityDbContext<User, Role, string>
 {
     private readonly ICompanyContext _companyContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ActivityLogQueue _activityLogQueue;
+    private readonly ILogger<ApplicationDbContext> _logger;
 
     private static readonly HashSet<string> TrashRootTypes = new(StringComparer.Ordinal)
     {
@@ -42,14 +48,67 @@ public class ApplicationDbContext
         nameof(StorefrontContent)
     };
 
+    private static readonly HashSet<string> MutationAuditTypes = new(StringComparer.Ordinal)
+    {
+        nameof(Product),
+        nameof(ProductImage),
+        nameof(ProductPrice),
+        nameof(ProductUnitConversion),
+        nameof(ProductInventory),
+        nameof(ProductVariant),
+        nameof(InventoryTransaction),
+        nameof(InventoryLot),
+        nameof(Warehouse),
+        nameof(Customer),
+        nameof(CustomerAddress),
+        nameof(Order),
+        nameof(OrderItem),
+        nameof(Payment),
+        nameof(OrderStatusHistory),
+        nameof(GeneralType),
+        nameof(Supplier),
+        nameof(Purchase),
+        nameof(PurchaseItem),
+        nameof(PurchasePayment),
+        nameof(InventorySale),
+        nameof(InventorySaleItem),
+        nameof(InventorySalePayment),
+        nameof(Staff),
+        nameof(StaffSalaryPayment),
+        nameof(StaffSalaryInstallment),
+        nameof(ExpenseCategory),
+        nameof(Expense),
+        nameof(ProductReview),
+        nameof(StorefrontContent)
+    };
+
+    private static readonly HashSet<string> IgnoredAuditProperties = new(StringComparer.OrdinalIgnoreCase)
+    {
+        nameof(API.Entities.Common.BaseEntity.CreatedAt),
+        nameof(API.Entities.Common.BaseEntity.UpdatedAt),
+        nameof(API.Entities.Common.BaseEntity.DeletedAt),
+        nameof(API.Entities.Common.BaseEntity.TenantId),
+        nameof(API.Entities.Common.BaseEntity.BranchId),
+        "RowVersion",
+        "ConcurrencyStamp",
+        "SecurityStamp",
+        "PasswordHash",
+        "RefreshToken",
+        "Token"
+    };
+
     public ApplicationDbContext(
         DbContextOptions<ApplicationDbContext> options,
         ICompanyContext companyContext,
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor,
+        ActivityLogQueue activityLogQueue,
+        ILogger<ApplicationDbContext> logger)
         : base(options)
     {
         _companyContext = companyContext;
         _httpContextAccessor = httpContextAccessor;
+        _activityLogQueue = activityLogQueue;
+        _logger = logger;
     }
 
     public long CurrentCompanyId => _companyContext.CompanyId;
@@ -262,14 +321,153 @@ public class ApplicationDbContext
     public override int SaveChanges()
     {
         ApplyAuditFields();
-        return base.SaveChanges();
+        var audits = CaptureMutationAudits();
+        var result = base.SaveChanges();
+        QueueMutationAudits(audits, useBackPressure: true).GetAwaiter().GetResult();
+        return result;
     }
 
-    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         ApplyAuditFields();
-        return base.SaveChangesAsync(cancellationToken);
+        var audits = CaptureMutationAudits();
+        var result = await base.SaveChangesAsync(cancellationToken);
+        await QueueMutationAudits(audits, useBackPressure: true);
+        return result;
     }
+
+    private IReadOnlyList<PendingMutationAudit> CaptureMutationAudits()
+    {
+        var httpContext = _httpContextAccessor.HttpContext;
+        if (httpContext?.User.Identity?.IsAuthenticated != true)
+            return [];
+
+        return ChangeTracker.Entries<API.Entities.Common.BaseEntity>()
+            .Where(entry => MutationAuditTypes.Contains(entry.Entity.GetType().Name))
+            .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+            .Select(entry => CreatePendingMutationAudit(entry, httpContext))
+            .Where(item => item is not null)
+            .Cast<PendingMutationAudit>()
+            .ToArray();
+    }
+
+    private static PendingMutationAudit? CreatePendingMutationAudit(
+        EntityEntry<API.Entities.Common.BaseEntity> entry,
+        HttpContext httpContext)
+    {
+        var deleted = entry.State == EntityState.Deleted ||
+            (entry.State == EntityState.Modified &&
+             entry.Entity.IsDeleted &&
+             entry.Property(nameof(API.Entities.Common.BaseEntity.IsDeleted)).IsModified);
+        var action = deleted
+            ? ActivityAction.Delete
+            : entry.State == EntityState.Added
+                ? ActivityAction.Create
+                : ActivityAction.Update;
+
+        var changes = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in entry.Properties)
+        {
+            var name = property.Metadata.Name;
+            if (IgnoredAuditProperties.Contains(name) || property.Metadata.IsPrimaryKey())
+                continue;
+            if (entry.State == EntityState.Modified && !property.IsModified)
+                continue;
+
+            var original = NormalizeAuditValue(property.OriginalValue);
+            var current = NormalizeAuditValue(property.CurrentValue);
+            if (entry.State == EntityState.Modified && Equals(original, current))
+                continue;
+
+            changes[name] = entry.State == EntityState.Added
+                ? current
+                : new { oldValue = original, newValue = current };
+        }
+
+        if (action == ActivityAction.Update && changes.Count == 0)
+            return null;
+
+        var userAgent = httpContext.Request.Headers.UserAgent.ToString();
+        var device = ClientDeviceParser.Parse(userAgent);
+        var entityName = entry.Entity.GetType().Name;
+        return new PendingMutationAudit(
+            entry,
+            new ActivityLog
+            {
+                TenantId = entry.Entity.TenantId,
+                BranchId = entry.Entity.BranchId,
+                UserId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                    ?? httpContext.User.FindFirstValue("sub"),
+                UserName = httpContext.User.FindFirstValue(ClaimTypes.Name)
+                    ?? httpContext.User.Identity?.Name,
+                CustomerId = long.TryParse(httpContext.User.FindFirstValue(AuthClaims.CustomerId), out var customerId)
+                    ? customerId
+                    : null,
+                Action = action,
+                EntityName = entityName,
+                Description = $"{action} {entityName}.",
+                Changes = changes.Count == 0 ? null : JsonSerializer.Serialize(changes),
+                HttpMethod = httpContext.Request.Method,
+                Path = httpContext.Request.Path + httpContext.Request.QueryString,
+                StatusCode = StatusCodes.Status200OK,
+                RequestId = httpContext.TraceIdentifier,
+                IpAddress = httpContext.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = LimitAuditValue(userAgent, 1000),
+                DeviceType = device.DeviceType,
+                Browser = device.Browser,
+                OperatingSystem = device.OperatingSystem,
+                CreatedAt = DateTime.UtcNow
+            });
+    }
+
+    private async ValueTask QueueMutationAudits(
+        IReadOnlyCollection<PendingMutationAudit> pending,
+        bool useBackPressure)
+    {
+        foreach (var item in pending)
+        {
+            item.Log.EntityId = item.Entry.Entity.Id > 0 ? item.Entry.Entity.Id : null;
+            item.Log.TenantId = item.Entry.Entity.TenantId > 0
+                ? item.Entry.Entity.TenantId
+                : _companyContext.CompanyId;
+            item.Log.BranchId ??= item.Entry.Entity.BranchId ?? _companyContext.BranchId;
+
+            try
+            {
+                if (useBackPressure)
+                    await _activityLogQueue.EnqueueAsync(item.Log, CancellationToken.None);
+                else if (!_activityLogQueue.TryEnqueue(item.Log))
+                    await _activityLogQueue.EnqueueAsync(item.Log, CancellationToken.None);
+            }
+            catch (ChannelClosedException)
+            {
+                // The business transaction has already committed. A host
+                // shutdown must never turn that successful write into a 500.
+                _logger.LogCritical(
+                    "Audit queue closed before {EntityName} #{EntityId} could be enqueued.",
+                    item.Log.EntityName,
+                    item.Log.EntityId);
+            }
+        }
+    }
+
+    private static object? NormalizeAuditValue(object? value) => value switch
+    {
+        null => null,
+        byte[] bytes => $"[{bytes.Length} bytes]",
+        string text when text.Length > 500 => text[..500] + "…",
+        DateTime date => date.ToUniversalTime(),
+        _ => value
+    };
+
+    private static string? LimitAuditValue(string? value, int maximum) =>
+        string.IsNullOrWhiteSpace(value)
+            ? null
+            : value.Length <= maximum ? value : value[..maximum];
+
+    private sealed record PendingMutationAudit(
+        EntityEntry<API.Entities.Common.BaseEntity> Entry,
+        ActivityLog Log);
 
     private void ApplyAuditFields()
     {

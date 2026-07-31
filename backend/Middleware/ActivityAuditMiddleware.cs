@@ -3,6 +3,8 @@ using System.Security.Claims;
 using ECommerce.Entities;
 using ECommerce.Services.Auditing;
 using ECommerce.Services.Company;
+using Microsoft.AspNetCore.Mvc.Controllers;
+using System.Threading.Channels;
 
 namespace ECommerce.Shared;
 
@@ -33,7 +35,9 @@ public sealed class ActivityAuditMiddleware(
         {
             timer.Stop();
             var route = httpContext.Request.RouteValues;
-            var controller = route["controller"]?.ToString() ?? "Api";
+            var descriptor = httpContext.GetEndpoint()?.Metadata.GetMetadata<ControllerActionDescriptor>();
+            var controller = descriptor?.ControllerName ?? route["controller"]?.ToString() ?? "Api";
+            var actionName = descriptor?.ActionName ?? route["action"]?.ToString();
             var idValue = route["id"]?.ToString();
             var entityId = long.TryParse(idValue, out var parsedId) ? parsedId : (long?)null;
             var userAgent = httpContext.Request.Headers.UserAgent.ToString();
@@ -43,7 +47,7 @@ public sealed class ActivityAuditMiddleware(
                 : StatusCodes.Status500InternalServerError;
             var method = httpContext.Request.Method.ToUpperInvariant();
 
-            await queue.EnqueueAsync(new ActivityLog
+            var activity = new ActivityLog
             {
                 TenantId = companyContext.CompanyId,
                 BranchId = companyContext.BranchId,
@@ -55,7 +59,9 @@ public sealed class ActivityAuditMiddleware(
                 Action = ToAction(method, httpContext.Request.Path, httpContext.Request.QueryString),
                 EntityName = controller,
                 EntityId = entityId,
-                Description = $"{method} {httpContext.Request.Path} returned {statusCode}.",
+                Description = actionName is null
+                    ? $"{method} {httpContext.Request.Path} returned {statusCode}."
+                    : $"{controller}.{actionName} returned {statusCode}.",
                 HttpMethod = method,
                 Path = httpContext.Request.Path + httpContext.Request.QueryString,
                 StatusCode = statusCode,
@@ -67,7 +73,16 @@ public sealed class ActivityAuditMiddleware(
                 Browser = device.Browser,
                 OperatingSystem = device.OperatingSystem,
                 CreatedAt = DateTime.UtcNow
-            }, CancellationToken.None);
+            };
+
+            try
+            {
+                await queue.EnqueueAsync(activity, CancellationToken.None);
+            }
+            catch (ChannelClosedException)
+            {
+                // The host is already draining the audit queue during shutdown.
+            }
         }
     }
 

@@ -9,6 +9,13 @@ public class Product : BaseEntity
 
     public string? Barcode { get; set; }
 
+    /// <summary>
+    /// Pharmaceutical strength such as 100 mg, 500 mg, 5 mg/5 ml, or 1%.
+    /// Strength is a product identity attribute, not a selling-unit conversion.
+    /// Different strengths should use separate products/SKUs and inventories.
+    /// </summary>
+    public string? Strength { get; set; }
+
     public string? ShortDescription { get; set; }
 
     public string? Description { get; set; }

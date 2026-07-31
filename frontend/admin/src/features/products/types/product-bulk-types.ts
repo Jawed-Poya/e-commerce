@@ -34,6 +34,7 @@ export interface ProductBulkItemFormValues {
 
     name: string;
     barcode: string;
+    strength: string;
     shortDescription: string;
     description: string;
 

@@ -13,6 +13,7 @@ export interface ActivityLogItem {
     entityName: string;
     entityId: number | null;
     description: string;
+    changes: string | null;
     httpMethod: string | null;
     path: string | null;
     statusCode: number | null;

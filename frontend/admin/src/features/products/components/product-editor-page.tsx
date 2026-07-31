@@ -21,7 +21,7 @@ import { useI18n } from "@/i18n/i18n-provider";
 import { CustomerPricingFields, activePriceInputs, createCustomerPriceDrafts, validatePriceDrafts, type CustomerPriceDraft } from "./customer-pricing-fields";
 import { ProductUnitConversionsFields, validateUnitConversions } from "./product-unit-conversions-fields";
 
-const empty = { name: "", barcode: "", shortDescription: "", description: "", slug: "", categoryId: 0, brandId: null as number | null, unitId: null as number | null, minimumValue: null as number | null, maximumValue: null as number | null, usesDisplayStock: false, displayStockQuantity: null as number | null, isFeatured: false, isActive: true };
+const empty = { name: "", barcode: "", strength: "", shortDescription: "", description: "", slug: "", categoryId: 0, brandId: null as number | null, unitId: null as number | null, minimumValue: null as number | null, maximumValue: null as number | null, usesDisplayStock: false, displayStockQuantity: null as number | null, isFeatured: false, isActive: true };
 
 export function ProductEditorPage() {
   const params = useParams();
@@ -42,7 +42,7 @@ export function ProductEditorPage() {
 
   useEffect(() => {
     if (!product) return;
-    setForm({ name: product.name, barcode: product.barcode ?? "", shortDescription: product.shortDescription ?? "", description: product.description ?? "", slug: product.slug ?? "", categoryId: product.categoryId, brandId: product.brandId, unitId: product.unitId, minimumValue: product.minimumValue, maximumValue: product.maximumValue, usesDisplayStock: product.usesDisplayStock, displayStockQuantity: product.displayStockQuantity, isFeatured: product.isFeatured, isActive: product.isActive });
+    setForm({ name: product.name, barcode: product.barcode ?? "", strength: product.strength ?? "", shortDescription: product.shortDescription ?? "", description: product.description ?? "", slug: product.slug ?? "", categoryId: product.categoryId, brandId: product.brandId, unitId: product.unitId, minimumValue: product.minimumValue, maximumValue: product.maximumValue, usesDisplayStock: product.usesDisplayStock, displayStockQuantity: product.displayStockQuantity, isFeatured: product.isFeatured, isActive: product.isActive });
     setUnitConversions(product.unitConversions.filter(unit => !unit.isBaseUnit).map(unit => ({
       id: unit.id,
       unitId: unit.unitId,
@@ -125,6 +125,7 @@ export function ProductEditorPage() {
         <Card><CardHeader><CardTitle className="flex items-center gap-2"><PackagePlus className="size-5" />Product information</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-2">
           <Field label="Product name *"><Input value={form.name} onChange={e => setForm(x => ({ ...x, name: e.target.value }))} /></Field>
           <Field label="Barcode"><Input value={form.barcode} onChange={e => setForm(x => ({ ...x, barcode: e.target.value }))} /></Field>
+          <Field label={t("products.strength")}><Input value={form.strength} onChange={e => setForm(x => ({ ...x, strength: e.target.value }))} placeholder={t("products.strengthPlaceholder")} /></Field>
           <Field label="Category *"><SimpleCombobox<number> value={form.categoryId || null} onValueChange={(value) => setForm((x) => ({ ...x, categoryId: value ?? 0 }))} options={(lookups?.categories ?? []).map((option) => ({ value: option.id, label: option.name }))} placeholder="Select category" /></Field>
           <Field label="Brand"><SimpleCombobox<number> value={form.brandId} onValueChange={(value) => setForm((x) => ({ ...x, brandId: value }))} options={(lookups?.brands ?? []).map((option) => ({ value: option.id, label: option.name }))} placeholder="No brand" /></Field>
           <Field label={t("productUnits.baseUnit")}><SimpleCombobox<number> value={form.unitId} onValueChange={(value) => setForm((x) => ({ ...x, unitId: value }))} options={(lookups?.units ?? []).map((option) => ({ value: option.id, label: option.name }))} placeholder="Select base unit" /></Field>

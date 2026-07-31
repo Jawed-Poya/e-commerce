@@ -12,6 +12,7 @@ export type Product = {
     id: number;
     name: string;
     barcode: string | null;
+    strength: string | null;
     shortDescription: string | null;
     description: string | null;
     slug: string | null;

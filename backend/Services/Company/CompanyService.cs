@@ -84,6 +84,28 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
         return Map(company);
     }
 
+
+    public async Task<CompanyProfileResponse> UpdateOperationLimitsAsync(
+        UpdateOperationLimitsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOperationLimits(request);
+        var company = await LoadTrackedAsync(cancellationToken);
+        var settings = company.Setting;
+        if (settings is null)
+        {
+            settings = DefaultSettings(company.Id);
+            company.Setting = settings;
+            context.TenantSettings.Add(settings);
+        }
+
+        settings.MaximumPurchaseLines = request.MaximumPurchaseLines;
+        settings.MaximumManualSaleLines = request.MaximumManualSaleLines;
+        settings.UpdatedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync(cancellationToken);
+        return Map(company);
+    }
+
     public async Task<CompanyBranchResponse> CreateBranchAsync(
         UpsertCompanyBranchRequest request,
         CancellationToken cancellationToken = default)
@@ -199,6 +221,8 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
         settings.BaseFontSize,
         settings.TrashRetentionDays,
         settings.NotificationRetentionDays,
+        settings.MaximumPurchaseLines,
+        settings.MaximumManualSaleLines,
         settings.AllowTenantUserClaimManagement);
 
     private static TenantSetting DefaultSettings(long companyId) => new() { TenantId = companyId };
@@ -229,6 +253,15 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
             throw new ArgumentException("Base font size must be between 12 and 22.");
         if (request.TrashRetentionDays is < 1 or > 3650 || request.NotificationRetentionDays is < 1 or > 3650)
             throw new ArgumentException("Retention days must be between 1 and 3650.");
+    }
+
+
+    private static void ValidateOperationLimits(UpdateOperationLimitsRequest request)
+    {
+        if (request.MaximumPurchaseLines is < 1 or > 500)
+            throw new ArgumentException("Maximum purchase lines must be between 1 and 500.");
+        if (request.MaximumManualSaleLines is < 1 or > 500)
+            throw new ArgumentException("Maximum manual sale lines must be between 1 and 500.");
     }
 
     private static void ValidateHexColor(string? value, string name)

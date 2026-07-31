@@ -57,6 +57,7 @@ function createProductsFormData(request: CreateBulkProductsRequest): FormData {
         formData.append(`${prefix}.IsActive`, String(product.isActive));
 
         appendOptionalValue(formData, `${prefix}.Barcode`, product.barcode);
+        appendOptionalValue(formData, `${prefix}.Strength`, product.strength);
 
         appendOptionalValue(
             formData,

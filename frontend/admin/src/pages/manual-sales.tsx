@@ -79,6 +79,10 @@ export default function ManualSalesPage() {
         operationKeys.sales(deferredSearch),
         () => operationsService.sales(deferredSearch),
     );
+    const { data: operationPolicy } = useOperationQuery(
+        operationKeys.policy,
+        operationsService.policy,
+    );
 
     const [open, setOpen] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -126,30 +130,42 @@ export default function ManualSalesPage() {
     const submit = async () => {
         if (!canManage) return;
         const documentItems = getSubmittableDocumentLines(items);
+        const configuredLineLimit = operationPolicy?.maximumManualSaleLines ?? 50;
+        const effectiveLineLimit = operationPolicy?.canOverrideLineLimits
+            ? 500
+            : configuredLineLimit;
+        if (documentItems.length > effectiveLineLimit) {
+            return toast.error(
+                operationPolicy?.canOverrideLineLimits
+                    ? tr("A document cannot contain more than 500 product lines.")
+                    : `${tr("The configured product-line limit is")} ${configuredLineLimit}.`,
+            );
+        }
         if (!documentItems.length) {
-            return toast.error("Add at least one product.");
+            return toast.error(tr("Add at least one product."));
         }
         if (documentItems.some((item) => !isDocumentLineComplete(item))) {
-            return toast.error("Complete every sale line.");
+            return toast.error(tr("Complete every sale line."));
         }
         if (
             new Set(documentItems.map((item) => item.productId)).size !==
             documentItems.length
         ) {
-            return toast.error("Each product may appear only once.");
+            return toast.error(tr("Each product may appear only once."));
         }
         for (const item of documentItems) {
             const product = item.product;
             if (!product) continue;
-            if (item.quantity > product.availableQuantity) {
+            const baseQuantity = item.quantity * Math.max(item.conversionFactor, 0.000001);
+            if (baseQuantity > product.availableQuantity) {
                 return toast.error(
-                    `${product.name}: ${tr("Available quantity")} ${product.availableQuantity}.`,
+                    `${product.name}: ${tr("Available quantity")} ${product.availableQuantity} ${product.baseUnitName ?? tr("base units")}.`,
                 );
             }
         }
         if (form.paidAmount < 0 || form.paidAmount > total) {
             return toast.error(
-                "Opening payment must be between zero and the sale total.",
+                tr("Opening payment must be between zero and the sale total."),
             );
         }
 
@@ -415,7 +431,13 @@ export default function ManualSalesPage() {
                     </div>
 
                     <Separator />
-                    <DocumentLines items={items} setItems={setItems} mode="sale" />
+                    <DocumentLines
+                        items={items}
+                        setItems={setItems}
+                        mode="sale"
+                        maximumLines={operationPolicy?.maximumManualSaleLines ?? 50}
+                        canOverrideLineLimit={operationPolicy?.canOverrideLineLimits ?? false}
+                    />
                     <Separator />
 
                     <DocumentSettlementLayout

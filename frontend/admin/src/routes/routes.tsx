@@ -95,7 +95,7 @@ export const router = createBrowserRouter([
                     },
                     {
                         path: "reviews",
-                        lazy: lazyAllowed(Permissions.ProductsManage, () =>
+                        lazy: lazyAllowed(Permissions.ReviewsView, () =>
                             import("@/pages/reviews").then((module) => module.default),
                         ),
                     },
@@ -192,6 +192,7 @@ export const router = createBrowserRouter([
                                 Permissions.CompanyProfileManage,
                                 Permissions.CompanySettingsManage,
                                 Permissions.CompanyBranchesManage,
+                                Permissions.OperationLineLimitsManage,
                             ],
                             () => import("@/pages/company-settings").then((module) => module.default),
                         ),
@@ -217,13 +218,13 @@ export const router = createBrowserRouter([
                     },
                     {
                         path: "system/general-types",
-                        lazy: lazyAllowed(Permissions.SystemManage, () =>
+                        lazy: lazyAllowed(Permissions.GeneralTypesManage, () =>
                             import("@/pages/general-types").then((module) => module.default),
                         ),
                     },
                     {
                         path: "system/storefront",
-                        lazy: lazyAllowed(Permissions.SystemManage, () =>
+                        lazy: lazyAllowed(Permissions.StorefrontManage, () =>
                             import("@/pages/storefront-content")
                                 .then((module) => module.default),
                         ),

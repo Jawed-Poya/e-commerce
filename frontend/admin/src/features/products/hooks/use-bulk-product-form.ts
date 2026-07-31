@@ -58,6 +58,7 @@ function createProductDraft(file: File): ProductBulkItemFormValues {
 
         name: defaultName,
         barcode: "",
+        strength: "",
         shortDescription: "",
         description: "",
 

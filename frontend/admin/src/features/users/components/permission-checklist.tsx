@@ -1,6 +1,7 @@
 import { Check, ShieldCheck } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
+import { useI18n } from "@/i18n/i18n-provider";
 import type { PermissionGroup } from "../user-types";
 
 export function PermissionChecklist({
@@ -14,6 +15,7 @@ export function PermissionChecklist({
     onChange: (permissions: string[]) => void;
     disabled?: boolean;
 }) {
+    const { tr } = useI18n();
     const selectedSet = new Set(selected);
 
     const toggle = (permission: string, checked: boolean) => {
@@ -40,7 +42,7 @@ export function PermissionChecklist({
                     selectedSet.has(item.value),
                 ).length;
                 return (
-                    <section key={group.group} className="border bg-muted/10">
+                    <section key={tr(group.group)} className="border bg-muted/10">
                         <button
                             type="button"
                             disabled={disabled}
@@ -49,7 +51,7 @@ export function PermissionChecklist({
                         >
                             <span className="flex items-center gap-2 font-semibold">
                                 <ShieldCheck className="size-4 text-primary" />
-                                {group.group}
+                                {tr(group.group)}
                             </span>
                             <span className="text-[11px] text-muted-foreground">
                                 {selectedCount}/{group.items.length}
@@ -75,13 +77,13 @@ export function PermissionChecklist({
                                         />
                                         <span className="min-w-0 flex-1">
                                             <span className="flex items-center gap-2 text-sm font-medium">
-                                                {permission.name}
+                                                {tr(permission.name)}
                                                 {checked && (
                                                     <Check className="size-3 text-primary" />
                                                 )}
                                             </span>
                                             <span className="mt-1 block text-xs leading-5 text-muted-foreground">
-                                                {permission.description}
+                                                {tr(permission.description)}
                                             </span>
                                         </span>
                                     </label>

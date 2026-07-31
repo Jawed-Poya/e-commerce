@@ -15,6 +15,7 @@ public sealed record OperationProductUnitLookup(
 public sealed record OperationProductLookup(
     long Id,
     string Name,
+    string? Strength,
     string? Barcode,
     decimal AvailableQuantity,
     decimal? DefaultPrice,
@@ -26,6 +27,7 @@ public sealed record OperationProductLookup(
     IReadOnlyList<OperationProductUnitLookup> Units);
 public sealed record OperationCustomerLookup(long Id, string Name, string Phone, string? Email, string? CustomerTypeName);
 public sealed record OperationSummary(decimal PurchasesThisMonth, decimal SalesThisMonth, decimal ExpensesThisMonth, decimal SalariesThisMonth, int LowStockProducts);
+public sealed record OperationPolicyResponse(int MaximumPurchaseLines, int MaximumManualSaleLines, bool CanOverrideLineLimits);
 
 public sealed class CreateSupplierRequest
 {

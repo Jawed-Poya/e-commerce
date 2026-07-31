@@ -32,13 +32,8 @@ public sealed class CompanyPermissionService(ApplicationDbContext context) : ICo
         if (!claimManagementEnabled)
             return Array.Empty<string>();
 
-        var ownPermissions = user.Claims
-            .Where(claim => claim.Type == AuthClaims.Permission)
-            .Select(claim => claim.Value)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
         return AppPermissions.All
-            .Where(ownPermissions.Contains)
+            .Where(permission => AppPermissions.IsGranted(user, permission))
             .OrderBy(value => value)
             .ToArray();
     }
