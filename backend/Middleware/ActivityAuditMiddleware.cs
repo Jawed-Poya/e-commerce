@@ -10,7 +10,8 @@ namespace ECommerce.Shared;
 
 public sealed class ActivityAuditMiddleware(
     RequestDelegate next,
-    ActivityLogQueue queue)
+    ActivityLogQueue queue,
+    ILogger<ActivityAuditMiddleware> logger)
 {
     public async Task InvokeAsync(HttpContext httpContext, ICompanyContext companyContext)
     {
@@ -44,7 +45,7 @@ public sealed class ActivityAuditMiddleware(
             var device = ClientDeviceParser.Parse(userAgent);
             var statusCode = failure is null
                 ? httpContext.Response.StatusCode
-                : StatusCodes.Status500InternalServerError;
+                : ApiExceptionMiddleware.GetStatusCode(failure);
             var method = httpContext.Request.Method.ToUpperInvariant();
 
             var activity = new ActivityLog
@@ -79,9 +80,14 @@ public sealed class ActivityAuditMiddleware(
             {
                 await queue.EnqueueAsync(activity, CancellationToken.None);
             }
-            catch (ChannelClosedException)
+            catch (ChannelClosedException exception)
             {
-                // The host is already draining the audit queue during shutdown.
+                logger.LogCritical(
+                    exception,
+                    "Audit queue closed before request {RequestId} ({Method} {Path}) could be recorded.",
+                    httpContext.TraceIdentifier,
+                    method,
+                    httpContext.Request.Path);
             }
         }
     }
