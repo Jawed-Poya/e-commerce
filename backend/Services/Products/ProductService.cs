@@ -254,6 +254,7 @@ public class ProductService : IProductService
             .Include(x => x.Images)
             .Include(x => x.Prices)
             .Include(x => x.UnitConversions)
+            .Include(x => x.Inventory)
             .Where(x => ids.Contains(x.Id) && !x.IsDeleted)
             .ToDictionaryAsync(x => x.Id, cancellationToken);
 
@@ -328,11 +329,12 @@ public class ProductService : IProductService
                 if (string.IsNullOrWhiteSpace(item.Name) ||
                     !item.UnitId.HasValue || item.UnitId.Value <= 0 ||
                     (item.MinimumValue.HasValue && item.MaximumValue.HasValue && item.MinimumValue > item.MaximumValue) ||
+                    item.MinimumStockQuantity < 0 ||
                     (item.UsesDisplayStock && !item.DisplayStockQuantity.HasValue) ||
                     (item.DisplayStockQuantity.HasValue && item.DisplayStockQuantity < 0))
                     throw new ProductValidationException(new Dictionary<string, string[]>
                     {
-                        ["Products"] = ["Names and base inventory units are required, maximum value must be at least minimum value, and display stock requires a non-negative customer-visible quantity."]
+                        ["Products"] = ["Names and base inventory units are required, maximum value must be at least minimum value, minimum stock cannot be negative, and display stock requires a non-negative customer-visible quantity."]
                     });
 
                 ValidateUnitConversions(item.UnitId, item.UnitConversions, $"Products[{item.Id}].UnitConversions");
@@ -353,6 +355,12 @@ public class ProductService : IProductService
                 product.DisplayStockQuantity = item.UsesDisplayStock
                     ? item.DisplayStockQuantity ?? 0
                     : null;
+                product.Inventory ??= new ProductInventory
+                {
+                    Quantity = 0,
+                    ReservedQuantity = 0
+                };
+                product.Inventory.MinimumQuantity = item.MinimumStockQuantity;
                 product.IsFeatured = item.IsFeatured;
                 product.IsActive = item.IsActive;
                 product.UpdatedAt = DateTime.UtcNow;
@@ -840,7 +848,8 @@ public class ProductService : IProductService
                     Inventory = new ProductInventory
                     {
                         Quantity = 0,
-                        ReservedQuantity = 0
+                        ReservedQuantity = 0,
+                        MinimumQuantity = item.Request.MinimumStockQuantity
                     }
                 };
 

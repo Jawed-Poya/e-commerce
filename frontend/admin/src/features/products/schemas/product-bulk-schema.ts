@@ -67,6 +67,10 @@ export const ProductBulkItemSchema = z
             .nonnegative("Maximum value cannot be negative.")
             .nullable(),
 
+        minimumStockQuantity: z
+            .number()
+            .nonnegative("Minimum stock quantity cannot be negative."),
+
         usesDisplayStock: z.boolean(),
 
         displayStockQuantity: z

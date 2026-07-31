@@ -123,6 +123,7 @@ export const ps: Messages = {
     "product.details": "جزئیات",
     "product.information": "د محصول معلومات",
     "product.category": "کټګوري",
+    "product.strength": "قوت / دوز",
     "product.brand": "برانډ",
     "product.unit": "واحد",
     "product.chooseSellingUnit": "د پلور واحد وټاکئ",

@@ -123,6 +123,7 @@ export const dr: Messages = {
     "product.details": "جزئیات",
     "product.information": "اطلاعات محصول",
     "product.category": "دسته‌بندی",
+    "product.strength": "قدرت / دوز",
     "product.brand": "برند",
     "product.unit": "واحد",
     "product.chooseSellingUnit": "واحد فروش را انتخاب کنید",

@@ -315,9 +315,14 @@ export function ProductPage() {
             </h1>
 
             {p.strength ? (
-              <p className="mt-2 text-sm font-black uppercase tracking-[0.08em] text-primary sm:text-base">
-                {p.strength}
-              </p>
+              <div className="mt-3 inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  {t("product.strength")}
+                </span>
+                <strong className="text-sm font-black text-primary sm:text-base">
+                  {p.strength}
+                </strong>
+              </div>
             ) : null}
 
             <p className="mt-4 text-sm leading-7 text-muted-foreground sm:mt-5 sm:text-base sm:leading-8">
@@ -511,6 +516,7 @@ export function ProductPage() {
                 {[
                   [t("product.category"), p.categoryName],
                   [t("product.brand"), p.brandName],
+                  [t("product.strength"), p.strength],
                   [t("product.unit"), p.unitName],
                   [t("product.barcode"), p.barcode],
                 ]

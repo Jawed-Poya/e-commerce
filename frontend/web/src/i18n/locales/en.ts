@@ -121,6 +121,7 @@ export const en: Messages = {
     "product.details": "Details",
     "product.information": "Product information",
     "product.category": "Category",
+    "product.strength": "Strength / dosage",
     "product.brand": "Brand",
     "product.unit": "Unit",
     "product.chooseSellingUnit": "Choose selling unit",

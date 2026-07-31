@@ -83,6 +83,12 @@ function createProductsFormData(request: CreateBulkProductsRequest): FormData {
             product.maximumValue,
         );
 
+        appendOptionalValue(
+            formData,
+            `${prefix}.MinimumStockQuantity`,
+            product.minimumStockQuantity,
+        );
+
         formData.append(`${prefix}.UsesDisplayStock`, String(product.usesDisplayStock));
         if (product.usesDisplayStock) {
             appendOptionalValue(

@@ -21,7 +21,7 @@ import { useI18n } from "@/i18n/i18n-provider";
 import { CustomerPricingFields, activePriceInputs, createCustomerPriceDrafts, validatePriceDrafts, type CustomerPriceDraft } from "./customer-pricing-fields";
 import { ProductUnitConversionsFields, validateUnitConversions } from "./product-unit-conversions-fields";
 
-const empty = { name: "", barcode: "", strength: "", shortDescription: "", description: "", slug: "", categoryId: 0, brandId: null as number | null, unitId: null as number | null, minimumValue: null as number | null, maximumValue: null as number | null, usesDisplayStock: false, displayStockQuantity: null as number | null, isFeatured: false, isActive: true };
+const empty = { name: "", barcode: "", strength: "", shortDescription: "", description: "", slug: "", categoryId: 0, brandId: null as number | null, unitId: null as number | null, minimumValue: null as number | null, maximumValue: null as number | null, minimumStockQuantity: 0, usesDisplayStock: false, displayStockQuantity: null as number | null, isFeatured: false, isActive: true };
 
 export function ProductEditorPage() {
   const params = useParams();
@@ -42,7 +42,7 @@ export function ProductEditorPage() {
 
   useEffect(() => {
     if (!product) return;
-    setForm({ name: product.name, barcode: product.barcode ?? "", strength: product.strength ?? "", shortDescription: product.shortDescription ?? "", description: product.description ?? "", slug: product.slug ?? "", categoryId: product.categoryId, brandId: product.brandId, unitId: product.unitId, minimumValue: product.minimumValue, maximumValue: product.maximumValue, usesDisplayStock: product.usesDisplayStock, displayStockQuantity: product.displayStockQuantity, isFeatured: product.isFeatured, isActive: product.isActive });
+    setForm({ name: product.name, barcode: product.barcode ?? "", strength: product.strength ?? "", shortDescription: product.shortDescription ?? "", description: product.description ?? "", slug: product.slug ?? "", categoryId: product.categoryId, brandId: product.brandId, unitId: product.unitId, minimumValue: product.minimumValue, maximumValue: product.maximumValue, minimumStockQuantity: product.inventory?.minimumQuantity ?? 0, usesDisplayStock: product.usesDisplayStock, displayStockQuantity: product.displayStockQuantity, isFeatured: product.isFeatured, isActive: product.isActive });
     setUnitConversions(product.unitConversions.filter(unit => !unit.isBaseUnit).map(unit => ({
       id: unit.id,
       unitId: unit.unitId,
@@ -85,6 +85,7 @@ export function ProductEditorPage() {
     if (!form.name.trim() || !form.categoryId) return toast.error("Product name and category are required.");
     if (form.minimumValue != null && form.minimumValue < 0) return toast.error("Minimum value cannot be negative.");
     if (form.maximumValue != null && form.maximumValue < 0) return toast.error("Maximum value cannot be negative.");
+    if (form.minimumStockQuantity < 0) return toast.error("Reorder point cannot be negative.");
     if (form.minimumValue != null && form.maximumValue != null && form.minimumValue > form.maximumValue) return toast.error("Maximum value must be at least the minimum value.");
     if (form.usesDisplayStock && form.displayStockQuantity == null) return toast.error("Enter the quantity customers should see.");
     if (form.displayStockQuantity != null && form.displayStockQuantity < 0) return toast.error("Display quantity cannot be negative.");
@@ -132,6 +133,7 @@ export function ProductEditorPage() {
           <Field label="Slug"><Input value={form.slug} onChange={e => setForm(x => ({ ...x, slug: e.target.value }))} placeholder="Generated automatically when empty" /></Field>
           <Field label="Minimum value"><Input type="number" min={0} value={form.minimumValue ?? ""} onChange={e => setForm(x => ({ ...x, minimumValue: e.target.value ? Number(e.target.value) : null }))} /></Field>
           <Field label="Maximum value"><Input type="number" min={0} value={form.maximumValue ?? ""} onChange={e => setForm(x => ({ ...x, maximumValue: e.target.value ? Number(e.target.value) : null }))} /></Field>
+          <Field label={t("inventory.reorderPoint")}><Input type="number" min={0} step="0.001" value={form.minimumStockQuantity} onChange={e => setForm(x => ({ ...x, minimumStockQuantity: e.target.value === "" ? 0 : Number(e.target.value) }))} /><p className="text-xs leading-5 text-muted-foreground">{t("inventory.reorderHelp")}</p></Field>
           <div className="md:col-span-2 rounded-xl border border-primary/20 bg-primary/[0.035] p-4">
             <label className="flex cursor-pointer items-start justify-between gap-4">
               <span className="flex min-w-0 gap-3">

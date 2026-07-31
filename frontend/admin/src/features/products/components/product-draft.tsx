@@ -351,7 +351,7 @@ export function ProductDraftCard({
                         )}
                     />
 
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-4 md:grid-cols-3">
                         <div className="space-y-1.5">
                             <Label>{t("form.minimum")}</Label>
 
@@ -412,6 +412,39 @@ export function ProductDraftCard({
                             <FieldError
                                 message={productErrors?.maximumValue?.message}
                             />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label>{t("inventory.reorderPoint")}</Label>
+
+                            <Controller
+                                control={control}
+                                name={`products.${index}.minimumStockQuantity`}
+                                render={({ field }) => (
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        step="0.001"
+                                        disabled={disabled}
+                                        placeholder="0"
+                                        value={field.value}
+                                        onChange={(event) =>
+                                            field.onChange(
+                                                event.target.value === ""
+                                                    ? 0
+                                                    : Number(event.target.value),
+                                            )
+                                        }
+                                    />
+                                )}
+                            />
+
+                            <FieldError
+                                message={productErrors?.minimumStockQuantity?.message}
+                            />
+                            <p className="text-xs leading-5 text-muted-foreground">
+                                {t("inventory.reorderHelp")}
+                            </p>
                         </div>
                     </div>
 
