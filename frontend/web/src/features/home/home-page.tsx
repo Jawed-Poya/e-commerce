@@ -14,7 +14,6 @@ import {
     Phone,
     ShoppingBag,
     Sparkles,
-    ShieldCheck,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -49,6 +48,8 @@ interface HeroSlide {
     image: string;
     product?: Product;
 }
+
+
 
 export function HomePage() {
     const location = useLocation();
@@ -128,12 +129,14 @@ export function HomePage() {
                 title: hero?.title ?? t("home.pharmacyHeroTitle"),
                 description:
                     hero?.description ?? t("home.pharmacyHeroDescription"),
-                primaryText: hero?.primaryButtonText ?? t("home.shopPharmacy"),
+                primaryText:
+                    hero?.primaryButtonText ?? t("home.shopPharmacy"),
                 primaryUrl: content.data?.primaryButtonUrl ?? "/products",
-                secondaryText: hero?.secondaryButtonText ?? t("nav.categories"),
+                secondaryText:
+                    hero?.secondaryButtonText ?? t("nav.categories"),
                 secondaryUrl: content.data?.secondaryButtonUrl?.startsWith("/#")
                     ? "/#categories"
-                    : (content.data?.secondaryButtonUrl ?? "/#categories"),
+                    : content.data?.secondaryButtonUrl ?? "/#categories",
                 image:
                     imageUrl(content.data?.heroImageUrl) ?? fallbackHeroImage,
             },
@@ -183,7 +186,8 @@ export function HomePage() {
     const activeSlide = slides[slideIndex] ?? slides[0];
     const moveSlide = (direction: number) => {
         setSlideIndex(
-            (current) => (current + direction + slides.length) % slides.length,
+            (current) =>
+                (current + direction + slides.length) % slides.length,
         );
     };
 
@@ -395,9 +399,7 @@ export function HomePage() {
                                     {t("home.supportDescription")}
                                 </span>
                                 <span className="mt-4 inline-flex max-w-full items-center gap-2 text-xs font-black text-foreground">
-                                    <span className="truncate">
-                                        {supportValue}
-                                    </span>
+                                    <span className="truncate">{supportValue}</span>
                                     <ArrowUpRight className="size-3.5 shrink-0 text-primary" />
                                 </span>
                             </span>
