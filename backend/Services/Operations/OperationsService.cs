@@ -138,13 +138,38 @@ public sealed class OperationsService(
         return MapSupplier(entity);
     }
 
-    public async Task<IReadOnlyList<PurchaseListItem>> GetPurchasesAsync(CancellationToken ct) =>
-        await context.Purchases.AsNoTracking().Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value).OrderByDescending(x => x.PurchaseDate).ThenByDescending(x => x.Id).Take(500)
-            .Select(x => new PurchaseListItem(x.Id, x.PurchaseNumber, x.PurchaseDate, x.Supplier == null ? null : x.Supplier.Name, x.Items.Count, x.Total, x.PaidAmount, x.Total > x.PaidAmount ? x.Total - x.PaidAmount : 0, x.PaymentStatus, x.Status, x.CreatedAt))
+    public async Task<IReadOnlyList<PurchaseListItem>> GetPurchasesAsync(string? search, CancellationToken ct)
+    {
+        var query = context.Purchases.AsNoTracking()
+            .Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value);
+        var clean = Clean(search);
+        if (clean is not null)
+            query = query.Where(x =>
+                x.PurchaseNumber.Contains(clean) ||
+                (x.ReferenceNumber != null && x.ReferenceNumber.Contains(clean)) ||
+                (x.Supplier != null && x.Supplier.Name.Contains(clean)) ||
+                x.Items.Any(item => item.Product.Name.Contains(clean) ||
+                    (item.Product.Barcode != null && item.Product.Barcode.Contains(clean)) ||
+                    (item.LotNumber != null && item.LotNumber.Contains(clean))));
+
+        return await query.OrderByDescending(x => x.PurchaseDate).ThenByDescending(x => x.Id).Take(500)
+            .Select(x => new PurchaseListItem(x.Id, x.PurchaseNumber, x.ReferenceNumber, x.PurchaseDate, x.Supplier == null ? null : x.Supplier.Name, x.Items.Count, x.Total, x.PaidAmount, x.Total > x.PaidAmount ? x.Total - x.PaidAmount : 0, x.PaymentStatus, x.Status, x.CreatedAt))
             .ToListAsync(ct);
+    }
 
     public async Task<PurchaseListItem> CreatePurchaseAsync(CreatePurchaseRequest request, string? userId, CancellationToken ct)
     {
+        var clientRequestId = Clean(request.ClientRequestId);
+        if (clientRequestId is not null)
+        {
+            var existing = await context.Purchases.AsNoTracking()
+                .Include(x => x.Supplier)
+                .Include(x => x.Items)
+                .SingleOrDefaultAsync(x => x.ClientRequestId == clientRequestId, ct);
+            if (existing is not null)
+                return MapPurchase(existing, existing.Supplier?.Name);
+        }
+
         ValidatePurchase(request);
         EnsureNoDuplicateProducts(request.Items.Select(item => item.ProductId), "purchase");
         var items = request.Items.ToList();
@@ -198,6 +223,7 @@ public sealed class OperationsService(
             CurrencyCode = currencyCode,
             PaymentStatus = PaymentStatus(request.PaidAmount, total),
             ReferenceNumber = Clean(request.ReferenceNumber),
+            ClientRequestId = clientRequestId,
             Notes = Clean(request.Notes),
             CreatedByUserId = userId
         };
@@ -274,13 +300,46 @@ public sealed class OperationsService(
         return MapPurchase(purchase, purchase.Supplier?.Name);
     }
 
-    public async Task<IReadOnlyList<InventorySaleListItem>> GetSalesAsync(CancellationToken ct) =>
-        await context.InventorySales.AsNoTracking().Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value).OrderByDescending(x => x.SaleDate).ThenByDescending(x => x.Id).Take(500)
-            .Select(x => new InventorySaleListItem(x.Id, x.SaleNumber, x.SaleDate, x.Customer != null ? (x.Customer.FirstName + " " + (x.Customer.LastName ?? "")).Trim() : (x.CustomerName ?? "Walk-in customer"), x.Items.Count, x.Total, x.PaidAmount, x.Total > x.PaidAmount ? x.Total - x.PaidAmount : 0, x.PaymentStatus, x.CreatedAt))
+    public async Task<IReadOnlyList<InventorySaleListItem>> GetSalesAsync(string? search, CancellationToken ct)
+    {
+        var query = context.InventorySales.AsNoTracking()
+            .Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value);
+        var clean = Clean(search);
+        if (clean is not null)
+            query = query.Where(x =>
+                x.SaleNumber.Contains(clean) ||
+                (x.ReferenceNumber != null && x.ReferenceNumber.Contains(clean)) ||
+                (x.CustomerName != null && x.CustomerName.Contains(clean)) ||
+                (x.CustomerPhone != null && x.CustomerPhone.Contains(clean)) ||
+                (x.Customer != null && (x.Customer.FirstName.Contains(clean) ||
+                    (x.Customer.LastName != null && x.Customer.LastName.Contains(clean)) ||
+                    x.Customer.Phone.Contains(clean))) ||
+                x.Items.Any(item => item.Product.Name.Contains(clean) ||
+                    (item.Product.Barcode != null && item.Product.Barcode.Contains(clean))));
+
+        return await query.OrderByDescending(x => x.SaleDate).ThenByDescending(x => x.Id).Take(500)
+            .Select(x => new InventorySaleListItem(x.Id, x.SaleNumber, x.ReferenceNumber, x.SaleDate, x.Customer != null ? (x.Customer.FirstName + " " + (x.Customer.LastName ?? "")).Trim() : (x.CustomerName ?? "Walk-in customer"), x.Items.Count, x.Total, x.PaidAmount, x.Total > x.PaidAmount ? x.Total - x.PaidAmount : 0, x.PaymentStatus, x.CreatedAt))
             .ToListAsync(ct);
+    }
 
     public async Task<InventorySaleListItem> CreateSaleAsync(CreateInventorySaleRequest request, string? userId, CancellationToken ct)
     {
+        var clientRequestId = Clean(request.ClientRequestId);
+        if (clientRequestId is not null)
+        {
+            var existing = await context.InventorySales.AsNoTracking()
+                .Include(x => x.Customer)
+                .Include(x => x.Items)
+                .SingleOrDefaultAsync(x => x.ClientRequestId == clientRequestId, ct);
+            if (existing is not null)
+            {
+                var existingCustomerName = existing.Customer is null
+                    ? existing.CustomerName ?? "Walk-in customer"
+                    : (existing.Customer.FirstName + " " + (existing.Customer.LastName ?? "")).Trim();
+                return MapSale(existing, existingCustomerName);
+            }
+        }
+
         if (request.Items.Count == 0) throw new ArgumentException("At least one sale item is required.");
         if (request.Items.Any(x => x.ProductId <= 0 || x.Quantity <= 0 || x.UnitPrice < 0)) throw new ArgumentException("Every sale item requires a product, positive quantity, and non-negative price.");
         if (request.Discount < 0 || request.Tax < 0) throw new ArgumentException("Discount and tax cannot be negative.");
@@ -341,6 +400,8 @@ public sealed class OperationsService(
             PaidAmount = request.PaidAmount,
             CurrencyCode = currencyCode,
             PaymentStatus = PaymentStatus(request.PaidAmount, total),
+            ReferenceNumber = Clean(request.ReferenceNumber),
+            ClientRequestId = clientRequestId,
             Notes = Clean(request.Notes),
             CreatedByUserId = userId
         };
@@ -771,8 +832,8 @@ public sealed class OperationsService(
     private static System.Linq.Expressions.Expression<Func<InventorySalePayment, DocumentPaymentResponse>> MapSalePayment() => x => new DocumentPaymentResponse(x.Id, x.Amount, x.PaymentDate, x.PaymentMethod, x.ReferenceNumber, x.Notes, x.CreatedAt);
     private static System.Linq.Expressions.Expression<Func<StaffSalaryInstallment, DocumentPaymentResponse>> MapSalaryPayment() => x => new DocumentPaymentResponse(x.Id, x.Amount, x.PaymentDate, x.PaymentMethod, x.ReferenceNumber, x.Notes, x.CreatedAt);
 
-    private static PurchaseListItem MapPurchase(Purchase x, string? supplierName) => new(x.Id, x.PurchaseNumber, x.PurchaseDate, supplierName, x.Items.Count, x.Total, x.PaidAmount, Math.Max(0, x.Total - x.PaidAmount), x.PaymentStatus, x.Status, x.CreatedAt);
-    private static InventorySaleListItem MapSale(InventorySale x, string customerName) => new(x.Id, x.SaleNumber, x.SaleDate, customerName.Trim(), x.Items.Count, x.Total, x.PaidAmount, Math.Max(0, x.Total - x.PaidAmount), x.PaymentStatus, x.CreatedAt);
+    private static PurchaseListItem MapPurchase(Purchase x, string? supplierName) => new(x.Id, x.PurchaseNumber, x.ReferenceNumber, x.PurchaseDate, supplierName, x.Items.Count, x.Total, x.PaidAmount, Math.Max(0, x.Total - x.PaidAmount), x.PaymentStatus, x.Status, x.CreatedAt);
+    private static InventorySaleListItem MapSale(InventorySale x, string customerName) => new(x.Id, x.SaleNumber, x.ReferenceNumber, x.SaleDate, customerName.Trim(), x.Items.Count, x.Total, x.PaidAmount, Math.Max(0, x.Total - x.PaidAmount), x.PaymentStatus, x.CreatedAt);
     private static SalaryPaymentResponse MapSalary(StaffSalaryPayment x, string staffName) => new(x.Id, x.StaffId, staffName, x.PeriodYear, x.PeriodMonth, x.BaseSalary, x.Bonus, x.Deduction, x.NetAmount, x.PaidAmount, Math.Max(0, x.NetAmount - x.PaidAmount), x.PaymentStatus, x.PaidDate, x.PaymentMethod, x.ReferenceNumber, x.CreatedAt);
     private static StaffResponse MapStaff(Staff x) => new(x.Id, x.EmployeeNumber, x.FullName, x.Phone, x.Email, x.Position, x.Department, x.HireDate, x.BaseSalary, x.IsActive, x.Address, x.Notes);
     private static SupplierResponse MapSupplier(Supplier x) => new(x.Id, x.Name, x.ContactPerson, x.Phone, x.Email, x.Address, x.TaxNumber, x.IsActive);

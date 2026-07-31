@@ -1,4 +1,5 @@
 import apiClient from "@/api/api-client";
+import { postQueueable } from "@/features/offline/offline-queue";
 import type { DocumentPayment, Expense, ExpenseCategory, ManualSale, OperationCustomer, OperationProduct, OperationSummary, Purchase, SalaryPayment, Staff, Supplier } from "./operations-types";
 
 const base = "/admin/operations";
@@ -9,12 +10,12 @@ export const operationsService = {
   suppliers: async (search = "", take = 50) => (await apiClient.get<Supplier[]>(`${base}/suppliers`, { search: search || undefined, take })).data,
   suppliersResponse: (search = "", take = 50) => apiClient.get<Supplier[]>(`${base}/suppliers`, { search: search || undefined, take }),
   saveSupplier: (id: number | null, body: Omit<Supplier, "id">) => id ? apiClient.put<Supplier>(`${base}/suppliers/${id}`, body) : apiClient.post<Supplier>(`${base}/suppliers`, body),
-  purchases: () => apiClient.get<Purchase[]>(`${base}/purchases`),
-  createPurchase: (body: unknown) => apiClient.post<Purchase>(`${base}/purchases`, body),
+  purchases: (search = "") => apiClient.get<Purchase[]>(`${base}/purchases`, { search: search || undefined }),
+  createPurchase: (body: Record<string, unknown>) => postQueueable<Purchase>(`${base}/purchases`, body, "Purchase"),
   purchasePayments: (id: number) => apiClient.get<DocumentPayment[]>(`${base}/purchases/${id}/payments`),
   addPurchasePayment: (id: number, body: unknown) => apiClient.post<Purchase>(`${base}/purchases/${id}/payments`, body),
-  sales: () => apiClient.get<ManualSale[]>(`${base}/sales`),
-  createSale: (body: unknown) => apiClient.post<ManualSale>(`${base}/sales`, body),
+  sales: (search = "") => apiClient.get<ManualSale[]>(`${base}/sales`, { search: search || undefined }),
+  createSale: (body: Record<string, unknown>) => postQueueable<ManualSale>(`${base}/sales`, body, "Manual sale"),
   salePayments: (id: number) => apiClient.get<DocumentPayment[]>(`${base}/sales/${id}/payments`),
   addSalePayment: (id: number, body: unknown) => apiClient.post<ManualSale>(`${base}/sales/${id}/payments`, body),
   staff: () => apiClient.get<Staff[]>(`${base}/staff`),
