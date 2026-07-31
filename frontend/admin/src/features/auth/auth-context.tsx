@@ -11,6 +11,8 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 
+import { clearAdminPwaPrivateCaches } from "@/app/register-service-worker";
+
 import { authService } from "./auth-service";
 import {
     type AdminUnauthorizedEventDetail,
@@ -89,6 +91,7 @@ export function AdminAuthProvider({ children }: PropsWithChildren) {
     );
 
     const logout = useCallback(() => {
+        void clearAdminPwaPrivateCaches();
         clearSessionState();
     }, [clearSessionState]);
 

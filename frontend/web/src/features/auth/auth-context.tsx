@@ -9,7 +9,8 @@ import {
     type PropsWithChildren,
 } from "react";
 
-import { customerTokenKey } from "../../shared/api/api-client";
+import { clearStorefrontPwaPrivateCaches } from "../../app/register-service-worker";
+import { ApiError, customerTokenKey } from "../../shared/api/api-client";
 import { getCurrentCustomer, loginCustomer, registerCustomer } from "./auth-api";
 import type {
     AuthResponse,
@@ -61,6 +62,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     );
 
     const logout = useCallback(() => {
+        void clearStorefrontPwaPrivateCaches();
         localStorage.removeItem(customerTokenKey);
         localStorage.removeItem(sessionKey);
         setUser(null);
@@ -80,10 +82,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
             const current = await getCurrentCustomer();
             localStorage.setItem(sessionKey, JSON.stringify(current));
             setUser(current);
-        } catch {
-            localStorage.removeItem(customerTokenKey);
-            localStorage.removeItem(sessionKey);
-            setUser(null);
+        } catch (error) {
+            // A stopped API or offline device must not erase a valid local
+            // customer session. Only an explicit authorization response can
+            // invalidate the stored login.
+            if (
+                error instanceof ApiError &&
+                (error.status === 401 || error.status === 403)
+            ) {
+                localStorage.removeItem(customerTokenKey);
+                localStorage.removeItem(sessionKey);
+                setUser(null);
+            }
         } finally {
             setLoading(false);
         }
