@@ -156,6 +156,16 @@ function ActivityTable({ items }: { items: ActivityLogItem[] }) {
                                     <span className="text-xs text-muted-foreground">{item.durationMs ?? 0} ms</span>
                                 </div>
                                 <p className="mt-1 truncate text-xs text-muted-foreground" title={item.path ?? ""}>{item.path ?? item.description}</p>
+                                {item.changes ? (
+                                    <details className="mt-2 rounded-lg bg-muted/45 p-2 text-xs">
+                                        <summary className="cursor-pointer select-none font-medium text-foreground">
+                                            {tr("View changed fields")}
+                                        </summary>
+                                        <pre className="mt-2 max-h-52 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-5 text-muted-foreground" dir="ltr">
+                                            {formatAuditChanges(item.changes)}
+                                        </pre>
+                                    </details>
+                                ) : null}
                             </TableCell>
                             <TableCell>
                                 <p>{tr(item.deviceType ?? "Unknown")}</p>
@@ -219,4 +229,12 @@ function Empty({ colSpan }: { colSpan: number }) {
 
 function formatDate(value: string, locale: string) {
     return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+function formatAuditChanges(value: string) {
+    try {
+        return JSON.stringify(JSON.parse(value), null, 2);
+    } catch {
+        return value;
+    }
 }

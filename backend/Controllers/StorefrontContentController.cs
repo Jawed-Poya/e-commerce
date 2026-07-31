@@ -19,7 +19,7 @@ public sealed class StorefrontContentController(IStorefrontContentService conten
             await content.GetAsync(cancellationToken)));
     }
 
-    [Authorize(Policy = AppPermissions.SystemManage)]
+    [Authorize(Policy = AppPermissions.StorefrontManage)]
     [HttpPut]
     public async Task<ActionResult<ApiResponse<StorefrontContentResponse>>> Update(
         UpdateStorefrontContentRequest request,
@@ -37,7 +37,7 @@ public sealed class StorefrontContentController(IStorefrontContentService conten
         }
     }
 
-    [Authorize(Policy = AppPermissions.SystemManage)]
+    [Authorize(Policy = AppPermissions.StorefrontManage)]
     [HttpPost("hero-image")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(8 * 1024 * 1024)]

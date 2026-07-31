@@ -34,7 +34,7 @@ type ProtectedItem = {
     titleKey: TranslationKey;
     url: string;
     icon?: React.ReactNode;
-    permission?: string;
+    permission?: string | readonly string[];
     items?: ProtectedItem[];
 };
 
@@ -74,7 +74,7 @@ const navigation: ProtectedGroup[] = [
                 titleKey: "nav.reviews",
                 url: "/reviews",
                 icon: <Star />,
-                permission: Permissions.ProductsManage,
+                permission: Permissions.ReviewsView,
             },
             {
                 titleKey: "nav.inventory",
@@ -140,19 +140,24 @@ const navigation: ProtectedGroup[] = [
                 titleKey: "nav.companySettings",
                 url: "/company",
                 icon: <Building2 />,
-                permission: Permissions.CompanyProfileManage,
+                permission: [
+                    Permissions.CompanyProfileManage,
+                    Permissions.CompanySettingsManage,
+                    Permissions.CompanyBranchesManage,
+                    Permissions.OperationLineLimitsManage,
+                ],
             },
             {
                 titleKey: "nav.storefront",
                 url: "/system/storefront",
                 icon: <SettingsIcon />,
-                permission: Permissions.SystemManage,
+                permission: Permissions.StorefrontManage,
             },
             {
                 titleKey: "nav.generalTypes",
                 url: "/system/general-types",
                 icon: <SettingsIcon />,
-                permission: Permissions.SystemManage,
+                permission: Permissions.GeneralTypesManage,
             },
             {
                 titleKey: "nav.users",
@@ -182,6 +187,13 @@ const navigation: ProtectedGroup[] = [
     },
 ];
 
+function canAccess(user: Parameters<typeof hasPermission>[0], permission?: string | readonly string[]) {
+    if (!permission) return true;
+    return typeof permission === "string"
+        ? hasPermission(user, permission)
+        : permission.some((value) => hasPermission(user, value));
+}
+
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     const { language, t } = useI18n();
     const { user } = useAdminAuth();
@@ -194,14 +206,12 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
                     ...item,
                     items: item.items?.filter(
                         (child) =>
-                            !child.permission ||
-                            hasPermission(user, child.permission),
+                            canAccess(user, child.permission),
                     ),
                 }))
                 .filter(
                     (item) =>
-                        (!item.permission ||
-                            hasPermission(user, item.permission)) &&
+                        canAccess(user, item.permission) &&
                         (!item.items || item.items.length > 0),
                 )
                 .map((item) => ({
