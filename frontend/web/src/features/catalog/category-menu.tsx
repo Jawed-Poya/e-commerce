@@ -42,8 +42,8 @@ export function CategoryMegaMenu() {
         <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
                 <Button
-                    variant="secondary"
-                    className="group h-9 min-w-48 justify-between rounded-lg border border-primary/15 bg-primary px-3.5 font-bold text-primary-foreground shadow-none transition hover:brightness-105 data-[state=open]:brightness-95"
+                    variant="default"
+                    className="group h-9 min-w-48 justify-between rounded-lg border border-primary/20 bg-primary px-3.5 font-bold text-primary-foreground shadow-sm transition hover:bg-primary/90 data-[state=open]:bg-primary/85"
                 >
                     <span className="flex items-center gap-2.5">
                         <span className="grid size-6 place-items-center rounded-md bg-white/12">
@@ -101,8 +101,8 @@ export function CategoryMegaMenu() {
                                                 className={cn(
                                                     "group flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-200",
                                                     isActive
-                                                        ? "border-primary/15 bg-background text-primary shadow-sm"
-                                                        : "border-transparent text-muted-foreground hover:border-border/70 hover:bg-background/70 hover:text-foreground",
+                                                        ? "border-primary/20 bg-primary/[0.09] text-primary shadow-sm"
+                                                        : "border-transparent text-muted-foreground hover:border-primary/15 hover:bg-primary/[0.06] hover:text-foreground",
                                                 )}
                                             >
                                                 <span className="flex min-w-0 items-center gap-3">

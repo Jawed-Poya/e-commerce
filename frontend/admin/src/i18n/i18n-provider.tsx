@@ -14,7 +14,7 @@ import { dr } from "./locales/dr";
 import { ps } from "./locales/ps";
 
 export type Language = "en" | "ps" | "dr";
-type TranslationKey = keyof typeof en;
+export type TranslationKey = keyof typeof en;
 type TranslationResources = Record<TranslationKey, string>;
 
 const resources: Record<Language, TranslationResources> = { en, ps, dr };

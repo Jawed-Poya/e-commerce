@@ -45,6 +45,10 @@ import {
     newDocumentItem,
 } from "@/features/operations/components/document-lines";
 import {
+    getSubmittableDocumentLines,
+    isDocumentLineComplete,
+} from "@/features/operations/document-line-state";
+import {
     AmountInputRow,
     DocumentSettlementLayout,
     MoneySummaryRow,
@@ -158,14 +162,17 @@ export default function PurchasesPage() {
 
     const submit = async () => {
         if (!canManage) return;
-        if (
-            items.some(
-                (item) => !item.productId || item.quantity <= 0 || item.amount < 0,
-            )
-        ) {
+        const documentItems = getSubmittableDocumentLines(items);
+        if (!documentItems.length) {
+            return toast.error("Add at least one product.");
+        }
+        if (documentItems.some((item) => !isDocumentLineComplete(item))) {
             return toast.error("Complete every purchase line.");
         }
-        if (new Set(items.map((item) => item.productId)).size !== items.length) {
+        if (
+            new Set(documentItems.map((item) => item.productId)).size !==
+            documentItems.length
+        ) {
             return toast.error("Each product may appear only once.");
         }
         if (form.paidAmount < 0 || form.paidAmount > total) {
@@ -182,7 +189,7 @@ export default function PurchasesPage() {
                 paymentReferenceNumber: nullable(form.paymentReferenceNumber),
                 referenceNumber: nullable(form.referenceNumber),
                 notes: nullable(form.notes),
-                items: items.map((item) => ({
+                items: documentItems.map((item) => ({
                     productId: item.productId,
                     unitId: item.unitId,
                     quantity: item.quantity,

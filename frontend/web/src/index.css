@@ -23,49 +23,79 @@
 @font-face { font-family: "Bahij Zar"; src: local("Bahij Zar"); font-display: swap; }
 
 @custom-variant dark (&:is(.dark *));
+
 :root {
-  --background: #f8faf9;
-  --foreground: #10231f;
-  --card: #fff;
-  --card-foreground: #10231f;
-  --popover: #fff;
-  --popover-foreground: #10231f;
-  --primary: #0f766e;
-  --primary-foreground: #fff;
-  --secondary: #eaf7f4;
-  --secondary-foreground: #0f5f59;
-  --muted: #eef4f2;
-  --muted-foreground: #637570;
-  --accent: #fff8e8;
-  --accent-foreground: #9a5a05;
+  --theme-primary-light: #0f766e;
+  --theme-primary-foreground-light: #ffffff;
+  --theme-secondary-light: #eaf7f4;
+  --theme-secondary-foreground-light: #0f5f59;
+  --theme-background-light: #f8faf9;
+  --theme-foreground-light: #10231f;
+  --theme-card-light: #ffffff;
+  --theme-muted-light: #eef4f2;
+  --theme-muted-foreground-light: #637570;
+  --theme-accent-light: #fff8e8;
+  --theme-accent-foreground-light: #9a5a05;
+  --theme-border-light: #dce6e2;
+  --theme-input-light: #d5e1dd;
+  --theme-ring-light: #14b8a6;
+  --theme-brand-secondary-light: #f59e0b;
+  --theme-brand-surface-light: #12332d;
+  --theme-brand-surface-strong-light: #071713;
+  --theme-brand-highlight-light: #8ee8dc;
+  --theme-page-glow-light: rgba(15, 118, 110, 0.075);
+
+  --background: var(--theme-background-light);
+  --foreground: var(--theme-foreground-light);
+  --card: var(--theme-card-light);
+  --card-foreground: var(--theme-foreground-light);
+  --popover: var(--theme-card-light);
+  --popover-foreground: var(--theme-foreground-light);
+  --primary: var(--theme-primary-light);
+  --primary-foreground: var(--theme-primary-foreground-light);
+  --secondary: var(--theme-secondary-light);
+  --secondary-foreground: var(--theme-secondary-foreground-light);
+  --muted: var(--theme-muted-light);
+  --muted-foreground: var(--theme-muted-foreground-light);
+  --accent: var(--theme-accent-light);
+  --accent-foreground: var(--theme-accent-foreground-light);
   --destructive: #d92d20;
-  --border: #dce6e2;
-  --input: #d5e1dd;
-  --ring: #14b8a6;
-  --brand-orange: #f59e0b;
+  --border: var(--theme-border-light);
+  --input: var(--theme-input-light);
+  --ring: var(--theme-ring-light);
+  --brand-orange: var(--theme-brand-secondary-light);
+  --brand-surface: var(--theme-brand-surface-light);
+  --brand-surface-strong: var(--theme-brand-surface-strong-light);
+  --brand-highlight: var(--theme-brand-highlight-light);
+  --page-glow: var(--theme-page-glow-light);
   --radius: 0.625rem;
 }
 .dark {
-  --background: #071512;
-  --foreground: #eef8f5;
-  --card: #0c1d19;
-  --card-foreground: #eef8f5;
-  --popover: #0c1d19;
-  --popover-foreground: #eef8f5;
-  --primary: #2dd4bf;
-  --primary-foreground: #05201b;
-  --secondary: #12312a;
-  --secondary-foreground: #dff8f1;
-  --muted: #102720;
-  --muted-foreground: #9cb8b0;
-  --accent: #3a2b12;
-  --accent-foreground: #f8c86c;
+  --background: var(--theme-background-dark, #071512);
+  --foreground: var(--theme-foreground-dark, #eef8f5);
+  --card: var(--theme-card-dark, #0c1d19);
+  --card-foreground: var(--theme-foreground-dark, #eef8f5);
+  --popover: var(--theme-card-dark, #0c1d19);
+  --popover-foreground: var(--theme-foreground-dark, #eef8f5);
+  --primary: var(--theme-primary-dark, #2dd4bf);
+  --primary-foreground: var(--theme-primary-foreground-dark, #05201b);
+  --secondary: var(--theme-secondary-dark, #12312a);
+  --secondary-foreground: var(--theme-secondary-foreground-dark, #dff8f1);
+  --muted: var(--theme-muted-dark, #102720);
+  --muted-foreground: var(--theme-muted-foreground-dark, #9cb8b0);
+  --accent: var(--theme-accent-dark, #3a2b12);
+  --accent-foreground: var(--theme-accent-foreground-dark, #f8c86c);
   --destructive: #f97066;
-  --border: #17332d;
-  --input: #27453e;
-  --ring: #5eead4;
-  --brand-orange: #fbbf24;
+  --border: var(--theme-border-dark, #17332d);
+  --input: var(--theme-input-dark, #27453e);
+  --ring: var(--theme-ring-dark, #5eead4);
+  --brand-orange: var(--theme-brand-secondary-dark, #fbbf24);
+  --brand-surface: var(--theme-brand-surface-dark, #0b211c);
+  --brand-surface-strong: var(--theme-brand-surface-strong-dark, #04110e);
+  --brand-highlight: var(--theme-brand-highlight-dark, #8ee8dc);
+  --page-glow: var(--theme-page-glow-dark, rgba(45, 212, 191, 0.1));
 }
+
 :root {
   --blue: var(--primary);
   --orange: var(--brand-orange);
@@ -120,7 +150,14 @@ html[data-language="ps"] {
 }
 body {
   @apply m-0 min-w-80 bg-background font-sans text-foreground antialiased;
+  background-image: radial-gradient(circle at 50% -12rem, var(--page-glow), transparent 38rem);
+  background-attachment: fixed;
   overflow-x: clip;
+}
+@media (max-width: 767px) {
+  body {
+    background-attachment: scroll;
+  }
 }
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--company-heading-font, var(--company-font));
