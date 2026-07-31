@@ -26,6 +26,7 @@ export interface InventorySummary {
 export interface InventoryListItem {
     productId: number;
     name: string;
+    strength: string | null;
     barcode: string | null;
     categoryName: string;
     unitName: string | null;
@@ -35,10 +36,32 @@ export interface InventoryListItem {
     availableQuantity: number;
     minimumQuantity: number;
     expireDate: string | null;
+    activeLotCount: number;
     status: InventoryStatus;
     isExpiringSoon: boolean;
     primaryImageUrl: string | null;
     updatedAt: string;
+}
+
+
+export interface InventoryLot {
+    id: number;
+    productId: number;
+    productName: string;
+    strength: string | null;
+    barcode: string | null;
+    warehouseId: number;
+    warehouseName: string;
+    lotNumber: string | null;
+    quantity: number;
+    reservedQuantity: number;
+    availableQuantity: number;
+    unitCost: number | null;
+    manufacturedAt: string | null;
+    expiresAt: string | null;
+    isExpired: boolean;
+    isExpiringSoon: boolean;
+    createdAt: string;
 }
 
 export interface InventoryTransaction {

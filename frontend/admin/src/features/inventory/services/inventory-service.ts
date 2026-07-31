@@ -3,6 +3,7 @@ import type {
     AdjustStockRequest,
     InventoryFilters,
     InventoryOverview,
+    InventoryLot,
     InventoryTransaction,
     InventoryTransactionFilters,
     PagedResult,
@@ -13,6 +14,10 @@ import type {
 export const inventoryService = {
     getOverview(params: InventoryFilters) {
         return apiClient.get<InventoryOverview>("/inventory", params);
+    },
+
+    getLots(productId: number) {
+        return apiClient.get<InventoryLot[]>(`/inventory/${productId}/lots`);
     },
 
     getTransactions(params: InventoryTransactionFilters) {

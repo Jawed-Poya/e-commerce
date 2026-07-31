@@ -24,6 +24,23 @@ public sealed class InventoryManagementController(IInventoryService inventory) :
     }
 
     [Authorize(Policy = AppPermissions.InventoryView)]
+    [HttpGet("{productId:long}/lots")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<InventoryLotResponse>>>> GetLots(
+        long productId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await inventory.GetLotsAsync(productId, cancellationToken);
+            return Ok(ApiResponse<IReadOnlyList<InventoryLotResponse>>.Ok(result));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(ApiResponse<IReadOnlyList<InventoryLotResponse>>.Fail(exception.Message));
+        }
+    }
+
+    [Authorize(Policy = AppPermissions.InventoryView)]
     [HttpGet("transactions")]
     public async Task<ActionResult<ApiResponse<PagedResult<InventoryTransactionResponse>>>> GetTransactions(
         [FromQuery] InventoryTransactionFilter filter,
