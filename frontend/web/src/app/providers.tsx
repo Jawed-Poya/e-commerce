@@ -1,5 +1,5 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { PropsWithChildren } from "react";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { useEffect, type PropsWithChildren } from "react";
 
 import { AuthProvider } from "../features/auth/auth-context";
 import { CartProvider } from "../features/cart/cart-context";
@@ -22,11 +22,31 @@ const queryClient = new QueryClient({
     },
 });
 
+function PwaQueryCacheWarmer() {
+    const client = useQueryClient();
+
+    useEffect(() => {
+        const warmActiveQueries = () => {
+            void client.invalidateQueries({ refetchType: "active" });
+        };
+
+        window.addEventListener("pharmadb-pwa-ready", warmActiveQueries);
+        return () =>
+            window.removeEventListener(
+                "pharmadb-pwa-ready",
+                warmActiveQueries,
+            );
+    }, [client]);
+
+    return null;
+}
+
 export function AppProviders({ children }: PropsWithChildren) {
     return (
         <ThemeProvider>
             <I18nProvider>
                 <QueryClientProvider client={queryClient}>
+                    <PwaQueryCacheWarmer />
                     <CompanyProvider>
                         <AuthProvider>
                             <CartProvider>

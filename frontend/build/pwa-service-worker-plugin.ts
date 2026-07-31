@@ -19,8 +19,9 @@ async function walk(directory: string, root = directory): Promise<string[]> {
 
 /**
  * Injects every production asset into the custom service worker without adding
- * another PWA dependency. Development still uses the public worker's
- * network-first runtime cache, while production receives a complete app shell.
+ * another PWA dependency. Normal development keeps service workers disabled;
+ * explicit PWA development warms runtime modules, while production receives
+ * a complete versioned application shell.
  */
 export function pwaServiceWorkerPlugin({ cachePrefix }: PwaServiceWorkerOptions): Plugin {
     let config: ResolvedConfig;
@@ -35,14 +36,18 @@ export function pwaServiceWorkerPlugin({ cachePrefix }: PwaServiceWorkerOptions)
             const outputDirectory = path.resolve(config.root, config.build.outDir);
             const workerPath = path.join(outputDirectory, "service-worker.js");
             const worker = await fs.readFile(workerPath, "utf8");
-            const files = (await walk(outputDirectory))
+            const outputFiles = (await walk(outputDirectory))
                 .filter((file) => file !== "service-worker.js" && !file.endsWith(".map"))
-                .map((file) => `/${file}`)
                 .sort();
-            const fingerprint = createHash("sha256")
-                .update(files.join("\n"))
-                .digest("hex")
-                .slice(0, 12);
+            const files = outputFiles.map((file) => `/${file}`);
+            const contentHash = createHash("sha256");
+            for (const file of outputFiles) {
+                contentHash.update(file);
+                contentHash.update("\0");
+                contentHash.update(await fs.readFile(path.join(outputDirectory, file)));
+                contentHash.update("\0");
+            }
+            const fingerprint = contentHash.digest("hex").slice(0, 12);
             const generated = worker
                 .replace('const BUILD_PRECACHE = [];', `const BUILD_PRECACHE = ${JSON.stringify(files)};`)
                 .replace('__BUILD_CACHE_VERSION__', `${cachePrefix}-${fingerprint}`);
