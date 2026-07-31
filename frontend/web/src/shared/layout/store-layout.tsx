@@ -1,5 +1,6 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import {
+    BadgeCheck,
     Check,
     Heart,
     House,
@@ -7,11 +8,13 @@ import {
     Mail,
     MapPin,
     Menu,
+    RotateCcw,
     Phone,
     Share2,
     ShieldCheck,
     ShoppingBag,
     Store,
+    Truck,
     UserRound,
     X,
 } from "lucide-react";
@@ -36,6 +39,30 @@ import { ThemeToggle } from "../components/theme-toggle";
 import { Button } from "../components/ui/button";
 import { formatMoney } from "../lib/money";
 import { cn } from "../lib/utils";
+
+
+const footerTrustItems = [
+    {
+        icon: ShieldCheck,
+        title: "home.secureShopping",
+        description: "home.protectedCheckout",
+    },
+    {
+        icon: Truck,
+        title: "home.fastDelivery",
+        description: "home.deliveryTracking",
+    },
+    {
+        icon: RotateCcw,
+        title: "home.easyReturns",
+        description: "home.simplePolicy",
+    },
+    {
+        icon: BadgeCheck,
+        title: "home.trustedCatalog",
+        description: "home.updatedInfo",
+    },
+] as const;
 
 type StoreNavItem = {
     to: string;
@@ -407,7 +434,13 @@ export function StoreLayout() {
                 <Outlet />
             </main>
 
-            <footer className="mt-20 bg-card">
+            <footer
+                className={cn(
+                    "bg-card",
+                    location.pathname === "/" ? "mt-0" : "mt-20",
+                )}
+            >
+                <FooterTrustStrip />
                 <div className="mx-auto grid w-full max-w-[1480px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-[1.2fr_.72fr_.72fr_1.15fr] lg:px-8">
                     <div>
                         <Logo />
@@ -631,6 +664,39 @@ export function StoreLayout() {
                 </Dialog.Portal>
             </Dialog.Root>
         </div>
+    );
+}
+
+
+function FooterTrustStrip() {
+    const { t } = useI18n();
+
+    return (
+        <section className="bg-muted/[0.42] dark:bg-white/[0.025]">
+            <div className="mx-auto grid w-full max-w-[1480px] gap-3 px-4 py-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
+                {footerTrustItems.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                        <div
+                            key={item.title}
+                            className="flex min-w-0 items-center gap-3 rounded-2xl bg-background/80 p-4 shadow-[0_14px_34px_-32px_rgba(15,23,42,.45)] dark:bg-white/[0.035]"
+                        >
+                            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+                                <Icon className="size-5" />
+                            </span>
+                            <span className="min-w-0">
+                                <span className="block truncate text-sm font-black text-foreground">
+                                    {t(item.title)}
+                                </span>
+                                <span className="mt-1 block truncate text-xs text-muted-foreground">
+                                    {t(item.description)}
+                                </span>
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+        </section>
     );
 }
 

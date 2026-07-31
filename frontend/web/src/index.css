@@ -163,6 +163,13 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--company-heading-font, var(--company-font));
 }
 button, input, textarea, select { font-family: inherit; }
+input[type="number"],
+.tabular-nums,
+[data-localized-number] {
+  font-family: var(--company-font) !important;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
 main { min-width: 0; }
 img { max-width: 100%; }
 section { scroll-margin-top: 7rem; }
