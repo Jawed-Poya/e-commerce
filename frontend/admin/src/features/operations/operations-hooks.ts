@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 export const operationKeys = {
     all: ["operations"] as const,
     summary: ["operations", "summary"] as const,
+    policy: ["operations", "policy"] as const,
     suppliers: ["operations", "suppliers"] as const,
     purchaseRoot: ["operations", "purchases"] as const,
     purchases: (search = "") => ["operations", "purchases", search] as const,

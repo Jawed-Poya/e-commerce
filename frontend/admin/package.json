@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "pwa:serve": "npm run build && vite preview --host 0.0.0.0",
     "clean": "node ../../scripts/clean-node-modules.mjs",
     "reinstall": "npm run clean && npm cache verify && npm ci"
   },
