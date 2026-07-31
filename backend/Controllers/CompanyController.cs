@@ -24,6 +24,75 @@ public sealed class CompanyController(
             operation.Token)));
     }
 
+
+    [AllowAnonymous]
+    [HttpGet("manifest.webmanifest")]
+    public async Task<IActionResult> GetManifest([FromQuery] string? app = null)
+    {
+        using var operation = ServerOperation.CreateReadScope();
+        var profile = await TransientSqlRetry.ExecuteAsync(
+            token => company.GetPublicProfileAsync(token),
+            operation.Token);
+
+        string? AssetUrl(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return null;
+            if (Uri.TryCreate(path, UriKind.Absolute, out var absolute)) return absolute.ToString();
+            var normalized = path.StartsWith('/') ? path : $"/{path}";
+            return $"{Request.Scheme}://{Request.Host}{normalized}";
+        }
+
+        var icon = AssetUrl(profile.FaviconUrl) ?? AssetUrl(profile.LogoUrl);
+        var requestOrigin = Request.Headers.Origin.FirstOrDefault();
+        Uri? clientOrigin = Uri.TryCreate(requestOrigin, UriKind.Absolute, out var parsedOrigin)
+            ? parsedOrigin
+            : null;
+        if (clientOrigin is null)
+        {
+            var refererValue = Request.Headers.Referer.FirstOrDefault();
+            if (Uri.TryCreate(refererValue, UriKind.Absolute, out var referer))
+                clientOrigin = new Uri(referer.GetLeftPart(UriPartial.Authority));
+        }
+        clientOrigin ??= new Uri($"{Request.Scheme}://{Request.Host}");
+
+        var appRoot = clientOrigin.ToString().TrimEnd('/') + "/";
+        var isAdmin = string.Equals(app, "admin", StringComparison.OrdinalIgnoreCase);
+        var appName = isAdmin ? $"{profile.Name} Admin" : profile.Name;
+        var icons = icon is null
+            ? Array.Empty<object>()
+            : new object[]
+            {
+                new { src = icon, sizes = "192x192", purpose = "any" },
+                new { src = icon, sizes = "512x512", purpose = "any maskable" }
+            };
+
+        Response.Headers["Cache-Control"] = "no-cache, max-age=0";
+        return new JsonResult(new
+        {
+            id = isAdmin ? $"{appRoot}#admin" : $"{appRoot}#storefront",
+            name = appName,
+            short_name = appName.Length > 24 ? appName[..24] : appName,
+            description = isAdmin
+                ? $"Manage {profile.Name} products, inventory, sales, purchases, and reports."
+                : $"Shop from {profile.Name} and track orders from any device.",
+            start_url = appRoot,
+            scope = appRoot,
+            display = "standalone",
+            orientation = "any",
+            background_color = "#ffffff",
+            theme_color = isAdmin
+                ? profile.Settings.AdminPrimaryColor
+                : profile.Settings.StorefrontPrimaryColor,
+            categories = isAdmin
+                ? new[] { "business", "productivity" }
+                : new[] { "shopping", "business", "medical" },
+            icons
+        })
+        {
+            ContentType = "application/manifest+json"
+        };
+    }
+
     [Authorize]
     [HttpGet("profile")]
     public async Task<ActionResult<ApiResponse<CompanyProfileResponse>>> GetProfile()

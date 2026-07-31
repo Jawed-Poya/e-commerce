@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AdminAuthProvider } from "@/features/auth/auth-context";
 import { CompanyProvider } from "@/features/company/company-context";
 import { AdminNotificationProvider } from "@/features/notifications/admin-notification-context";
+import { OfflineSyncManager } from "@/features/offline/offline-sync-manager";
 import { I18nProvider } from "@/i18n/i18n-provider";
 
 const queryClient = new QueryClient({
@@ -29,6 +30,7 @@ export function AdminProviders({ children }: PropsWithChildren) {
                     <CompanyProvider>
                         <AdminAuthProvider>
                             <AdminNotificationProvider>
+                                <OfflineSyncManager />
                                 {children}
                             </AdminNotificationProvider>
                         </AdminAuthProvider>

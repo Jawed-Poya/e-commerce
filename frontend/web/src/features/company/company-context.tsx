@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useMemo, type PropsWithChildren } from "react";
 
 import { useI18n } from "../../i18n/i18n-provider";
-import { apiGet, imageUrl } from "../../shared/api/api-client";
+import { apiBaseUrl, apiGet, imageUrl } from "../../shared/api/api-client";
 import { configureMoney } from "../../shared/lib/money";
 import { resolveCompanyFontStack, resolveCompanyHeadingStack } from "./company-fonts";
 import { applyStorefrontTheme } from "./storefront-theme";
@@ -82,21 +82,36 @@ export function CompanyProvider({ children }: PropsWithChildren) {
         root.style.setProperty("--company-heading-font-ps", resolveCompanyHeadingStack("ps", settings.pashtoFontFamily));
         root.style.setProperty("--company-base-font-size", `${settings.baseFontSize}px`);
         root.dataset.language = language;
+        root.lang = language === "dr" ? "fa-AF" : language === "ps" ? "ps-AF" : "en";
+        document.body.dataset.language = language;
         document.title = company.name;
         configureMoney(
             settings.mainCurrencyCode,
             settings.currencyDecimalPlaces,
             language === "en" ? "en-US" : language === "ps" ? "ps-AF" : "fa-AF",
         );
-        if (company.faviconUrl) {
+        const favicon = imageUrl(company.faviconUrl) ?? company.faviconUrl;
+        const logo = imageUrl(company.logoUrl) ?? company.logoUrl;
+        const appIcon = favicon || logo;
+        if (appIcon) {
             let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
             if (!link) {
                 link = document.createElement("link");
                 link.rel = "icon";
                 document.head.appendChild(link);
             }
-            link.href = imageUrl(company.faviconUrl) ?? company.faviconUrl;
+            link.href = appIcon;
         }
+
+        const touchIcon = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+        if (touchIcon && appIcon) touchIcon.href = appIcon;
+
+        const manifestLink = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+        if (manifestLink) {
+            manifestLink.href = `${apiBaseUrl}/company/manifest.webmanifest`;
+            manifestLink.crossOrigin = "anonymous";
+        }
+
     }, [company, language]);
 
     const value = useMemo<CompanyContextValue>(

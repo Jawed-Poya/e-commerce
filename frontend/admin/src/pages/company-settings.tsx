@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, ImagePlus, LoaderCircle, MapPin, Pencil, Plus, Save, Settings2, UploadCloud, X } from "lucide-react";
+import { Building2, CheckCircle2, ImagePlus, LoaderCircle, MapPin, MonitorSmartphone, Pencil, Plus, Save, Settings2, UploadCloud, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { apiOrigin } from "@/api/axios";
@@ -198,23 +198,40 @@ export default function CompanySettingsPage() {
                             <Field label="Registration number"><Input value={profile.registrationNumber ?? ""} onChange={(event) => setProfile({ ...profile, registrationNumber: nullable(event.target.value) })} /></Field>
                             <Field label="Email"><Input type="email" value={profile.email ?? ""} onChange={(event) => setProfile({ ...profile, email: nullable(event.target.value) })} /></Field>
                             <Field label="Phone"><Input value={profile.phone ?? ""} onChange={(event) => setProfile({ ...profile, phone: nullable(event.target.value) })} /></Field>
-                            <BrandAssetUploader
-                                assetType="logo"
-                                label="Company logo"
-                                description="Upload a transparent PNG, JPG, WEBP, or AVIF logo up to 5 MB."
-                                value={profile.logoUrl}
-                                disabled={!canManageProfile}
-                                onChange={(logoUrl) => setProfile({ ...profile, logoUrl })}
-                            />
-                            <BrandAssetUploader
-                                assetType="favicon"
-                                label="Browser favicon"
-                                description="Use a square image for browser tabs and saved shortcuts."
-                                value={profile.faviconUrl}
-                                disabled={!canManageProfile}
-                                compact
-                                onChange={(faviconUrl) => setProfile({ ...profile, faviconUrl })}
-                            />
+                            <section className="space-y-4 rounded-2xl bg-muted/35 p-4 sm:col-span-2">
+                                <div className="flex items-start gap-3">
+                                    <div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
+                                        <MonitorSmartphone className="size-5" />
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold">Brand assets</p>
+                                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                            These images are used by the admin header, storefront, browser tab, shortcuts, and installed PWA.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,.8fr)]">
+                                    <BrandAssetUploader
+                                        assetType="logo"
+                                        label="Company logo"
+                                        description="Recommended: transparent image, at least 512 × 256 pixels."
+                                        value={profile.logoUrl}
+                                        disabled={!canManageProfile}
+                                        companyName={profile.name}
+                                        onChange={(logoUrl) => setProfile({ ...profile, logoUrl })}
+                                    />
+                                    <BrandAssetUploader
+                                        assetType="favicon"
+                                        label="Favicon and app icon"
+                                        description="Recommended: square image, at least 512 × 512 pixels."
+                                        value={profile.faviconUrl}
+                                        disabled={!canManageProfile}
+                                        compact
+                                        companyName={profile.name}
+                                        onChange={(faviconUrl) => setProfile({ ...profile, faviconUrl })}
+                                    />
+                                </div>
+                            </section>
                             <div className="space-y-2 sm:col-span-2"><Label>Address</Label><Textarea value={profile.address ?? ""} onChange={(event) => setProfile({ ...profile, address: nullable(event.target.value) })} /></div>
                             <div className="sm:col-span-2 flex items-center justify-between gap-3">
                                 {!canManageProfile && <p className="text-xs text-muted-foreground">You can view this profile but cannot edit it.</p>}
@@ -332,6 +349,7 @@ function BrandAssetUploader({
     onChange,
     disabled,
     compact = false,
+    companyName,
 }: {
     assetType: "logo" | "favicon";
     label: string;
@@ -340,6 +358,7 @@ function BrandAssetUploader({
     onChange: (value: string | null) => void;
     disabled?: boolean;
     compact?: boolean;
+    companyName: string;
 }) {
     const inputRef = useRef<HTMLInputElement>(null);
     const { tr } = useI18n();
@@ -377,12 +396,24 @@ function BrandAssetUploader({
         : null;
 
     return (
-        <div className="space-y-2">
-            <Label>{label}</Label>
+        <div className="overflow-hidden rounded-2xl bg-background shadow-sm ring-1 ring-border/60">
+            <div className="flex items-center justify-between gap-3 border-b border-border/50 px-4 py-3">
+                <div>
+                    <Label className="font-semibold">{label}</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+                </div>
+                {value ? (
+                    <Badge variant="secondary" className="gap-1">
+                        <CheckCircle2 className="size-3" /> Ready
+                    </Badge>
+                ) : (
+                    <Badge variant="outline">Not uploaded</Badge>
+                )}
+            </div>
             <div
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={handleDrop}
-                className="group relative overflow-hidden rounded-2xl border border-dashed bg-muted/20 p-3 transition hover:border-primary/50 hover:bg-primary/[0.03] dark:border-white/12"
+                className="group relative p-4"
             >
                 <input
                     ref={inputRef}
@@ -395,31 +426,49 @@ function BrandAssetUploader({
                         event.currentTarget.value = "";
                     }}
                 />
-                <div className="flex items-center gap-3">
-                    <div className={`${compact ? "size-16" : "h-20 w-28"} grid shrink-0 place-items-center overflow-hidden rounded-xl border bg-background p-2 shadow-sm dark:border-white/10`}>
-                        {preview ? (
-                            <img src={preview} alt="" className="size-full object-contain" />
-                        ) : (
-                            <ImagePlus className="size-6 text-muted-foreground" />
-                        )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold">{upload.isPending ? tr("Uploading…") : tr("Choose or drop an image")}</p>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
-                        {value ? <p className="mt-1 text-[11px] font-medium text-primary">{tr("The uploaded image will be applied when you save the company profile.")}</p> : null}
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            <Button type="button" size="sm" variant="outline" disabled={disabled || upload.isPending} onClick={() => inputRef.current?.click()}>
-                                {upload.isPending ? <LoaderCircle className="animate-spin" /> : <UploadCloud />}
-                                {upload.isPending ? tr("Uploading…") : tr("Upload image")}
-                            </Button>
-                            {value ? (
-                                <Button type="button" size="sm" variant="ghost" disabled={disabled || upload.isPending} onClick={() => onChange(null)}>
-                                    <X /> {tr("Remove image")}
-                                </Button>
-                            ) : null}
+
+                {compact ? (
+                    <div className="grid min-h-44 place-items-center rounded-xl bg-muted/45 p-5">
+                        <div className="space-y-3 text-center">
+                            <div className="mx-auto grid size-24 place-items-center overflow-hidden rounded-[1.4rem] bg-background p-3 shadow-xl ring-1 ring-black/5 dark:ring-white/10">
+                                {preview ? <img src={preview} alt="" className="size-full object-contain" /> : <ImagePlus className="size-8 text-muted-foreground" />}
+                            </div>
+                            <div className="mx-auto flex max-w-52 items-center gap-2 rounded-lg bg-background/95 px-3 py-2 text-start text-xs shadow-md ring-1 ring-black/5 dark:ring-white/10">
+                                <div className="size-4 overflow-hidden rounded bg-muted">
+                                    {preview ? <img src={preview} alt="" className="size-full object-contain" /> : null}
+                                </div>
+                                <span className="truncate">{companyName || "Company"}</span>
+                            </div>
                         </div>
                     </div>
+                ) : (
+                    <div className="grid min-h-52 place-items-center overflow-hidden rounded-xl bg-gradient-to-br from-muted/60 to-muted/20 p-6">
+                        {preview ? (
+                            <img src={preview} alt="" className="max-h-36 w-full object-contain" />
+                        ) : (
+                            <div className="text-center">
+                                <div className="mx-auto grid size-16 place-items-center rounded-2xl bg-background shadow-sm ring-1 ring-border/60">
+                                    <ImagePlus className="size-7 text-muted-foreground" />
+                                </div>
+                                <p className="mt-3 text-sm font-medium">No logo uploaded</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <Button type="button" size="sm" variant="outline" disabled={disabled || upload.isPending} onClick={() => inputRef.current?.click()}>
+                        {upload.isPending ? <LoaderCircle className="animate-spin" /> : <UploadCloud />}
+                        {upload.isPending ? tr("Uploading…") : tr(value ? "Replace image" : "Upload image")}
+                    </Button>
+                    {value ? (
+                        <Button type="button" size="sm" variant="ghost" disabled={disabled || upload.isPending} onClick={() => onChange(null)}>
+                            <X /> {tr("Remove image")}
+                        </Button>
+                    ) : null}
+                    <span className="ms-auto text-[11px] text-muted-foreground">PNG, JPG, WEBP or AVIF · max 5 MB</span>
                 </div>
+                {value ? <p className="mt-3 text-[11px] font-medium text-primary">{tr("Save the company profile to publish this asset everywhere.")}</p> : null}
             </div>
         </div>
     );

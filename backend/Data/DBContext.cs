@@ -100,6 +100,7 @@ public class ApplicationDbContext
     public DbSet<GeneralType> Types => Set<GeneralType>();
 
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
+    public DbSet<CustomerVisitLog> CustomerVisitLogs => Set<CustomerVisitLog>();
 
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<StorefrontContent> StorefrontContents => Set<StorefrontContent>();
@@ -252,6 +253,8 @@ public class ApplicationDbContext
         builder.Entity<OrderItem>().HasQueryFilter(x => !x.IsDeleted && !x.Order.IsDeleted && !x.Product.IsDeleted);
         builder.Entity<Payment>().HasQueryFilter(x => !x.IsDeleted && !x.Order.IsDeleted);
         builder.Entity<OrderStatusHistory>().HasQueryFilter(x => !x.IsDeleted && !x.Order.IsDeleted);
+        builder.Entity<ActivityLog>().HasQueryFilter(x => !x.IsDeleted);
+        builder.Entity<CustomerVisitLog>().HasQueryFilter(x => !x.IsDeleted);
 
         ApplyCompanyQueryFilters(builder);
     }

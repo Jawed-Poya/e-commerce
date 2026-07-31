@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
     CircleDollarSign,
@@ -73,9 +73,11 @@ export default function ManualSalesPage() {
     const { tr } = useI18n();
     const { user } = useAdminAuth();
     const canManage = hasPermission(user, Permissions.ManualSalesManage);
+    const [search, setSearch] = useState("");
+    const deferredSearch = useDeferredValue(search.trim());
     const { data: sales, isLoading } = useOperationQuery(
-        operationKeys.sales,
-        operationsService.sales,
+        operationKeys.sales(deferredSearch),
+        () => operationsService.sales(deferredSearch),
     );
 
     const [open, setOpen] = useState(false);
@@ -93,6 +95,7 @@ export default function ManualSalesPage() {
         paidAmount: 0,
         paymentMethod: "Cash",
         paymentReferenceNumber: "",
+        referenceNumber: "",
         notes: "",
     });
 
@@ -115,6 +118,7 @@ export default function ManualSalesPage() {
             paidAmount: 0,
             paymentMethod: "Cash",
             paymentReferenceNumber: "",
+            referenceNumber: "",
             notes: "",
         });
     };
@@ -137,22 +141,6 @@ export default function ManualSalesPage() {
         for (const item of documentItems) {
             const product = item.product;
             if (!product) continue;
-            if (
-                product.minimumValue != null &&
-                item.quantity < product.minimumValue
-            ) {
-                return toast.error(
-                    `${product.name}: ${tr("Minimum quantity")} ${product.minimumValue}.`,
-                );
-            }
-            if (
-                product.maximumValue != null &&
-                item.quantity > product.maximumValue
-            ) {
-                return toast.error(
-                    `${product.name}: ${tr("Maximum quantity")} ${product.maximumValue}.`,
-                );
-            }
             if (item.quantity > product.availableQuantity) {
                 return toast.error(
                     `${product.name}: ${tr("Available quantity")} ${product.availableQuantity}.`,
@@ -167,7 +155,7 @@ export default function ManualSalesPage() {
 
         setSaving(true);
         try {
-            await operationsService.createSale({
+            const response = await operationsService.createSale({
                 customerId: selectedCustomer?.id ?? null,
                 customerName: selectedCustomer
                     ? null
@@ -181,6 +169,7 @@ export default function ManualSalesPage() {
                 paidAmount: form.paidAmount,
                 paymentMethod: form.paymentMethod,
                 paymentReferenceNumber: nullable(form.paymentReferenceNumber),
+                referenceNumber: nullable(form.referenceNumber),
                 notes: nullable(form.notes),
                 items: documentItems.map((item) => ({
                     productId: item.productId,
@@ -190,11 +179,15 @@ export default function ManualSalesPage() {
                 })),
             });
             await Promise.all([
-                queryClient.invalidateQueries({ queryKey: operationKeys.sales }),
+                queryClient.invalidateQueries({ queryKey: operationKeys.saleRoot }),
                 queryClient.invalidateQueries({ queryKey: operationKeys.summary }),
                 queryClient.invalidateQueries({ queryKey: ["inventory"] }),
             ]);
-            toast.success("Sale recorded and stock deducted.");
+            toast.success(
+                response.offlineQueued
+                    ? response.message
+                    : "Sale recorded and stock deducted.",
+            );
             setOpen(false);
             reset();
         } catch (error) {
@@ -219,6 +212,14 @@ export default function ManualSalesPage() {
                 }
             />
 
+            <div className="max-w-xl">
+                <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search sale, receipt reference, customer, product or barcode…"
+                />
+            </div>
+
             <Card>
                 <CardContent className="p-0">
                     <Table>
@@ -242,7 +243,12 @@ export default function ManualSalesPage() {
                                 sales.map((sale) => (
                                     <TableRow key={sale.id}>
                                         <TableCell className="font-medium">
-                                            {sale.saleNumber}
+                                            <p>{sale.saleNumber}</p>
+                                            {sale.referenceNumber ? (
+                                                <p className="text-xs font-normal text-muted-foreground">
+                                                    Reference: {sale.referenceNumber}
+                                                </p>
+                                            ) : null}
                                         </TableCell>
                                         <TableCell>{date(sale.saleDate)}</TableCell>
                                         <TableCell>{sale.customerName}</TableCell>
@@ -394,6 +400,18 @@ export default function ManualSalesPage() {
                                 placeholder="Optional receipt or transfer number"
                             />
                         </Field>
+                        <Field label="Sale receipt / external reference">
+                            <Input
+                                value={form.referenceNumber}
+                                onChange={(event) =>
+                                    setForm((current) => ({
+                                        ...current,
+                                        referenceNumber: event.target.value,
+                                    }))
+                                }
+                                placeholder="Optional external receipt or bill number"
+                            />
+                        </Field>
                     </div>
 
                     <Separator />
@@ -478,7 +496,7 @@ export default function ManualSalesPage() {
                         operationsService.addSalePayment(selectedSale.id, body)
                     }
                     onDocumentUpdated={setSelectedSale}
-                    invalidate={[operationKeys.sales, operationKeys.summary]}
+                    invalidate={[operationKeys.saleRoot, operationKeys.summary]}
                     canManage={canManage}
                 />
             ) : null}
