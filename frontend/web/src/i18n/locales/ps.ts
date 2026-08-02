@@ -1,4 +1,5 @@
 import type { Messages } from "../types";
+import { en } from "./en";
 
 export const ps: Messages = {
     ...en,

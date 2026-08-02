@@ -12,6 +12,7 @@ import {
     MapPin,
     PackageCheck,
     Phone,
+    ShieldCheck,
     ShoppingBag,
     Sparkles,
 } from "lucide-react";
