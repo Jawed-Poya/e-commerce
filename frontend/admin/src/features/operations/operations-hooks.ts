@@ -11,6 +11,7 @@ export const operationKeys = {
     purchasePayments: (id: number) => ["operations", "purchases", id, "payments"] as const,
     saleRoot: ["operations", "sales"] as const,
     sales: (search = "") => ["operations", "sales", search] as const,
+    saleLots: (id: number) => ["operations", "sales", id, "lots"] as const,
     salePayments: (id: number) => ["operations", "sales", id, "payments"] as const,
     staff: ["operations", "staff"] as const,
     salaries: ["operations", "salaries"] as const,

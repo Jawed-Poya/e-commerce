@@ -244,21 +244,23 @@ function InventoryTransactions() {
                 {data?.items.map(transaction => <article key={transaction.id} className="min-w-0 rounded-xl border bg-background p-4 shadow-xs">
                     <div className="flex min-w-0 items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-semibold">{transaction.productName}</p><p className="mt-1 truncate text-xs text-muted-foreground">{transaction.productBarcode || t("inventory.noBarcode")}</p></div><div className="shrink-0"><MovementBadge type={transaction.type} label={typeOptions.find(option => option.id === transaction.type)?.name ?? transaction.type} /></div></div>
                     <div className="mt-4 grid grid-cols-2 gap-2 text-sm"><MobileValue label={t("inventory.change")} value={`${transaction.quantity > 0 ? "+" : ""}${formatNumber(transaction.quantity)}`} strong /><MobileValue label={t("inventory.beforeAfter")} value={`${formatNumber(transaction.quantityBefore)} → ${formatNumber(transaction.quantityAfter)}`} /></div>
+                    <div className="mt-3"><LotMovementList lots={transaction.lots} locale={locale} /></div>
                     <div className="mt-3 rounded-lg bg-muted/35 p-3"><p className="text-xs text-muted-foreground">{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(transaction.createdAt))}</p><p className="mt-2 line-clamp-3 text-sm leading-5">{transaction.description || t("inventory.noNote")}</p>{transaction.referenceId && <p className="mt-1 break-all text-xs text-muted-foreground">{transaction.referenceType} #{transaction.referenceId}</p>}</div>
                     <Button variant="outline" size="sm" className="mt-3 w-full" onClick={() => navigate(`/products/${transaction.productId}`)}><Eye className="me-2 size-4" />{t("details.open")}</Button>
                 </article>)}
             </div>
 
-            <div className="responsive-table hidden min-w-0 overflow-x-auto rounded-xl border xl:block"><Table className="min-w-[980px]">
-                <TableHeader><TableRow><TableHead>{t("inventory.date")}</TableHead><TableHead className="min-w-56">{t("products.product")}</TableHead><TableHead>{t("inventory.movementType")}</TableHead><TableHead className="text-end">{t("inventory.change")}</TableHead><TableHead className="text-end">{t("inventory.beforeAfter")}</TableHead><TableHead className="min-w-52">{t("inventory.note")}</TableHead><TableHead /></TableRow></TableHeader>
+            <div className="responsive-table hidden min-w-0 overflow-x-auto rounded-xl border xl:block"><Table className="min-w-[1180px]">
+                <TableHeader><TableRow><TableHead>{t("inventory.date")}</TableHead><TableHead className="min-w-56">{t("products.product")}</TableHead><TableHead>{t("inventory.movementType")}</TableHead><TableHead className="min-w-60">{t("inventory.lotBatch")}</TableHead><TableHead className="text-end">{t("inventory.change")}</TableHead><TableHead className="text-end">{t("inventory.beforeAfter")}</TableHead><TableHead className="min-w-52">{t("inventory.note")}</TableHead><TableHead /></TableRow></TableHeader>
                 <TableBody>
-                    {isLoading && <LoadingRow colSpan={7} />}
-                    {isError && <MessageRow colSpan={7} message={t("inventory.transactionsError")} destructive />}
-                    {!isLoading && !isError && (data?.items.length ?? 0) === 0 && <MessageRow colSpan={7} message={t("inventory.noTransactions")} />}
+                    {isLoading && <LoadingRow colSpan={8} />}
+                    {isError && <MessageRow colSpan={8} message={t("inventory.transactionsError")} destructive />}
+                    {!isLoading && !isError && (data?.items.length ?? 0) === 0 && <MessageRow colSpan={8} message={t("inventory.noTransactions")} />}
                     {data?.items.map(transaction => <TableRow key={transaction.id}>
                         <TableCell className="whitespace-nowrap text-xs"><p>{new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(transaction.createdAt))}</p><p className="mt-0.5 text-[11px] text-muted-foreground">{new Intl.DateTimeFormat(locale, { timeStyle: "short" }).format(new Date(transaction.createdAt))}</p></TableCell>
                         <TableCell><p className="font-medium">{transaction.productName}</p><p className="mt-0.5 text-[11px] text-muted-foreground">{transaction.productBarcode || t("inventory.noBarcode")}</p></TableCell>
                         <TableCell><MovementBadge type={transaction.type} label={typeOptions.find(option => option.id === transaction.type)?.name ?? transaction.type} /></TableCell>
+                        <TableCell><LotMovementList lots={transaction.lots} locale={locale} compact /></TableCell>
                         <TableCell className={cn("text-end font-semibold tabular-nums", transaction.quantity > 0 ? "text-emerald-600 dark:text-emerald-400" : transaction.quantity < 0 && "text-destructive")}>{transaction.quantity > 0 ? "+" : ""}{formatNumber(transaction.quantity)}</TableCell>
                         <TableCell className="text-end tabular-nums"><span className="text-muted-foreground">{formatNumber(transaction.quantityBefore)}</span><span className="mx-1">→</span><span className="font-medium">{formatNumber(transaction.quantityAfter)}</span></TableCell>
                         <TableCell><p className="line-clamp-2 text-xs">{transaction.description || t("inventory.noNote")}</p>{transaction.referenceId && <p className="mt-1 text-[11px] text-muted-foreground">{transaction.referenceType} #{transaction.referenceId}</p>}</TableCell>
@@ -282,6 +284,28 @@ function StockStatusBadge({ item }: { item: InventoryListItem }) {
     if (item.status === "OutOfStock") return <Badge variant="destructive"><PackageSearch className="me-1 size-3" />{t("inventory.outOfStock")}</Badge>;
     if (item.status === "LowStock") return <Badge className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300" variant="outline"><AlertTriangle className="me-1 size-3" />{t("inventory.lowStock")}</Badge>;
     return <Badge className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" variant="outline"><CheckCircle2 className="me-1 size-3" />{t("inventory.healthy")}</Badge>;
+}
+
+function LotMovementList({ lots, locale, compact = false }: { lots: import("@/features/inventory/types/inventory-types").InventoryTransactionLot[]; locale: string; compact?: boolean }) {
+    const { t } = useI18n();
+    if (lots.length === 0) return <span className="text-xs text-muted-foreground">{t("inventory.unassignedLot")}</span>;
+
+    return <div className="space-y-1.5">
+        {lots.map(lot => {
+            const movement = lot.quantityDelta !== 0 ? lot.quantityDelta : lot.reservedDelta;
+            return <div key={lot.id} className={cn("border bg-muted/25 px-2.5 py-2 text-xs", compact && "max-w-72")}>
+                <div className="flex items-center justify-between gap-2">
+                    <span className="truncate font-medium">{lot.lotNumber || `${t("inventory.unnumberedLot")} #${lot.inventoryLotId ?? lot.id}`}</span>
+                    <span className={cn("shrink-0 font-semibold tabular-nums", movement > 0 ? "text-emerald-600 dark:text-emerald-400" : movement < 0 && "text-destructive")}>
+                        {movement > 0 ? "+" : ""}{formatNumber(movement)}
+                    </span>
+                </div>
+                <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                    {lot.warehouseName}{lot.expiresAt ? ` · ${new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${lot.expiresAt}T00:00:00Z`))}` : ""}
+                </p>
+            </div>;
+        })}
+    </div>;
 }
 
 function MovementBadge({ type, label }: { type: InventoryTransactionType; label: string }) {

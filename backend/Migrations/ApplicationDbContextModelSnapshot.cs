@@ -1136,6 +1136,79 @@ namespace ECommerce.Migrations
                     b.ToTable("InventoryTransactions");
                 });
 
+            modelBuilder.Entity("ECommerce.Entities.Products.InventoryTransactionLot", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("BranchId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateOnly?>("ExpiresAt")
+                        .HasColumnType("date");
+
+                    b.Property<long?>("InventoryLotId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("InventoryTransactionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LotNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal>("QuantityDelta")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<decimal>("ReservedDelta")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("WarehouseId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("WarehouseName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InventoryTransactionId");
+
+                    b.HasIndex("InventoryLotId", "CreatedAt");
+
+                    b.HasIndex("TenantId", "LotNumber", "CreatedAt");
+
+                    b.ToTable("InventoryTransactionLots", t =>
+                        {
+                            t.HasCheckConstraint("CK_InventoryTransactionLot_Movement", "[QuantityDelta] <> 0 OR [ReservedDelta] <> 0");
+                        });
+                });
+
             modelBuilder.Entity("ECommerce.Entities.Products.ProductReview", b =>
                 {
                     b.Property<long>("Id")
@@ -2048,6 +2121,8 @@ namespace ECommerce.Migrations
                     b.Navigation("ProductVariant");
 
                     b.Navigation("Warehouse");
+
+                    b.Navigation("Transactions");
                 });
 
             modelBuilder.Entity("ECommerce.Entities.Products.InventoryTransaction", b =>
@@ -2059,6 +2134,26 @@ namespace ECommerce.Migrations
                         .IsRequired();
 
                     b.Navigation("Product");
+
+                    b.Navigation("Lots");
+                });
+
+            modelBuilder.Entity("ECommerce.Entities.Products.InventoryTransactionLot", b =>
+                {
+                    b.HasOne("ECommerce.Entities.Products.InventoryLot", "InventoryLot")
+                        .WithMany("Transactions")
+                        .HasForeignKey("InventoryLotId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ECommerce.Entities.Products.InventoryTransaction", "InventoryTransaction")
+                        .WithMany("Lots")
+                        .HasForeignKey("InventoryTransactionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("InventoryLot");
+
+                    b.Navigation("InventoryTransaction");
                 });
 
             modelBuilder.Entity("ECommerce.Entities.Products.ProductReview", b =>

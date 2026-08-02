@@ -101,6 +101,7 @@ public class ApplicationDbContext
     public DbSet<ProductInventory> ProductInventories => Set<ProductInventory>();
 
     public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
+    public DbSet<InventoryTransactionLot> InventoryTransactionLots => Set<InventoryTransactionLot>();
 
     public DbSet<ProductReview> ProductReviews => Set<ProductReview>();
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
@@ -279,6 +280,7 @@ public class ApplicationDbContext
         builder.Entity<ProductPrice>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted && !x.CustomerType.IsDeleted);
         builder.Entity<ProductUnitConversion>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted && !x.Unit.IsDeleted);
         builder.Entity<InventoryTransaction>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted);
+        builder.Entity<InventoryTransactionLot>().HasQueryFilter(x => !x.IsDeleted && !x.InventoryTransaction.IsDeleted);
         builder.Entity<ProductReview>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted && !x.Customer.IsDeleted);
         builder.Entity<ProductVariant>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted);
         builder.Entity<InventoryLot>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted && !x.Warehouse.IsDeleted);

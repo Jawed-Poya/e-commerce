@@ -64,6 +64,18 @@ export interface InventoryLot {
     createdAt: string;
 }
 
+export interface InventoryTransactionLot {
+    id: number;
+    inventoryLotId: number | null;
+    lotNumber: string | null;
+    warehouseId: number;
+    warehouseName: string;
+    expiresAt: string | null;
+    quantityDelta: number;
+    reservedDelta: number;
+    unitCost: number | null;
+}
+
 export interface InventoryTransaction {
     id: number;
     productId: number;
@@ -79,6 +91,7 @@ export interface InventoryTransaction {
     referenceId: number | null;
     performedByUserId: string | null;
     description: string | null;
+    lots: InventoryTransactionLot[];
     createdAt: string;
 }
 
@@ -130,6 +143,7 @@ export interface AdjustStockRequest {
     type: InventoryTransactionType;
     description?: string;
     idempotencyKey: string;
+    lotId?: number;
 }
 
 export interface UpdateInventorySettingsRequest {

@@ -60,6 +60,18 @@ public sealed record InventoryLotResponse(
     DateTime CreatedAt
 );
 
+public sealed record InventoryTransactionLotResponse(
+    long Id,
+    long? InventoryLotId,
+    string? LotNumber,
+    long WarehouseId,
+    string WarehouseName,
+    DateOnly? ExpiresAt,
+    decimal QuantityDelta,
+    decimal ReservedDelta,
+    decimal? UnitCost
+);
+
 public sealed record InventoryTransactionResponse(
     long Id,
     long ProductId,
@@ -75,5 +87,6 @@ public sealed record InventoryTransactionResponse(
     long? ReferenceId,
     string? PerformedByUserId,
     string? Description,
+    IReadOnlyList<InventoryTransactionLotResponse> Lots,
     DateTime CreatedAt
 );

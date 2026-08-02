@@ -77,6 +77,12 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
     [HttpGet("sales")]
     public async Task<IActionResult> Sales([FromQuery] string? search, CancellationToken ct) => Ok(ApiResponse<IReadOnlyList<InventorySaleListItem>>.Ok(await service.GetSalesAsync(search, ct)));
 
+    [Authorize(Policy = AppPermissions.ManualSalesView)]
+    [HttpGet("sales/{id:long}/lots")]
+    public async Task<IActionResult> SaleLots(long id, CancellationToken ct) =>
+        Ok(ApiResponse<IReadOnlyList<InventorySaleLotMovementResponse>>.Ok(
+            await service.GetSaleLotsAsync(id, ct)));
+
     [Authorize(Policy = AppPermissions.ManualSalesManage)]
     [HttpPost("sales")]
     public Task<IActionResult> CreateSale(CreateInventorySaleRequest request, CancellationToken ct) => Handle(async () => ApiResponse<InventorySaleListItem>.Ok(await service.CreateSaleAsync(request, UserId(), HasAnyPermission(AppPermissions.OperationLineLimitsOverride), ct), "Sale recorded and stock updated."));

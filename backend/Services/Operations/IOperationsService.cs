@@ -16,6 +16,7 @@ public interface IOperationsService
     Task<IReadOnlyList<DocumentPaymentResponse>> GetPurchasePaymentsAsync(long purchaseId, CancellationToken ct);
     Task<PurchaseListItem> AddPurchasePaymentAsync(long purchaseId, RecordDocumentPaymentRequest request, string? userId, CancellationToken ct);
     Task<IReadOnlyList<InventorySaleListItem>> GetSalesAsync(string? search, CancellationToken ct);
+    Task<IReadOnlyList<InventorySaleLotMovementResponse>> GetSaleLotsAsync(long saleId, CancellationToken ct);
     Task<InventorySaleListItem> CreateSaleAsync(CreateInventorySaleRequest request, string? userId, bool canOverrideLineLimits, CancellationToken ct);
     Task<IReadOnlyList<DocumentPaymentResponse>> GetSalePaymentsAsync(long saleId, CancellationToken ct);
     Task<InventorySaleListItem> AddSalePaymentAsync(long saleId, RecordDocumentPaymentRequest request, string? userId, CancellationToken ct);

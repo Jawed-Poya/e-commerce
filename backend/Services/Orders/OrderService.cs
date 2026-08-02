@@ -357,7 +357,7 @@ public sealed class OrderService(
         CancellationToken cancellationToken = default)
     {
         var order = await LoadOrderAsync(id, false, cancellationToken);
-        return order is null ? null : MapDetails(order);
+        return order is null ? null : await MapDetailsWithLotsAsync(order, cancellationToken);
     }
 
     public async Task<OrderDetailsResponse> UpdateStatusAsync(
@@ -376,7 +376,7 @@ public sealed class OrderService(
             if (order.Status == request.Status)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                return MapDetails(order);
+                return await MapDetailsWithLotsAsync(order, cancellationToken);
             }
 
             EnsureValidStatusTransition(order, request.Status);
@@ -453,7 +453,7 @@ public sealed class OrderService(
             await notifications.PublishAsync(pendingNotifications, CancellationToken.None);
             await adminNotifications.PublishAsync(adminNotification, CancellationToken.None);
 
-            return MapDetails(order);
+            return await MapDetailsWithLotsAsync(order, cancellationToken);
         }
         catch (DbUpdateException exception) when (SqlServerExceptionClassifier.IsUniqueConstraintViolation(
                    exception,
@@ -465,7 +465,7 @@ public sealed class OrderService(
             // A concurrent request may have completed the same transition first.
             // Return the committed state instead of exposing a SQL index error.
             var current = await LoadOrderAsync(id, false, cancellationToken);
-            if (current?.Status == request.Status) return MapDetails(current);
+            if (current?.Status == request.Status) return await MapDetailsWithLotsAsync(current, cancellationToken);
 
             throw new InvalidOperationException(
                 "This order inventory action was already processed. Refresh the order and try again.");
@@ -476,7 +476,7 @@ public sealed class OrderService(
             context.ChangeTracker.Clear();
 
             var current = await LoadOrderAsync(id, false, cancellationToken);
-            if (current?.Status == request.Status) return MapDetails(current);
+            if (current?.Status == request.Status) return await MapDetailsWithLotsAsync(current, cancellationToken);
 
             throw new InvalidOperationException(
                 "Inventory changed while the order was being updated. Refresh and try again.");
@@ -530,7 +530,7 @@ public sealed class OrderService(
 
         await context.SaveChangesAsync(cancellationToken);
         await adminNotifications.PublishAsync(adminNotification, CancellationToken.None);
-        return MapDetails(order);
+        return await MapDetailsWithLotsAsync(order, cancellationToken);
     }
 
     public async Task<OrderTrackingResponse?> TrackAsync(
@@ -633,7 +633,7 @@ public sealed class OrderService(
                 item.OrderNumber == orderNumber.Trim(),
                 cancellationToken);
 
-        return order is null ? null : MapDetails(order);
+        return order is null ? null : MapDetails(order, []);
     }
 
     private async Task<Customer> UpsertCheckoutCustomerAsync(
@@ -857,7 +857,39 @@ public sealed class OrderService(
         return saleIsActive ? selected.SalePrice!.Value : selected.RegularPrice;
     }
 
-    private OrderDetailsResponse MapDetails(OrderEntity order)
+    private async Task<OrderDetailsResponse> MapDetailsWithLotsAsync(
+        OrderEntity order,
+        CancellationToken cancellationToken)
+    {
+        var lotMovements = await context.InventoryTransactionLots
+            .AsNoTracking()
+            .Where(item =>
+                item.InventoryTransaction.ReferenceType == "Order" &&
+                item.InventoryTransaction.ReferenceId == order.Id)
+            .OrderBy(item => item.CreatedAt)
+            .ThenBy(item => item.Id)
+            .Select(item => new OrderLotMovementResponse(
+                item.Id,
+                item.InventoryTransactionId,
+                item.InventoryTransaction.ProductId,
+                item.InventoryTransaction.Product.Name,
+                item.InventoryTransaction.Type,
+                item.InventoryLotId,
+                item.LotNumber,
+                item.WarehouseId,
+                item.WarehouseName,
+                item.ExpiresAt,
+                item.QuantityDelta,
+                item.ReservedDelta,
+                item.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        return MapDetails(order, lotMovements);
+    }
+
+    private OrderDetailsResponse MapDetails(
+        OrderEntity order,
+        IReadOnlyCollection<OrderLotMovementResponse> lotMovements)
     {
         var address = DeserializeAddress(order.ShippingAddressJson);
 
@@ -901,6 +933,7 @@ public sealed class OrderService(
                     item.Total,
                     item.Currency))
                 .ToList(),
+            lotMovements,
             order.Payments
                 .OrderByDescending(item => item.Id)
                 .Select(item => new PaymentResponse(

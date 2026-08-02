@@ -27,6 +27,22 @@ export interface OrderListItem {
     createdAt: string;
 }
 
+export interface OrderLotMovement {
+    id: number;
+    inventoryTransactionId: number;
+    productId: number;
+    productName: string;
+    type: "Purchase" | "Sale" | "SaleReturn" | "StockAdjustment" | "Damaged" | "Expired" | "Transfer" | "Reservation" | "ReservationRelease";
+    inventoryLotId: number | null;
+    lotNumber: string | null;
+    warehouseId: number;
+    warehouseName: string;
+    expiresAt: string | null;
+    quantityDelta: number;
+    reservedDelta: number;
+    createdAt: string;
+}
+
 export interface OrderDetails {
     id: number;
     orderNumber: string;
@@ -46,6 +62,7 @@ export interface OrderDetails {
     customer: { id: number; name: string; phone: string; email: string | null; customerTypeName: string | null };
     shippingAddress: { label: string; recipientName: string; phone: string; addressLine1: string; addressLine2: string | null; city: string; state: string | null; country: string; postalCode: string | null };
     items: { id: number; productId: number; productName: string; productBarcode: string | null; quantity: number; unitId: number | null; unitName: string | null; conversionFactor: number; unitPrice: number; discount: number; tax: number; total: number; currency: string }[];
+    lotMovements: OrderLotMovement[];
     payments: { id: number; method: PaymentMethod; provider: string; externalReference: string | null; amount: number; currency: string; status: PaymentStatus; paidAt: string | null; failureReason: string | null; createdAt: string }[];
     statusHistory: { id: number; fromStatus: OrderStatus; toStatus: OrderStatus; note: string | null; changedByUserId: string | null; createdAt: string }[];
 }

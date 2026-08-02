@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
     CircleDollarSign,
     CreditCard,
+    Layers3,
     LoaderCircle,
     Save,
 } from "lucide-react";
@@ -62,6 +63,7 @@ import { operationsService } from "@/features/operations/operations-service";
 import type {
     DocumentItem,
     ManualSale,
+    ManualSaleLotMovement,
     OperationCustomer,
 } from "@/features/operations/operations-types";
 
@@ -70,7 +72,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default function ManualSalesPage() {
     const queryClient = useQueryClient();
     const { formatMoney } = useCompany();
-    const { tr } = useI18n();
+    const { locale, t, tr } = useI18n();
     const { user } = useAdminAuth();
     const canManage = hasPermission(user, Permissions.ManualSalesManage);
     const [search, setSearch] = useState("");
@@ -83,10 +85,16 @@ export default function ManualSalesPage() {
         operationKeys.policy,
         operationsService.policy,
     );
-
     const [open, setOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     const [selectedSale, setSelectedSale] = useState<ManualSale | null>(null);
+    const [lotSale, setLotSale] = useState<ManualSale | null>(null);
+    const { data: saleLots, isLoading: saleLotsLoading } = useOperationQuery(
+        operationKeys.saleLots(lotSale?.id ?? 0),
+        () => operationsService.saleLots(lotSale!.id),
+        Boolean(lotSale),
+    );
+
     const [selectedCustomer, setSelectedCustomer] =
         useState<OperationCustomer | null>(null);
     const [items, setItems] = useState<DocumentItem[]>([newDocumentItem()]);
@@ -206,6 +214,9 @@ export default function ManualSalesPage() {
             );
             setOpen(false);
             reset();
+            if (!response.offlineQueued && response.data) {
+                setLotSale(response.data);
+            }
         } catch (error) {
             toast.error(message(error));
         } finally {
@@ -283,6 +294,14 @@ export default function ManualSalesPage() {
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex justify-end gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => setLotSale(sale)}
+                                                >
+                                                    <Layers3 className="me-2 size-4" />
+                                                    {t("inventory.lotBatch")}
+                                                </Button>
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
@@ -494,6 +513,41 @@ export default function ManualSalesPage() {
                             Complete sale
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={Boolean(lotSale)} onOpenChange={(next) => !next && setLotSale(null)}>
+                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+                    <DialogHeader>
+                        <DialogTitle>{t("orders.lotTraceability")}</DialogTitle>
+                        <DialogDescription>
+                            {lotSale?.saleNumber} · {t("orders.lotTraceabilityHelp")}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="overflow-x-auto border">
+                        <Table className="min-w-[720px]">
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>{t("orders.product")}</TableHead>
+                                    <TableHead>{t("inventory.lotBatch")}</TableHead>
+                                    <TableHead>{t("orders.warehouse")}</TableHead>
+                                    <TableHead>{t("orders.expiry")}</TableHead>
+                                    <TableHead className="text-end">{t("orders.baseQuantity")}</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {saleLotsLoading ? <Loading colSpan={5} /> : saleLots?.length ? saleLots.map((movement: ManualSaleLotMovement) => (
+                                    <TableRow key={movement.id}>
+                                        <TableCell className="font-medium">{movement.productName}</TableCell>
+                                        <TableCell>{movement.lotNumber || `${t("inventory.unnumberedLot")} #${movement.inventoryLotId ?? movement.id}`}</TableCell>
+                                        <TableCell>{movement.warehouseName}</TableCell>
+                                        <TableCell>{movement.expiresAt ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${movement.expiresAt}T00:00:00Z`)) : "—"}</TableCell>
+                                        <TableCell className="text-end font-semibold tabular-nums">{movement.quantity.toLocaleString(locale, { maximumFractionDigits: 3 })}</TableCell>
+                                    </TableRow>
+                                )) : <Empty colSpan={5} text={t("inventory.unassignedLot")} />}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </DialogContent>
             </Dialog>
 

@@ -1,4 +1,4 @@
-﻿namespace ECommerce.Entities.Products;
+namespace ECommerce.Entities.Products;
 
 public class InventoryTransaction : ProductEntity
 {
@@ -23,4 +23,6 @@ public class InventoryTransaction : ProductEntity
     public string? PerformedByUserId { get; set; }
 
     public string? Description { get; set; }
+
+    public ICollection<InventoryTransactionLot> Lots { get; set; } = [];
 }

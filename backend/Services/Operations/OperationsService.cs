@@ -15,6 +15,7 @@ public sealed class OperationsService(
     ApplicationDbContext context,
     IDefaultCustomerTypeResolver defaultCustomerTypeResolver,
     IInventoryCostService inventoryCosts,
+    IInventoryLotAllocator lotAllocator,
     ICompanyContext companyContext) : IOperationsService
 {
     private const string MainWarehouseCode = "MAIN";
@@ -316,24 +317,34 @@ public sealed class OperationsService(
         await using var tx = await context.Database.BeginTransactionAsync(ct);
         context.Purchases.Add(purchase);
         await context.SaveChangesAsync(ct);
-        var warehouseId = await context.Warehouses
+        var warehouse = await context.Warehouses
             .Where(x => x.IsActive && (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value))
             .OrderByDescending(x => x.Code == MainWarehouseCode)
             .ThenBy(x => x.Id)
-            .Select(x => (long?)x.Id)
             .FirstOrDefaultAsync(ct)
             ?? throw new InvalidOperationException("No active warehouse is configured. Activate or create a warehouse before receiving purchases.");
 
         foreach (var line in normalizedItems)
         {
-            await ApplyStockMovement(line.Request.ProductId, line.BaseQuantity, InventoryTransactionType.Purchase, "Purchase", purchase.Id, purchase.PurchaseNumber, userId, line.Request.ExpireDate, ct);
-            await AddOrMergeInventoryLotAsync(
+            var lot = await AddOrMergeInventoryLotAsync(
                 line.Request.ProductId,
-                warehouseId,
+                warehouse.Id,
                 Clean(line.Request.LotNumber) ?? purchase.PurchaseNumber,
                 line.Request.ExpireDate,
                 line.BaseQuantity,
                 line.BaseUnitCost,
+                ct);
+            lot.Warehouse = warehouse;
+            await ApplyStockMovement(
+                line.Request.ProductId,
+                line.BaseQuantity,
+                InventoryTransactionType.Purchase,
+                "Purchase",
+                purchase.Id,
+                purchase.PurchaseNumber,
+                userId,
+                line.Request.ExpireDate,
+                [new InventoryLotAllocation(lot, line.BaseQuantity)],
                 ct);
         }
         await context.SaveChangesAsync(ct);
@@ -386,6 +397,40 @@ public sealed class OperationsService(
 
         return await query.OrderByDescending(x => x.SaleDate).ThenByDescending(x => x.Id).Take(500)
             .Select(x => new InventorySaleListItem(x.Id, x.SaleNumber, x.ReferenceNumber, x.SaleDate, x.Customer != null ? (x.Customer.FirstName + " " + (x.Customer.LastName ?? "")).Trim() : (x.CustomerName ?? "Walk-in customer"), x.Items.Count, x.Total, x.PaidAmount, x.Total > x.PaidAmount ? x.Total - x.PaidAmount : 0, x.PaymentStatus, x.CreatedAt))
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<InventorySaleLotMovementResponse>> GetSaleLotsAsync(
+        long saleId,
+        CancellationToken ct)
+    {
+        var saleExists = await context.InventorySales.AsNoTracking().AnyAsync(
+            sale => sale.Id == saleId &&
+                (!companyContext.BranchId.HasValue || sale.BranchId == companyContext.BranchId.Value),
+            ct);
+        if (!saleExists)
+            throw new KeyNotFoundException("Manual sale not found.");
+
+        return await context.InventoryTransactionLots.AsNoTracking()
+            .Where(movement =>
+                movement.InventoryTransaction.ReferenceType == "ManualSale" &&
+                movement.InventoryTransaction.ReferenceId == saleId &&
+                movement.InventoryTransaction.Type == InventoryTransactionType.Sale)
+            .OrderBy(movement => movement.InventoryTransaction.Product.Name)
+            .ThenBy(movement => movement.ExpiresAt == null)
+            .ThenBy(movement => movement.ExpiresAt)
+            .ThenBy(movement => movement.Id)
+            .Select(movement => new InventorySaleLotMovementResponse(
+                movement.Id,
+                movement.InventoryTransaction.ProductId,
+                movement.InventoryTransaction.Product.Name,
+                movement.InventoryLotId,
+                movement.LotNumber,
+                movement.WarehouseId,
+                movement.WarehouseName,
+                movement.ExpiresAt,
+                Math.Abs(movement.QuantityDelta),
+                movement.CreatedAt))
             .ToListAsync(ct);
     }
 
@@ -500,8 +545,21 @@ public sealed class OperationsService(
             if (line.Product.UsesDisplayStock)
                 continue;
 
-            await ApplyStockMovement(line.Request.ProductId, -line.BaseQuantity, InventoryTransactionType.Sale, "ManualSale", sale.Id, sale.SaleNumber, userId, null, ct);
-            await ConsumeInventoryLotsAsync(line.Request.ProductId, line.BaseQuantity, ct);
+            var allocations = await lotAllocator.ConsumeFefoAsync(
+                line.Request.ProductId,
+                line.BaseQuantity,
+                ct);
+            await ApplyStockMovement(
+                line.Request.ProductId,
+                -line.BaseQuantity,
+                InventoryTransactionType.Sale,
+                "ManualSale",
+                sale.Id,
+                sale.SaleNumber,
+                userId,
+                null,
+                allocations,
+                ct);
         }
         await context.SaveChangesAsync(ct);
         foreach (var productId in normalizedItems
@@ -804,7 +862,7 @@ public sealed class OperationsService(
             .Select(item => item.MainCurrencyCode)
             .FirstOrDefaultAsync(ct) ?? "USD";
 
-    private async Task AddOrMergeInventoryLotAsync(
+    private async Task<InventoryLot> AddOrMergeInventoryLotAsync(
         long productId,
         long warehouseId,
         string lotNumber,
@@ -822,7 +880,7 @@ public sealed class OperationsService(
 
         if (lot is null)
         {
-            context.InventoryLots.Add(new InventoryLot
+            lot = new InventoryLot
             {
                 ProductId = productId,
                 WarehouseId = warehouseId,
@@ -831,8 +889,9 @@ public sealed class OperationsService(
                 ReservedQuantity = 0,
                 UnitCost = unitCost,
                 ExpiresAt = expiresAt
-            });
-            return;
+            };
+            context.InventoryLots.Add(lot);
+            return lot;
         }
 
         var previousQuantity = lot.Quantity;
@@ -846,6 +905,7 @@ public sealed class OperationsService(
                 MidpointRounding.AwayFromZero);
         lot.Quantity = combinedQuantity;
         lot.UpdatedAt = DateTime.UtcNow;
+        return lot;
     }
 
     private async Task RefreshInventoryExpiryAsync(long productId, CancellationToken ct)
@@ -862,21 +922,17 @@ public sealed class OperationsService(
             .MinAsync(item => item.ExpiresAt, ct);
     }
 
-    private async Task ConsumeInventoryLotsAsync(long productId, decimal quantity, CancellationToken ct)
-    {
-        var remaining = quantity;
-        var lots = await context.InventoryLots.Where(x => x.ProductId == productId && x.Quantity - x.ReservedQuantity > 0)
-            .OrderBy(x => x.ExpiresAt == null).ThenBy(x => x.ExpiresAt).ThenBy(x => x.CreatedAt).ToListAsync(ct);
-        foreach (var lot in lots)
-        {
-            if (remaining <= 0) break;
-            var consumed = Math.Min(lot.Quantity - lot.ReservedQuantity, remaining);
-            lot.Quantity -= consumed;
-            remaining -= consumed;
-        }
-    }
-
-    private async Task ApplyStockMovement(long productId, decimal delta, InventoryTransactionType type, string referenceType, long referenceId, string documentNumber, string? userId, DateOnly? expireDate, CancellationToken ct)
+    private async Task ApplyStockMovement(
+        long productId,
+        decimal delta,
+        InventoryTransactionType type,
+        string referenceType,
+        long referenceId,
+        string documentNumber,
+        string? userId,
+        DateOnly? expireDate,
+        IReadOnlyList<InventoryLotAllocation> allocations,
+        CancellationToken ct)
     {
         var inventory = await context.ProductInventories.SingleOrDefaultAsync(x => x.ProductId == productId, ct);
         if (inventory is null)
@@ -890,7 +946,7 @@ public sealed class OperationsService(
         if (delta < 0 && inventory.Quantity - inventory.ReservedQuantity < -delta) throw new InvalidOperationException("Insufficient available stock for one or more sale items.");
         inventory.Quantity += delta;
         if (expireDate.HasValue && (!inventory.ExpireDate.HasValue || expireDate.Value < inventory.ExpireDate.Value)) inventory.ExpireDate = expireDate;
-        context.InventoryTransactions.Add(new InventoryTransaction
+        var inventoryTransaction = new InventoryTransaction
         {
             ProductId = productId,
             Quantity = delta,
@@ -903,7 +959,23 @@ public sealed class OperationsService(
             ReferenceId = referenceId,
             PerformedByUserId = userId,
             Description = $"{referenceType} {documentNumber}"
-        });
+        };
+        foreach (var allocation in allocations)
+        {
+            inventoryTransaction.Lots.Add(new InventoryTransactionLot
+            {
+                InventoryLot = allocation.Lot,
+                InventoryLotId = allocation.Lot.Id > 0 ? allocation.Lot.Id : null,
+                LotNumber = allocation.Lot.LotNumber,
+                WarehouseId = allocation.Lot.WarehouseId,
+                WarehouseName = allocation.Lot.Warehouse?.Name ?? MainWarehouseCode,
+                ExpiresAt = allocation.Lot.ExpiresAt,
+                QuantityDelta = Math.Sign(delta) * allocation.Quantity,
+                ReservedDelta = 0,
+                UnitCost = allocation.Lot.UnitCost
+            });
+        }
+        context.InventoryTransactions.Add(inventoryTransaction);
     }
 
     private async Task EnsurePurchasableProductsAsync(IEnumerable<long> ids, CancellationToken ct)

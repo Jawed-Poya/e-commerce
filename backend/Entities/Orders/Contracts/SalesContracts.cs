@@ -1,5 +1,6 @@
 using API.Entities.Orders;
 using ECommerce.Entities.Orders;
+using ECommerce.Entities.Products;
 
 namespace ECommerce.Entities.Orders.Contracts;
 
@@ -148,6 +149,22 @@ public sealed record OrderStatusHistoryResponse(
     DateTime CreatedAt
 );
 
+public sealed record OrderLotMovementResponse(
+    long Id,
+    long InventoryTransactionId,
+    long ProductId,
+    string ProductName,
+    InventoryTransactionType Type,
+    long? InventoryLotId,
+    string? LotNumber,
+    long WarehouseId,
+    string WarehouseName,
+    DateOnly? ExpiresAt,
+    decimal QuantityDelta,
+    decimal ReservedDelta,
+    DateTime CreatedAt
+);
+
 public sealed record OrderDetailsResponse(
     long Id,
     string OrderNumber,
@@ -167,6 +184,7 @@ public sealed record OrderDetailsResponse(
     OrderCustomerResponse Customer,
     OrderAddressResponse ShippingAddress,
     IReadOnlyCollection<OrderItemResponse> Items,
+    IReadOnlyCollection<OrderLotMovementResponse> LotMovements,
     IReadOnlyCollection<PaymentResponse> Payments,
     IReadOnlyCollection<OrderStatusHistoryResponse> StatusHistory
 );

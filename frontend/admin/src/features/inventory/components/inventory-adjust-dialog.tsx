@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { LoaderCircle, PackageMinus, PackagePlus } from "lucide-react";
+import { Boxes, LoaderCircle, PackageMinus, PackagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,8 +20,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useAdjustInventory } from "@/features/inventory/hooks/use-inventory";
-import type { InventoryListItem, InventoryTransactionType } from "@/features/inventory/types/inventory-types";
+import { useAdjustInventory, useInventoryLots } from "@/features/inventory/hooks/use-inventory";
+import type {
+    InventoryListItem,
+    InventoryLot,
+    InventoryTransactionType,
+} from "@/features/inventory/types/inventory-types";
 import { useI18n } from "@/i18n/i18n-provider";
 
 type AdjustmentAction = {
@@ -32,9 +36,18 @@ type AdjustmentAction = {
     description: string;
 };
 
-export function InventoryAdjustDialog({ item, open, onOpenChange }: { item: InventoryListItem | null; open: boolean; onOpenChange: (open: boolean) => void }) {
-    const { t } = useI18n();
+export function InventoryAdjustDialog({
+    item,
+    open,
+    onOpenChange,
+}: {
+    item: InventoryListItem | null;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}) {
+    const { locale, t } = useI18n();
     const mutation = useAdjustInventory();
+    const lotsQuery = useInventoryLots(open ? item?.productId ?? null : null);
     const actions = useMemo<AdjustmentAction[]>(() => [
         { id: "purchase", type: "Purchase", direction: 1, label: t("inventory.action.purchase"), description: t("inventory.action.purchaseHelp") },
         { id: "return", type: "SaleReturn", direction: 1, label: t("inventory.action.return"), description: t("inventory.action.returnHelp") },
@@ -44,20 +57,40 @@ export function InventoryAdjustDialog({ item, open, onOpenChange }: { item: Inve
         { id: "expired", type: "Expired", direction: -1, label: t("inventory.action.expired"), description: t("inventory.action.expiredHelp") },
     ], [t]);
     const [actionId, setActionId] = useState(actions[0].id);
+    const [selectedLotId, setSelectedLotId] = useState<number | null>(null);
     const [quantity, setQuantity] = useState("");
     const [description, setDescription] = useState("");
+
     const action = actions.find(option => option.id === actionId) ?? actions[0];
+    const requiresLot = action.direction < 0;
+    const lotOptions = useMemo(
+        () => (lotsQuery.data ?? []).filter(lot =>
+            lot.availableQuantity > 0 && (action.type !== "Expired" || lot.isExpired)),
+        [action.type, lotsQuery.data],
+    );
+    const selectedLot = lotOptions.find(lot => lot.id === selectedLotId) ?? null;
     const numericQuantity = Number(quantity);
     const delta = Number.isFinite(numericQuantity) ? numericQuantity * action.direction : 0;
     const projectedQuantity = (item?.quantity ?? 0) + delta;
-    const isValid = numericQuantity > 0 && projectedQuantity >= (item?.reservedQuantity ?? 0);
+    const aggregateValid = numericQuantity > 0 && projectedQuantity >= (item?.reservedQuantity ?? 0);
+    const lotValid = !requiresLot || (
+        selectedLot !== null &&
+        numericQuantity <= selectedLot.availableQuantity
+    );
+    const isValid = aggregateValid && lotValid;
 
     useEffect(() => {
         if (!open) return;
         setActionId("purchase");
+        setSelectedLotId(null);
         setQuantity("");
         setDescription("");
     }, [open, item?.productId]);
+
+    useEffect(() => {
+        setSelectedLotId(null);
+        setQuantity("");
+    }, [actionId]);
 
     const submit = async () => {
         if (!item || !isValid) return;
@@ -69,6 +102,7 @@ export function InventoryAdjustDialog({ item, open, onOpenChange }: { item: Inve
                     type: action.type,
                     description: description.trim() || undefined,
                     idempotencyKey: crypto.randomUUID(),
+                    lotId: selectedLot?.id,
                 },
             });
             toast.success(t("inventory.adjustSuccess"));
@@ -80,6 +114,15 @@ export function InventoryAdjustDialog({ item, open, onOpenChange }: { item: Inve
 
     if (!item) return null;
     const selectedAction = actions.find(option => option.id === actionId) ?? actions[0];
+    const lotError = getLotError({
+        requiresLot,
+        actionType: action.type,
+        selectedLot,
+        numericQuantity,
+        lotsLoading: lotsQuery.isLoading,
+        lotOptions,
+        t,
+    });
 
     return <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-xl">
@@ -109,9 +152,49 @@ export function InventoryAdjustDialog({ item, open, onOpenChange }: { item: Inve
                 <p className="text-xs text-muted-foreground">{action.description}</p>
             </div>
 
+            {requiresLot ? <div className="space-y-2">
+                <Label>{t("inventory.lotBatch")}</Label>
+                <Combobox
+                    items={lotOptions}
+                    value={selectedLot}
+                    onValueChange={lot => setSelectedLotId(lot?.id ?? null)}
+                    itemToStringLabel={lot => lotLabel(lot, t)}
+                >
+                    <ComboboxInput className="w-full" placeholder={t("inventory.selectLot")} disabled={lotsQuery.isLoading} />
+                    <ComboboxContent>
+                        <ComboboxList>
+                            {lotOptions.map(lot => <ComboboxItem key={lot.id} value={lot}>
+                                <span className="flex size-8 shrink-0 items-center justify-center border bg-muted/40 text-muted-foreground">
+                                    <Boxes className="size-4" />
+                                </span>
+                                <span className="min-w-0">
+                                    <span className="block truncate font-medium">{lotLabel(lot, t)}</span>
+                                    <span className="block text-[11px] text-muted-foreground">
+                                        {lot.warehouseName} · {t("inventory.lotAvailable")}: {formatNumber(lot.availableQuantity)}
+                                        {lot.expiresAt ? ` · ${formatDate(lot.expiresAt, locale)}` : ""}
+                                    </span>
+                                </span>
+                            </ComboboxItem>)}
+                        </ComboboxList>
+                    </ComboboxContent>
+                </Combobox>
+                <p className="text-xs text-muted-foreground">{t("inventory.lotHelp")}</p>
+                {lotError ? <p className="text-xs text-destructive">{lotError}</p> : null}
+            </div> : null}
+
             <div className="space-y-2">
                 <Label htmlFor="inventory-adjust-quantity">{t("inventory.quantity")}</Label>
-                <Input id="inventory-adjust-quantity" type="number" min="0.001" step="0.001" inputMode="decimal" value={quantity} onChange={event => setQuantity(event.target.value)} placeholder="0" />
+                <Input
+                    id="inventory-adjust-quantity"
+                    type="number"
+                    min="0.001"
+                    max={selectedLot?.availableQuantity}
+                    step="0.001"
+                    inputMode="decimal"
+                    value={quantity}
+                    onChange={event => setQuantity(event.target.value)}
+                    placeholder="0"
+                />
             </div>
 
             <div className="grid grid-cols-3 border text-center">
@@ -119,7 +202,7 @@ export function InventoryAdjustDialog({ item, open, onOpenChange }: { item: Inve
                 <StockPreview label={t("inventory.change")} value={delta} signed className="border-x" />
                 <StockPreview label={t("inventory.newStock")} value={projectedQuantity} />
             </div>
-            {!isValid && numericQuantity > 0 && <p className="text-xs text-destructive">{t("inventory.reservedGuard")}</p>}
+            {!aggregateValid && numericQuantity > 0 ? <p className="text-xs text-destructive">{t("inventory.reservedGuard")}</p> : null}
 
             <div className="space-y-2">
                 <Label htmlFor="inventory-adjust-note">{t("inventory.note")}</Label>
@@ -129,8 +212,8 @@ export function InventoryAdjustDialog({ item, open, onOpenChange }: { item: Inve
 
             <DialogFooter>
                 <Button variant="outline" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>{t("form.cancel")}</Button>
-                <Button onClick={submit} disabled={!isValid || mutation.isPending}>
-                    {mutation.isPending && <LoaderCircle className="me-2 size-4 animate-spin" />}
+                <Button onClick={submit} disabled={!isValid || mutation.isPending || lotsQuery.isLoading}>
+                    {(mutation.isPending || lotsQuery.isLoading) && <LoaderCircle className="me-2 size-4 animate-spin" />}
                     {mutation.isPending ? t("inventory.saving") : t("inventory.confirmAdjustment")}
                 </Button>
             </DialogFooter>
@@ -138,8 +221,46 @@ export function InventoryAdjustDialog({ item, open, onOpenChange }: { item: Inve
     </Dialog>;
 }
 
+function getLotError({
+    requiresLot,
+    actionType,
+    selectedLot,
+    numericQuantity,
+    lotsLoading,
+    lotOptions,
+    t,
+}: {
+    requiresLot: boolean;
+    actionType: InventoryTransactionType;
+    selectedLot: InventoryLot | null;
+    numericQuantity: number;
+    lotsLoading: boolean;
+    lotOptions: InventoryLot[];
+    t: ReturnType<typeof useI18n>["t"];
+}) {
+    if (!requiresLot || lotsLoading) return null;
+    if (lotOptions.length === 0)
+        return actionType === "Expired" ? t("inventory.noExpiredLots") : t("inventory.noAvailableLots");
+    if (!selectedLot) return t("inventory.lotRequired");
+    if (numericQuantity > selectedLot.availableQuantity) return t("inventory.lotQuantityGuard");
+    return null;
+}
+
+function lotLabel(lot: InventoryLot, t: ReturnType<typeof useI18n>["t"]) {
+    return lot.lotNumber || `${t("inventory.unnumberedLot")} #${lot.id}`;
+}
+
+function formatDate(value: string, locale: string) {
+    return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" })
+        .format(new Date(`${value}T00:00:00Z`));
+}
+
+function formatNumber(value: number) {
+    return value.toLocaleString(undefined, { maximumFractionDigits: 3 });
+}
+
 function StockPreview({ label, value, signed = false, className = "" }: { label: string; value: number; signed?: boolean; className?: string }) {
-    const formatted = `${signed && value > 0 ? "+" : ""}${value.toLocaleString(undefined, { maximumFractionDigits: 3 })}`;
+    const formatted = `${signed && value > 0 ? "+" : ""}${formatNumber(value)}`;
     return <div className={`p-3 ${className}`}><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold tabular-nums">{formatted}</p></div>;
 }
 

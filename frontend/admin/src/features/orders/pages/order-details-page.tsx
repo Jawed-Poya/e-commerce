@@ -11,6 +11,7 @@ import { OrderActions } from "../components/order-actions";
 import {
     OrderCustomerAndShipping,
     OrderItemsTable,
+    OrderLotTraceability,
     OrderPaymentAndTotals,
     OrderStatusHistory,
     OrderSummaryCards,
@@ -76,6 +77,7 @@ export default function OrderDetailsPage() {
 
             <OrderCustomerAndShipping order={order} />
             <OrderItemsTable order={order} formatMoney={formatMoney} />
+            <OrderLotTraceability order={order} />
             <OrderPaymentAndTotals order={order} formatMoney={formatMoney} />
             <OrderStatusHistory order={order} />
         </div>

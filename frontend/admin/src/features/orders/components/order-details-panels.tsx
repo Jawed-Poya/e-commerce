@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Banknote, Box, Clock3, MapPin, Phone, Truck, UserRound } from "lucide-react";
+import { Banknote, Box, Clock3, Layers3, MapPin, Phone, Truck, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -172,6 +172,69 @@ export function OrderItemsTable({ order, formatMoney }: OrderPanelProps) {
     );
 }
 
+export function OrderLotTraceability({ order }: Pick<OrderPanelProps, "order">) {
+    const { locale, t } = useI18n();
+    if (order.lotMovements.length === 0) return null;
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Layers3 className="size-4" />
+                    {t("orders.lotTraceability")}
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">{t("orders.lotTraceabilityHelp")}</p>
+            </CardHeader>
+            <CardContent>
+                <div className="overflow-x-auto border">
+                    <Table className="min-w-[880px]">
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>{t("orders.date")}</TableHead>
+                                <TableHead>{t("orders.product")}</TableHead>
+                                <TableHead>{t("orders.lotBatch")}</TableHead>
+                                <TableHead>{t("orders.warehouse")}</TableHead>
+                                <TableHead>{t("orders.expiry")}</TableHead>
+                                <TableHead>{t("orders.inventoryAction")}</TableHead>
+                                <TableHead className="text-end">{t("orders.baseQuantity")}</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {order.lotMovements.map(movement => {
+                                const amount = movement.quantityDelta !== 0
+                                    ? movement.quantityDelta
+                                    : movement.reservedDelta;
+                                return (
+                                    <TableRow key={movement.id}>
+                                        <TableCell className="whitespace-nowrap text-xs">
+                                            {new Date(movement.createdAt).toLocaleString(locale)}
+                                        </TableCell>
+                                        <TableCell className="font-medium">{movement.productName}</TableCell>
+                                        <TableCell>
+                                            {movement.lotNumber || `${t("orders.unnumberedLot")} #${movement.inventoryLotId ?? movement.id}`}
+                                        </TableCell>
+                                        <TableCell>{movement.warehouseName}</TableCell>
+                                        <TableCell className="whitespace-nowrap">
+                                            {movement.expiresAt
+                                                ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" })
+                                                    .format(new Date(`${movement.expiresAt}T00:00:00Z`))
+                                                : "—"}
+                                        </TableCell>
+                                        <TableCell>{inventoryActionLabel(movement.type, t)}</TableCell>
+                                        <TableCell className={amount < 0 ? "text-end font-semibold tabular-nums text-destructive" : "text-end font-semibold tabular-nums text-emerald-600 dark:text-emerald-400"}>
+                                            {amount > 0 ? "+" : ""}{amount.toLocaleString(locale, { maximumFractionDigits: 3 })}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
 export function OrderPaymentAndTotals({ order, formatMoney }: OrderPanelProps) {
     const { locale, t } = useI18n();
     const payment = order.payments[0];
@@ -256,6 +319,13 @@ export function OrderStatusHistory({ order }: Pick<OrderPanelProps, "order">) {
             </CardContent>
         </Card>
     );
+}
+
+function inventoryActionLabel(type: OrderDetails["lotMovements"][number]["type"], t: ReturnType<typeof useI18n>["t"]) {
+    if (type === "Reservation") return t("orders.inventoryReserved");
+    if (type === "ReservationRelease") return t("orders.inventoryReleased");
+    if (type === "Sale") return t("orders.inventorySold");
+    return type;
 }
 
 function SummaryCard({ icon, label, value }: { icon: ReactNode; label: string; value: ReactNode }) {

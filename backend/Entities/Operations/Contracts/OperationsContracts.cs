@@ -128,6 +128,17 @@ public sealed class InventorySaleItemRequest
     public decimal UnitPrice { get; set; }
 }
 public sealed record InventorySaleListItem(long Id, string SaleNumber, string? ReferenceNumber, DateOnly SaleDate, string CustomerName, int ItemCount, decimal Total, decimal PaidAmount, decimal RemainingAmount, DocumentPaymentStatus PaymentStatus, DateTime CreatedAt);
+public sealed record InventorySaleLotMovementResponse(
+    long Id,
+    long ProductId,
+    string ProductName,
+    long? InventoryLotId,
+    string? LotNumber,
+    long WarehouseId,
+    string WarehouseName,
+    DateOnly? ExpiresAt,
+    decimal Quantity,
+    DateTime CreatedAt);
 
 public sealed class RecordDocumentPaymentRequest
 {

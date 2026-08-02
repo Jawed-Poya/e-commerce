@@ -54,6 +54,34 @@ public sealed class InventoryTransactionConfiguration : IEntityTypeConfiguration
     }
 }
 
+public sealed class InventoryTransactionLotConfiguration : IEntityTypeConfiguration<InventoryTransactionLot>
+{
+    public void Configure(EntityTypeBuilder<InventoryTransactionLot> b)
+    {
+        b.Property(x => x.LotNumber).HasMaxLength(100);
+        b.Property(x => x.WarehouseName).HasMaxLength(150).IsRequired();
+        b.Property(x => x.QuantityDelta).HasPrecision(18, 3);
+        b.Property(x => x.ReservedDelta).HasPrecision(18, 3);
+        b.Property(x => x.UnitCost).HasPrecision(18, 4);
+
+        b.HasOne(x => x.InventoryTransaction)
+            .WithMany(x => x.Lots)
+            .HasForeignKey(x => x.InventoryTransactionId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.InventoryLot)
+            .WithMany(x => x.Transactions)
+            .HasForeignKey(x => x.InventoryLotId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        b.HasIndex(x => x.InventoryTransactionId);
+        b.HasIndex(x => new { x.InventoryLotId, x.CreatedAt });
+        b.HasIndex(x => new { x.TenantId, x.LotNumber, x.CreatedAt });
+        b.ToTable(t => t.HasCheckConstraint(
+            "CK_InventoryTransactionLot_Movement",
+            "[QuantityDelta] <> 0 OR [ReservedDelta] <> 0"));
+    }
+}
+
 public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 {
     public void Configure(EntityTypeBuilder<Order> b)

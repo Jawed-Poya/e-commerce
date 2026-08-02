@@ -8,7 +8,7 @@ import {
   readReferenceItems,
   writeCachedValue,
 } from "@/features/offline/offline-reference-cache";
-import type { DocumentPayment, Expense, ExpenseCategory, ManualSale, OperationCustomer, OperationPolicy, OperationProduct, OperationSummary, Purchase, PurchaseDetails, SalaryPayment, Staff, Supplier } from "./operations-types";
+import type { DocumentPayment, Expense, ExpenseCategory, ManualSale, ManualSaleLotMovement, OperationCustomer, OperationPolicy, OperationProduct, OperationSummary, Purchase, PurchaseDetails, SalaryPayment, Staff, Supplier } from "./operations-types";
 
 const base = "/admin/operations";
 
@@ -121,6 +121,7 @@ export const operationsService = {
     (item, clean) => [item.saleNumber, item.referenceNumber, item.customerName].some((value) => normalize(value ?? "").includes(clean)),
   ),
   createSale: (body: Record<string, unknown>) => postQueueable<ManualSale>(`${base}/sales`, body, "Manual sale"),
+  saleLots: (id: number) => apiClient.get<ManualSaleLotMovement[]>(`${base}/sales/${id}/lots`),
   salePayments: (id: number) => apiClient.get<DocumentPayment[]>(`${base}/sales/${id}/payments`),
   addSalePayment: (id: number, body: unknown) => apiClient.post<ManualSale>(`${base}/sales/${id}/payments`, body),
   staff: () => apiClient.get<Staff[]>(`${base}/staff`),

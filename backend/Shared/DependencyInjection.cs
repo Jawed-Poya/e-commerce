@@ -40,6 +40,7 @@ public static class DependencyInjection
         services.AddScoped<IGeneralTypeService, GeneralTypesService>();
         services.AddScoped<IProductImageStorage, LocalProductImageStorage>();
         services.AddScoped<IInventoryService, InventoryService>();
+        services.AddScoped<IInventoryLotAllocator, InventoryLotAllocator>();
         services.AddScoped<IInventoryCostService, InventoryCostService>();
         services.AddScoped<IFinancialReportService, FinancialReportService>();
         services.AddScoped<IFinancialDocumentService, FinancialDocumentService>();

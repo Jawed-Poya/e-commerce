@@ -18,4 +18,5 @@ public class InventoryLot : BaseEntity
     public DateOnly? ManufacturedAt { get; set; }
     public DateOnly? ExpiresAt { get; set; }
     public byte[] RowVersion { get; set; } = [];
+    public ICollection<InventoryTransactionLot> Transactions { get; set; } = [];
 }
