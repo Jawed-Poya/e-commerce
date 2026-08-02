@@ -1,3 +1,8 @@
+export type ExpiryAlertSound =
+    | "critical-pulse"
+    | "urgent-alarm"
+    | "warning-chime";
+
 export interface CompanySettings {
     mainCurrencyCode: string;
     currencySymbol: string;
@@ -13,6 +18,10 @@ export interface CompanySettings {
     baseFontSize: number;
     trashRetentionDays: number;
     notificationRetentionDays: number;
+    expiryAlertsEnabled: boolean;
+    expiryAlertLeadDays: number;
+    expiryAlertSoundEnabled: boolean;
+    expiryAlertSound: ExpiryAlertSound;
     maximumPurchaseLines: number;
     maximumManualSaleLines: number;
     allowUserClaimManagement: boolean;

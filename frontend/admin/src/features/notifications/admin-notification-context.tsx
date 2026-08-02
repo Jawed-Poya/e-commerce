@@ -14,7 +14,10 @@ import { apiBaseUrl } from "@/api/axios";
 import { useAdminAuth } from "@/features/auth/auth-context";
 import { getAdminToken } from "@/features/auth/auth-storage";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
+import { useCompany } from "@/features/company/company-context";
+import { useI18n } from "@/i18n/i18n-provider";
 import { adminNotificationService } from "./admin-notification-service";
+import { armExpiryAlertSound, playExpiryAlertSound } from "./expiry-alert-sounds";
 import type { AdminNotification } from "./admin-notification-types";
 
 const seenKey = "easycart-admin-notifications-seen";
@@ -26,6 +29,7 @@ type RealtimeStatus = "connecting" | "live" | "reconnecting" | "polling";
 type AdminNotificationContextValue = {
     items: AdminNotification[];
     unreadCount: number;
+    canManage: boolean;
     realtimeStatus: RealtimeStatus;
     markAllRead: () => void;
     remove: (id: number) => Promise<void>;
@@ -38,11 +42,16 @@ const AdminNotificationContext =
 
 export function AdminNotificationProvider({ children }: PropsWithChildren) {
     const auth = useAdminAuth();
+    const { company, loading: companyLoading } = useCompany();
+    const { t } = useI18n();
     const [items, setItems] = useState<AdminNotification[]>([]);
     const [seenIds, setSeenIds] = useState<number[]>(readSeenIds);
+    const seenIdsRef = useRef(new Set(seenIds));
     const [realtimeStatus, setRealtimeStatus] =
         useState<RealtimeStatus>("connecting");
     const deliveredIds = useRef(new Set<number>());
+    const pendingExpiryAlerts = useRef<AdminNotification[]>([]);
+    const expiryAnnouncementTimer = useRef<number | null>(null);
     const hydrated = useRef(false);
     const lastCheck = useRef(
         localStorage.getItem(lastCheckKey) ??
@@ -51,7 +60,99 @@ export function AdminNotificationProvider({ children }: PropsWithChildren) {
 
     const enabled =
         auth.isAuthenticated &&
-        hasPermission(auth.user, Permissions.OrdersView);
+        !companyLoading &&
+        (hasPermission(auth.user, Permissions.OrdersView) ||
+            hasPermission(auth.user, Permissions.InventoryView) ||
+            hasPermission(auth.user, Permissions.ReviewsView));
+    const canManage = hasPermission(auth.user, Permissions.NotificationsManage);
+    const expiryAlertsEnabled = company?.settings.expiryAlertsEnabled !== false;
+
+    useEffect(() => {
+        seenIdsRef.current = new Set(seenIds);
+    }, [seenIds]);
+
+    useEffect(() => {
+        if (
+            !company?.settings.expiryAlertsEnabled ||
+            !company.settings.expiryAlertSoundEnabled
+        ) return;
+        return armExpiryAlertSound(company.settings.expiryAlertSound);
+    }, [
+        company?.settings.expiryAlertsEnabled,
+        company?.settings.expiryAlertSound,
+        company?.settings.expiryAlertSoundEnabled,
+    ]);
+
+    useEffect(() => {
+        if (company?.settings.expiryAlertsEnabled !== false) return;
+
+        pendingExpiryAlerts.current = [];
+        if (expiryAnnouncementTimer.current !== null) {
+            window.clearTimeout(expiryAnnouncementTimer.current);
+            expiryAnnouncementTimer.current = null;
+        }
+        setItems((current) => current.filter((item) => item.kind !== "Expiry"));
+    }, [company?.settings.expiryAlertsEnabled]);
+
+    const announcePendingExpiryAlerts = useCallback(() => {
+        expiryAnnouncementTimer.current = null;
+        const expiryAlerts = pendingExpiryAlerts.current.filter(
+            (item) => !seenIdsRef.current.has(item.id),
+        );
+        pendingExpiryAlerts.current = [];
+        if (!expiryAlerts.length || company?.settings.expiryAlertsEnabled === false)
+            return;
+
+        const first = expiryAlerts[0];
+        const count = expiryAlerts.length;
+        const title = count === 1
+            ? first.title
+            : t("notifications.expiryBatchTitle").replace("{count}", String(count));
+        const description = count === 1
+            ? first.message
+            : t("notifications.expiryBatchDescription").replace("{count}", String(count));
+
+        if (
+            company?.settings.expiryAlertsEnabled &&
+            company.settings.expiryAlertSoundEnabled
+        ) {
+            void playExpiryAlertSound(company.settings.expiryAlertSound).catch(() => {
+                // Browsers can block automatic audio until the first user interaction.
+            });
+        }
+
+        toast.warning(title, {
+            description,
+            duration: 15_000,
+            action: {
+                label: t("notifications.openInventory"),
+                onClick: () => window.location.assign(first.link),
+            },
+        });
+    }, [
+        company?.settings.expiryAlertSound,
+        company?.settings.expiryAlertSoundEnabled,
+        company?.settings.expiryAlertsEnabled,
+        t,
+    ]);
+
+    const queueExpiryAnnouncement = useCallback((alerts: AdminNotification[]) => {
+        if (company?.settings.expiryAlertsEnabled === false || !alerts.length)
+            return;
+
+        pendingExpiryAlerts.current.push(...alerts);
+        if (expiryAnnouncementTimer.current !== null) return;
+
+        expiryAnnouncementTimer.current = window.setTimeout(
+            announcePendingExpiryAlerts,
+            750,
+        );
+    }, [announcePendingExpiryAlerts, company?.settings.expiryAlertsEnabled]);
+
+    useEffect(() => () => {
+        if (expiryAnnouncementTimer.current !== null)
+            window.clearTimeout(expiryAnnouncementTimer.current);
+    }, []);
 
     const receive = useCallback((
         incoming: AdminNotification[],
@@ -64,9 +165,14 @@ export function AdminNotificationProvider({ children }: PropsWithChildren) {
         });
         if (!fresh.length) return;
 
+        const visibleFresh = expiryAlertsEnabled
+            ? fresh
+            : fresh.filter((item) => item.kind !== "Expiry");
+        if (!visibleFresh.length) return;
+
         setItems((current) => {
             const byId = new Map(
-                [...fresh, ...current].map((item) => [item.id, item]),
+                [...visibleFresh, ...current].map((item) => [item.id, item]),
             );
             return [...byId.values()]
                 .sort(
@@ -77,17 +183,24 @@ export function AdminNotificationProvider({ children }: PropsWithChildren) {
                 .slice(0, 50);
         });
 
-        if (!announce) return;
-        fresh.forEach((item) =>
-            toast(item.title, {
-                description: item.message,
-                action: {
-                    label: "Open",
-                    onClick: () => window.location.assign(item.link),
-                },
-            }),
+        const expiryAlerts = visibleFresh.filter(
+            (item) => item.kind === "Expiry" && !seenIdsRef.current.has(item.id),
         );
-    }, []);
+        queueExpiryAnnouncement(expiryAlerts);
+
+        if (!announce) return;
+        visibleFresh
+            .filter((item) => item.kind !== "Expiry")
+            .forEach((item) =>
+                toast(item.title, {
+                    description: item.message,
+                    action: {
+                        label: t("notifications.open"),
+                        onClick: () => window.location.assign(item.link),
+                    },
+                }),
+            );
+    }, [expiryAlertsEnabled, queueExpiryAnnouncement, t]);
 
     const refresh = useCallback(async () => {
         if (!enabled) return;
@@ -111,6 +224,11 @@ export function AdminNotificationProvider({ children }: PropsWithChildren) {
         if (!enabled) {
             setItems([]);
             deliveredIds.current.clear();
+            pendingExpiryAlerts.current = [];
+            if (expiryAnnouncementTimer.current !== null) {
+                window.clearTimeout(expiryAnnouncementTimer.current);
+                expiryAnnouncementTimer.current = null;
+            }
             hydrated.current = false;
             setRealtimeStatus("polling");
             return;
@@ -192,9 +310,9 @@ export function AdminNotificationProvider({ children }: PropsWithChildren) {
     const markAllRead = useCallback(() => {
         const ids = items.map((item) => item.id);
         localStorage.setItem(seenKey, JSON.stringify(ids));
+        seenIdsRef.current = new Set(ids);
         setSeenIds(ids);
     }, [items]);
-
 
     const remove = useCallback(async (id: number) => {
         await adminNotificationService.delete(id);
@@ -203,6 +321,7 @@ export function AdminNotificationProvider({ children }: PropsWithChildren) {
         setSeenIds((current) => {
             const next = current.filter((item) => item !== id);
             localStorage.setItem(seenKey, JSON.stringify(next));
+            seenIdsRef.current = new Set(next);
             return next;
         });
     }, []);
@@ -211,7 +330,9 @@ export function AdminNotificationProvider({ children }: PropsWithChildren) {
         await adminNotificationService.clear();
         setItems([]);
         deliveredIds.current.clear();
+        pendingExpiryAlerts.current = [];
         setSeenIds([]);
+        seenIdsRef.current = new Set();
         localStorage.setItem(seenKey, "[]");
     }, []);
 
@@ -222,13 +343,14 @@ export function AdminNotificationProvider({ children }: PropsWithChildren) {
         () => ({
             items,
             unreadCount,
+            canManage,
             realtimeStatus,
             markAllRead,
             remove,
             clear,
             refresh,
         }),
-        [clear, items, markAllRead, realtimeStatus, refresh, remove, unreadCount],
+        [canManage, clear, items, markAllRead, realtimeStatus, refresh, remove, unreadCount],
     );
 
     return (

@@ -5,6 +5,7 @@ import {
     CircleDollarSign,
     Radio,
     ShoppingCart,
+    Siren,
     Star,
     Trash2,
 } from "lucide-react";
@@ -78,7 +79,7 @@ export function AdminNotificationCenter() {
                     <span>{notifications.items.length} {t("notifications.recentEvents")}</span>
                     <div className="flex items-center gap-2">
                         <span className="inline-flex items-center gap-1.5"><CheckCheck className="size-3.5 text-primary" />{t("notifications.openedRead")}</span>
-                        {notifications.items.length > 0 ? <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => void clear()}><Trash2 className="size-3.5" />{t("notifications.clearAll")}</Button> : null}
+                        {notifications.canManage && notifications.items.length > 0 ? <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => void clear()}><Trash2 className="size-3.5" />{t("notifications.clearAll")}</Button> : null}
                     </div>
                 </div>
 
@@ -86,12 +87,27 @@ export function AdminNotificationCenter() {
                     {notifications.items.map((item) => (
                         <div key={item.id} className="group relative rounded-xl hover:bg-muted focus-within:bg-muted">
                             <button type="button" onClick={() => navigate(item.link)} className="flex w-full gap-3 rounded-xl p-3 pe-12 text-start outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                <span className={cn("mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl", item.kind === "Payment" ? "bg-emerald-500/10 text-emerald-600" : item.kind === "Review" ? "bg-amber-500/10 text-amber-600" : "bg-primary/10 text-primary")}>
-                                    {item.kind === "Payment" ? <CircleDollarSign className="size-5" /> : item.kind === "Review" ? <Star className="size-5 fill-current" /> : <ShoppingCart className="size-5" />}
+                                <span className={cn(
+                                    "mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl",
+                                    item.kind === "Payment"
+                                        ? "bg-emerald-500/10 text-emerald-600"
+                                        : item.kind === "Review"
+                                            ? "bg-amber-500/10 text-amber-600"
+                                            : item.kind === "Expiry"
+                                                ? "bg-destructive/10 text-destructive"
+                                                : "bg-primary/10 text-primary",
+                                )}>
+                                    {item.kind === "Payment"
+                                        ? <CircleDollarSign className="size-5" />
+                                        : item.kind === "Review"
+                                            ? <Star className="size-5 fill-current" />
+                                            : item.kind === "Expiry"
+                                                ? <Siren className="size-5" />
+                                                : <ShoppingCart className="size-5" />}
                                 </span>
                                 <span className="min-w-0 flex-1"><b className="block truncate text-sm">{item.title}</b><span className="mt-1 line-clamp-2 block text-xs leading-5 text-muted-foreground">{item.message}</span><span className="mt-1.5 block text-[10px] text-muted-foreground">{new Date(item.createdAt).toLocaleString(language === "en" ? "en-US" : language === "ps" ? "ps-AF" : "fa-AF")}</span></span>
                             </button>
-                            <Button variant="ghost" size="icon" className="absolute end-2 top-2 size-8 opacity-70 hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100" aria-label={t("notifications.deleteOne")} onClick={() => void remove(item.id)}><Trash2 className="size-4" /></Button>
+                            {notifications.canManage ? <Button variant="ghost" size="icon" className="absolute end-2 top-2 size-8 opacity-70 hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100" aria-label={t("notifications.deleteOne")} onClick={() => void remove(item.id)}><Trash2 className="size-4" /></Button> : null}
                         </div>
                     ))}
 

@@ -15,6 +15,10 @@ public sealed record CompanySettingsResponse(
     int BaseFontSize,
     int TrashRetentionDays,
     int NotificationRetentionDays,
+    bool ExpiryAlertsEnabled,
+    int ExpiryAlertLeadDays,
+    bool ExpiryAlertSoundEnabled,
+    string ExpiryAlertSound,
     int MaximumPurchaseLines,
     int MaximumManualSaleLines,
     bool AllowUserClaimManagement);
@@ -78,7 +82,11 @@ public sealed record UpdateCompanySettingsRequest(
     int BaseFontSize,
     int TrashRetentionDays,
     int NotificationRetentionDays,
-    bool AllowUserClaimManagement);
+    bool AllowUserClaimManagement,
+    bool ExpiryAlertsEnabled = true,
+    int ExpiryAlertLeadDays = 30,
+    bool ExpiryAlertSoundEnabled = true,
+    string ExpiryAlertSound = "critical-pulse");
 
 public sealed record UpdateOperationLimitsRequest(
     int MaximumPurchaseLines,

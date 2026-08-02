@@ -78,6 +78,10 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
         settings.BaseFontSize = request.BaseFontSize;
         settings.TrashRetentionDays = request.TrashRetentionDays;
         settings.NotificationRetentionDays = request.NotificationRetentionDays;
+        settings.ExpiryAlertsEnabled = request.ExpiryAlertsEnabled;
+        settings.ExpiryAlertLeadDays = request.ExpiryAlertLeadDays;
+        settings.ExpiryAlertSoundEnabled = request.ExpiryAlertSoundEnabled;
+        settings.ExpiryAlertSound = Required(request.ExpiryAlertSound, "Expiry alert sound").ToLowerInvariant();
         settings.AllowTenantUserClaimManagement = request.AllowUserClaimManagement;
         settings.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync(cancellationToken);
@@ -221,6 +225,10 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
         settings.BaseFontSize,
         settings.TrashRetentionDays,
         settings.NotificationRetentionDays,
+        settings.ExpiryAlertsEnabled,
+        settings.ExpiryAlertLeadDays,
+        settings.ExpiryAlertSoundEnabled,
+        settings.ExpiryAlertSound,
         settings.MaximumPurchaseLines,
         settings.MaximumManualSaleLines,
         settings.AllowTenantUserClaimManagement);
@@ -253,6 +261,11 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
             throw new ArgumentException("Base font size must be between 12 and 22.");
         if (request.TrashRetentionDays is < 1 or > 3650 || request.NotificationRetentionDays is < 1 or > 3650)
             throw new ArgumentException("Retention days must be between 1 and 3650.");
+        if (request.ExpiryAlertLeadDays is < 1 or > 365)
+            throw new ArgumentException("Expiry alert lead days must be between 1 and 365.");
+        var expirySound = Required(request.ExpiryAlertSound, "Expiry alert sound").ToLowerInvariant();
+        if (expirySound is not ("critical-pulse" or "urgent-alarm" or "warning-chime"))
+            throw new ArgumentException("Expiry alert sound is not supported.");
     }
 
 

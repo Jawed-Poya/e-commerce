@@ -124,11 +124,13 @@ public sealed class AdminNotificationService(
     {
         var serverTime = DateTime.UtcNow;
         var retentionDays = await context.TenantSettings.AsNoTracking()
+            .Where(item => item.TenantId == context.CurrentCompanyId)
             .Select(item => (int?)item.NotificationRetentionDays)
             .FirstOrDefaultAsync(cancellationToken) ?? 30;
         var earliestAvailable = serverTime.AddDays(-Math.Clamp(retentionDays, 1, 365));
         var threshold = after?.ToUniversalTime() ?? serverTime.AddDays(-2);
         if (threshold < earliestAvailable) threshold = earliestAvailable;
+        var includeOutstandingExpiryAlerts = !after.HasValue;
 
         var items = await context.Notifications
             .AsNoTracking()
@@ -137,8 +139,12 @@ public sealed class AdminNotificationService(
                 notification.UserId == null &&
                 notification.EntityType != null &&
                 notification.EntityType.StartsWith("Admin:") &&
-                notification.CreatedAt > threshold)
-            .OrderByDescending(notification => notification.CreatedAt)
+                (notification.CreatedAt > threshold ||
+                    (includeOutstandingExpiryAlerts &&
+                        notification.EntityType.StartsWith("Admin:InventoryExpiry:"))))
+            .OrderByDescending(notification =>
+                notification.EntityType.StartsWith("Admin:InventoryExpiry:"))
+            .ThenByDescending(notification => notification.CreatedAt)
             .Take(Math.Clamp(take, 1, 100))
             .Select(notification => new AdminNotificationResponse(
                 notification.Id,
@@ -146,11 +152,15 @@ public sealed class AdminNotificationService(
                 notification.Message,
                 notification.Type == NotificationType.Payment
                     ? "Payment"
-                    : notification.Type == NotificationType.Product ? "Review" : "Order",
+                    : notification.Type == NotificationType.Product
+                        ? "Review"
+                        : notification.Type == NotificationType.Inventory ? "Expiry" : "Order",
                 notification.EntityId,
                 notification.Type == NotificationType.Product
                     ? "/reviews"
-                    : notification.EntityId.HasValue ? $"/orders/{notification.EntityId.Value}" : "/orders",
+                    : notification.Type == NotificationType.Inventory
+                        ? "/inventory"
+                        : notification.EntityId.HasValue ? $"/orders/{notification.EntityId.Value}" : "/orders",
                 notification.CreatedAt))
             .ToListAsync(cancellationToken);
 
@@ -199,7 +209,9 @@ public sealed class AdminNotificationService(
                 .Where(item => item.TenantId == tenantId &&
                     item.EntityType != null &&
                     item.EntityType.StartsWith("Admin:") &&
-                    item.CreatedAt <= cutoff)
+                    item.CreatedAt <= cutoff &&
+                    (item.IsDeleted ||
+                        !item.EntityType.StartsWith("Admin:InventoryExpiry:")))
                 .ExecuteDeleteAsync(cancellationToken);
         }
 
@@ -213,11 +225,15 @@ public sealed class AdminNotificationService(
             notification.Message,
             notification.Type == NotificationType.Payment
                 ? "Payment"
-                : notification.Type == NotificationType.Product ? "Review" : "Order",
+                : notification.Type == NotificationType.Product
+                    ? "Review"
+                    : notification.Type == NotificationType.Inventory ? "Expiry" : "Order",
             notification.EntityId,
             notification.Type == NotificationType.Product
                 ? "/reviews"
-                : notification.EntityId.HasValue ? $"/orders/{notification.EntityId.Value}" : "/orders",
+                : notification.Type == NotificationType.Inventory
+                    ? "/inventory"
+                    : notification.EntityId.HasValue ? $"/orders/{notification.EntityId.Value}" : "/orders",
             notification.CreatedAt);
 }
 

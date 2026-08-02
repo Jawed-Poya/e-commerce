@@ -174,6 +174,10 @@ public sealed class TenantSetting
     public int BaseFontSize { get; set; } = 16;
     public int TrashRetentionDays { get; set; } = 30;
     public int NotificationRetentionDays { get; set; } = 30;
+    public bool ExpiryAlertsEnabled { get; set; } = true;
+    public int ExpiryAlertLeadDays { get; set; } = 30;
+    public bool ExpiryAlertSoundEnabled { get; set; } = true;
+    [MaxLength(40)] public string ExpiryAlertSound { get; set; } = "critical-pulse";
     public int MaximumPurchaseLines { get; set; } = 50;
     public int MaximumManualSaleLines { get; set; } = 50;
     public bool AllowTenantUserClaimManagement { get; set; } = true;

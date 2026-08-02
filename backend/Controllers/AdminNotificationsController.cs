@@ -17,7 +17,7 @@ public sealed class AdminNotificationsController(
     AdminNotificationBroker broker,
     ICompanyContext companyContext) : ControllerBase
 {
-    [Authorize(Policy = AppPermissions.OrdersView)]
+    [Authorize(Policy = AppPermissions.AdminNotificationsViewPolicy)]
     [HttpGet]
     public async Task<ActionResult<ApiResponse<AdminNotificationsResponse>>> Get(
         [FromQuery] DateTime? after,
@@ -44,7 +44,7 @@ public sealed class AdminNotificationsController(
         return Ok(ApiResponse<object>.Ok(new { count }, "Notifications cleared."));
     }
 
-    [Authorize(Policy = AppPermissions.OrdersView)]
+    [Authorize(Policy = AppPermissions.AdminNotificationsViewPolicy)]
     [HttpGet("stream")]
     public async Task Stream()
     {

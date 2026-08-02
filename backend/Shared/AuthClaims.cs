@@ -17,6 +17,8 @@ public static class AppRoles
 
 public static class AppPermissions
 {
+    public const string AdminNotificationsViewPolicy = "admin.notifications.view";
+
     public const string DashboardView = "dashboard.view";
 
     public const string ProductsView = "products.view";

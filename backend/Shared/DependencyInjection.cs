@@ -51,6 +51,8 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IStoreNotificationService, StoreNotificationService>();
         services.AddScoped<IAdminNotificationService, AdminNotificationService>();
+        services.AddScoped<IInventoryExpiryAlertService, InventoryExpiryAlertService>();
+        services.AddHostedService<InventoryExpiryAlertHostedService>();
         services.AddHostedService<AdminNotificationCleanupHostedService>();
         services.AddSingleton<AdminNotificationBroker>();
         services.AddSingleton<StoreRealtimeMetrics>();

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, CheckCircle2, ImagePlus, ListChecks, LoaderCircle, MapPin, MonitorSmartphone, Pencil, Plus, Save, Settings2, UploadCloud, X } from "lucide-react";
+import { Building2, CheckCircle2, ImagePlus, ListChecks, LoaderCircle, MapPin, MonitorSmartphone, Pencil, Play, Plus, Save, Settings2, Siren, UploadCloud, Volume2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { apiOrigin } from "@/api/axios";
@@ -20,6 +20,7 @@ import { useCompany } from "@/features/company/company-context";
 import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
 import { useI18n } from "@/i18n/i18n-provider";
+import { expiryAlertSounds, playExpiryAlertSound } from "@/features/notifications/expiry-alert-sounds";
 
 const emptyBranch: UpsertCompanyBranch = {
     name: "",
@@ -168,6 +169,15 @@ export default function CompanySettingsPage() {
             ? `${previewMoney} ${settings.currencySymbol || settings.mainCurrencyCode}`
             : `${settings.currencySymbol || settings.mainCurrencyCode} ${previewMoney}`
         : formatMoney(123456.78);
+
+    const previewExpiryAlertSound = async () => {
+        if (!settings) return;
+        try {
+            await playExpiryAlertSound(settings.expiryAlertSound);
+        } catch {
+            toast.error(tr("The browser blocked audio. Click anywhere in the admin app, then test again."));
+        }
+    };
 
     if (profileQuery.isLoading || (profileQuery.isSuccess && (!profile || !settings))) {
         return <div className="grid min-h-[60vh] place-items-center"><LoaderCircle className="size-7 animate-spin text-primary" /></div>;
@@ -395,6 +405,76 @@ export default function CompanySettingsPage() {
                             <Field label="Notification retention days"><Input type="number" min={1} max={3650} value={settings.notificationRetentionDays} onChange={(event) => setSettings({ ...settings, notificationRetentionDays: Number(event.target.value) })} /></Field>
                             <div className="flex items-center justify-between gap-4 rounded-xl border p-4 sm:col-span-2"><div><p className="text-sm font-semibold">Allow permission assignment</p><p className="mt-1 text-xs text-muted-foreground">Administrators can assign permissions they already hold.</p></div><Switch checked={settings.allowUserClaimManagement} onCheckedChange={(checked) => setSettings({ ...settings, allowUserClaimManagement: checked })} /></div>
                         </div>
+
+                        <section className="overflow-hidden rounded-2xl border border-destructive/20 bg-destructive/[0.035]">
+                            <div className="flex flex-col gap-3 border-b border-destructive/15 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
+                                <div className="flex items-start gap-3">
+                                    <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-destructive text-destructive-foreground shadow-sm">
+                                        <Siren className="size-5" />
+                                    </span>
+                                    <div>
+                                        <p className="font-bold">Inventory expiry alerts</p>
+                                        <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
+                                            Notify administrators when a stocked lot is expired or enters the configured warning window. Alerts are deduplicated per lot and expiry date.
+                                        </p>
+                                    </div>
+                                </div>
+                                <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-destructive/20 bg-background px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-destructive">
+                                    <Volume2 className="size-3" /> Critical alert
+                                </span>
+                            </div>
+
+                            <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-2">
+                                <Toggle
+                                    label="Enable expiry alerts"
+                                    description="Create real-time admin notifications for expiring and expired stock lots."
+                                    checked={settings.expiryAlertsEnabled}
+                                    onCheckedChange={(checked) => setSettings({ ...settings, expiryAlertsEnabled: checked })}
+                                />
+                                <Field label="Alert lead time">
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            max={365}
+                                            value={settings.expiryAlertLeadDays}
+                                            disabled={!settings.expiryAlertsEnabled}
+                                            onChange={(event) => setSettings({
+                                                ...settings,
+                                                expiryAlertLeadDays: clampExpiryLeadDays(event.target.value),
+                                            })}
+                                        />
+                                        <span className="shrink-0 text-xs font-medium text-muted-foreground">days before expiry</span>
+                                    </div>
+                                </Field>
+                                <Toggle
+                                    label="Play danger sound"
+                                    description="Play one warning sound when new unread expiry alerts arrive."
+                                    checked={settings.expiryAlertSoundEnabled}
+                                    onCheckedChange={(checked) => setSettings({ ...settings, expiryAlertSoundEnabled: checked })}
+                                />
+                                <Field label="Danger sound">
+                                    <div className="flex gap-2">
+                                        <SimpleCombobox
+                                            value={settings.expiryAlertSound}
+                                            disabled={!settings.expiryAlertSoundEnabled}
+                                            onValueChange={(value) => value && setSettings({ ...settings, expiryAlertSound: value })}
+                                            options={[...expiryAlertSounds]}
+                                            placeholder="Select warning sound"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="shrink-0"
+                                            disabled={!settings.expiryAlertSoundEnabled}
+                                            onClick={() => void previewExpiryAlertSound()}
+                                        >
+                                            <Play className="size-4" /> Test
+                                        </Button>
+                                    </div>
+                                </Field>
+                            </div>
+                        </section>
                         <div className="flex items-center justify-between gap-3">
                             {!canManageSettings && <p className="text-xs text-muted-foreground">You can view these settings but cannot edit them.</p>}
                             <Button type="submit" className="ms-auto" disabled={saveSettings.isPending || !settingsChanged}><Save />{saveSettings.isPending ? "Saving…" : "Save settings"}</Button>
@@ -572,6 +652,12 @@ function clampLineLimit(value: string) {
     const parsed = Number.parseInt(value, 10);
     if (!Number.isFinite(parsed)) return 1;
     return Math.max(1, Math.min(parsed, 500));
+}
+
+function clampExpiryLeadDays(value: string) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) return 1;
+    return Math.max(1, Math.min(parsed, 365));
 }
 
 function nullable(value: string) {

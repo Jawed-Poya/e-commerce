@@ -104,6 +104,12 @@ builder.Services.AddAuthorization(options =>
             policy.RequireAssertion(context =>
                 AppPermissions.IsGranted(context.User, permission)));
     }
+
+    options.AddPolicy(AppPermissions.AdminNotificationsViewPolicy, policy =>
+        policy.RequireAssertion(context =>
+            AppPermissions.IsGranted(context.User, AppPermissions.OrdersView) ||
+            AppPermissions.IsGranted(context.User, AppPermissions.InventoryView) ||
+            AppPermissions.IsGranted(context.User, AppPermissions.ReviewsView)));
 });
 
 builder.Services.Configure<FormOptions>(options =>
