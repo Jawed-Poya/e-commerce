@@ -2148,7 +2148,7 @@ namespace ECommerce.Migrations
                     b.HasOne("ECommerce.Entities.Products.InventoryTransaction", "InventoryTransaction")
                         .WithMany("Lots")
                         .HasForeignKey("InventoryTransactionId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.Navigation("InventoryLot");

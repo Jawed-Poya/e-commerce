@@ -67,7 +67,10 @@ public sealed class InventoryTransactionLotConfiguration : IEntityTypeConfigurat
         b.HasOne(x => x.InventoryTransaction)
             .WithMany(x => x.Lots)
             .HasForeignKey(x => x.InventoryTransactionId)
-            .OnDelete(DeleteBehavior.Cascade);
+            // InventoryTransaction and InventoryLot are both reachable from Product.
+            // NO ACTION prevents SQL Server multiple-cascade-path errors and protects
+            // immutable lot audit details from accidental hard deletes.
+            .OnDelete(DeleteBehavior.NoAction);
         b.HasOne(x => x.InventoryLot)
             .WithMany(x => x.Transactions)
             .HasForeignKey(x => x.InventoryLotId)

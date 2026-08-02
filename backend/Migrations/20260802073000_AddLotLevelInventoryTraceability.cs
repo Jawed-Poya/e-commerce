@@ -52,7 +52,7 @@ public sealed class AddLotLevelInventoryTraceability : Migration
                     column: x => x.InventoryTransactionId,
                     principalTable: "InventoryTransactions",
                     principalColumn: "Id",
-                    onDelete: ReferentialAction.Cascade);
+                    onDelete: ReferentialAction.NoAction);
             });
 
         migrationBuilder.CreateIndex(
