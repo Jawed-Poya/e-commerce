@@ -115,6 +115,24 @@ export function CheckoutPage() {
     );
 
     if (!cart.items.length) return <Navigate to="/cart" replace />;
+    if (auth.loading) {
+        return <div className="grid min-h-[50vh] place-items-center"><LoaderCircle className="size-7 animate-spin text-primary" /></div>;
+    }
+    if (!auth.isAuthenticated) {
+        return <Navigate to="/account/login" replace state={{ from: "/checkout" }} />;
+    }
+    if (!auth.user?.canPlaceOrders) {
+        return (
+            <main className="mx-auto grid min-h-[60vh] max-w-2xl place-items-center px-4 py-14">
+                <section className="w-full rounded-[28px] border bg-card p-8 text-center shadow-lg sm:p-12">
+                    <BadgeCheck className="mx-auto size-12 text-primary" />
+                    <h1 className="mt-5 text-3xl font-black tracking-tight">{t("checkout.verifyBeforeOrder")}</h1>
+                    <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-muted-foreground">{t("checkout.verifyBeforeOrderDescription")}</p>
+                    <Button asChild className="mt-6 rounded-xl"><Link viewTransition to="/account">{t("checkout.openVerification")}</Link></Button>
+                </section>
+            </main>
+        );
+    }
 
     const update = (field: keyof CheckoutForm, value: string) => {
         setForm((current) => ({ ...current, [field]: value }));
@@ -180,6 +198,7 @@ export function CheckoutPage() {
 
         try {
             const confirmation = await createOrder(request);
+            await auth.refresh();
             saveConfirmation(confirmation, form.phone);
             saveRecentOrder(confirmation, form.phone);
             cart.clear();
@@ -264,6 +283,7 @@ export function CheckoutPage() {
                                         }));
                                 }}
                                 placeholder="+93 ..."
+                                disabled={auth.user.phoneVerified}
                             />
                             <Field
                                 label={t("common.email")}
@@ -271,6 +291,7 @@ export function CheckoutPage() {
                                 value={form.email}
                                 onChange={(value) => update("email", value)}
                                 placeholder="Optional"
+                                disabled={auth.user.emailVerified}
                             />
                         </div>
                     </CheckoutSection>
@@ -601,6 +622,7 @@ function Field({
     type = "text",
     placeholder,
     className,
+    disabled,
 }: {
     label: string;
     value: string;
@@ -609,6 +631,7 @@ function Field({
     type?: string;
     placeholder?: string;
     className?: string;
+    disabled?: boolean;
 }) {
     return (
         <label className={`grid gap-2 ${className ?? ""}`}>
@@ -620,7 +643,8 @@ function Field({
                 onChange={(event) => onChange(event.target.value)}
                 type={type}
                 placeholder={placeholder}
-                className="h-12 rounded-xl border bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                disabled={disabled}
+                className="h-12 rounded-xl border bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
             />
         </label>
     );

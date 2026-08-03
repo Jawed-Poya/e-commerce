@@ -10,7 +10,7 @@ namespace ECommerce.Services.Auditing;
 public sealed class AuditLogService(
     ApplicationDbContext context,
     ActivityLogQueue queue,
-    ECommerce.Services.Company.ICompanyContext companyContext) : IAuditLogService
+    ECommerce.Services.Company.IBranchContext branchContext) : IAuditLogService
 {
     public async ValueTask RecordAuthenticationAsync(
         string userId,
@@ -25,8 +25,7 @@ public sealed class AuditLogService(
         var device = ClientDeviceParser.Parse(userAgent);
         await queue.EnqueueAsync(new ActivityLog
         {
-            TenantId = companyContext.CompanyId,
-            BranchId = companyContext.BranchId,
+            BranchId = branchContext.BranchId,
             UserId = userId,
             UserName = Clean(userName, 256),
             CustomerId = customerId,

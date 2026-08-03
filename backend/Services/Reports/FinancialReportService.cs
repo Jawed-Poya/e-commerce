@@ -10,7 +10,7 @@ namespace ECommerce.Services.Reports;
 
 public sealed class FinancialReportService(
     ApplicationDbContext context,
-    ICompanyContext companyContext) : IFinancialReportService
+    IBranchContext branchContext) : IFinancialReportService
 {
     private static readonly HashSet<string> SupportedSources = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -58,8 +58,7 @@ public sealed class FinancialReportService(
         var availableCurrencies = await GetAvailableCurrenciesAsync(selectedCurrency, cancellationToken);
 
         if (request.BranchId.HasValue && !await context.Branches.AsNoTracking()
-                .AnyAsync(item => item.Id == request.BranchId.Value &&
-                    item.TenantId == companyContext.CompanyId && item.IsActive,
+                .AnyAsync(item => item.Id == request.BranchId.Value && item.IsActive,
                     cancellationToken))
             throw new ArgumentException("The selected branch is not available for this company.");
 
@@ -512,8 +511,7 @@ public sealed class FinancialReportService(
     }
 
     private async Task<string> GetMainCurrencyAsync(CancellationToken cancellationToken) =>
-        await context.TenantSettings.AsNoTracking()
-            .OrderBy(item => item.TenantId)
+        await context.CompanySettings.AsNoTracking()
             .Select(item => item.MainCurrencyCode)
             .FirstOrDefaultAsync(cancellationToken) ?? "USD";
 
@@ -1016,15 +1014,15 @@ public sealed class FinancialReportService(
 
     private long? ResolveBranchId(long? requestedBranchId)
     {
-        if (!companyContext.BranchId.HasValue)
+        if (!branchContext.BranchId.HasValue)
             return requestedBranchId;
 
         if (requestedBranchId.HasValue &&
-            requestedBranchId.Value != companyContext.BranchId.Value)
+            requestedBranchId.Value != branchContext.BranchId.Value)
             throw new UnauthorizedAccessException(
                 "You can view financial data only for your assigned branch.");
 
-        return companyContext.BranchId.Value;
+        return branchContext.BranchId.Value;
     }
 
     private static void ValidateRange(

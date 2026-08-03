@@ -9,11 +9,10 @@ using ECommerce.Entities.Notifications;
 using ECommerce.Entities.Operations;
 using ECommerce.Entities.Products;
 using ECommerce.Entities.Storefront;
-using ECommerce.Entities.Tenancy;
+using ECommerce.Entities.Company;
 using ECommerce.Services.Company;
 using ECommerce.Services.Auditing;
 using ECommerce.Shared;
-using System.Linq.Expressions;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Channels;
@@ -25,7 +24,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 public class ApplicationDbContext
     : IdentityDbContext<User, Role, string>
 {
-    private readonly ICompanyContext _companyContext;
+    private readonly IBranchContext _branchContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ActivityLogQueue _activityLogQueue;
     private readonly ILogger<ApplicationDbContext> _logger;
@@ -54,7 +53,8 @@ public class ApplicationDbContext
         // them would recursively create more audit rows.
         nameof(ActivityLog),
         nameof(CustomerVisitLog),
-        nameof(TrashRecord)
+        nameof(TrashRecord),
+        nameof(AccountVerificationCode)
     };
 
     private static readonly HashSet<string> IgnoredAuditProperties = new(StringComparer.OrdinalIgnoreCase)
@@ -62,7 +62,6 @@ public class ApplicationDbContext
         nameof(API.Entities.Common.BaseEntity.CreatedAt),
         nameof(API.Entities.Common.BaseEntity.UpdatedAt),
         nameof(API.Entities.Common.BaseEntity.DeletedAt),
-        nameof(API.Entities.Common.BaseEntity.TenantId),
         nameof(API.Entities.Common.BaseEntity.BranchId),
         "RowVersion",
         "ConcurrencyStamp",
@@ -74,20 +73,18 @@ public class ApplicationDbContext
 
     public ApplicationDbContext(
         DbContextOptions<ApplicationDbContext> options,
-        ICompanyContext companyContext,
+        IBranchContext branchContext,
         IHttpContextAccessor httpContextAccessor,
         ActivityLogQueue activityLogQueue,
         ILogger<ApplicationDbContext> logger)
         : base(options)
     {
-        _companyContext = companyContext;
+        _branchContext = branchContext;
         _httpContextAccessor = httpContextAccessor;
         _activityLogQueue = activityLogQueue;
         _logger = logger;
     }
 
-    public long CurrentCompanyId => _companyContext.CompanyId;
-    public bool BypassCompanyFilter => false;
 
     #region Catalog
 
@@ -152,15 +149,11 @@ public class ApplicationDbContext
     public DbSet<ExpenseCategory> ExpenseCategories => Set<ExpenseCategory>();
     public DbSet<Expense> Expenses => Set<Expense>();
 
-    public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<Company> Companies => Set<Company>();
     public DbSet<Branch> Branches => Set<Branch>();
-    public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
-    public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
-    public DbSet<SubscriptionPlanPermission> SubscriptionPlanPermissions => Set<SubscriptionPlanPermission>();
-    public DbSet<PlatformSetting> PlatformSettings => Set<PlatformSetting>();
-    public DbSet<TenantPermissionGrant> TenantPermissionGrants => Set<TenantPermissionGrant>();
-    public DbSet<TenantSetting> TenantSettings => Set<TenantSetting>();
+    public DbSet<CompanySetting> CompanySettings => Set<CompanySetting>();
     public DbSet<TrashRecord> TrashRecords => Set<TrashRecord>();
+    public DbSet<AccountVerificationCode> AccountVerificationCodes => Set<AccountVerificationCode>();
 
     #endregion
 
@@ -175,78 +168,35 @@ public class ApplicationDbContext
         );
 
         builder.Entity<GeneralType>()
-            .HasIndex(x => new
-            {
-                x.TenantId,
-                x.Group,
-                x.Name
-            })
+            .HasIndex(x => new { x.Group, x.Name })
             .IsUnique();
 
-
-        builder.Entity<Tenant>(entity =>
-        {
-            entity.HasIndex(item => item.Slug).IsUnique();
-            entity.HasIndex(item => item.StorefrontKey).IsUnique();
-            entity.HasIndex(item => item.CustomDomain).IsUnique().HasFilter("[CustomDomain] IS NOT NULL");
-            entity.HasOne(item => item.Setting).WithOne(item => item.Tenant)
-                .HasForeignKey<TenantSetting>(item => item.TenantId).OnDelete(DeleteBehavior.Cascade);
-        });
         builder.Entity<Branch>(entity =>
         {
-            entity.HasIndex(item => new { item.TenantId, item.Code }).IsUnique();
-            entity.HasOne(item => item.Tenant).WithMany(item => item.Branches)
-                .HasForeignKey(item => item.TenantId).OnDelete(DeleteBehavior.Cascade);
-        });
-        builder.Entity<TenantSubscription>(entity =>
-        {
-            entity.Property(item => item.MonthlyPrice).HasPrecision(18, 2);
-            entity.HasIndex(item => new { item.TenantId, item.Status });
-            entity.HasOne(item => item.Tenant).WithMany(item => item.Subscriptions)
-                .HasForeignKey(item => item.TenantId).OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(item => item.SubscriptionPlan).WithMany(item => item.Subscriptions)
-                .HasForeignKey(item => item.SubscriptionPlanId).OnDelete(DeleteBehavior.SetNull);
-        });
-        builder.Entity<SubscriptionPlan>(entity =>
-        {
-            entity.Property(item => item.MonthlyPrice).HasPrecision(18, 2);
-            entity.Property(item => item.YearlyPrice).HasPrecision(18, 2);
             entity.HasIndex(item => item.Code).IsUnique();
-        });
-        builder.Entity<SubscriptionPlanPermission>(entity =>
-        {
-            entity.HasIndex(item => new { item.SubscriptionPlanId, item.Permission }).IsUnique();
-            entity.HasOne(item => item.SubscriptionPlan).WithMany(item => item.Permissions)
-                .HasForeignKey(item => item.SubscriptionPlanId).OnDelete(DeleteBehavior.Cascade);
-        });
-        builder.Entity<PlatformSetting>(entity =>
-        {
-            entity.Property(item => item.Id).ValueGeneratedNever();
-        });
-        builder.Entity<TenantPermissionGrant>(entity =>
-        {
-            entity.HasIndex(item => new { item.TenantId, item.Permission }).IsUnique();
-            entity.HasOne(item => item.Tenant).WithMany(item => item.PermissionGrants)
-                .HasForeignKey(item => item.TenantId).OnDelete(DeleteBehavior.Cascade);
-        });
-        builder.Entity<TenantSetting>(entity =>
-        {
-            entity.HasIndex(item => item.TenantId).IsUnique();
         });
         builder.Entity<TrashRecord>(entity =>
         {
-            entity.HasIndex(item => new { item.TenantId, item.EntityType, item.EntityId, item.PurgedAt });
+            entity.HasIndex(item => new { item.EntityType, item.EntityId, item.PurgedAt });
         });
         builder.Entity<User>(entity =>
         {
-            entity.HasIndex(item => new { item.TenantId, item.NormalizedEmail })
+            entity.HasIndex(item => item.NormalizedEmail)
                 .IsUnique()
                 .HasFilter("[NormalizedEmail] IS NOT NULL");
+            entity.HasIndex(item => item.PhoneNumber)
+                .IsUnique()
+                .HasFilter("[PhoneNumber] IS NOT NULL");
             entity.HasIndex(item => item.BranchId);
         });
-        builder.Entity<Role>(entity =>
+        builder.Entity<AccountVerificationCode>(entity =>
         {
-            entity.HasIndex(item => item.TenantId);
+            entity.HasOne(item => item.User)
+                .WithMany()
+                .HasForeignKey(item => item.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(item => new { item.UserId, item.Channel, item.CreatedAt });
+            entity.HasIndex(item => item.ExpiresAt);
         });
 
         builder.Entity<StorefrontContent>(entity =>
@@ -292,7 +242,6 @@ public class ApplicationDbContext
         builder.Entity<ActivityLog>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<CustomerVisitLog>().HasQueryFilter(x => !x.IsDeleted);
 
-        ApplyCompanyQueryFilters(builder);
     }
 
     public override int SaveChanges()
@@ -378,7 +327,6 @@ public class ApplicationDbContext
             entry,
             new ActivityLog
             {
-                TenantId = entry.Entity.TenantId,
                 BranchId = entry.Entity.BranchId,
                 UserId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
                     ?? httpContext.User.FindFirstValue("sub"),
@@ -411,10 +359,7 @@ public class ApplicationDbContext
         foreach (var item in pending)
         {
             item.Log.EntityId = item.Entry.Entity.Id > 0 ? item.Entry.Entity.Id : null;
-            item.Log.TenantId = item.Entry.Entity.TenantId > 0
-                ? item.Entry.Entity.TenantId
-                : _companyContext.CompanyId;
-            item.Log.BranchId ??= item.Entry.Entity.BranchId ?? _companyContext.BranchId;
+            item.Log.BranchId ??= item.Entry.Entity.BranchId ?? _branchContext.BranchId;
 
             try
             {
@@ -466,8 +411,7 @@ public class ApplicationDbContext
             if (entry.State == EntityState.Added)
             {
                 if (entry.Entity.CreatedAt == default) entry.Entity.CreatedAt = now;
-                if (entry.Entity.TenantId <= 0) entry.Entity.TenantId = _companyContext.CompanyId;
-                entry.Entity.BranchId ??= _companyContext.BranchId;
+                entry.Entity.BranchId ??= _branchContext.BranchId;
             }
 
             var isDeleteTransition = entry.State == EntityState.Deleted ||
@@ -512,7 +456,6 @@ public class ApplicationDbContext
             ?? principal?.Identity?.Name;
         return new TrashRecord
         {
-            TenantId = entity.TenantId <= 0 ? _companyContext.CompanyId : entity.TenantId,
             BranchId = entity.BranchId,
             EntityType = type,
             EntityId = entity.Id.ToString(),
@@ -527,32 +470,4 @@ public class ApplicationDbContext
         };
     }
 
-    private void ApplyCompanyQueryFilters(ModelBuilder builder)
-    {
-        foreach (var entityType in builder.Model.GetEntityTypes()
-                     .Where(item => typeof(API.Entities.Common.BaseEntity).IsAssignableFrom(item.ClrType)))
-        {
-            var parameter = Expression.Parameter(entityType.ClrType, "entity");
-            var tenantProperty = Expression.Property(parameter, nameof(API.Entities.Common.BaseEntity.TenantId));
-            var currentTenant = Expression.Property(Expression.Constant(this), nameof(CurrentCompanyId));
-            var bypass = Expression.Property(Expression.Constant(this), nameof(BypassCompanyFilter));
-            Expression tenantBody = Expression.OrElse(bypass, Expression.Equal(tenantProperty, currentTenant));
-
-            var existing = entityType.GetQueryFilter();
-            if (existing is not null)
-            {
-                var existingBody = new ReplaceExpressionVisitor(existing.Parameters[0], parameter)
-                    .Visit(existing.Body)!;
-                tenantBody = Expression.AndAlso(existingBody, tenantBody);
-            }
-
-            entityType.SetQueryFilter(Expression.Lambda(tenantBody, parameter));
-        }
-    }
-
-    private sealed class ReplaceExpressionVisitor(Expression oldValue, Expression newValue) : ExpressionVisitor
-    {
-        public override Expression? Visit(Expression? node) =>
-            node == oldValue ? newValue : base.Visit(node);
-    }
 }

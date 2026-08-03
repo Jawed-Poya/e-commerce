@@ -2,7 +2,6 @@ using API.Entities.Types;
 using ECommerce.Data;
 using ECommerce.Entities.Common;
 using ECommerce.Options;
-using ECommerce.Services.Company;
 using ECommerce.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -12,22 +11,16 @@ namespace ECommerce.Services.Customers;
 
 public sealed class DefaultCustomerTypeResolver(
     ApplicationDbContext context,
-    ICompanyContext companyContext,
     IOptions<CommerceOptions> options,
     IMemoryCache cache) : IDefaultCustomerTypeResolver
 {
-    private const string CacheKeyPrefix = "commerce:default-customer-type";
+    private const string CacheKey = "commerce:default-customer-type";
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(2);
     private readonly CommerceOptions _options = options.Value;
 
     public async Task<GeneralType> GetAsync(CancellationToken cancellationToken = default)
     {
-        var tenantId = companyContext.CompanyId;
-        if (tenantId <= 0)
-            throw new InvalidOperationException("A company workspace must be resolved before customer pricing can be loaded.");
-
-        var cacheKey = CacheKey(tenantId);
-        if (cache.TryGetValue<GeneralType>(cacheKey, out var cached) && cached is not null)
+        if (cache.TryGetValue<GeneralType>(CacheKey, out var cached) && cached is not null)
             return cached;
 
         var customerType = await TransientSqlRetry.ExecuteAsync(
@@ -59,7 +52,6 @@ public sealed class DefaultCustomerTypeResolver(
                 var archivedGeneral = await context.Types
                     .IgnoreQueryFilters()
                     .FirstOrDefaultAsync(type =>
-                        type.TenantId == tenantId &&
                         type.Group == GeneralTypeEnum.CustomerType &&
                         type.Name == "General",
                         token);
@@ -73,7 +65,7 @@ public sealed class DefaultCustomerTypeResolver(
                 }
 
                 var branchId = await context.Branches
-                    .Where(branch => branch.TenantId == tenantId && branch.IsActive)
+                    .Where(branch => branch.IsActive)
                     .OrderByDescending(branch => branch.IsMain)
                     .ThenBy(branch => branch.Id)
                     .Select(branch => (long?)branch.Id)
@@ -81,7 +73,6 @@ public sealed class DefaultCustomerTypeResolver(
 
                 var general = new GeneralType
                 {
-                    TenantId = tenantId,
                     BranchId = branchId,
                     Name = "General",
                     Group = GeneralTypeEnum.CustomerType,
@@ -101,25 +92,17 @@ public sealed class DefaultCustomerTypeResolver(
                         .Where(type => type.Group == GeneralTypeEnum.CustomerType && type.Name == "General")
                         .OrderBy(type => type.Id)
                         .FirstOrDefaultAsync(token);
-                    if (concurrent is not null)
-                        return concurrent;
-                    throw;
+                    return concurrent ?? throw;
                 }
             },
             cancellationToken);
 
-        cache.Set(cacheKey, customerType, CacheDuration);
+        cache.Set(CacheKey, customerType, CacheDuration);
         return customerType;
     }
 
     public async Task<long> GetIdAsync(CancellationToken cancellationToken = default) =>
         (await GetAsync(cancellationToken)).Id;
 
-    public void Invalidate()
-    {
-        if (companyContext.CompanyId > 0)
-            cache.Remove(CacheKey(companyContext.CompanyId));
-    }
-
-    private static string CacheKey(long tenantId) => $"{CacheKeyPrefix}:{tenantId}";
+    public void Invalidate() => cache.Remove(CacheKey);
 }

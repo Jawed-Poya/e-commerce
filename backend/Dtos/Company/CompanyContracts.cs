@@ -16,7 +16,7 @@ public sealed record CompanySettingsResponse(
     int TrashRetentionDays,
     int NotificationRetentionDays,
     bool ExpiryAlertsEnabled,
-    int ExpiryAlertLeadDays,
+    IReadOnlyCollection<int> ExpiryAlertPeriods,
     bool ExpiryAlertSoundEnabled,
     string ExpiryAlertSound,
     int MaximumPurchaseLines,
@@ -84,7 +84,7 @@ public sealed record UpdateCompanySettingsRequest(
     int NotificationRetentionDays,
     bool AllowUserClaimManagement,
     bool ExpiryAlertsEnabled = true,
-    int ExpiryAlertLeadDays = 30,
+    IReadOnlyCollection<int>? ExpiryAlertPeriods = null,
     bool ExpiryAlertSoundEnabled = true,
     string ExpiryAlertSound = "critical-pulse");
 

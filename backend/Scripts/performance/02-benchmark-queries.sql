@@ -3,22 +3,21 @@ SET NOCOUNT ON;
 SET STATISTICS IO ON;
 SET STATISTICS TIME ON;
 
-DECLARE @TenantId bigint = 1;       -- PERF_TENANT_ID
 DECLARE @CatalogRows int = 10000;   -- PERF_CATALOG_ROWS
 DECLARE @Prefix nvarchar(30) = N'PERF-LOAD-';
 DECLARE @BranchId bigint =
 (
     SELECT TOP (1) Id FROM dbo.Branches
-    WHERE TenantId = @TenantId AND IsActive = 1
+    WHERE IsActive = 1
     ORDER BY IsMain DESC, Id
 );
 DECLARE @Currency nvarchar(3) = COALESCE
 (
-    (SELECT TOP (1) MainCurrencyCode FROM dbo.TenantSettings WHERE TenantId = @TenantId),
+    (SELECT TOP (1) MainCurrencyCode FROM dbo.CompanySettings ORDER BY Id),
     N'USD'
 );
 
-IF NOT EXISTS (SELECT 1 FROM dbo.Products WHERE TenantId = @TenantId AND Barcode LIKE @Prefix + N'P-%')
+IF NOT EXISTS (SELECT 1 FROM dbo.Products WHERE Barcode LIKE @Prefix + N'P-%')
     THROW 51100, 'No performance dataset was found. Run 01-seed-performance-data.sql first.', 1;
 
 PRINT 'Benchmark 1: product catalog / product PDF projection';
@@ -43,8 +42,7 @@ OUTER APPLY
         SUM(stock.Quantity - stock.ReservedQuantity) AS Stock,
         MAX(stock.MinimumQuantity) AS MinimumStock
     FROM dbo.ProductInventories stock
-    WHERE stock.TenantId = @TenantId
-      AND stock.IsDeleted = 0
+    WHERE stock.IsDeleted = 0
       AND stock.ProductId = product.Id
       AND (@BranchId IS NULL OR stock.BranchId = @BranchId)
 ) inventory
@@ -52,13 +50,11 @@ OUTER APPLY
 (
     SELECT TOP (1) COALESCE(productPrice.SalePrice, productPrice.RegularPrice) AS Price
     FROM dbo.ProductPrices productPrice
-    WHERE productPrice.TenantId = @TenantId
-      AND productPrice.IsDeleted = 0
+    WHERE productPrice.IsDeleted = 0
       AND productPrice.ProductId = product.Id
     ORDER BY productPrice.CustomerTypeId, productPrice.Id
 ) price
-WHERE product.TenantId = @TenantId
-  AND product.IsDeleted = 0
+WHERE product.IsDeleted = 0
 ORDER BY product.Name
 OPTION (RECOMPILE);
 SELECT
@@ -86,21 +82,18 @@ OUTER APPLY
 (
     SELECT SUM(item.Quantity * item.UnitCost) AS CostOfGoods
     FROM dbo.OrderItems item
-    WHERE item.TenantId = @TenantId
-      AND item.IsDeleted = 0
+    WHERE item.IsDeleted = 0
       AND item.OrderId = orders.Id
 ) cost
 OUTER APPLY
 (
     SELECT SUM(entry.Amount) AS PaidAmount
     FROM dbo.Payments entry
-    WHERE entry.TenantId = @TenantId
-      AND entry.IsDeleted = 0
+    WHERE entry.IsDeleted = 0
       AND entry.OrderId = orders.Id
       AND entry.Status IN (3, 4)
 ) payment
-WHERE orders.TenantId = @TenantId
-  AND orders.IsDeleted = 0
+WHERE orders.IsDeleted = 0
   AND orders.Status <> 6
   AND orders.Currency = @Currency
   AND orders.CreatedAt >= @StartDate
@@ -120,7 +113,7 @@ DECLARE @CustomerId bigint =
 (
     SELECT TOP (1) CustomerId
     FROM dbo.Orders
-    WHERE TenantId = @TenantId AND OrderNumber LIKE @Prefix + N'ORD-%'
+    WHERE OrderNumber LIKE @Prefix + N'ORD-%'
     GROUP BY CustomerId
     ORDER BY COUNT_BIG(*) DESC, CustomerId
 );
@@ -138,13 +131,11 @@ OUTER APPLY
 (
     SELECT SUM(entry.Amount) AS PaidAmount
     FROM dbo.Payments entry
-    WHERE entry.TenantId = @TenantId
-      AND entry.IsDeleted = 0
+    WHERE entry.IsDeleted = 0
       AND entry.OrderId = orders.Id
       AND entry.Status IN (3, 4)
 ) payment
-WHERE orders.TenantId = @TenantId
-  AND orders.IsDeleted = 0
+WHERE orders.IsDeleted = 0
   AND orders.CustomerId = @CustomerId
 OPTION (RECOMPILE);
 SELECT

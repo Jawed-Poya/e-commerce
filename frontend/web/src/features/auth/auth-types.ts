@@ -9,6 +9,10 @@ export interface AuthUser {
     customerTypeId: number | null;
     customerTypeName: string | null;
     isAdmin: boolean;
+    branchId: number | null;
+    emailVerified: boolean;
+    phoneVerified: boolean;
+    canPlaceOrders: boolean;
 }
 
 export interface AuthResponse {
@@ -28,4 +32,13 @@ export interface RegisterRequest {
     phone: string;
     email: string | null;
     password: string;
+}
+
+export type VerificationChannel = "Email" | "Phone";
+
+export interface VerificationDispatch {
+    channel: VerificationChannel;
+    destination: string;
+    expiresAt: string;
+    alreadyVerified: boolean;
 }

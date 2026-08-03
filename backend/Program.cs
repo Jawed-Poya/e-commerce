@@ -135,7 +135,7 @@ app.UseStaticFiles();
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseCors("CorsPolicy");
 app.UseAuthentication();
-app.UseMiddleware<CompanyContextMiddleware>();
+app.UseMiddleware<BranchContextMiddleware>();
 app.UseMiddleware<ActivityAuditMiddleware>();
 app.UseAuthorization();
 app.MapControllers();

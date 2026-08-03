@@ -3,6 +3,7 @@ using ECommerce.Entities.Orders.Contracts;
 using ECommerce.Services.Orders;
 using ECommerce.Shared;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ECommerce.Controllers;
 
@@ -14,6 +15,7 @@ public sealed class CheckoutController(IOrderService orders) : ApiControllerBase
         CancellationToken cancellationToken) =>
         Success(await orders.GetCheckoutConfigurationAsync(cancellationToken));
 
+    [Authorize(Roles = AppRoles.Customer)]
     [HttpPost("orders")]
     [ProducesResponseType(typeof(ApiResponse<OrderConfirmationResponse>), StatusCodes.Status201Created)]
     public async Task<ActionResult<ApiResponse<OrderConfirmationResponse>>> CreateOrder(

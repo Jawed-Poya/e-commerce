@@ -104,7 +104,7 @@ public sealed class AdminNotificationService(
 
         try
         {
-            broker.Publish(notification.Entity.TenantId, Map(notification.Entity));
+            broker.Publish(Map(notification.Entity));
         }
         catch (Exception exception)
         {
@@ -123,8 +123,7 @@ public sealed class AdminNotificationService(
         CancellationToken cancellationToken = default)
     {
         var serverTime = DateTime.UtcNow;
-        var retentionDays = await context.TenantSettings.AsNoTracking()
-            .Where(item => item.TenantId == context.CurrentCompanyId)
+        var retentionDays = await context.CompanySettings.AsNoTracking()
             .Select(item => (int?)item.NotificationRetentionDays)
             .FirstOrDefaultAsync(cancellationToken) ?? 30;
         var earliestAvailable = serverTime.AddDays(-Math.Clamp(retentionDays, 1, 365));
@@ -191,31 +190,19 @@ public sealed class AdminNotificationService(
 
     public async Task<int> CleanupExpiredAsync(CancellationToken cancellationToken = default)
     {
-        var settings = await context.TenantSettings.IgnoreQueryFilters().AsNoTracking()
-            .ToDictionaryAsync(
-                item => item.TenantId,
-                item => Math.Clamp(item.NotificationRetentionDays, 1, 365),
-                cancellationToken);
-        var tenantIds = await context.Tenants.IgnoreQueryFilters().AsNoTracking()
-            .Select(item => item.Id)
-            .ToListAsync(cancellationToken);
-        var now = DateTime.UtcNow;
-        var removed = 0;
+        var retentionDays = await context.CompanySettings
+            .AsNoTracking()
+            .Select(item => (int?)item.NotificationRetentionDays)
+            .FirstOrDefaultAsync(cancellationToken) ?? 30;
+        var cutoff = DateTime.UtcNow.AddDays(-Math.Clamp(retentionDays, 1, 365));
 
-        foreach (var tenantId in tenantIds)
-        {
-            var cutoff = now.AddDays(-settings.GetValueOrDefault(tenantId, 30));
-            removed += await context.Notifications.IgnoreQueryFilters()
-                .Where(item => item.TenantId == tenantId &&
-                    item.EntityType != null &&
-                    item.EntityType.StartsWith("Admin:") &&
-                    item.CreatedAt <= cutoff &&
-                    (item.IsDeleted ||
-                        !item.EntityType.StartsWith("Admin:InventoryExpiry:")))
-                .ExecuteDeleteAsync(cancellationToken);
-        }
-
-        return removed;
+        return await context.Notifications.IgnoreQueryFilters()
+            .Where(item =>
+                item.EntityType != null &&
+                item.EntityType.StartsWith("Admin:") &&
+                item.CreatedAt <= cutoff &&
+                (item.IsDeleted || !item.EntityType.StartsWith("Admin:InventoryExpiry:")))
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
     private static AdminNotificationResponse Map(Notification notification) =>
@@ -250,8 +237,6 @@ public sealed class AdminNotificationCleanupHostedService(
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
-                var companyContext = scope.ServiceProvider.GetRequiredService<ECommerce.Services.Company.CompanyContext>();
-                companyContext.Initialize();
                 var service = scope.ServiceProvider.GetRequiredService<IAdminNotificationService>();
                 var count = await service.CleanupExpiredAsync(stoppingToken);
                 if (count > 0) logger.LogInformation("Permanently removed {Count} expired admin notifications.", count);

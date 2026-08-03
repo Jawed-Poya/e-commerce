@@ -1,6 +1,9 @@
+using ECommerce.Entities.Users;
+
 namespace ECommerce.Entities.Users.Contracts;
 
 public sealed record LoginRequest(string Identifier, string Password);
+public sealed record GoogleSignInRequest(string Credential);
 
 public sealed record RegisterCustomerRequest(
     string FirstName,
@@ -21,7 +24,10 @@ public sealed record AuthUserResponse(
     long? CustomerTypeId,
     string? CustomerTypeName,
     bool IsAdmin,
-    long? BranchId
+    long? BranchId,
+    bool EmailVerified,
+    bool PhoneVerified,
+    bool CanPlaceOrders
 );
 
 public sealed record AuthResponse(
@@ -40,7 +46,10 @@ public sealed record UserProfileResponse(
     IReadOnlyCollection<string> Roles,
     IReadOnlyCollection<string> Permissions,
     DateTime? LastLoginAt,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    bool EmailVerified,
+    bool PhoneVerified,
+    bool CanPlaceOrders);
 
 public sealed record UpdateUserProfileRequest(
     string FullName,
@@ -50,3 +59,11 @@ public sealed record UpdateUserProfileRequest(
 public sealed record ChangePasswordRequest(
     string CurrentPassword,
     string NewPassword);
+
+public sealed record VerificationRequest(VerificationChannel Channel);
+public sealed record ConfirmVerificationRequest(VerificationChannel Channel, string Code);
+public sealed record VerificationDispatchResponse(
+    VerificationChannel Channel,
+    string Destination,
+    DateTime ExpiresAt,
+    bool AlreadyVerified);

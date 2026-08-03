@@ -7,7 +7,7 @@ using ECommerce.Entities.Notifications;
 using ECommerce.Entities.Operations;
 using ECommerce.Entities.Products;
 using ECommerce.Entities.Storefront;
-using ECommerce.Entities.Tenancy;
+using ECommerce.Entities.Company;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
@@ -35,7 +35,6 @@ public interface ITrashService
 
 public sealed class TrashService(
     ApplicationDbContext context,
-    ICompanyContext companyContext,
     ILogger<TrashService> logger) : ITrashService
 {
     public async Task<IReadOnlyCollection<TrashItemResponse>> GetAsync(
@@ -44,13 +43,11 @@ public sealed class TrashService(
         long? branchId,
         CancellationToken cancellationToken = default)
     {
-        var retention = await context.TenantSettings.AsNoTracking()
-            .Where(item => item.TenantId == companyContext.CompanyId)
+        var retention = await context.CompanySettings.AsNoTracking()
             .Select(item => (int?)item.TrashRetentionDays)
             .FirstOrDefaultAsync(cancellationToken) ?? 30;
         retention = NormalizeRetention(retention);
         var branches = await context.Branches.AsNoTracking()
-            .Where(item => item.TenantId == companyContext.CompanyId)
             .ToDictionaryAsync(item => item.Id, item => item.Name, cancellationToken);
         var query = context.TrashRecords.AsNoTracking()
             .Where(item => item.RestoredAt == null && item.PurgedAt == null);
@@ -84,7 +81,7 @@ public sealed class TrashService(
 
         try
         {
-            var restored = await RestoreEntityAsync(trash.EntityType, entityId, trash.TenantId, cancellationToken);
+            var restored = await RestoreEntityAsync(trash.EntityType, entityId, cancellationToken);
             if (!restored) throw new KeyNotFoundException("The deleted record no longer exists.");
             trash.RestoredAt = DateTime.UtcNow;
             trash.RestoredByUserId = userId;
@@ -106,7 +103,7 @@ public sealed class TrashService(
             throw new InvalidOperationException("The deleted entity identifier is invalid.");
         try
         {
-            await DeleteEntityAsync(trash.EntityType, entityId, trash.TenantId, cancellationToken);
+            await DeleteEntityAsync(trash.EntityType, entityId, cancellationToken);
             trash.PurgedAt = DateTime.UtcNow;
             await context.SaveChangesAsync(cancellationToken);
         }
@@ -120,7 +117,9 @@ public sealed class TrashService(
 
     public async Task<int> PurgeExpiredAsync(CancellationToken cancellationToken = default)
     {
-        var settings = await context.TenantSettings.AsNoTracking().ToDictionaryAsync(item => item.TenantId, item => item.TrashRetentionDays, cancellationToken);
+        var retention = NormalizeRetention(await context.CompanySettings.AsNoTracking()
+            .Select(item => (int?)item.TrashRetentionDays)
+            .FirstOrDefaultAsync(cancellationToken) ?? 30);
         var candidates = await context.TrashRecords.IgnoreQueryFilters()
             .Where(item => item.RestoredAt == null && item.PurgedAt == null)
             .OrderBy(item => item.CreatedAt)
@@ -129,12 +128,11 @@ public sealed class TrashService(
         var purged = 0;
         foreach (var item in candidates)
         {
-            var retention = NormalizeRetention(settings.GetValueOrDefault(item.TenantId, 30));
             if (item.CreatedAt.AddDays(retention) > DateTime.UtcNow) continue;
             try
             {
                 if (long.TryParse(item.EntityId, out var entityId))
-                    await DeleteEntityAsync(item.EntityType, entityId, item.TenantId, cancellationToken);
+                    await DeleteEntityAsync(item.EntityType, entityId, cancellationToken);
                 item.PurgedAt = DateTime.UtcNow;
                 purged++;
             }
@@ -142,67 +140,66 @@ public sealed class TrashService(
             {
                 logger.LogWarning(
                     exception,
-                    "Skipped expired trash item {TrashId} ({EntityType} {EntityId}) for tenant {TenantId} because it could not be purged.",
+                    "Skipped expired trash item {TrashId} ({EntityType} {EntityId}) because it could not be purged.",
                     item.Id,
                     item.EntityType,
-                    item.EntityId,
-                    item.TenantId);
+                    item.EntityId);
             }
         }
         if (purged > 0) await context.SaveChangesAsync(cancellationToken);
         return purged;
     }
 
-    private async Task<bool> RestoreEntityAsync(string type, long id, long tenantId, CancellationToken cancellationToken)
+    private async Task<bool> RestoreEntityAsync(string type, long id, CancellationToken cancellationToken)
     {
         return type switch
         {
-            nameof(Product) => await Restore(context.Products.IgnoreQueryFilters(), id, tenantId, cancellationToken),
-            nameof(Customer) => await Restore(context.Customers.IgnoreQueryFilters(), id, tenantId, cancellationToken),
-            nameof(Order) => await Restore(context.Orders.IgnoreQueryFilters(), id, tenantId, cancellationToken),
-            nameof(GeneralType) => await Restore(context.Types.IgnoreQueryFilters(), id, tenantId, cancellationToken),
-            nameof(Supplier) => await Restore(context.Suppliers.IgnoreQueryFilters(), id, tenantId, cancellationToken),
-            nameof(Purchase) => await Restore(context.Purchases.IgnoreQueryFilters(), id, tenantId, cancellationToken),
-            nameof(InventorySale) => await Restore(context.InventorySales.IgnoreQueryFilters(), id, tenantId, cancellationToken),
-            nameof(Staff) => await Restore(context.StaffMembers.IgnoreQueryFilters(), id, tenantId, cancellationToken),
-            nameof(StaffSalaryPayment) => await Restore(context.StaffSalaryPayments.IgnoreQueryFilters(), id, tenantId, cancellationToken),
-            nameof(Expense) => await Restore(context.Expenses.IgnoreQueryFilters(), id, tenantId, cancellationToken),
-            nameof(ProductReview) => await Restore(context.ProductReviews.IgnoreQueryFilters(), id, tenantId, cancellationToken),
-            nameof(Warehouse) => await Restore(context.Warehouses.IgnoreQueryFilters(), id, tenantId, cancellationToken),
-            nameof(Notification) => await Restore(context.Notifications.IgnoreQueryFilters(), id, tenantId, cancellationToken),
-            nameof(StorefrontContent) => await Restore(context.StorefrontContents.IgnoreQueryFilters(), id, tenantId, cancellationToken),
+            nameof(Product) => await Restore(context.Products.IgnoreQueryFilters(), id, cancellationToken),
+            nameof(Customer) => await Restore(context.Customers.IgnoreQueryFilters(), id, cancellationToken),
+            nameof(Order) => await Restore(context.Orders.IgnoreQueryFilters(), id, cancellationToken),
+            nameof(GeneralType) => await Restore(context.Types.IgnoreQueryFilters(), id, cancellationToken),
+            nameof(Supplier) => await Restore(context.Suppliers.IgnoreQueryFilters(), id, cancellationToken),
+            nameof(Purchase) => await Restore(context.Purchases.IgnoreQueryFilters(), id, cancellationToken),
+            nameof(InventorySale) => await Restore(context.InventorySales.IgnoreQueryFilters(), id, cancellationToken),
+            nameof(Staff) => await Restore(context.StaffMembers.IgnoreQueryFilters(), id, cancellationToken),
+            nameof(StaffSalaryPayment) => await Restore(context.StaffSalaryPayments.IgnoreQueryFilters(), id, cancellationToken),
+            nameof(Expense) => await Restore(context.Expenses.IgnoreQueryFilters(), id, cancellationToken),
+            nameof(ProductReview) => await Restore(context.ProductReviews.IgnoreQueryFilters(), id, cancellationToken),
+            nameof(Warehouse) => await Restore(context.Warehouses.IgnoreQueryFilters(), id, cancellationToken),
+            nameof(Notification) => await Restore(context.Notifications.IgnoreQueryFilters(), id, cancellationToken),
+            nameof(StorefrontContent) => await Restore(context.StorefrontContents.IgnoreQueryFilters(), id, cancellationToken),
             _ => false
         };
     }
 
-    private async Task DeleteEntityAsync(string type, long id, long tenantId, CancellationToken cancellationToken)
+    private async Task DeleteEntityAsync(string type, long id, CancellationToken cancellationToken)
     {
         var affected = type switch
         {
-            nameof(Product) => await context.Products.IgnoreQueryFilters().Where(item => item.Id == id && item.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken),
-            nameof(Customer) => await context.Customers.IgnoreQueryFilters().Where(item => item.Id == id && item.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken),
-            nameof(Order) => await context.Orders.IgnoreQueryFilters().Where(item => item.Id == id && item.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken),
-            nameof(GeneralType) => await context.Types.IgnoreQueryFilters().Where(item => item.Id == id && item.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken),
-            nameof(Supplier) => await context.Suppliers.IgnoreQueryFilters().Where(item => item.Id == id && item.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken),
-            nameof(Purchase) => await context.Purchases.IgnoreQueryFilters().Where(item => item.Id == id && item.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken),
-            nameof(InventorySale) => await context.InventorySales.IgnoreQueryFilters().Where(item => item.Id == id && item.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken),
-            nameof(Staff) => await context.StaffMembers.IgnoreQueryFilters().Where(item => item.Id == id && item.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken),
-            nameof(StaffSalaryPayment) => await context.StaffSalaryPayments.IgnoreQueryFilters().Where(item => item.Id == id && item.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken),
-            nameof(Expense) => await context.Expenses.IgnoreQueryFilters().Where(item => item.Id == id && item.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken),
-            nameof(ProductReview) => await context.ProductReviews.IgnoreQueryFilters().Where(item => item.Id == id && item.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken),
-            nameof(Warehouse) => await context.Warehouses.IgnoreQueryFilters().Where(item => item.Id == id && item.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken),
-            nameof(Notification) => await context.Notifications.IgnoreQueryFilters().Where(item => item.Id == id && item.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken),
-            nameof(StorefrontContent) => await context.StorefrontContents.IgnoreQueryFilters().Where(item => item.Id == id && item.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken),
+            nameof(Product) => await context.Products.IgnoreQueryFilters().Where(item => item.Id == id).ExecuteDeleteAsync(cancellationToken),
+            nameof(Customer) => await context.Customers.IgnoreQueryFilters().Where(item => item.Id == id).ExecuteDeleteAsync(cancellationToken),
+            nameof(Order) => await context.Orders.IgnoreQueryFilters().Where(item => item.Id == id).ExecuteDeleteAsync(cancellationToken),
+            nameof(GeneralType) => await context.Types.IgnoreQueryFilters().Where(item => item.Id == id).ExecuteDeleteAsync(cancellationToken),
+            nameof(Supplier) => await context.Suppliers.IgnoreQueryFilters().Where(item => item.Id == id).ExecuteDeleteAsync(cancellationToken),
+            nameof(Purchase) => await context.Purchases.IgnoreQueryFilters().Where(item => item.Id == id).ExecuteDeleteAsync(cancellationToken),
+            nameof(InventorySale) => await context.InventorySales.IgnoreQueryFilters().Where(item => item.Id == id).ExecuteDeleteAsync(cancellationToken),
+            nameof(Staff) => await context.StaffMembers.IgnoreQueryFilters().Where(item => item.Id == id).ExecuteDeleteAsync(cancellationToken),
+            nameof(StaffSalaryPayment) => await context.StaffSalaryPayments.IgnoreQueryFilters().Where(item => item.Id == id).ExecuteDeleteAsync(cancellationToken),
+            nameof(Expense) => await context.Expenses.IgnoreQueryFilters().Where(item => item.Id == id).ExecuteDeleteAsync(cancellationToken),
+            nameof(ProductReview) => await context.ProductReviews.IgnoreQueryFilters().Where(item => item.Id == id).ExecuteDeleteAsync(cancellationToken),
+            nameof(Warehouse) => await context.Warehouses.IgnoreQueryFilters().Where(item => item.Id == id).ExecuteDeleteAsync(cancellationToken),
+            nameof(Notification) => await context.Notifications.IgnoreQueryFilters().Where(item => item.Id == id).ExecuteDeleteAsync(cancellationToken),
+            nameof(StorefrontContent) => await context.StorefrontContents.IgnoreQueryFilters().Where(item => item.Id == id).ExecuteDeleteAsync(cancellationToken),
             _ => 0
         };
         if (affected == 0 && !KnownType(type))
             throw new InvalidOperationException($"Permanent deletion is not supported for '{type}'.");
     }
 
-    private async Task<bool> Restore<TEntity>(IQueryable<TEntity> query, long id, long tenantId, CancellationToken cancellationToken)
+    private async Task<bool> Restore<TEntity>(IQueryable<TEntity> query, long id, CancellationToken cancellationToken)
         where TEntity : API.Entities.Common.BaseEntity
     {
-        var entity = await query.FirstOrDefaultAsync(item => item.Id == id && item.TenantId == tenantId, cancellationToken);
+        var entity = await query.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
         if (entity is null) return false;
         entity.IsDeleted = false;
         entity.DeletedAt = null;
@@ -245,8 +242,6 @@ public sealed class TrashCleanupHostedService(IServiceScopeFactory scopeFactory,
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
-                var companyContext = scope.ServiceProvider.GetRequiredService<CompanyContext>();
-                companyContext.Initialize();
                 var service = scope.ServiceProvider.GetRequiredService<ITrashService>();
                 var count = await service.PurgeExpiredAsync(stoppingToken);
                 if (count > 0) logger.LogInformation("Permanently purged {Count} expired trash items.", count);

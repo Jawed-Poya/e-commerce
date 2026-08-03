@@ -15,7 +15,7 @@ using PaymentStatus = API.Entities.Orders.PaymentStatus;
 
 namespace ECommerce.Services.Documents;
 
-public sealed class FinancialDocumentService(ApplicationDbContext context, ICompanyContext companyContext) : IFinancialDocumentService
+public sealed class FinancialDocumentService(ApplicationDbContext context, IBranchContext branchContext) : IFinancialDocumentService
 {
     private const string Navy = "#0F172A";
     private const string Slate = "#475569";
@@ -26,8 +26,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
 
     public async Task<string> GetCompanyNameAsync(CancellationToken cancellationToken = default) =>
         await TransientSqlRetry.ExecuteAsync(
-            token => context.Tenants.AsNoTracking()
-                .Where(item => item.Id == companyContext.CompanyId)
+            token => context.Companies.AsNoTracking()
                 .Select(item => item.Name)
                 .SingleOrDefaultAsync(token),
             cancellationToken) ?? "Company";
@@ -711,8 +710,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
     public async Task<ReceiptResponse> GetReceiptAsync(string source, long id, CancellationToken cancellationToken = default)
     {
         var company = await TransientSqlRetry.ExecuteAsync(
-            token => context.Tenants.AsNoTracking()
-                .Where(item => item.Id == companyContext.CompanyId)
+            token => context.Companies.AsNoTracking()
                 .Select(item => new { item.Name, item.LegalName, item.Phone, item.Email, item.Address, item.LogoUrl })
                 .SingleOrDefaultAsync(token),
             cancellationToken)
@@ -724,8 +722,8 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
         {
             var order = await context.Orders.AsNoTracking()
                 .Where(item => item.Id == id &&
-                    (!companyContext.BranchId.HasValue ||
-                     item.BranchId == companyContext.BranchId.Value ||
+                    (!branchContext.BranchId.HasValue ||
+                     item.BranchId == branchContext.BranchId.Value ||
                      item.BranchId == null))
                 .Select(item => new
                 {
@@ -753,8 +751,8 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
         {
             var sale = await context.InventorySales.AsNoTracking()
                 .Where(item => item.Id == id &&
-                    (!companyContext.BranchId.HasValue ||
-                     item.BranchId == companyContext.BranchId.Value ||
+                    (!branchContext.BranchId.HasValue ||
+                     item.BranchId == branchContext.BranchId.Value ||
                      item.BranchId == null))
                 .Select(item => new
                 {
@@ -791,15 +789,15 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
 
     private long? ResolveBranchId(long? requestedBranchId)
     {
-        if (!companyContext.BranchId.HasValue)
+        if (!branchContext.BranchId.HasValue)
             return requestedBranchId;
 
         if (requestedBranchId.HasValue &&
-            requestedBranchId.Value != companyContext.BranchId.Value)
+            requestedBranchId.Value != branchContext.BranchId.Value)
             throw new UnauthorizedAccessException(
                 "You can export documents only for your assigned branch.");
 
-        return companyContext.BranchId.Value;
+        return branchContext.BranchId.Value;
     }
 
     public byte[] CreateReceiptPdf(ReceiptResponse receipt, bool thermal = false) =>
@@ -1080,8 +1078,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IComp
     private async Task<DocumentCompanyProfile> GetDocumentCompanyAsync(CancellationToken cancellationToken)
     {
         var company = await TransientSqlRetry.ExecuteAsync(
-            token => context.Tenants.AsNoTracking()
-                .Where(item => item.Id == companyContext.CompanyId)
+            token => context.Companies.AsNoTracking()
                 .Select(item => new DocumentCompanyProfile(
                     item.Name,
                     item.LegalName,

@@ -7,7 +7,6 @@
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
-DECLARE @TenantId bigint = 1;                 -- PERF_TENANT_ID
 DECLARE @ProductCount int = 10000;            -- PERF_PRODUCT_COUNT
 DECLARE @CustomerCount int = 20000;           -- PERF_CUSTOMER_COUNT
 DECLARE @OrderCount int = 50000;              -- PERF_ORDER_COUNT
@@ -19,8 +18,8 @@ DECLARE @StartedAt datetime2(3) = SYSUTCDATETIME();
 IF DB_NAME() IN (N'master', N'model', N'msdb', N'tempdb')
     THROW 51000, 'Performance data cannot be inserted into a system database.', 1;
 
-IF NOT EXISTS (SELECT 1 FROM dbo.Tenants WHERE Id = @TenantId)
-    THROW 51001, 'The configured company row does not exist.', 1;
+IF NOT EXISTS (SELECT 1 FROM dbo.Companies)
+    THROW 51001, 'The company profile does not exist.', 1;
 
 IF COL_LENGTH(N'dbo.Products', N'UsesDisplayStock') IS NULL OR
    COL_LENGTH(N'dbo.OrderItems', N'UnitCost') IS NULL OR
@@ -39,7 +38,7 @@ DECLARE @BranchId bigint =
 (
     SELECT TOP (1) Id
     FROM dbo.Branches
-    WHERE TenantId = @TenantId AND IsActive = 1
+    WHERE IsActive = 1
     ORDER BY IsMain DESC, Id
 );
 
@@ -48,7 +47,7 @@ IF @BranchId IS NULL
 
 DECLARE @Currency nvarchar(3) = COALESCE
 (
-    (SELECT TOP (1) MainCurrencyCode FROM dbo.TenantSettings WHERE TenantId = @TenantId),
+    (SELECT TOP (1) MainCurrencyCode FROM dbo.CompanySettings ORDER BY Id),
     N'USD'
 );
 
@@ -59,44 +58,44 @@ BEGIN
     DELETE payment
     FROM dbo.Payments payment
     INNER JOIN dbo.Orders orders ON orders.Id = payment.OrderId
-    WHERE orders.TenantId = @TenantId AND orders.OrderNumber LIKE @Prefix + N'ORD-%';
+    WHERE orders.OrderNumber LIKE @Prefix + N'ORD-%';
 
     DELETE item
     FROM dbo.OrderItems item
     INNER JOIN dbo.Orders orders ON orders.Id = item.OrderId
-    WHERE orders.TenantId = @TenantId AND orders.OrderNumber LIKE @Prefix + N'ORD-%';
+    WHERE orders.OrderNumber LIKE @Prefix + N'ORD-%';
 
     DELETE FROM dbo.Orders
-    WHERE TenantId = @TenantId AND OrderNumber LIKE @Prefix + N'ORD-%';
+    WHERE OrderNumber LIKE @Prefix + N'ORD-%';
 
     DELETE price
     FROM dbo.ProductPrices price
     INNER JOIN dbo.Products product ON product.Id = price.ProductId
-    WHERE product.TenantId = @TenantId AND product.Barcode LIKE @Prefix + N'P-%';
+    WHERE product.Barcode LIKE @Prefix + N'P-%';
 
     DELETE inventory
     FROM dbo.ProductInventories inventory
     INNER JOIN dbo.Products product ON product.Id = inventory.ProductId
-    WHERE product.TenantId = @TenantId AND product.Barcode LIKE @Prefix + N'P-%';
+    WHERE product.Barcode LIKE @Prefix + N'P-%';
 
     DELETE FROM dbo.Products
-    WHERE TenantId = @TenantId AND Barcode LIKE @Prefix + N'P-%';
+    WHERE Barcode LIKE @Prefix + N'P-%';
 
     DELETE FROM dbo.Customers
-    WHERE TenantId = @TenantId AND Phone LIKE @Prefix + N'C-%';
+    WHERE Phone LIKE @Prefix + N'C-%';
 END;
 
 DECLARE @CategoryId bigint =
 (
     SELECT TOP (1) Id
     FROM dbo.Types
-    WHERE TenantId = @TenantId AND [Group] = 1 AND Name = N'PERF Load Category'
+    WHERE [Group] = 1 AND Name = N'PERF Load Category'
 );
 
 IF @CategoryId IS NULL
 BEGIN
-    INSERT dbo.Types (TenantId, BranchId, [Group], Name, SortOrder, CreatedAt, IsDeleted)
-    VALUES (@TenantId, @BranchId, 1, N'PERF Load Category', 9990, SYSUTCDATETIME(), 0);
+    INSERT dbo.Types (BranchId, [Group], Name, SortOrder, CreatedAt, IsDeleted)
+    VALUES (@BranchId, 1, N'PERF Load Category', 9990, SYSUTCDATETIME(), 0);
     SET @CategoryId = SCOPE_IDENTITY();
 END;
 
@@ -104,13 +103,13 @@ DECLARE @CustomerTypeId bigint =
 (
     SELECT TOP (1) Id
     FROM dbo.Types
-    WHERE TenantId = @TenantId AND [Group] = 4 AND Name = N'PERF Load Customer'
+    WHERE [Group] = 4 AND Name = N'PERF Load Customer'
 );
 
 IF @CustomerTypeId IS NULL
 BEGIN
-    INSERT dbo.Types (TenantId, BranchId, [Group], Name, SortOrder, CreatedAt, IsDeleted)
-    VALUES (@TenantId, @BranchId, 4, N'PERF Load Customer', 9990, SYSUTCDATETIME(), 0);
+    INSERT dbo.Types (BranchId, [Group], Name, SortOrder, CreatedAt, IsDeleted)
+    VALUES (@BranchId, 4, N'PERF Load Customer', 9990, SYSUTCDATETIME(), 0);
     SET @CustomerTypeId = SCOPE_IDENTITY();
 END;
 
@@ -118,14 +117,14 @@ DECLARE @ProductUnitId bigint =
 (
     SELECT TOP (1) Id
     FROM dbo.Types
-    WHERE TenantId = @TenantId AND [Group] = 3 AND IsDeleted = 0
+    WHERE [Group] = 3 AND IsDeleted = 0
     ORDER BY CASE WHEN Name = N'Piece (Dana)' THEN 0 ELSE 1 END, SortOrder, Id
 );
 
 IF @ProductUnitId IS NULL
 BEGIN
-    INSERT dbo.Types (TenantId, BranchId, [Group], Name, SortOrder, CreatedAt, IsDeleted)
-    VALUES (@TenantId, @BranchId, 3, N'Piece (Dana)', 0, SYSUTCDATETIME(), 0);
+    INSERT dbo.Types (BranchId, [Group], Name, SortOrder, CreatedAt, IsDeleted)
+    VALUES (@BranchId, 3, N'Piece (Dana)', 0, SYSUTCDATETIME(), 0);
     SET @ProductUnitId = SCOPE_IDENTITY();
 END;
 
@@ -152,13 +151,12 @@ CREATE UNIQUE CLUSTERED INDEX IX_Numbers_Number ON #Numbers(Number);
 PRINT CONCAT('Inserting ', FORMAT(@ProductCount, 'N0'), ' products...');
 INSERT dbo.Products
 (
-    TenantId, BranchId, Name, Barcode, ShortDescription, Description,
+    BranchId, Name, Barcode, ShortDescription, Description,
     MinimumValue, MaximumValue, UsesDisplayStock, DisplayStockQuantity,
     CategoryId, BrandId, UnitId, IsFeatured, IsActive, Slug, ViewCount,
     CreatedAt, IsDeleted
 )
 SELECT
-    @TenantId,
     @BranchId,
     CONCAT(N'Performance Product ', RIGHT(REPLICATE('0', 6) + CONVERT(varchar(10), Number), 6)),
     CONCAT(@Prefix, N'P-', RIGHT(REPLICATE('0', 10) + CONVERT(varchar(10), Number), 10)),
@@ -187,17 +185,16 @@ SELECT
     UsesDisplayStock
 INTO #PerfProducts
 FROM dbo.Products
-WHERE TenantId = @TenantId AND Barcode LIKE @Prefix + N'P-%';
+WHERE Barcode LIKE @Prefix + N'P-%';
 CREATE UNIQUE CLUSTERED INDEX IX_PerfProducts_Number ON #PerfProducts(Number);
 CREATE UNIQUE INDEX IX_PerfProducts_Id ON #PerfProducts(Id);
 
 INSERT dbo.ProductPrices
 (
-    TenantId, BranchId, ProductId, CustomerTypeId, StartDate, EndDate,
+    BranchId, ProductId, CustomerTypeId, StartDate, EndDate,
     PriceTypeId, RegularPrice, SalePrice, CreatedAt, IsDeleted
 )
 SELECT
-    @TenantId,
     @BranchId,
     product.Id,
     @CustomerTypeId,
@@ -215,11 +212,10 @@ FROM #PerfProducts product;
 
 INSERT dbo.ProductInventories
 (
-    TenantId, BranchId, ProductId, Quantity, ReservedQuantity,
+    BranchId, ProductId, Quantity, ReservedQuantity,
     MinimumQuantity, ExpireDate, CreatedAt, IsDeleted
 )
 SELECT
-    @TenantId,
     @BranchId,
     product.Id,
     CONVERT(decimal(18,3), 100 + product.Number % 5000),
@@ -234,11 +230,10 @@ WHERE product.UsesDisplayStock = 0;
 PRINT CONCAT('Inserting ', FORMAT(@CustomerCount, 'N0'), ' customers...');
 INSERT dbo.Customers
 (
-    TenantId, BranchId, FirstName, LastName, Phone, Email, Address,
+    BranchId, FirstName, LastName, Phone, Email, Address,
     CustomerTypeId, CreatedAt, IsDeleted
 )
 SELECT
-    @TenantId,
     @BranchId,
     CONCAT(N'Performance ', RIGHT(REPLICATE('0', 6) + CONVERT(varchar(10), Number), 6)),
     N'Customer',
@@ -255,18 +250,17 @@ DROP TABLE IF EXISTS #PerfCustomers;
 SELECT ROW_NUMBER() OVER (ORDER BY Id) AS Number, Id
 INTO #PerfCustomers
 FROM dbo.Customers
-WHERE TenantId = @TenantId AND Phone LIKE @Prefix + N'C-%';
+WHERE Phone LIKE @Prefix + N'C-%';
 CREATE UNIQUE CLUSTERED INDEX IX_PerfCustomers_Number ON #PerfCustomers(Number);
 
 PRINT CONCAT('Inserting ', FORMAT(@OrderCount, 'N0'), ' orders...');
 INSERT dbo.Orders
 (
-    TenantId, BranchId, OrderNumber, CustomerId, Status, Total, Subtotal,
+    BranchId, OrderNumber, CustomerId, Status, Total, Subtotal,
     DiscountTotal, TaxTotal, ShippingTotal, Currency, PaymentStatus,
     FulfillmentStatus, ReservationExpiresAt, Notes, CreatedAt, IsDeleted
 )
 SELECT
-    @TenantId,
     @BranchId,
     CONCAT(@Prefix, N'ORD-', RIGHT(REPLICATE('0', 10) + CONVERT(varchar(10), number.Number), 10)),
     customer.Id,
@@ -292,7 +286,7 @@ DROP TABLE IF EXISTS #PerfOrders;
 SELECT ROW_NUMBER() OVER (ORDER BY Id) AS Number, Id, CreatedAt
 INTO #PerfOrders
 FROM dbo.Orders
-WHERE TenantId = @TenantId AND OrderNumber LIKE @Prefix + N'ORD-%';
+WHERE OrderNumber LIKE @Prefix + N'ORD-%';
 CREATE UNIQUE CLUSTERED INDEX IX_PerfOrders_Number ON #PerfOrders(Number);
 CREATE UNIQUE INDEX IX_PerfOrders_Id ON #PerfOrders(Id);
 
@@ -306,14 +300,13 @@ CREATE UNIQUE CLUSTERED INDEX IX_ItemOffsets_Number ON #ItemOffsets(OffsetNumber
 PRINT CONCAT('Inserting ', FORMAT(@OrderCount * @ItemsPerOrder, 'N0'), ' order items...');
 INSERT dbo.OrderItems
 (
-    TenantId, BranchId, OrderId, ProductId,
+    BranchId, OrderId, ProductId,
     Quantity, OrderedQuantity, SelectedUnitId, SelectedUnitName, UnitConversionFactor,
     UnitPrice, SellingUnitPrice, UnitCost,
     AffectsInventory, Discount, ProductName, ProductBarcode,
     VariantDescription, Tax, Currency, CreatedAt, IsDeleted
 )
 SELECT
-    @TenantId,
     @BranchId,
     orders.Id,
     product.Id,
@@ -349,18 +342,17 @@ INNER JOIN
 (
     SELECT OrderId, SUM((OrderedQuantity * SellingUnitPrice) - Discount + Tax) AS Subtotal
     FROM dbo.OrderItems
-    WHERE TenantId = @TenantId AND IsDeleted = 0
+    WHERE IsDeleted = 0
     GROUP BY OrderId
 ) totals ON totals.OrderId = orders.Id
-WHERE orders.TenantId = @TenantId AND orders.OrderNumber LIKE @Prefix + N'ORD-%';
+WHERE orders.OrderNumber LIKE @Prefix + N'ORD-%';
 
 INSERT dbo.Payments
 (
-    TenantId, BranchId, OrderId, Provider, ExternalReference,
+    BranchId, OrderId, Provider, ExternalReference,
     Amount, Currency, Status, PaidAt, CreatedAt, IsDeleted
 )
 SELECT
-    @TenantId,
     @BranchId,
     orders.Id,
     N'performance-test',
@@ -384,12 +376,11 @@ UPDATE STATISTICS dbo.OrderItems;
 UPDATE STATISTICS dbo.Payments;
 
 SELECT
-    @TenantId AS TenantId,
     @BranchId AS BranchId,
     @Currency AS CurrencyCode,
-    (SELECT COUNT_BIG(*) FROM dbo.Products WHERE TenantId = @TenantId AND Barcode LIKE @Prefix + N'P-%') AS ProductsInserted,
-    (SELECT COUNT_BIG(*) FROM dbo.Customers WHERE TenantId = @TenantId AND Phone LIKE @Prefix + N'C-%') AS CustomersInserted,
-    (SELECT COUNT_BIG(*) FROM dbo.Orders WHERE TenantId = @TenantId AND OrderNumber LIKE @Prefix + N'ORD-%') AS OrdersInserted,
-    (SELECT COUNT_BIG(*) FROM dbo.OrderItems item INNER JOIN dbo.Orders orders ON orders.Id = item.OrderId WHERE orders.TenantId = @TenantId AND orders.OrderNumber LIKE @Prefix + N'ORD-%') AS OrderItemsInserted,
-    (SELECT COUNT_BIG(*) FROM dbo.Payments payment INNER JOIN dbo.Orders orders ON orders.Id = payment.OrderId WHERE orders.TenantId = @TenantId AND orders.OrderNumber LIKE @Prefix + N'ORD-%') AS PaymentsInserted,
+    (SELECT COUNT_BIG(*) FROM dbo.Products WHERE Barcode LIKE @Prefix + N'P-%') AS ProductsInserted,
+    (SELECT COUNT_BIG(*) FROM dbo.Customers WHERE Phone LIKE @Prefix + N'C-%') AS CustomersInserted,
+    (SELECT COUNT_BIG(*) FROM dbo.Orders WHERE OrderNumber LIKE @Prefix + N'ORD-%') AS OrdersInserted,
+    (SELECT COUNT_BIG(*) FROM dbo.OrderItems item INNER JOIN dbo.Orders orders ON orders.Id = item.OrderId WHERE orders.OrderNumber LIKE @Prefix + N'ORD-%') AS OrderItemsInserted,
+    (SELECT COUNT_BIG(*) FROM dbo.Payments payment INNER JOIN dbo.Orders orders ON orders.Id = payment.OrderId WHERE orders.OrderNumber LIKE @Prefix + N'ORD-%') AS PaymentsInserted,
     DATEDIFF_BIG(millisecond, @StartedAt, SYSUTCDATETIME()) AS TotalElapsedMilliseconds;

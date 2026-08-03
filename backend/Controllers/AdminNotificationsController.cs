@@ -1,7 +1,6 @@
 using ECommerce.Entities;
 using ECommerce.Entities.Notifications.Contracts;
 using ECommerce.Services.Notifications;
-using ECommerce.Services.Company;
 using ECommerce.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,8 +13,7 @@ namespace ECommerce.Controllers;
 [Authorize]
 public sealed class AdminNotificationsController(
     IAdminNotificationService notifications,
-    AdminNotificationBroker broker,
-    ICompanyContext companyContext) : ControllerBase
+    AdminNotificationBroker broker) : ControllerBase
 {
     [Authorize(Policy = AppPermissions.AdminNotificationsViewPolicy)]
     [HttpGet]
@@ -57,7 +55,7 @@ public sealed class AdminNotificationsController(
 
         try
         {
-            using var subscription = broker.Subscribe(companyContext.CompanyId);
+            using var subscription = broker.Subscribe();
 
             await WriteEventAsync(": connected\n\n", requestAborted);
 

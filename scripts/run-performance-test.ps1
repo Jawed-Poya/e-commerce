@@ -2,7 +2,6 @@
 param(
     [string]$Server = "localhost",
     [string]$Database = "Ecommerce",
-    [long]$TenantId = 1,
     [int]$ProductCount = 10000,
     [int]$CustomerCount = 20000,
     [int]$OrderCount = 50000,
@@ -78,14 +77,11 @@ function New-ConfiguredSqlScript {
     )
 
     $content = Get-Content -Raw -Path $SourcePath
-    $content = $content.Replace("DECLARE @TenantId bigint = 1;                 -- PERF_TENANT_ID", "DECLARE @TenantId bigint = $TenantId;                 -- PERF_TENANT_ID")
     $content = $content.Replace("DECLARE @ProductCount int = 10000;            -- PERF_PRODUCT_COUNT", "DECLARE @ProductCount int = $ProductCount;            -- PERF_PRODUCT_COUNT")
     $content = $content.Replace("DECLARE @CustomerCount int = 20000;           -- PERF_CUSTOMER_COUNT", "DECLARE @CustomerCount int = $CustomerCount;           -- PERF_CUSTOMER_COUNT")
     $content = $content.Replace("DECLARE @OrderCount int = 50000;              -- PERF_ORDER_COUNT", "DECLARE @OrderCount int = $OrderCount;              -- PERF_ORDER_COUNT")
     $content = $content.Replace("DECLARE @ItemsPerOrder int = 4;               -- PERF_ITEMS_PER_ORDER", "DECLARE @ItemsPerOrder int = $ItemsPerOrder;               -- PERF_ITEMS_PER_ORDER")
-    $content = $content.Replace("DECLARE @TenantId bigint = 1;       -- PERF_TENANT_ID", "DECLARE @TenantId bigint = $TenantId;       -- PERF_TENANT_ID")
     $content = $content.Replace("DECLARE @CatalogRows int = 10000;   -- PERF_CATALOG_ROWS", "DECLARE @CatalogRows int = $PdfRows;   -- PERF_CATALOG_ROWS")
-    $content = $content.Replace("DECLARE @TenantId bigint = 1; -- PERF_TENANT_ID", "DECLARE @TenantId bigint = $TenantId; -- PERF_TENANT_ID")
     Set-Content -Path $DestinationPath -Value $content -Encoding UTF8
 }
 
@@ -123,7 +119,6 @@ $summary = [ordered]@{
     runId = $runStamp
     server = $Server
     database = $Database
-    tenantId = $TenantId
     productCount = $ProductCount
     customerCount = $CustomerCount
     orderCount = $OrderCount

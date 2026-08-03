@@ -1,14 +1,15 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Net.Mail;
 using System.Security.Claims;
 using System.Text;
-using API.Entities.Customers;
 using ECommerce.Data;
 using ECommerce.Entities.Users;
 using ECommerce.Entities.Users.Contracts;
 using ECommerce.Options;
-using ECommerce.Services.Customers;
 using ECommerce.Services.Company;
+using ECommerce.Services.Customers;
 using ECommerce.Shared;
+using Google.Apis.Auth;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -18,23 +19,19 @@ namespace ECommerce.Services.Auth;
 
 public sealed class AuthService(
     UserManager<User> userManager,
-    RoleManager<Role> roleManager,
     ApplicationDbContext context,
-    IDefaultCustomerTypeResolver defaultCustomerType,
     ICurrentCustomerAccessor currentCustomer,
-    ICompanyContext companyContext,
     ICompanyPermissionService companyPermissions,
-    IOptions<JwtOptions> jwtOptions) : IAuthService
+    IOptions<JwtOptions> jwtOptions,
+    IOptions<GoogleAuthOptions> googleOptions) : IAuthService
 {
     private readonly JwtOptions _jwt = jwtOptions.Value;
+    private readonly GoogleAuthOptions _google = googleOptions.Value;
 
-    public async Task<AuthResponse> LoginCustomerAsync(
-        LoginRequest request,
-        CancellationToken cancellationToken = default)
+    public async Task<AuthResponse> LoginCustomerAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
-        var user = await FindUserAsync(request.Identifier)
+        var user = await FindUserAsync(request.Identifier, cancellationToken)
             ?? throw new InvalidOperationException("Invalid email/phone or password.");
-
         if (!user.IsActive || !await userManager.CheckPasswordAsync(user, request.Password))
             throw new InvalidOperationException("Invalid email/phone or password.");
 
@@ -43,17 +40,14 @@ public sealed class AuthService(
             throw new InvalidOperationException("This account is not a customer account.");
 
         user.LastLoginAt = DateTime.UtcNow;
-        await userManager.UpdateAsync(user);
+        EnsureSucceeded(await userManager.UpdateAsync(user), "Could not update login information.");
         return await CreateResponseAsync(user, roles, cancellationToken);
     }
 
-    public async Task<AuthResponse> LoginAdminAsync(
-        LoginRequest request,
-        CancellationToken cancellationToken = default)
+    public async Task<AuthResponse> LoginAdminAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
-        var user = await FindUserAsync(request.Identifier)
+        var user = await FindUserAsync(request.Identifier, cancellationToken)
             ?? throw new InvalidOperationException("Invalid credentials.");
-
         if (!user.IsActive || !await userManager.CheckPasswordAsync(user, request.Password))
             throw new InvalidOperationException("Invalid credentials.");
 
@@ -63,7 +57,7 @@ public sealed class AuthService(
             throw new UnauthorizedAccessException("This account cannot access the admin panel.");
 
         user.LastLoginAt = DateTime.UtcNow;
-        await userManager.UpdateAsync(user);
+        EnsureSucceeded(await userManager.UpdateAsync(user), "Could not update login information.");
         return await CreateResponseAsync(user, roles, cancellationToken);
     }
 
@@ -71,132 +65,156 @@ public sealed class AuthService(
         RegisterCustomerRequest request,
         CancellationToken cancellationToken = default)
     {
-        var firstName = request.FirstName?.Trim();
+        var firstName = Clean(request.FirstName);
         var lastName = Clean(request.LastName);
         var phone = NormalizePhone(request.Phone);
         var email = NormalizeEmail(request.Email);
+        if (firstName is null) throw new ArgumentException("First name is required.");
+        if (phone.Length < 6) throw new ArgumentException("Enter a valid phone number.");
+        if (string.IsNullOrWhiteSpace(request.Password)) throw new ArgumentException("Password is required.");
 
-        if (string.IsNullOrWhiteSpace(firstName))
-            throw new ArgumentException("First name is required.");
-        if (phone.Length < 6)
-            throw new ArgumentException("Enter a valid phone number.");
-        if (string.IsNullOrWhiteSpace(request.Password))
-            throw new ArgumentException("Password is required.");
-
-        var matchingCustomers = await context.Customers
-            .Where(customer =>
-                customer.Phone == phone ||
-                (email != null && customer.Email == email))
-            .ToListAsync(cancellationToken);
-
-        if (matchingCustomers.Select(customer => customer.Id).Distinct().Count() > 1)
-            throw new InvalidOperationException(
-                "The phone number and email belong to different customer records. Ask an admin to merge them first.");
-
-        var customer = matchingCustomers.SingleOrDefault();
-        var existingUser = await FindUserAsync(email ?? phone);
-        if (existingUser is null && email is not null)
-            existingUser = await FindUserAsync(phone);
-        if (existingUser is not null)
+        var existing = await FindExistingByContactsAsync(email, phone, cancellationToken);
+        if (existing is not null)
             throw new InvalidOperationException("An account with this email or phone already exists. Use login instead.");
 
         var user = new User
         {
             Email = email,
+            EmailConfirmed = false,
             PhoneNumber = phone,
+            PhoneNumberConfirmed = false,
             FullName = string.Join(' ', new[] { firstName, lastName }.Where(value => !string.IsNullOrWhiteSpace(value))),
-            IsActive = true,
-            TenantId = companyContext.CompanyId,
-            BranchId = companyContext.BranchId
+            IsActive = true
         };
-        user.UserName = CompanyUserName.Create(user.TenantId, user.Id);
+        user.UserName = CompanyUserName.Create(user.Id);
 
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         try
         {
-            var identityResult = await userManager.CreateAsync(user, request.Password);
-            if (!identityResult.Succeeded)
-                throw new ArgumentException(string.Join(" ", identityResult.Errors.Select(error => error.Description)));
+            EnsureSucceeded(await userManager.CreateAsync(user, request.Password), "Could not create customer account.");
+            EnsureSucceeded(await userManager.AddToRoleAsync(user, AppRoles.Customer), "Could not assign the customer role.");
 
-            var roleResult = await userManager.AddToRoleAsync(user, AppRoles.Customer);
-            if (!roleResult.Succeeded)
-                throw new InvalidOperationException(string.Join(" ", roleResult.Errors.Select(error => error.Description)));
-
-            var type = await defaultCustomerType.GetAsync(cancellationToken);
-            if (customer is null)
-            {
-                customer = new Customer
-                {
-                    FirstName = firstName!,
-                    LastName = lastName,
-                    Phone = phone,
-                    Email = email,
-                    CustomerTypeId = type.Id
-                };
-                context.Customers.Add(customer);
-            }
-            else
-            {
-                customer.FirstName = firstName!;
-                customer.LastName = lastName ?? customer.LastName;
-                customer.Phone = phone;
-                customer.Email = email ?? customer.Email;
-                customer.CustomerTypeId ??= type.Id;
-                customer.UpdatedAt = DateTime.UtcNow;
-            }
-            await context.SaveChangesAsync(cancellationToken);
-
-            var linkResult = await userManager.AddClaimAsync(
-                user,
-                new Claim(AuthClaims.CustomerId, customer.Id.ToString()));
-            if (!linkResult.Succeeded)
-                throw new InvalidOperationException(string.Join(
-                    " ",
-                    linkResult.Errors.Select(error => error.Description)));
-
+            // Customer data and order history are linked only after a verified
+            // checkout. Registration alone must never claim a historical customer
+            // record just because its submitted email or phone happens to match.
             await transaction.CommitAsync(cancellationToken);
-
-            return await CreateResponseAsync(user, [AppRoles.Customer], cancellationToken);
         }
         catch
         {
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
+
+        return await CreateResponseAsync(user, [AppRoles.Customer], cancellationToken);
+    }
+
+    public async Task<AuthResponse> SignInWithGoogleAsync(
+        GoogleSignInRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(_google.ClientId))
+            throw new InvalidOperationException("Google sign-in is not configured.");
+        if (string.IsNullOrWhiteSpace(request.Credential))
+            throw new ArgumentException("Google credential is required.");
+
+        GoogleJsonWebSignature.Payload payload;
+        try
+        {
+            payload = await GoogleJsonWebSignature.ValidateAsync(
+                request.Credential,
+                new GoogleJsonWebSignature.ValidationSettings { Audience = [_google.ClientId] });
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw new InvalidOperationException("Google sign-in could not be verified.", exception);
+        }
+
+        var email = NormalizeEmail(payload.Email);
+        if (!payload.EmailVerified || email is null || string.IsNullOrWhiteSpace(payload.Subject))
+            throw new InvalidOperationException("Google must provide a verified email address.");
+
+        const string provider = "Google";
+        var linkedUser = await userManager.FindByLoginAsync(provider, payload.Subject);
+        var normalizedEmail = userManager.NormalizeEmail(email);
+        var matchingUsers = await context.Users
+            .Where(item => item.NormalizedEmail == normalizedEmail)
+            .Take(2)
+            .ToListAsync(cancellationToken);
+
+        if (linkedUser is null && matchingUsers.Count > 1)
+            throw new InvalidOperationException(
+                "Multiple legacy accounts use this email address. Ask an administrator to merge them before using Google sign-in.");
+        if (linkedUser is not null && matchingUsers.Any(item => item.Id != linkedUser.Id))
+            throw new InvalidOperationException(
+                "This Google email is already connected to another customer account.");
+
+        var user = linkedUser ?? matchingUsers.SingleOrDefault();
+        IReadOnlyCollection<string> roles;
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            if (user is null)
+            {
+                user = new User
+                {
+                    Email = email,
+                    EmailConfirmed = true,
+                    FullName = Clean(payload.Name) ?? Clean(payload.GivenName) ?? email.Split('@')[0],
+                    AvatarUrl = Clean(payload.Picture),
+                    IsActive = true
+                };
+                user.UserName = CompanyUserName.Create(user.Id);
+                EnsureSucceeded(await userManager.CreateAsync(user), "Could not create the Google account.");
+            }
+            else
+            {
+                if (!user.IsActive) throw new UnauthorizedAccessException("This account is inactive.");
+                user.Email = email;
+                user.EmailConfirmed = true;
+                user.FullName = Clean(payload.Name) ?? user.FullName;
+                user.AvatarUrl ??= Clean(payload.Picture);
+                if (CompanyUserName.RequiresRepair(user.UserName))
+                    user.UserName = CompanyUserName.Create(user.Id);
+                EnsureSucceeded(await userManager.UpdateAsync(user), "Could not update the Google account.");
+            }
+
+            var logins = await userManager.GetLoginsAsync(user);
+            if (!logins.Any(login => login.LoginProvider == provider && login.ProviderKey == payload.Subject))
+                EnsureSucceeded(
+                    await userManager.AddLoginAsync(user, new UserLoginInfo(provider, payload.Subject, "Google")),
+                    "Could not link Google sign-in.");
+
+            if (!await userManager.IsInRoleAsync(user, AppRoles.Customer))
+                EnsureSucceeded(await userManager.AddToRoleAsync(user, AppRoles.Customer), "Could not assign the customer role.");
+
+            user.LastLoginAt = DateTime.UtcNow;
+            EnsureSucceeded(await userManager.UpdateAsync(user), "Could not update login information.");
+            roles = await userManager.GetRolesAsync(user);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+
+        return await CreateResponseAsync(user, roles, cancellationToken);
     }
 
     public async Task<AuthUserResponse?> GetCurrentAsync(CancellationToken cancellationToken = default)
     {
-        if (!currentCustomer.IsAuthenticated || string.IsNullOrWhiteSpace(currentCustomer.UserId))
-            return null;
-
-        var user = await userManager.FindByIdAsync(currentCustomer.UserId);
-        if (user is null)
-            return null;
-
-        var roles = (await userManager.GetRolesAsync(user)).ToArray();
-        return await BuildUserAsync(user, roles, cancellationToken);
+        var user = await FindCurrentUserAsync();
+        if (user is null) return null;
+        return await BuildUserAsync(user, await userManager.GetRolesAsync(user), cancellationToken);
     }
 
-    public async Task<UserProfileResponse?> GetProfileAsync(
-        CancellationToken cancellationToken = default)
+    public async Task<UserProfileResponse?> GetProfileAsync(CancellationToken cancellationToken = default)
     {
         var user = await FindCurrentUserAsync();
         if (user is null) return null;
-
         var roles = (await userManager.GetRolesAsync(user)).ToArray();
         var permissions = await GetPermissionsAsync(user, roles, cancellationToken);
-        return new UserProfileResponse(
-            user.Id,
-            user.FullName,
-            user.Email,
-            user.PhoneNumber,
-            user.AvatarUrl,
-            user.IsActive,
-            roles.Select(DisplayRoleName).ToArray(),
-            permissions,
-            user.LastLoginAt,
-            user.CreatedAt);
+        return MapProfile(user, roles, permissions);
     }
 
     public async Task<UserProfileResponse> UpdateProfileAsync(
@@ -205,114 +223,67 @@ public sealed class AuthService(
     {
         var user = await FindCurrentUserAsync()
             ?? throw new UnauthorizedAccessException("Authentication is required.");
-
-        var fullName = Clean(request.FullName);
-        var email = NormalizeEmail(request.Email);
+        var fullName = Clean(request.FullName) ?? throw new ArgumentException("Full name is required.");
+        var email = NormalizeEmail(request.Email) ?? throw new ArgumentException("Email is required.");
         var phone = NormalizePhone(request.Phone);
-        if (string.IsNullOrWhiteSpace(fullName))
-            throw new ArgumentException("Full name is required.");
-        if (string.IsNullOrWhiteSpace(email))
-            throw new ArgumentException("Email is required.");
-        if (phone.Length > 0 && phone.Length < 6)
-            throw new ArgumentException("Enter a valid phone number.");
+        if (phone.Length > 0 && phone.Length < 6) throw new ArgumentException("Enter a valid phone number.");
 
-        var emailChanged = !string.Equals(
-            NormalizeEmail(user.Email),
-            email,
-            StringComparison.OrdinalIgnoreCase);
-        var phoneChanged = !string.Equals(
-            NormalizePhone(user.PhoneNumber),
-            phone,
-            StringComparison.Ordinal);
-
-        if (emailChanged && await context.Users.AnyAsync(
-                item => item.Id != user.Id &&
-                    item.TenantId == user.TenantId &&
-                    item.Email == email,
-                cancellationToken))
+        var emailChanged = !string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase);
+        var phoneValue = phone.Length == 0 ? null : phone;
+        var phoneChanged = !string.Equals(user.PhoneNumber, phoneValue, StringComparison.Ordinal);
+        if (emailChanged && await context.Users.AnyAsync(item => item.Id != user.Id && item.Email == email, cancellationToken))
             throw new InvalidOperationException("This email address is already in use.");
-
-        if (phoneChanged && phone.Length > 0 && await context.Users.AnyAsync(
-                item => item.Id != user.Id &&
-                    item.TenantId == user.TenantId &&
-                    item.PhoneNumber == phone,
-                cancellationToken))
+        if (phoneChanged && phoneValue is not null && await context.Users.AnyAsync(item => item.Id != user.Id && item.PhoneNumber == phoneValue, cancellationToken))
             throw new InvalidOperationException("This phone number is already in use.");
-
-        // Resolve unchanged authorization data before committing the profile. Nothing
-        // after UpdateAsync should be able to turn a successful database write into an
-        // apparent failure because the browser cancelled a follow-up query.
-        var roles = (await userManager.GetRolesAsync(user)).ToArray();
-        var permissions = await GetPermissionsAsync(user, roles, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
 
         user.FullName = fullName;
         user.Email = email;
-        if (CompanyUserName.RequiresRepair(user.UserName))
-            user.UserName = CompanyUserName.Create(user.TenantId, user.Id);
-        user.PhoneNumber = phone.Length == 0 ? null : phone;
+        user.PhoneNumber = phoneValue;
+        if (emailChanged) user.EmailConfirmed = false;
+        if (phoneChanged) user.PhoneNumberConfirmed = false;
+        if (CompanyUserName.RequiresRepair(user.UserName)) user.UserName = CompanyUserName.Create(user.Id);
+        EnsureSucceeded(await userManager.UpdateAsync(user), "Could not update the profile.");
 
-        var result = await userManager.UpdateAsync(user);
-        if (!result.Succeeded)
-            throw new InvalidOperationException(string.Join(
-                " ",
-                result.Errors.Select(error => error.Description)));
-
-        return new UserProfileResponse(
-            user.Id,
-            user.FullName,
-            user.Email,
-            user.PhoneNumber,
-            user.AvatarUrl,
-            user.IsActive,
-            roles.Select(DisplayRoleName).ToArray(),
-            permissions,
-            user.LastLoginAt,
-            user.CreatedAt);
+        var roles = (await userManager.GetRolesAsync(user)).ToArray();
+        var permissions = await GetPermissionsAsync(user, roles, cancellationToken);
+        return MapProfile(user, roles, permissions);
     }
 
-    public async Task ChangePasswordAsync(
-        ChangePasswordRequest request,
-        CancellationToken cancellationToken = default)
+    public async Task ChangePasswordAsync(ChangePasswordRequest request, CancellationToken cancellationToken = default)
     {
         var user = await FindCurrentUserAsync()
             ?? throw new UnauthorizedAccessException("Authentication is required.");
-
-        if (string.IsNullOrWhiteSpace(request.CurrentPassword) ||
-            string.IsNullOrWhiteSpace(request.NewPassword))
+        if (string.IsNullOrWhiteSpace(request.CurrentPassword) || string.IsNullOrWhiteSpace(request.NewPassword))
             throw new ArgumentException("Current and new passwords are required.");
-
-        var result = await userManager.ChangePasswordAsync(
-            user,
-            request.CurrentPassword,
-            request.NewPassword);
-        if (!result.Succeeded)
-            throw new InvalidOperationException(string.Join(
-                " ",
-                result.Errors.Select(error => error.Description)));
+        EnsureSucceeded(
+            await userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword),
+            "Could not change the password.");
     }
 
     private async Task<User?> FindCurrentUserAsync()
     {
         if (!currentCustomer.IsAuthenticated || string.IsNullOrWhiteSpace(currentCustomer.UserId))
             return null;
-
         return await userManager.FindByIdAsync(currentCustomer.UserId);
     }
 
-    private async Task<User?> FindUserAsync(string identifier)
+    private async Task<User?> FindUserAsync(string identifier, CancellationToken cancellationToken)
     {
-        var value = identifier?.Trim();
-        if (string.IsNullOrWhiteSpace(value)) return null;
-
-        var normalized = value.ToUpperInvariant();
+        var value = Clean(identifier);
+        if (value is null) return null;
+        var normalizedName = userManager.NormalizeName(value);
+        var normalizedEmail = userManager.NormalizeEmail(value);
         var phone = NormalizePhone(value);
         return await context.Users.FirstOrDefaultAsync(user =>
-            user.TenantId == companyContext.CompanyId &&
-            (user.NormalizedUserName == normalized ||
-             user.NormalizedEmail == normalized ||
-             user.PhoneNumber == phone));
+            user.NormalizedUserName == normalizedName ||
+            user.NormalizedEmail == normalizedEmail ||
+            (phone.Length > 0 && user.PhoneNumber == phone), cancellationToken);
     }
+
+    private async Task<User?> FindExistingByContactsAsync(string? email, string phone, CancellationToken cancellationToken) =>
+        await context.Users.FirstOrDefaultAsync(user =>
+            (email != null && user.Email == email) || user.PhoneNumber == phone,
+            cancellationToken);
 
     private async Task<AuthResponse> CreateResponseAsync(
         User user,
@@ -328,12 +299,10 @@ public sealed class AuthService(
             new(ClaimTypes.Name, user.FullName),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N"))
         };
-
         if (!string.IsNullOrWhiteSpace(user.Email)) claims.Add(new Claim(ClaimTypes.Email, user.Email));
         if (!string.IsNullOrWhiteSpace(user.PhoneNumber)) claims.Add(new Claim(ClaimTypes.MobilePhone, user.PhoneNumber));
         foreach (var role in roles) claims.Add(new Claim(ClaimTypes.Role, role));
-        foreach (var permission in authUser.Permissions)
-            claims.Add(new Claim(AuthClaims.Permission, permission));
+        foreach (var permission in authUser.Permissions) claims.Add(new Claim(AuthClaims.Permission, permission));
         if (authUser.CustomerId.HasValue) claims.Add(new Claim(AuthClaims.CustomerId, authUser.CustomerId.Value.ToString()));
         if (authUser.CustomerTypeId.HasValue) claims.Add(new Claim(AuthClaims.CustomerTypeId, authUser.CustomerTypeId.Value.ToString()));
         if (user.BranchId.HasValue) claims.Add(new Claim(AuthClaims.BranchId, user.BranchId.Value.ToString()));
@@ -345,7 +314,6 @@ public sealed class AuthService(
             claims: claims,
             expires: expiresAt,
             signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
-
         return new AuthResponse(new JwtSecurityTokenHandler().WriteToken(token), expiresAt, authUser);
     }
 
@@ -354,41 +322,22 @@ public sealed class AuthService(
         IReadOnlyCollection<string> roles,
         CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // Read Identity claims once. The old implementation loaded user claims twice and
-        // resolved role claims one role at a time, which made /auth/me and profile saves
-        // unnecessarily slow and prone to client timeout/cancellation.
-        var identityClaims = await context.UserClaims
-            .AsNoTracking()
+        var identityClaims = await context.UserClaims.AsNoTracking()
             .Where(claim => claim.UserId == user.Id)
             .Select(claim => new IdentityClaimProjection(claim.ClaimType, claim.ClaimValue))
             .ToArrayAsync(cancellationToken);
-
         var permissions = await GetPermissionsAsync(identityClaims, roles, cancellationToken);
         var linkedCustomerId = long.TryParse(
             identityClaims.FirstOrDefault(claim => claim.Type == AuthClaims.CustomerId)?.Value,
-            out var parsedCustomerId)
-            ? parsedCustomerId
-            : (long?)null;
+            out var customerId) ? customerId : (long?)null;
 
         Customer? customer = null;
-        var isCustomerAccount = roles.Contains(AppRoles.Customer, StringComparer.OrdinalIgnoreCase);
-        if (linkedCustomerId.HasValue || isCustomerAccount)
+        if (linkedCustomerId.HasValue)
         {
-            var customers = context.Customers
+            customer = await context.Customers
                 .AsNoTracking()
-                .Include(item => item.CustomerType);
-
-            customer = linkedCustomerId.HasValue
-                ? await customers.FirstOrDefaultAsync(
-                    item => item.Id == linkedCustomerId.Value,
-                    cancellationToken)
-                : await customers.FirstOrDefaultAsync(
-                    item =>
-                        (user.PhoneNumber != null && item.Phone == user.PhoneNumber) ||
-                        (user.Email != null && item.Email == user.Email),
-                    cancellationToken);
+                .Include(item => item.CustomerType)
+                .FirstOrDefaultAsync(item => item.Id == linkedCustomerId.Value, cancellationToken);
         }
 
         return new AuthUserResponse(
@@ -396,13 +345,16 @@ public sealed class AuthService(
             user.FullName,
             user.Email,
             user.PhoneNumber,
-            roles.Select(DisplayRoleName).ToArray(),
+            roles.ToArray(),
             permissions,
             customer?.Id,
             customer?.CustomerTypeId,
             customer?.CustomerType?.Name,
             roles.Contains(AppRoles.Admin, StringComparer.OrdinalIgnoreCase) || permissions.Count > 0,
-            user.BranchId);
+            user.BranchId,
+            user.EmailConfirmed,
+            user.PhoneNumberConfirmed,
+            user.EmailConfirmed || user.PhoneNumberConfirmed);
     }
 
     private async Task<IReadOnlyCollection<string>> GetPermissionsAsync(
@@ -410,13 +362,11 @@ public sealed class AuthService(
         IReadOnlyCollection<string> roles,
         CancellationToken cancellationToken)
     {
-        var identityClaims = await context.UserClaims
-            .AsNoTracking()
+        var claims = await context.UserClaims.AsNoTracking()
             .Where(claim => claim.UserId == user.Id)
             .Select(claim => new IdentityClaimProjection(claim.ClaimType, claim.ClaimValue))
             .ToArrayAsync(cancellationToken);
-
-        return await GetPermissionsAsync(identityClaims, roles, cancellationToken);
+        return await GetPermissionsAsync(claims, roles, cancellationToken);
     }
 
     private async Task<IReadOnlyCollection<string>> GetPermissionsAsync(
@@ -429,38 +379,44 @@ public sealed class AuthService(
             .Select(claim => claim.Value!)
             .Where(AppPermissions.All.Contains)
             .ToArray();
-
         var roleNames = roles.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var rolePermissions = roleNames.Length == 0
-            ? Array.Empty<string>()
-            : await (
-                from role in context.Roles.AsNoTracking()
-                join claim in context.RoleClaims.AsNoTracking() on role.Id equals claim.RoleId
-                where role.Name != null && roleNames.Contains(role.Name) &&
-                      claim.ClaimType == AuthClaims.Permission && claim.ClaimValue != null
-                select claim.ClaimValue!)
+            ? []
+            : await (from role in context.Roles.AsNoTracking()
+                     join claim in context.RoleClaims.AsNoTracking() on role.Id equals claim.RoleId
+                     where role.Name != null && roleNames.Contains(role.Name) &&
+                           claim.ClaimType == AuthClaims.Permission && claim.ClaimValue != null
+                     select claim.ClaimValue!)
                 .Distinct()
                 .ToArrayAsync(cancellationToken);
-
-        var enabledForCompany = (await companyPermissions.GetCompanyPermissionsAsync(cancellationToken))
+        var enabled = (await companyPermissions.GetCompanyPermissionsAsync(cancellationToken))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        return userPermissions
-            .Concat(rolePermissions)
+        return userPermissions.Concat(rolePermissions)
             .Where(AppPermissions.All.Contains)
-            .Where(enabledForCompany.Contains)
+            .Where(enabled.Contains)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(value => value)
             .ToArray();
     }
 
-    private static string DisplayRoleName(string roleName)
-    {
-        var separator = roleName.IndexOf(':');
-        return (roleName.StartsWith("company:", StringComparison.OrdinalIgnoreCase) || roleName.StartsWith("tenant-", StringComparison.OrdinalIgnoreCase)) && separator >= 0
-            ? roleName[(separator + 1)..]
-            : roleName;
-    }
+    private static UserProfileResponse MapProfile(
+        User user,
+        IReadOnlyCollection<string> roles,
+        IReadOnlyCollection<string> permissions) =>
+        new(
+            user.Id,
+            user.FullName,
+            user.Email,
+            user.PhoneNumber,
+            user.AvatarUrl,
+            user.IsActive,
+            roles.ToArray(),
+            permissions,
+            user.LastLoginAt,
+            user.CreatedAt,
+            user.EmailConfirmed,
+            user.PhoneNumberConfirmed,
+            user.EmailConfirmed || user.PhoneNumberConfirmed);
 
     private static string NormalizePhone(string? value) =>
         string.Concat((value ?? string.Empty).Where(character => char.IsDigit(character) || character == '+')).Trim();
@@ -468,15 +424,23 @@ public sealed class AuthService(
     private static string? NormalizeEmail(string? value)
     {
         var clean = Clean(value)?.ToLowerInvariant();
-        if (clean is not null && !clean.Contains('@'))
+        if (clean is null) return null;
+        if (!MailAddress.TryCreate(clean, out var address) ||
+            !string.Equals(address.Address, clean, StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("Enter a valid email address.");
-        return clean;
+        return address.Address.ToLowerInvariant();
     }
 
     private static string? Clean(string? value)
     {
         var clean = value?.Trim();
         return string.IsNullOrWhiteSpace(clean) ? null : clean;
+    }
+
+    private static void EnsureSucceeded(IdentityResult result, string message)
+    {
+        if (!result.Succeeded)
+            throw new InvalidOperationException(message + " " + string.Join(" ", result.Errors.Select(error => error.Description)));
     }
 
     private sealed record IdentityClaimProjection(string? Type, string? Value);

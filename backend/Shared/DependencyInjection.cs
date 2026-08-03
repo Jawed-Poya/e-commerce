@@ -4,6 +4,7 @@ using ECommerce.Data;
 using ECommerce.Entities.Users;
 using ECommerce.Options;
 using ECommerce.Services.Auth;
+using ECommerce.Services.Auth.Verification;
 using ECommerce.Services.Auditing;
 using ECommerce.Services.Customers;
 using ECommerce.Services.Company;
@@ -29,8 +30,8 @@ public static class DependencyInjection
     {
         services.AddHttpContextAccessor();
         services.AddMemoryCache();
-        services.AddScoped<CompanyContext>();
-        services.AddScoped<ICompanyContext>(provider => provider.GetRequiredService<CompanyContext>());
+        services.AddScoped<BranchContext>();
+        services.AddScoped<IBranchContext>(provider => provider.GetRequiredService<BranchContext>());
         services.AddScoped<ICompanyPermissionService, CompanyPermissionService>();
         services.AddScoped<ICompanyService, CompanyService>();
         services.AddScoped<ITrashService, TrashService>();
@@ -50,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentCustomerAccessor, CurrentCustomerAccessor>();
         services.AddScoped<IDefaultCustomerTypeResolver, DefaultCustomerTypeResolver>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IAccountVerificationService, AccountVerificationService>();
         services.AddScoped<IStoreNotificationService, StoreNotificationService>();
         services.AddScoped<IAdminNotificationService, AdminNotificationService>();
         services.AddScoped<IInventoryExpiryAlertService, InventoryExpiryAlertService>();
@@ -78,6 +80,9 @@ public static class DependencyInjection
         services.Configure<AuditOptions>(configuration.GetSection(AuditOptions.SectionName));
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<SeedAdminOptions>(configuration.GetSection(SeedAdminOptions.SectionName));
+        services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
+        services.Configure<AccountVerificationOptions>(configuration.GetSection(AccountVerificationOptions.SectionName));
+        services.AddHttpClient();
 
         services.AddDbContext<ApplicationDbContext>(options =>
         {

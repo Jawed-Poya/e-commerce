@@ -19,8 +19,8 @@ public sealed class ActivityLogConfiguration : IEntityTypeConfiguration<Activity
         b.Property(x => x.DeviceType).HasMaxLength(40);
         b.Property(x => x.Browser).HasMaxLength(100);
         b.Property(x => x.OperatingSystem).HasMaxLength(100);
-        b.HasIndex(x => new { x.TenantId, x.CreatedAt });
-        b.HasIndex(x => new { x.TenantId, x.UserId, x.CreatedAt });
+        b.HasIndex(x => x.CreatedAt);
+        b.HasIndex(x => new { x.UserId, x.CreatedAt });
     }
 }
 
@@ -37,9 +37,9 @@ public sealed class CustomerVisitLogConfiguration : IEntityTypeConfiguration<Cus
         b.Property(x => x.Browser).HasMaxLength(100);
         b.Property(x => x.OperatingSystem).HasMaxLength(100);
         b.Property(x => x.Language).HasMaxLength(20);
-        b.HasIndex(x => new { x.TenantId, x.CreatedAt });
-        b.HasIndex(x => new { x.TenantId, x.SessionId, x.CreatedAt });
-        b.HasIndex(x => new { x.TenantId, x.CustomerId, x.CreatedAt });
+        b.HasIndex(x => x.CreatedAt);
+        b.HasIndex(x => new { x.SessionId, x.CreatedAt });
+        b.HasIndex(x => new { x.CustomerId, x.CreatedAt });
         b.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.SetNull);
     }
 }

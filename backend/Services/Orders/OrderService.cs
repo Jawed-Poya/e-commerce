@@ -7,6 +7,7 @@ using ECommerce.Data;
 using ECommerce.Entities.Common;
 using ECommerce.Entities.Orders.Contracts;
 using ECommerce.Entities.Orders.Filters;
+using ECommerce.Entities.Users;
 using ECommerce.Options;
 using ECommerce.Shared;
 using ECommerce.Services.Customers;
@@ -15,6 +16,9 @@ using ECommerce.Services.Notifications;
 using ECommerce.Services.Storefront;
 using ECommerce.Services.Company;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+using System.Security.Claims;
+using System.Net.Mail;
 using Microsoft.Extensions.Options;
 using OrderEntity = API.Entities.Orders.Order;
 using OrderStatus = ECommerce.Entities.Orders.OrderStatus;
@@ -25,6 +29,7 @@ public sealed class OrderService(
     ApplicationDbContext context,
     IOptions<CommerceOptions> commerceOptions,
     ICurrentCustomerAccessor currentCustomer,
+    UserManager<User> userManager,
     IDefaultCustomerTypeResolver defaultCustomerType,
     IStoreNotificationService notifications,
     IAdminNotificationService adminNotifications,
@@ -72,6 +77,7 @@ public sealed class OrderService(
         CancellationToken cancellationToken = default)
     {
         ValidateCheckoutRequest(request);
+        var checkoutUser = await EnsureVerifiedCheckoutUserAsync(request.Customer, cancellationToken);
         var currency = await GetCompanyCurrencyAsync(cancellationToken);
 
         var groupedItems = request.Items
@@ -89,8 +95,9 @@ public sealed class OrderService(
 
         try
         {
-            var customer = await UpsertCheckoutCustomerAsync(request.Customer, cancellationToken);
+            var customer = await UpsertCheckoutCustomerAsync(checkoutUser, request.Customer, cancellationToken);
             await context.SaveChangesAsync(cancellationToken);
+            await EnsureCustomerLinkAsync(checkoutUser, customer.Id);
 
             await UpsertDefaultAddressAsync(customer.Id, request.ShippingAddress, cancellationToken);
 
@@ -457,7 +464,7 @@ public sealed class OrderService(
         }
         catch (DbUpdateException exception) when (SqlServerExceptionClassifier.IsUniqueConstraintViolation(
                    exception,
-                   "IX_InventoryTransactions_TenantId_IdempotencyKey"))
+                   "IX_InventoryTransactions_IdempotencyKey"))
         {
             await transaction.RollbackAsync(cancellationToken);
             context.ChangeTracker.Clear();
@@ -574,12 +581,12 @@ public sealed class OrderService(
     public async Task<IReadOnlyCollection<OrderListItemResponse>> GetMyOrdersAsync(
         CancellationToken cancellationToken = default)
     {
-        if (!currentCustomer.CustomerId.HasValue)
-            throw new UnauthorizedAccessException("A customer account is required.");
+        var customerId = await ResolveCurrentCustomerIdAsync(cancellationToken)
+            ?? throw new UnauthorizedAccessException("A customer account is required.");
 
         var rows = await context.Orders
             .AsNoTracking()
-            .Where(order => order.CustomerId == currentCustomer.CustomerId.Value)
+            .Where(order => order.CustomerId == customerId)
             .OrderByDescending(order => order.CreatedAt)
             .Take(100)
             .Select(order => new
@@ -618,8 +625,8 @@ public sealed class OrderService(
         string orderNumber,
         CancellationToken cancellationToken = default)
     {
-        if (!currentCustomer.CustomerId.HasValue)
-            throw new UnauthorizedAccessException("A customer account is required.");
+        var customerId = await ResolveCurrentCustomerIdAsync(cancellationToken)
+            ?? throw new UnauthorizedAccessException("A customer account is required.");
 
         var order = await context.Orders
             .AsNoTracking()
@@ -629,25 +636,108 @@ public sealed class OrderService(
             .Include(item => item.Payments)
             .Include(item => item.StatusHistory)
             .FirstOrDefaultAsync(item =>
-                item.CustomerId == currentCustomer.CustomerId.Value &&
+                item.CustomerId == customerId &&
                 item.OrderNumber == orderNumber.Trim(),
                 cancellationToken);
 
         return order is null ? null : MapDetails(order, []);
     }
 
+    private async Task<User> EnsureVerifiedCheckoutUserAsync(
+        CheckoutCustomerRequest customer,
+        CancellationToken cancellationToken)
+    {
+        if (!currentCustomer.IsAuthenticated || string.IsNullOrWhiteSpace(currentCustomer.UserId))
+            throw new UnauthorizedAccessException("Sign in before placing an order.");
+
+        var user = await userManager.FindByIdAsync(currentCustomer.UserId)
+            ?? throw new UnauthorizedAccessException("Your account could not be found.");
+        if (!user.IsActive)
+            throw new UnauthorizedAccessException("Your account is inactive.");
+
+        var email = NormalizeEmail(customer.Email);
+        var phone = NormalizePhone(customer.Phone);
+        var verifiedEmailMatches = user.EmailConfirmed &&
+            !string.IsNullOrWhiteSpace(user.Email) &&
+            string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase);
+        var verifiedPhoneMatches = user.PhoneNumberConfirmed &&
+            !string.IsNullOrWhiteSpace(user.PhoneNumber) &&
+            string.Equals(NormalizePhone(user.PhoneNumber), phone, StringComparison.Ordinal);
+
+        if (!verifiedEmailMatches && !verifiedPhoneMatches)
+            throw new UnauthorizedAccessException(
+                "Verify the email or phone number used for this order before checkout.");
+        return user;
+    }
+
+
+    private async Task<long?> ResolveCurrentCustomerIdAsync(CancellationToken cancellationToken)
+    {
+        if (currentCustomer.CustomerId.HasValue)
+            return currentCustomer.CustomerId.Value;
+        if (!currentCustomer.IsAuthenticated || string.IsNullOrWhiteSpace(currentCustomer.UserId))
+            return null;
+
+        var user = await userManager.FindByIdAsync(currentCustomer.UserId);
+        return user is null ? null : await GetLinkedCustomerIdAsync(user);
+    }
+
+    private async Task<long?> GetLinkedCustomerIdAsync(User user)
+    {
+        var claims = await userManager.GetClaimsAsync(user);
+        return long.TryParse(
+            claims.FirstOrDefault(claim => claim.Type == AuthClaims.CustomerId)?.Value,
+            out var customerId)
+            ? customerId
+            : null;
+    }
+
+    private async Task EnsureCustomerLinkAsync(User user, long customerId)
+    {
+        var claims = await userManager.GetClaimsAsync(user);
+        var existing = claims.FirstOrDefault(claim => claim.Type == AuthClaims.CustomerId);
+        if (existing?.Value == customerId.ToString()) return;
+        if (existing is not null)
+        {
+            var remove = await userManager.RemoveClaimAsync(user, existing);
+            if (!remove.Succeeded)
+                throw new InvalidOperationException("Could not update the customer account link.");
+        }
+        var add = await userManager.AddClaimAsync(user, new Claim(AuthClaims.CustomerId, customerId.ToString()));
+        if (!add.Succeeded)
+            throw new InvalidOperationException("Could not link the order to your customer account.");
+    }
+
     private async Task<Customer> UpsertCheckoutCustomerAsync(
+        User user,
         CheckoutCustomerRequest request,
         CancellationToken cancellationToken)
     {
         var phone = NormalizePhone(request.Phone);
         var email = NormalizeEmail(request.Email);
-        var customer = currentCustomer.CustomerId.HasValue
-            ? await context.Customers.FirstOrDefaultAsync(
-                item => item.Id == currentCustomer.CustomerId.Value, cancellationToken)
-            : await context.Customers.FirstOrDefaultAsync(
-                item => item.Phone == phone, cancellationToken);
+        var linkedCustomerId = currentCustomer.CustomerId ?? await GetLinkedCustomerIdAsync(user);
+        Customer? customer;
+        if (linkedCustomerId.HasValue)
+        {
+            customer = await context.Customers.FirstOrDefaultAsync(
+                item => item.Id == linkedCustomerId.Value, cancellationToken);
+        }
+        else
+        {
+            var matchingCustomers = await context.Customers
+                .Where(item => item.Phone == phone || (email != null && item.Email == email))
+                .Take(2)
+                .ToListAsync(cancellationToken);
+            if (matchingCustomers.Count > 1)
+                throw new InvalidOperationException(
+                    "The order email and phone belong to different customer records. Ask an administrator to merge them first.");
+            customer = matchingCustomers.SingleOrDefault();
+        }
 
+        if (await context.Customers.AnyAsync(
+                item => item.Phone == phone && (customer == null || item.Id != customer.Id),
+                cancellationToken))
+            throw new InvalidOperationException("This phone number already belongs to another customer.");
         if (email is not null && await context.Customers.AnyAsync(
                 item => item.Email == email && (customer == null || item.Id != customer.Id),
                 cancellationToken))
@@ -669,7 +759,9 @@ public sealed class OrderService(
         {
             customer.FirstName = request.FirstName.Trim();
             customer.LastName = CleanOptional(request.LastName);
+            customer.Phone = phone;
             customer.Email = email ?? customer.Email;
+            customer.UpdatedAt = DateTime.UtcNow;
         }
 
         return customer;
@@ -773,9 +865,8 @@ public sealed class OrderService(
         if (NormalizePhone(request.Customer.Phone).Length < 6)
             throw new ArgumentException("Enter a valid customer phone number.");
 
-        if (!string.IsNullOrWhiteSpace(request.Customer.Email) &&
-            !request.Customer.Email.Contains('@'))
-            throw new ArgumentException("Enter a valid email address.");
+        if (!string.IsNullOrWhiteSpace(request.Customer.Email))
+            _ = NormalizeEmail(request.Customer.Email);
 
         if (string.IsNullOrWhiteSpace(request.ShippingAddress.RecipientName) ||
             string.IsNullOrWhiteSpace(request.ShippingAddress.AddressLine1) ||
@@ -1017,14 +1108,20 @@ public sealed class OrderService(
         new(value.Trim().Where(character =>
             char.IsDigit(character) || character == '+').ToArray());
 
-    private static string? NormalizeEmail(string? value) =>
-        CleanOptional(value)?.ToLowerInvariant();
+    private static string? NormalizeEmail(string? value)
+    {
+        var clean = CleanOptional(value)?.ToLowerInvariant();
+        if (clean is null) return null;
+        if (!MailAddress.TryCreate(clean, out var address) ||
+            !string.Equals(address.Address, clean, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Enter a valid email address.");
+        return address.Address.ToLowerInvariant();
+    }
 
 
     private async Task<string> GetCompanyCurrencyAsync(CancellationToken cancellationToken)
     {
-        var currency = await context.TenantSettings.AsNoTracking()
-            .Where(item => item.TenantId == context.CurrentCompanyId)
+        var currency = await context.CompanySettings.AsNoTracking()
             .Select(item => item.MainCurrencyCode)
             .FirstOrDefaultAsync(cancellationToken);
         return NormalizeCurrency(currency ?? _options.Currency);

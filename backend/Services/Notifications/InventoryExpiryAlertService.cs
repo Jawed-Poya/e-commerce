@@ -1,14 +1,13 @@
+using System.Text.Json;
 using ECommerce.Data;
 using ECommerce.Entities.Notifications;
 using ECommerce.Entities.Notifications.Contracts;
-using ECommerce.Services.Company;
 using Microsoft.EntityFrameworkCore;
 
 namespace ECommerce.Services.Notifications;
 
 public sealed class InventoryExpiryAlertService(
     ApplicationDbContext context,
-    ICompanyContext companyContext,
     AdminNotificationBroker broker,
     ILogger<InventoryExpiryAlertService> logger) : IInventoryExpiryAlertService
 {
@@ -16,16 +15,16 @@ public sealed class InventoryExpiryAlertService(
     private const string LotEntityTypePrefix = EntityTypePrefix + "Lot:";
     private const string ProductEntityTypePrefix = EntityTypePrefix + "Product:";
     private const int MaximumNewAlertsPerRun = 250;
+    private static readonly int[] DefaultPeriods = [30, 14, 7, 3, 1, 0];
 
     public async Task<int> GenerateAsync(CancellationToken cancellationToken = default)
     {
-        var settings = await context.TenantSettings
+        var settings = await context.CompanySettings
             .AsNoTracking()
-            .Where(item => item.TenantId == companyContext.CompanyId)
             .Select(item => new
             {
                 item.ExpiryAlertsEnabled,
-                item.ExpiryAlertLeadDays
+                item.ExpiryAlertPeriodsJson
             })
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -35,12 +34,12 @@ public sealed class InventoryExpiryAlertService(
             return 0;
         }
 
-        var leadDays = Math.Clamp(settings?.ExpiryAlertLeadDays ?? 30, 1, 365);
+        var periods = ParsePeriods(settings?.ExpiryAlertPeriodsJson);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var alertThrough = today.AddDays(leadDays);
+        var alertThrough = today.AddDays(periods.Max());
 
-        var lotEvents = await LoadLotEventsAsync(today, alertThrough, cancellationToken);
-        var productEvents = await LoadProductFallbackEventsAsync(today, alertThrough, cancellationToken);
+        var lotEvents = await LoadLotEventsAsync(today, alertThrough, periods, cancellationToken);
+        var productEvents = await LoadProductFallbackEventsAsync(today, alertThrough, periods, cancellationToken);
         var expiryEvents = lotEvents
             .Concat(productEvents)
             .OrderBy(item => item.ExpiresAt)
@@ -52,6 +51,7 @@ public sealed class InventoryExpiryAlertService(
             .ToHashSet(StringComparer.Ordinal);
 
         var existing = await context.Notifications
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(item =>
                 item.UserId == null &&
@@ -69,13 +69,14 @@ public sealed class InventoryExpiryAlertService(
         if (resolvedIds.Length > 0)
         {
             await context.Notifications
+                .IgnoreQueryFilters()
                 .Where(item => resolvedIds.Contains(item.Id))
                 .ExecuteDeleteAsync(cancellationToken);
         }
 
         // Deleted rows represent alerts an administrator intentionally dismissed.
-        // Keep those keys until retention cleanup so the scanner does not recreate
-        // the same alert every 15 minutes.
+        // Their stage-specific keys remain until retention cleanup, preventing the
+        // same alert from being recreated every scan.
         var existingKeys = existing
             .Where(item =>
                 !resolvedIds.Contains(item.Id) &&
@@ -92,7 +93,6 @@ public sealed class InventoryExpiryAlertService(
 
             pending.Add(new Notification
             {
-                TenantId = expiryEvent.TenantId,
                 BranchId = expiryEvent.BranchId,
                 Title = expiryEvent.Title,
                 Message = expiryEvent.Message,
@@ -116,7 +116,7 @@ public sealed class InventoryExpiryAlertService(
         {
             try
             {
-                broker.Publish(companyContext.CompanyId, Map(notification));
+                broker.Publish(Map(notification));
             }
             catch (Exception exception)
             {
@@ -128,10 +128,9 @@ public sealed class InventoryExpiryAlertService(
         }
 
         logger.LogInformation(
-            "Created {Count} inventory expiry alerts through {AlertThrough} for company {CompanyId}.",
+            "Created {Count} inventory expiry alerts through {AlertThrough}.",
             pending.Count,
-            alertThrough,
-            companyContext.CompanyId);
+            alertThrough);
 
         return pending.Count;
     }
@@ -139,6 +138,7 @@ public sealed class InventoryExpiryAlertService(
     private async Task<IReadOnlyCollection<ExpiryEvent>> LoadLotEventsAsync(
         DateOnly today,
         DateOnly alertThrough,
+        IReadOnlyCollection<int> periods,
         CancellationToken cancellationToken)
     {
         var lots = await context.InventoryLots
@@ -153,7 +153,6 @@ public sealed class InventoryExpiryAlertService(
             .Select(lot => new
             {
                 lot.Id,
-                lot.TenantId,
                 lot.BranchId,
                 lot.Product.Name,
                 lot.Product.Strength,
@@ -166,6 +165,7 @@ public sealed class InventoryExpiryAlertService(
 
         return lots.Select(lot =>
         {
+            var period = ResolvePeriod(lot.ExpiresAt, today, periods);
             var productName = ProductLabel(lot.Name, lot.Strength);
             var lotLabel = string.IsNullOrWhiteSpace(lot.LotNumber)
                 ? $"Lot #{lot.Id}"
@@ -179,8 +179,7 @@ public sealed class InventoryExpiryAlertService(
 
             return new ExpiryEvent(
                 lot.Id,
-                $"{LotEntityTypePrefix}{lot.ExpiresAt:yyyyMMdd}",
-                lot.TenantId,
+                $"{LotEntityTypePrefix}{lot.ExpiresAt:yyyyMMdd}:P{period}",
                 lot.BranchId,
                 lot.ExpiresAt,
                 status.Title,
@@ -191,6 +190,7 @@ public sealed class InventoryExpiryAlertService(
     private async Task<IReadOnlyCollection<ExpiryEvent>> LoadProductFallbackEventsAsync(
         DateOnly today,
         DateOnly alertThrough,
+        IReadOnlyCollection<int> periods,
         CancellationToken cancellationToken)
     {
         var products = await context.ProductInventories
@@ -208,7 +208,6 @@ public sealed class InventoryExpiryAlertService(
             .Select(inventory => new
             {
                 inventory.ProductId,
-                inventory.TenantId,
                 inventory.BranchId,
                 inventory.Product.Name,
                 inventory.Product.Strength,
@@ -219,6 +218,7 @@ public sealed class InventoryExpiryAlertService(
 
         return products.Select(product =>
         {
+            var period = ResolvePeriod(product.ExpiresAt, today, periods);
             var productName = ProductLabel(product.Name, product.Strength);
             var status = BuildStatus(
                 productName,
@@ -229,8 +229,7 @@ public sealed class InventoryExpiryAlertService(
 
             return new ExpiryEvent(
                 product.ProductId,
-                $"{ProductEntityTypePrefix}{product.ExpiresAt:yyyyMMdd}",
-                product.TenantId,
+                $"{ProductEntityTypePrefix}{product.ExpiresAt:yyyyMMdd}:P{period}",
                 product.BranchId,
                 product.ExpiresAt,
                 status.Title,
@@ -246,6 +245,35 @@ public sealed class InventoryExpiryAlertService(
                 item.EntityType != null &&
                 item.EntityType.StartsWith(EntityTypePrefix))
             .ExecuteDeleteAsync(cancellationToken);
+
+    private static int ResolvePeriod(
+        DateOnly expiresAt,
+        DateOnly today,
+        IReadOnlyCollection<int> periods)
+    {
+        var remaining = Math.Max(0, expiresAt.DayNumber - today.DayNumber);
+        return periods.OrderBy(value => value).First(value => value >= remaining);
+    }
+
+    private static int[] ParsePeriods(string? json)
+    {
+        try
+        {
+            var values = JsonSerializer.Deserialize<int[]>(json ?? string.Empty) ?? [];
+            var normalized = values
+                .Where(value => value is >= 0 and <= 365)
+                .Append(0)
+                .Distinct()
+                .OrderByDescending(value => value)
+                .Take(12)
+                .ToArray();
+            return normalized.Length == 0 ? DefaultPeriods : normalized;
+        }
+        catch (JsonException)
+        {
+            return DefaultPeriods;
+        }
+    }
 
     private static (string Title, string Message) BuildStatus(
         string productName,
@@ -293,7 +321,6 @@ public sealed class InventoryExpiryAlertService(
     private sealed record ExpiryEvent(
         long EntityId,
         string EntityType,
-        long TenantId,
         long? BranchId,
         DateOnly ExpiresAt,
         string Title,
@@ -327,8 +354,6 @@ public sealed class InventoryExpiryAlertHostedService(
         try
         {
             await using var scope = scopeFactory.CreateAsyncScope();
-            var companyContext = scope.ServiceProvider.GetRequiredService<CompanyContext>();
-            companyContext.Initialize();
             var service = scope.ServiceProvider.GetRequiredService<IInventoryExpiryAlertService>();
             await service.GenerateAsync(cancellationToken);
         }

@@ -13,7 +13,7 @@ import {
     Sparkles,
     UserRound,
 } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { useCompany } from "../company/company-context";
@@ -22,6 +22,7 @@ import { Button } from "../../shared/components/ui/button";
 import { cn } from "../../shared/lib/utils";
 import { useAuth } from "./auth-context";
 import { useI18n } from "../../i18n/i18n-provider";
+import { GoogleSignInButton } from "./google-sign-in-button";
 
 export function AuthPage() {
     const auth = useAuth();
@@ -41,8 +42,6 @@ export function AuthPage() {
         identifier: "",
         password: "",
     });
-
-    if (auth.isAuthenticated) return <Navigate to="/account" replace />;
 
     const update = (field: keyof typeof form, value: string) => {
         setForm((current) => ({ ...current, [field]: value }));
@@ -82,6 +81,22 @@ export function AuthPage() {
             setSubmitting(false);
         }
     };
+
+    const handleGoogleCredential = useCallback(async (credential: string) => {
+        setSubmitting(true);
+        setError(null);
+        try {
+            await auth.googleSignIn(credential);
+            const from = (location.state as { from?: string } | null)?.from;
+            navigate(from || "/account", { replace: true, viewTransition: true });
+        } catch (requestError) {
+            setError(requestError instanceof ApiError ? requestError.message : t("auth.requestError"));
+        } finally {
+            setSubmitting(false);
+        }
+    }, [auth, location.state, navigate, t]);
+
+    if (auth.isAuthenticated) return <Navigate to="/account" replace />;
 
     const logo = imageUrl(company?.logoUrl);
     const companyName = company?.name ?? "EasyCart";
@@ -176,7 +191,16 @@ export function AuthPage() {
                             </p>
                         </div>
 
-                        <form onSubmit={submit} className="mt-8 grid gap-4">
+                        <div className="mt-7">
+                            <GoogleSignInButton onCredential={handleGoogleCredential} disabled={submitting} />
+                            <div className="my-5 flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                                <span className="h-px flex-1 bg-border" />
+                                {t("auth.orContinueWithPassword")}
+                                <span className="h-px flex-1 bg-border" />
+                            </div>
+                        </div>
+
+                        <form onSubmit={submit} className="grid gap-4">
                             {mode === "register" ? (
                                 <>
                                     <div className="grid gap-4 sm:grid-cols-2">

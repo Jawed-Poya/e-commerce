@@ -46,6 +46,7 @@ export default function CompanySettingsPage() {
     const [branchDialog, setBranchDialog] = useState(false);
     const [editingBranch, setEditingBranch] = useState<CompanyBranch | null>(null);
     const [branch, setBranch] = useState<UpsertCompanyBranch>(emptyBranch);
+    const [expiryPeriodInput, setExpiryPeriodInput] = useState("30");
 
     useEffect(() => {
         if (!profileQuery.data) return;
@@ -169,6 +170,24 @@ export default function CompanySettingsPage() {
             ? `${previewMoney} ${settings.currencySymbol || settings.mainCurrencyCode}`
             : `${settings.currencySymbol || settings.mainCurrencyCode} ${previewMoney}`
         : formatMoney(123456.78);
+
+    const addExpiryPeriod = () => {
+        if (!settings) return;
+        const value = clampExpiryPeriod(expiryPeriodInput);
+        const periods = [...new Set([...settings.expiryAlertPeriods, value, 0])]
+            .sort((a, b) => b - a)
+            .slice(0, 12);
+        setSettings({ ...settings, expiryAlertPeriods: periods });
+        setExpiryPeriodInput("");
+    };
+
+    const removeExpiryPeriod = (value: number) => {
+        if (!settings || value === 0) return;
+        setSettings({
+            ...settings,
+            expiryAlertPeriods: settings.expiryAlertPeriods.filter((period) => period !== value),
+        });
+    };
 
     const previewExpiryAlertSound = async () => {
         if (!settings) return;
@@ -431,22 +450,44 @@ export default function CompanySettingsPage() {
                                     checked={settings.expiryAlertsEnabled}
                                     onCheckedChange={(checked) => setSettings({ ...settings, expiryAlertsEnabled: checked })}
                                 />
-                                <Field label="Alert lead time">
-                                    <div className="flex items-center gap-2">
+                                <div className="space-y-3 lg:col-span-2">
+                                    <div>
+                                        <Label>Expiry alert periods</Label>
+                                        <p className="mt-1 text-xs text-muted-foreground">Add the exact days before expiry when a new alert should fire. Day 0 is the expiry date and cannot be removed.</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {settings.expiryAlertPeriods.map((period) => (
+                                            <Badge key={period} variant="secondary" className="gap-1.5 px-3 py-1.5">
+                                                {period === 0 ? "Expiry day" : `${period} day${period === 1 ? "" : "s"} before`}
+                                                {period !== 0 ? (
+                                                    <button type="button" disabled={!settings.expiryAlertsEnabled} onClick={() => removeExpiryPeriod(period)} aria-label={`Remove ${period}-day alert`} className="rounded-full p-0.5 hover:bg-background">
+                                                        <X className="size-3" />
+                                                    </button>
+                                                ) : null}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                    <div className="flex max-w-md gap-2">
                                         <Input
                                             type="number"
-                                            min={1}
+                                            min={0}
                                             max={365}
-                                            value={settings.expiryAlertLeadDays}
-                                            disabled={!settings.expiryAlertsEnabled}
-                                            onChange={(event) => setSettings({
-                                                ...settings,
-                                                expiryAlertLeadDays: clampExpiryLeadDays(event.target.value),
-                                            })}
+                                            value={expiryPeriodInput}
+                                            disabled={!settings.expiryAlertsEnabled || settings.expiryAlertPeriods.length >= 12}
+                                            onChange={(event) => setExpiryPeriodInput(event.target.value)}
+                                            onKeyDown={(event) => {
+                                                if (event.key === "Enter") {
+                                                    event.preventDefault();
+                                                    addExpiryPeriod();
+                                                }
+                                            }}
+                                            placeholder="Example: 60"
                                         />
-                                        <span className="shrink-0 text-xs font-medium text-muted-foreground">days before expiry</span>
+                                        <Button type="button" variant="outline" disabled={!settings.expiryAlertsEnabled || !expiryPeriodInput.trim() || settings.expiryAlertPeriods.length >= 12} onClick={addExpiryPeriod}>
+                                            <Plus /> Add period
+                                        </Button>
                                     </div>
-                                </Field>
+                                </div>
                                 <Toggle
                                     label="Play danger sound"
                                     description="Play one warning sound when new unread expiry alerts arrive."
@@ -458,7 +499,10 @@ export default function CompanySettingsPage() {
                                         <SimpleCombobox
                                             value={settings.expiryAlertSound}
                                             disabled={!settings.expiryAlertSoundEnabled}
-                                            onValueChange={(value) => value && setSettings({ ...settings, expiryAlertSound: value })}
+                                            onValueChange={(value) => value && setSettings({
+                                                ...settings,
+                                                expiryAlertSound: value as CompanySettings["expiryAlertSound"],
+                                            })}
                                             options={[...expiryAlertSounds]}
                                             placeholder="Select warning sound"
                                         />
@@ -654,10 +698,10 @@ function clampLineLimit(value: string) {
     return Math.max(1, Math.min(parsed, 500));
 }
 
-function clampExpiryLeadDays(value: string) {
+function clampExpiryPeriod(value: string) {
     const parsed = Number.parseInt(value, 10);
-    if (!Number.isFinite(parsed)) return 1;
-    return Math.max(1, Math.min(parsed, 365));
+    if (!Number.isFinite(parsed)) return 0;
+    return Math.max(0, Math.min(parsed, 365));
 }
 
 function nullable(value: string) {

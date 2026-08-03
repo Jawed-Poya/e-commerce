@@ -1,15 +1,20 @@
+using System.Text.Json;
 using ECommerce.Data;
 using ECommerce.Dtos.Company;
-using ECommerce.Entities.Tenancy;
+using ECommerce.Entities.Company;
 using Microsoft.EntityFrameworkCore;
 
 namespace ECommerce.Services.Company;
 
-public sealed class CompanyService(ApplicationDbContext context, ICompanyContext companyContext) : ICompanyService
+public sealed class CompanyService(ApplicationDbContext context) : ICompanyService
 {
+    private static readonly int[] DefaultExpiryPeriods = [30, 14, 7, 3, 1, 0];
+
     public async Task<PublicCompanyProfileResponse> GetPublicProfileAsync(CancellationToken cancellationToken = default)
     {
-        var company = await LoadAsync(cancellationToken);
+        var company = await LoadCompanyAsync(false, cancellationToken);
+        var branches = await LoadBranchesAsync(true, cancellationToken);
+        var settings = await LoadSettingsAsync(false, cancellationToken) ?? DefaultSettings();
         return new PublicCompanyProfileResponse(
             company.Id,
             company.Name,
@@ -19,24 +24,18 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
             company.Address,
             company.LogoUrl,
             company.FaviconUrl,
-            company.Branches
-                .Where(item => item.IsActive)
-                .OrderByDescending(item => item.IsMain)
-                .ThenBy(item => item.Name)
-                .Select(Map)
-                .ToArray(),
-            Map(company.Setting ?? DefaultSettings(company.Id)));
+            branches.Select(Map).ToArray(),
+            Map(settings));
     }
 
     public async Task<CompanyProfileResponse> GetProfileAsync(CancellationToken cancellationToken = default) =>
-        Map(await LoadAsync(cancellationToken));
+        await BuildProfileAsync(false, cancellationToken);
 
     public async Task<CompanyProfileResponse> UpdateProfileAsync(
         UpdateCompanyProfileRequest request,
         CancellationToken cancellationToken = default)
     {
-        var company = await LoadTrackedAsync(cancellationToken);
-
+        var company = await LoadCompanyAsync(true, cancellationToken);
         company.Name = Required(request.Name, "Company name");
         company.LegalName = Clean(request.LegalName);
         company.RegistrationNumber = Clean(request.RegistrationNumber);
@@ -47,21 +46,19 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
         company.FaviconUrl = Clean(request.FaviconUrl);
         company.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync(cancellationToken);
-        return Map(company);
+        return await BuildProfileAsync(false, cancellationToken);
     }
 
     public async Task<CompanyProfileResponse> UpdateSettingsAsync(
         UpdateCompanySettingsRequest request,
         CancellationToken cancellationToken = default)
     {
-        ValidateSettings(request);
-        var company = await LoadTrackedAsync(cancellationToken);
-        var settings = company.Setting;
+        var periods = ValidateSettings(request);
+        var settings = await LoadSettingsAsync(true, cancellationToken);
         if (settings is null)
         {
-            settings = DefaultSettings(company.Id);
-            company.Setting = settings;
-            context.TenantSettings.Add(settings);
+            settings = DefaultSettings();
+            context.CompanySettings.Add(settings);
         }
 
         settings.MainCurrencyCode = Required(request.MainCurrencyCode, "Currency code").ToUpperInvariant();
@@ -79,35 +76,32 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
         settings.TrashRetentionDays = request.TrashRetentionDays;
         settings.NotificationRetentionDays = request.NotificationRetentionDays;
         settings.ExpiryAlertsEnabled = request.ExpiryAlertsEnabled;
-        settings.ExpiryAlertLeadDays = request.ExpiryAlertLeadDays;
+        settings.ExpiryAlertPeriodsJson = JsonSerializer.Serialize(periods);
         settings.ExpiryAlertSoundEnabled = request.ExpiryAlertSoundEnabled;
         settings.ExpiryAlertSound = Required(request.ExpiryAlertSound, "Expiry alert sound").ToLowerInvariant();
-        settings.AllowTenantUserClaimManagement = request.AllowUserClaimManagement;
+        settings.AllowUserClaimManagement = request.AllowUserClaimManagement;
         settings.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync(cancellationToken);
-        return Map(company);
+        return await BuildProfileAsync(false, cancellationToken);
     }
-
 
     public async Task<CompanyProfileResponse> UpdateOperationLimitsAsync(
         UpdateOperationLimitsRequest request,
         CancellationToken cancellationToken = default)
     {
         ValidateOperationLimits(request);
-        var company = await LoadTrackedAsync(cancellationToken);
-        var settings = company.Setting;
+        var settings = await LoadSettingsAsync(true, cancellationToken);
         if (settings is null)
         {
-            settings = DefaultSettings(company.Id);
-            company.Setting = settings;
-            context.TenantSettings.Add(settings);
+            settings = DefaultSettings();
+            context.CompanySettings.Add(settings);
         }
 
         settings.MaximumPurchaseLines = request.MaximumPurchaseLines;
         settings.MaximumManualSaleLines = request.MaximumManualSaleLines;
         settings.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync(cancellationToken);
-        return Map(company);
+        return await BuildProfileAsync(false, cancellationToken);
     }
 
     public async Task<CompanyBranchResponse> CreateBranchAsync(
@@ -116,20 +110,17 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
     {
         ValidateBranch(request);
         var code = request.Code.Trim().ToUpperInvariant();
-        if (await context.Branches.AnyAsync(
-                item => item.TenantId == companyContext.CompanyId && item.Code == code,
-                cancellationToken))
+        if (await context.Branches.AnyAsync(item => item.Code == code, cancellationToken))
             throw new InvalidOperationException("A branch with this code already exists.");
         if (request.IsMain)
-            await context.Branches
-                .Where(item => item.TenantId == companyContext.CompanyId)
-                .ExecuteUpdateAsync(
-                    setters => setters.SetProperty(item => item.IsMain, false),
-                    cancellationToken);
+        {
+            await context.Branches.ExecuteUpdateAsync(
+                setters => setters.SetProperty(item => item.IsMain, false),
+                cancellationToken);
+        }
 
         var branch = new Branch
         {
-            TenantId = companyContext.CompanyId,
             Name = request.Name.Trim(),
             Code = code,
             Phone = Clean(request.Phone),
@@ -148,26 +139,23 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
         CancellationToken cancellationToken = default)
     {
         ValidateBranch(request);
-        var branch = await context.Branches.SingleOrDefaultAsync(
-                item => item.Id == id && item.TenantId == companyContext.CompanyId,
-                cancellationToken)
+        var branch = await context.Branches.SingleOrDefaultAsync(item => item.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Branch was not found.");
         var code = request.Code.Trim().ToUpperInvariant();
-        if (await context.Branches.AnyAsync(
-                item => item.TenantId == companyContext.CompanyId &&
-                    item.Id != id && item.Code == code,
-                cancellationToken))
+        if (await context.Branches.AnyAsync(item => item.Id != id && item.Code == code, cancellationToken))
             throw new InvalidOperationException("A branch with this code already exists.");
         if (branch.IsMain && !request.IsActive)
             throw new ArgumentException("The main branch must remain active.");
         if (branch.IsMain && !request.IsMain)
             throw new ArgumentException("Assign another branch as main before changing the current main branch.");
         if (request.IsMain)
+        {
             await context.Branches
-                .Where(item => item.TenantId == companyContext.CompanyId && item.Id != id)
+                .Where(item => item.Id != id)
                 .ExecuteUpdateAsync(
                     setters => setters.SetProperty(item => item.IsMain, false),
                     cancellationToken);
+        }
 
         branch.Name = request.Name.Trim();
         branch.Code = code;
@@ -180,37 +168,56 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
         return Map(branch);
     }
 
-    private async Task<Tenant> LoadAsync(CancellationToken cancellationToken) =>
-        await context.Tenants.AsNoTracking()
-            .Include(item => item.Setting)
-            .Include(item => item.Branches)
-            .SingleOrDefaultAsync(item => item.Id == companyContext.CompanyId, cancellationToken)
-            ?? throw new KeyNotFoundException("Company profile was not found.");
+    private async Task<CompanyProfileResponse> BuildProfileAsync(
+        bool tracked,
+        CancellationToken cancellationToken)
+    {
+        var company = await LoadCompanyAsync(tracked, cancellationToken);
+        var branches = await LoadBranchesAsync(false, cancellationToken);
+        var settings = await LoadSettingsAsync(tracked, cancellationToken) ?? DefaultSettings();
+        return new CompanyProfileResponse(
+            company.Id,
+            company.Name,
+            company.LegalName,
+            company.RegistrationNumber,
+            company.Email,
+            company.Phone,
+            company.Address,
+            company.LogoUrl,
+            company.FaviconUrl,
+            branches.Select(Map).ToArray(),
+            Map(settings));
+    }
 
-    private async Task<Tenant> LoadTrackedAsync(CancellationToken cancellationToken) =>
-        await context.Tenants
-            .Include(item => item.Setting)
-            .Include(item => item.Branches)
-            .SingleOrDefaultAsync(item => item.Id == companyContext.CompanyId, cancellationToken)
+    private async Task<Company> LoadCompanyAsync(bool tracked, CancellationToken cancellationToken)
+    {
+        var query = tracked ? context.Companies : context.Companies.AsNoTracking();
+        return await query.SingleOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException("Company profile was not found.");
+    }
 
-    private static CompanyProfileResponse Map(Tenant company) => new(
-        company.Id,
-        company.Name,
-        company.LegalName,
-        company.RegistrationNumber,
-        company.Email,
-        company.Phone,
-        company.Address,
-        company.LogoUrl,
-        company.FaviconUrl,
-        company.Branches.OrderByDescending(item => item.IsMain).ThenBy(item => item.Name).Select(Map).ToArray(),
-        Map(company.Setting ?? DefaultSettings(company.Id)));
+    private async Task<CompanySetting?> LoadSettingsAsync(bool tracked, CancellationToken cancellationToken)
+    {
+        var query = tracked ? context.CompanySettings : context.CompanySettings.AsNoTracking();
+        return await query.SingleOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<IReadOnlyCollection<Branch>> LoadBranchesAsync(
+        bool activeOnly,
+        CancellationToken cancellationToken)
+    {
+        var query = context.Branches.AsNoTracking();
+        if (activeOnly) query = query.Where(item => item.IsActive);
+        return await query
+            .OrderByDescending(item => item.IsMain)
+            .ThenBy(item => item.Name)
+            .ToArrayAsync(cancellationToken);
+    }
 
     private static CompanyBranchResponse Map(Branch branch) => new(
         branch.Id, branch.Name, branch.Code, branch.Phone, branch.Address, branch.IsMain, branch.IsActive);
 
-    private static CompanySettingsResponse Map(TenantSetting settings) => new(
+    private static CompanySettingsResponse Map(CompanySetting settings) => new(
         settings.MainCurrencyCode,
         settings.CurrencySymbol,
         settings.CurrencyPosition,
@@ -226,14 +233,38 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
         settings.TrashRetentionDays,
         settings.NotificationRetentionDays,
         settings.ExpiryAlertsEnabled,
-        settings.ExpiryAlertLeadDays,
+        ParseExpiryPeriods(settings.ExpiryAlertPeriodsJson),
         settings.ExpiryAlertSoundEnabled,
         settings.ExpiryAlertSound,
         settings.MaximumPurchaseLines,
         settings.MaximumManualSaleLines,
-        settings.AllowTenantUserClaimManagement);
+        settings.AllowUserClaimManagement);
 
-    private static TenantSetting DefaultSettings(long companyId) => new() { TenantId = companyId };
+    private static CompanySetting DefaultSettings() => new();
+
+    private static int[] ParseExpiryPeriods(string? json)
+    {
+        try
+        {
+            return NormalizeExpiryPeriods(JsonSerializer.Deserialize<int[]>(json ?? string.Empty));
+        }
+        catch (JsonException)
+        {
+            return DefaultExpiryPeriods;
+        }
+    }
+
+    private static int[] NormalizeExpiryPeriods(IEnumerable<int>? values)
+    {
+        var normalized = (values ?? DefaultExpiryPeriods)
+            .Where(value => value is >= 0 and <= 365)
+            .Append(0)
+            .Distinct()
+            .OrderByDescending(value => value)
+            .Take(12)
+            .ToArray();
+        return normalized.Length == 0 ? DefaultExpiryPeriods : normalized;
+    }
 
     private static void ValidateBranch(UpsertCompanyBranchRequest request)
     {
@@ -243,7 +274,7 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
             throw new ArgumentException("The main branch must remain active.");
     }
 
-    private static void ValidateSettings(UpdateCompanySettingsRequest request)
+    private static int[] ValidateSettings(UpdateCompanySettingsRequest request)
     {
         var currency = Required(request.MainCurrencyCode, "Currency code");
         if (currency.Length != 3 || !currency.All(char.IsLetter))
@@ -261,13 +292,15 @@ public sealed class CompanyService(ApplicationDbContext context, ICompanyContext
             throw new ArgumentException("Base font size must be between 12 and 22.");
         if (request.TrashRetentionDays is < 1 or > 3650 || request.NotificationRetentionDays is < 1 or > 3650)
             throw new ArgumentException("Retention days must be between 1 and 3650.");
-        if (request.ExpiryAlertLeadDays is < 1 or > 365)
-            throw new ArgumentException("Expiry alert lead days must be between 1 and 365.");
+        var requestedPeriods = request.ExpiryAlertPeriods?.Where(value => value is >= 0 and <= 365).Distinct().ToArray();
+        if (requestedPeriods is { Length: > 12 })
+            throw new ArgumentException("Configure no more than 12 expiry alert periods.");
+        var periods = NormalizeExpiryPeriods(requestedPeriods);
         var expirySound = Required(request.ExpiryAlertSound, "Expiry alert sound").ToLowerInvariant();
         if (expirySound is not ("critical-pulse" or "urgent-alarm" or "warning-chime"))
             throw new ArgumentException("Expiry alert sound is not supported.");
+        return periods;
     }
-
 
     private static void ValidateOperationLimits(UpdateOperationLimitsRequest request)
     {

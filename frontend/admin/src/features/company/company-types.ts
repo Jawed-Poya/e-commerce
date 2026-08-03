@@ -19,7 +19,7 @@ export interface CompanySettings {
     trashRetentionDays: number;
     notificationRetentionDays: number;
     expiryAlertsEnabled: boolean;
-    expiryAlertLeadDays: number;
+    expiryAlertPeriods: number[];
     expiryAlertSoundEnabled: boolean;
     expiryAlertSound: ExpiryAlertSound;
     maximumPurchaseLines: number;

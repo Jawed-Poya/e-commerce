@@ -45,11 +45,11 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             "CK_Product_DisplayStockQuantity",
             "[DisplayStockQuantity] IS NULL OR [DisplayStockQuantity] >= 0"));
 
-        builder.HasIndex(x => new { x.TenantId, x.Barcode })
+        builder.HasIndex(x => x.Barcode)
             .IsUnique()
             .HasFilter("[Barcode] IS NOT NULL");
 
-        builder.HasIndex(x => new { x.TenantId, x.Slug })
+        builder.HasIndex(x => x.Slug)
             .IsUnique()
             .HasFilter("[Slug] IS NOT NULL");
 

@@ -13,7 +13,7 @@ public sealed class ActivityAuditMiddleware(
     ActivityLogQueue queue,
     ILogger<ActivityAuditMiddleware> logger)
 {
-    public async Task InvokeAsync(HttpContext httpContext, ICompanyContext companyContext)
+    public async Task InvokeAsync(HttpContext httpContext, IBranchContext branchContext)
     {
         if (!ShouldAudit(httpContext))
         {
@@ -50,8 +50,7 @@ public sealed class ActivityAuditMiddleware(
 
             var activity = new ActivityLog
             {
-                TenantId = companyContext.CompanyId,
-                BranchId = companyContext.BranchId,
+                BranchId = branchContext.BranchId,
                 UserId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
                     ?? httpContext.User.FindFirstValue("sub"),
                 UserName = httpContext.User.FindFirstValue(ClaimTypes.Name)

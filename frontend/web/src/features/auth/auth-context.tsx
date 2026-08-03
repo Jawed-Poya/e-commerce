@@ -11,7 +11,7 @@ import {
 
 import { clearStorefrontPwaPrivateCaches } from "../../app/register-service-worker";
 import { ApiError, customerTokenKey } from "../../shared/api/api-client";
-import { getCurrentCustomer, loginCustomer, registerCustomer } from "./auth-api";
+import { getCurrentCustomer, loginCustomer, registerCustomer, signInWithGoogle } from "./auth-api";
 import type {
     AuthResponse,
     AuthUser,
@@ -27,6 +27,7 @@ type AuthContextValue = {
     loading: boolean;
     login: (request: LoginRequest) => Promise<void>;
     register: (request: RegisterRequest) => Promise<void>;
+    googleSignIn: (credential: string) => Promise<void>;
     logout: () => void;
     refresh: () => Promise<void>;
 };
@@ -113,6 +114,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
             loading,
             login: async (request) => save(await loginCustomer(request)),
             register: async (request) => save(await registerCustomer(request)),
+            googleSignIn: async (credential) => save(await signInWithGoogle(credential)),
             logout,
             refresh,
         }),

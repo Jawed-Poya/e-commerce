@@ -1,6 +1,7 @@
 using ECommerce.Entities;
 using ECommerce.Entities.Users.Contracts;
 using ECommerce.Services.Auth;
+using ECommerce.Services.Auth.Verification;
 using ECommerce.Services.Auditing;
 using ECommerce.Shared;
 using Microsoft.AspNetCore.Authorization;
@@ -10,7 +11,10 @@ namespace ECommerce.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public sealed class AuthController(IAuthService auth, IAuditLogService audit) : ControllerBase
+public sealed class AuthController(
+    IAuthService auth,
+    IAccountVerificationService verification,
+    IAuditLogService audit) : ControllerBase
 {
     [HttpPost("customer/register")]
     public async Task<ActionResult<ApiResponse<AuthResponse>>> RegisterCustomer(
@@ -62,6 +66,91 @@ public sealed class AuthController(IAuthService auth, IAuditLogService audit) : 
         catch (InvalidOperationException exception)
         {
             return Unauthorized(ApiResponse<object>.Fail(exception.Message));
+        }
+    }
+
+
+    [HttpPost("customer/google")]
+    public async Task<ActionResult<ApiResponse<AuthResponse>>> SignInWithGoogle(
+        GoogleSignInRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await auth.SignInWithGoogleAsync(request, cancellationToken);
+            await audit.RecordAuthenticationAsync(
+                response.User.UserId,
+                response.User.FullName,
+                response.User.CustomerId,
+                ActivityAction.Login,
+                "Google storefront sign-in",
+                HttpContext,
+                CancellationToken.None);
+            return Ok(ApiResponse<AuthResponse>.Ok(response, "Google sign-in successful."));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Fail(exception.Message));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Unauthorized(ApiResponse<object>.Fail(exception.Message));
+        }
+    }
+
+    [Authorize]
+    [HttpPost("verification/send")]
+    public async Task<ActionResult<ApiResponse<VerificationDispatchResponse>>> SendVerification(
+        VerificationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!Enum.IsDefined(request.Channel))
+            return BadRequest(ApiResponse<object>.Fail("Select a valid verification channel."));
+
+        try
+        {
+            var result = await verification.SendAsync(request.Channel, cancellationToken);
+            return Ok(ApiResponse<VerificationDispatchResponse>.Ok(result, result.AlreadyVerified
+                ? "This contact is already verified."
+                : "Verification code sent."));
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return Unauthorized(ApiResponse<object>.Fail(exception.Message));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
+        }
+    }
+
+    [Authorize]
+    [HttpPost("verification/confirm")]
+    public async Task<ActionResult<ApiResponse<AuthUserResponse>>> ConfirmVerification(
+        ConfirmVerificationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!Enum.IsDefined(request.Channel))
+            return BadRequest(ApiResponse<object>.Fail("Select a valid verification channel."));
+        if (string.IsNullOrWhiteSpace(request.Code))
+            return BadRequest(ApiResponse<object>.Fail("Verification code is required."));
+
+        try
+        {
+            var result = await verification.ConfirmAsync(request.Channel, request.Code, cancellationToken);
+            return Ok(ApiResponse<AuthUserResponse>.Ok(result, "Contact verified successfully."));
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return Unauthorized(ApiResponse<object>.Fail(exception.Message));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
         }
     }
 

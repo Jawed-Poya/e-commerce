@@ -5,7 +5,7 @@ using ECommerce.Entities.Common;
 using ECommerce.Entities.Users;
 using ECommerce.Entities.Operations;
 using ECommerce.Entities.Products;
-using ECommerce.Entities.Tenancy;
+using ECommerce.Entities.Company;
 using ECommerce.Options;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -26,11 +26,11 @@ public static class DatabaseInitializer
         var company = await EnsureCompanyAsync(context);
         await EnsureRolesAsync(services);
         await EnsureAdminPermissionsAsync(services);
-        await EnsureStoreOperatorRoleAsync(services, company.Company.Id);
-        await EnsureDefaultCustomerTypesAsync(context, company.Company.Id, company.MainBranch.Id);
-        await EnsureDefaultProductUnitsAsync(context, company.Company.Id, company.MainBranch.Id);
-        await EnsureOperationDefaultsAsync(context, company.Company.Id, company.MainBranch.Id);
-        await EnsureAdminAsync(services, company.Company.Id, company.MainBranch.Id);
+        await EnsureStoreOperatorRoleAsync(services);
+        await EnsureDefaultCustomerTypesAsync(context, company.MainBranch.Id);
+        await EnsureDefaultProductUnitsAsync(context, company.MainBranch.Id);
+        await EnsureOperationDefaultsAsync(context, company.MainBranch.Id);
+        await EnsureAdminAsync(services, company.MainBranch.Id);
         await EnsureSafeIdentityUserNamesAsync(services);
     }
 
@@ -112,58 +112,35 @@ END;
     }
 
 
-    private sealed record DefaultCompany(Tenant Company, Branch MainBranch);
+    private sealed record DefaultCompany(Company Company, Branch MainBranch);
 
     private static async Task<DefaultCompany> EnsureCompanyAsync(ApplicationDbContext context)
     {
-        // Tenant is the retained legacy table name. Runtime behavior is strictly
-        // single-company and always uses the reserved row with id 1.
-        var company = await context.Tenants
-            .OrderBy(item => item.Id)
-            .FirstOrDefaultAsync();
-
+        var company = await context.Companies.SingleOrDefaultAsync();
         if (company is null)
         {
-            company = new Tenant
+            company = new Company
             {
                 Name = "Default Company",
-                Slug = "company",
                 LegalName = "Default Company",
                 IsActive = true
             };
-            context.Tenants.Add(company);
-            await context.SaveChangesAsync();
+            context.Companies.Add(company);
         }
         else
         {
             company.IsActive = true;
-            company.Slug = "company";
-            await context.SaveChangesAsync();
+            company.UpdatedAt = DateTime.UtcNow;
         }
 
-        if (company.Id != ECommerce.Services.Company.CompanyContext.SingleCompanyId)
-            throw new InvalidOperationException(
-                "The single-company compatibility row must use id 1. Back up and normalize the legacy company row before starting the API.");
-
-        // Preserve old portal records for recovery, but prevent them from behaving
-        // as active companies in the refactored single-company application.
-        await context.Tenants
-            .Where(item => item.Id != company.Id && item.IsActive)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(item => item.IsActive, false)
-                .SetProperty(item => item.UpdatedAt, DateTime.UtcNow));
-
         var branch = await context.Branches
-            .Where(item => item.TenantId == company.Id)
             .OrderByDescending(item => item.IsMain)
             .ThenBy(item => item.Id)
             .FirstOrDefaultAsync();
-
         if (branch is null)
         {
             branch = new Branch
             {
-                TenantId = company.Id,
                 Name = "Main Branch",
                 Code = "MAIN",
                 IsMain = true,
@@ -176,12 +153,12 @@ END;
             branch.IsMain = true;
             branch.IsActive = true;
             await context.Branches
-                .Where(item => item.TenantId == company.Id && item.Id != branch.Id && item.IsMain)
+                .Where(item => item.Id != branch.Id && item.IsMain)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.IsMain, false));
         }
 
-        if (!await context.TenantSettings.AnyAsync(item => item.TenantId == company.Id))
-            context.TenantSettings.Add(new TenantSetting { TenantId = company.Id });
+        if (!await context.CompanySettings.AnyAsync())
+            context.CompanySettings.Add(new CompanySetting());
 
         await context.SaveChangesAsync();
         return new DefaultCompany(company, branch);
@@ -190,25 +167,18 @@ END;
     private static async Task EnsureRolesAsync(IServiceProvider services)
     {
         var roleManager = services.GetRequiredService<RoleManager<Role>>();
-
         foreach (var roleName in new[] { AppRoles.Admin, AppRoles.Customer })
         {
-            var existingRole = await roleManager.FindByNameAsync(roleName);
-            if (existingRole is not null)
+            if (await roleManager.FindByNameAsync(roleName) is not null)
                 continue;
 
-            var roleResult = await roleManager.CreateAsync(new Role
-            {
-                Name = roleName,
-                Description = $"{roleName} application role"
-            });
-
-            if (!roleResult.Succeeded)
-            {
-                throw new InvalidOperationException(
-                    $"Could not create role '{roleName}': " +
-                    string.Join(" ", roleResult.Errors.Select(error => error.Description)));
-            }
+            EnsureSucceeded(
+                await roleManager.CreateAsync(new Role
+                {
+                    Name = roleName,
+                    Description = $"{roleName} application role"
+                }),
+                $"Could not create role '{roleName}'.");
         }
     }
 
@@ -217,54 +187,31 @@ END;
         var roleManager = services.GetRequiredService<RoleManager<Role>>();
         var adminRole = await roleManager.FindByNameAsync(AppRoles.Admin)
             ?? throw new InvalidOperationException("Admin role is missing.");
-
         var existing = (await roleManager.GetClaimsAsync(adminRole))
             .Where(claim => claim.Type == AuthClaims.Permission)
             .Select(claim => claim.Value)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         foreach (var permission in AppPermissions.All.Where(permission => !existing.Contains(permission)))
-        {
-            var result = await roleManager.AddClaimAsync(
-                adminRole,
-                new Claim(AuthClaims.Permission, permission));
-
-            if (!result.Succeeded)
-            {
-                throw new InvalidOperationException(
-                    $"Could not assign permission '{permission}' to the Admin role: " +
-                    string.Join(" ", result.Errors.Select(error => error.Description)));
-            }
-        }
+            EnsureSucceeded(
+                await roleManager.AddClaimAsync(adminRole, new Claim(AuthClaims.Permission, permission)),
+                $"Could not assign permission '{permission}' to the Admin role.");
     }
 
-    private static async Task EnsureStoreOperatorRoleAsync(IServiceProvider services, long companyId)
+    private static async Task EnsureStoreOperatorRoleAsync(IServiceProvider services)
     {
         var roleManager = services.GetRequiredService<RoleManager<Role>>();
-        var internalName = $"company:{AppRoles.StoreOperator}";
-        var role = await roleManager.FindByNameAsync(internalName);
+        var role = await roleManager.FindByNameAsync(AppRoles.StoreOperator);
         if (role is null)
         {
-            role = new Role
-            {
-                Name = internalName,
-                Description = "Daily catalog, inventory, order, customer, purchase, sales, payroll, expense, and report operations without user, role, branch, or company settings access.",
-                TenantId = companyId
-            };
-            var create = await roleManager.CreateAsync(role);
-            if (!create.Succeeded)
-                throw new InvalidOperationException(
-                    $"Could not create role '{AppRoles.StoreOperator}': " +
-                    string.Join(" ", create.Errors.Select(error => error.Description)));
+            role = new Role { Name = AppRoles.StoreOperator };
+            EnsureSucceeded(await roleManager.CreateAsync(role),
+                $"Could not create role '{AppRoles.StoreOperator}'.");
         }
-        else if (role.TenantId != companyId)
-        {
-            role.TenantId = companyId;
-            role.Description = "Daily catalog, inventory, order, customer, purchase, sales, payroll, expense, and report operations without user, role, branch, or company settings access.";
-            var update = await roleManager.UpdateAsync(role);
-            if (!update.Succeeded)
-                throw new InvalidOperationException($"Could not scope role '{AppRoles.StoreOperator}' to the active company.");
-        }
+
+        role.Description = "Daily catalog, inventory, order, customer, purchase, sales, payroll, expense, and report operations without user, role, branch, or company settings access.";
+        EnsureSucceeded(await roleManager.UpdateAsync(role),
+            $"Could not update role '{AppRoles.StoreOperator}'.");
 
         var safePermissions = new[]
         {
@@ -300,86 +247,61 @@ END;
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         foreach (var permission in safePermissions.Where(permission => !existing.Contains(permission)))
-        {
-            var result = await roleManager.AddClaimAsync(role, new Claim(AuthClaims.Permission, permission));
-            if (!result.Succeeded)
-                throw new InvalidOperationException(
-                    $"Could not assign permission '{permission}' to '{AppRoles.StoreOperator}': " +
-                    string.Join(" ", result.Errors.Select(error => error.Description)));
-        }
+            EnsureSucceeded(
+                await roleManager.AddClaimAsync(role, new Claim(AuthClaims.Permission, permission)),
+                $"Could not assign permission '{permission}' to '{AppRoles.StoreOperator}'.");
 
         var allowed = safePermissions.ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var claim in claims.Where(claim => !allowed.Contains(claim.Value)))
-        {
-            var remove = await roleManager.RemoveClaimAsync(role, claim);
-            if (!remove.Succeeded)
-                throw new InvalidOperationException(
-                    $"Could not remove restricted permission '{claim.Value}' from '{AppRoles.StoreOperator}'.");
-        }
+            EnsureSucceeded(
+                await roleManager.RemoveClaimAsync(role, claim),
+                $"Could not remove restricted permission '{claim.Value}' from '{AppRoles.StoreOperator}'.");
     }
 
     private static async Task EnsureDefaultCustomerTypesAsync(
         ApplicationDbContext context,
-        long companyId,
         long mainBranchId)
     {
         var general = await context.Types
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(type =>
-                type.TenantId == companyId &&
                 type.Group == GeneralTypeEnum.CustomerType &&
                 type.Name == "General");
 
-        if (general is not null)
-        {
-            if (!general.IsDeleted && general.BranchId.HasValue)
-                return;
-
-            general.IsDeleted = false;
-            general.DeletedAt = null;
-            general.BranchId ??= mainBranchId;
-            general.SortOrder ??= 0;
-            general.UpdatedAt = DateTime.UtcNow;
-        }
-        else
+        if (general is null)
         {
             context.Types.Add(new GeneralType
             {
-                TenantId = companyId,
                 BranchId = mainBranchId,
                 Name = "General",
                 Group = GeneralTypeEnum.CustomerType,
                 SortOrder = 0
             });
         }
+        else
+        {
+            general.IsDeleted = false;
+            general.DeletedAt = null;
+            general.BranchId ??= mainBranchId;
+            general.SortOrder ??= 0;
+            general.UpdatedAt = DateTime.UtcNow;
+        }
 
         await context.SaveChangesAsync();
     }
 
-
     private static async Task EnsureDefaultProductUnitsAsync(
         ApplicationDbContext context,
-        long companyId,
         long mainBranchId)
     {
         var unitNames = new[]
         {
-            "Piece (Dana)",
-            "Tablet",
-            "Capsule",
-            "Strip",
-            "Box",
-            "Bottle",
-            "Pack",
-            "Vial",
-            "Tube",
-            "Sachet",
-            "Carton"
+            "Piece (Dana)", "Tablet", "Capsule", "Strip", "Box", "Bottle",
+            "Pack", "Vial", "Tube", "Sachet", "Carton"
         };
-
         var existing = await context.Types
             .IgnoreQueryFilters()
-            .Where(type => type.TenantId == companyId && type.Group == GeneralTypeEnum.ProductUnit)
+            .Where(type => type.Group == GeneralTypeEnum.ProductUnit)
             .ToListAsync();
         var byName = existing
             .GroupBy(type => type.Name, StringComparer.OrdinalIgnoreCase)
@@ -393,24 +315,22 @@ END;
             {
                 if (!unit.IsDeleted && unit.BranchId.HasValue && unit.SortOrder == index)
                     continue;
-
                 unit.IsDeleted = false;
                 unit.DeletedAt = null;
                 unit.BranchId ??= mainBranchId;
                 unit.SortOrder = index;
                 unit.UpdatedAt = DateTime.UtcNow;
-                changed = true;
-                continue;
             }
-
-            context.Types.Add(new GeneralType
+            else
             {
-                TenantId = companyId,
-                BranchId = mainBranchId,
-                Name = name,
-                Group = GeneralTypeEnum.ProductUnit,
-                SortOrder = index
-            });
+                context.Types.Add(new GeneralType
+                {
+                    BranchId = mainBranchId,
+                    Name = name,
+                    Group = GeneralTypeEnum.ProductUnit,
+                    SortOrder = index
+                });
+            }
             changed = true;
         }
 
@@ -418,40 +338,40 @@ END;
             await context.SaveChangesAsync();
     }
 
-
-    private static async Task EnsureOperationDefaultsAsync(ApplicationDbContext context, long companyId, long branchId)
+    private static async Task EnsureOperationDefaultsAsync(ApplicationDbContext context, long branchId)
     {
         var changed = false;
-        var expenseCategoryNames = new[] { "Rent", "Utilities", "Transport", "Office", "Other" };
-        var existingExpenseCategoryNames = await context.Types
+        var names = new[] { "Rent", "Utilities", "Transport", "Office", "Other" };
+        var existingNames = await context.Types
             .IgnoreQueryFilters()
-            .Where(type => type.TenantId == companyId && !type.IsDeleted && type.Group == GeneralTypeEnum.ExpenseCategory)
+            .Where(type => !type.IsDeleted && type.Group == GeneralTypeEnum.ExpenseCategory)
             .Select(type => type.Name)
             .ToListAsync();
-        var missingExpenseCategories = expenseCategoryNames
-            .Where(name => !existingExpenseCategoryNames.Contains(name, StringComparer.OrdinalIgnoreCase))
+
+        var missing = names
+            .Where(name => !existingNames.Contains(name, StringComparer.OrdinalIgnoreCase))
             .Select((name, index) => new GeneralType
             {
-                TenantId = companyId,
                 BranchId = branchId,
                 Name = name,
                 Group = GeneralTypeEnum.ExpenseCategory,
                 SortOrder = index
             })
-            .ToList();
-        if (missingExpenseCategories.Count > 0)
+            .ToArray();
+        if (missing.Length > 0)
         {
-            context.Types.AddRange(missingExpenseCategories);
+            context.Types.AddRange(missing);
             changed = true;
         }
 
-        if (!await context.Warehouses
-                .IgnoreQueryFilters()
-                .AnyAsync(item => item.TenantId == companyId && !item.IsDeleted))
+        var warehouse = await context.Warehouses
+            .IgnoreQueryFilters()
+            .OrderBy(item => item.Id)
+            .FirstOrDefaultAsync();
+        if (warehouse is null)
         {
             context.Warehouses.Add(new Warehouse
             {
-                TenantId = companyId,
                 BranchId = branchId,
                 Name = "Main Warehouse",
                 Code = "MAIN",
@@ -459,30 +379,36 @@ END;
             });
             changed = true;
         }
+        else if (warehouse.IsDeleted || !warehouse.IsActive || !warehouse.BranchId.HasValue)
+        {
+            warehouse.IsDeleted = false;
+            warehouse.DeletedAt = null;
+            warehouse.IsActive = true;
+            warehouse.BranchId ??= branchId;
+            warehouse.UpdatedAt = DateTime.UtcNow;
+            changed = true;
+        }
 
-        if (changed) await context.SaveChangesAsync();
+        if (changed)
+            await context.SaveChangesAsync();
     }
 
-    private static async Task EnsureAdminAsync(IServiceProvider services, long companyId, long branchId)
+    private static async Task EnsureAdminAsync(IServiceProvider services, long branchId)
     {
         var seed = services.GetRequiredService<IOptions<SeedAdminOptions>>().Value;
         var email = seed.Email?.Trim().ToLowerInvariant();
-
-        // No credentials in configuration means seeding is intentionally disabled.
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(seed.Password))
             return;
 
         var userManager = services.GetRequiredService<UserManager<User>>();
         var context = services.GetRequiredService<ApplicationDbContext>();
         var normalizedEmail = userManager.NormalizeEmail(email);
-        var admin = await context.Users.FirstOrDefaultAsync(user =>
-            user.TenantId == companyId && user.NormalizedEmail == normalizedEmail);
+        var admin = await context.Users.FirstOrDefaultAsync(user => user.NormalizedEmail == normalizedEmail);
 
         if (admin is null)
         {
             admin = new User
             {
-                TenantId = companyId,
                 BranchId = branchId,
                 Email = email,
                 FullName = string.IsNullOrWhiteSpace(seed.FullName)
@@ -491,50 +417,16 @@ END;
                 IsActive = true,
                 EmailConfirmed = true
             };
-            admin.UserName = CompanyUserName.Create(companyId, admin.Id);
-
-            var createResult = await userManager.CreateAsync(admin, seed.Password);
-            if (!createResult.Succeeded)
-            {
-                throw new InvalidOperationException(
-                    "Could not seed admin user: " +
-                    string.Join(" ", createResult.Errors.Select(error => error.Description)));
-            }
+            admin.UserName = CompanyUserName.Create(admin.Id);
+            EnsureSucceeded(await userManager.CreateAsync(admin, seed.Password), "Could not seed admin user.");
         }
         else
         {
             var changed = false;
-
-            if (admin.TenantId != companyId)
-            {
-                admin.TenantId = companyId;
-                changed = true;
-            }
-
-            if (!admin.BranchId.HasValue)
-            {
-                admin.BranchId = branchId;
-                changed = true;
-            }
-
-            if (CompanyUserName.RequiresRepair(admin.UserName))
-            {
-                admin.UserName = CompanyUserName.Create(companyId, admin.Id);
-                changed = true;
-            }
-
-            if (!admin.IsActive)
-            {
-                admin.IsActive = true;
-                changed = true;
-            }
-
-            if (!admin.EmailConfirmed)
-            {
-                admin.EmailConfirmed = true;
-                changed = true;
-            }
-
+            if (!admin.BranchId.HasValue) { admin.BranchId = branchId; changed = true; }
+            if (CompanyUserName.RequiresRepair(admin.UserName)) { admin.UserName = CompanyUserName.Create(admin.Id); changed = true; }
+            if (!admin.IsActive) { admin.IsActive = true; changed = true; }
+            if (!admin.EmailConfirmed) { admin.EmailConfirmed = true; changed = true; }
             if (string.IsNullOrWhiteSpace(admin.FullName))
             {
                 admin.FullName = string.IsNullOrWhiteSpace(seed.FullName)
@@ -542,29 +434,12 @@ END;
                     : seed.FullName.Trim();
                 changed = true;
             }
-
             if (changed)
-            {
-                var updateResult = await userManager.UpdateAsync(admin);
-                if (!updateResult.Succeeded)
-                {
-                    throw new InvalidOperationException(
-                        "Could not repair the seeded admin user: " +
-                        string.Join(" ", updateResult.Errors.Select(error => error.Description)));
-                }
-            }
+                EnsureSucceeded(await userManager.UpdateAsync(admin), "Could not repair the seeded admin user.");
         }
 
         if (!await userManager.IsInRoleAsync(admin, AppRoles.Admin))
-        {
-            var addRoleResult = await userManager.AddToRoleAsync(admin, AppRoles.Admin);
-            if (!addRoleResult.Succeeded)
-            {
-                throw new InvalidOperationException(
-                    "Could not assign the Admin role: " +
-                    string.Join(" ", addRoleResult.Errors.Select(error => error.Description)));
-            }
-        }
+            EnsureSucceeded(await userManager.AddToRoleAsync(admin, AppRoles.Admin), "Could not assign the Admin role.");
     }
 
     private static async Task EnsureSafeIdentityUserNamesAsync(IServiceProvider services)
@@ -572,19 +447,23 @@ END;
         var context = services.GetRequiredService<ApplicationDbContext>();
         var userManager = services.GetRequiredService<UserManager<User>>();
         var users = await context.Users
-            .Where(user => user.UserName == null || user.UserName.Contains(":"))
+            .Where(user => user.UserName == null || user.UserName.Contains(":") || user.UserName.StartsWith("T"))
             .ToListAsync();
 
         foreach (var user in users)
         {
-            user.UserName = CompanyUserName.Create(user.TenantId, user.Id);
-            var result = await userManager.UpdateAsync(user);
-            if (!result.Succeeded)
-            {
-                throw new InvalidOperationException(
-                    $"Could not repair the internal username for {user.Email ?? user.Id}: " +
-                    string.Join(" ", result.Errors.Select(error => error.Description)));
-            }
+            if (!CompanyUserName.RequiresRepair(user.UserName))
+                continue;
+            user.UserName = CompanyUserName.Create(user.Id);
+            EnsureSucceeded(await userManager.UpdateAsync(user),
+                $"Could not repair the internal username for {user.Email ?? user.Id}.");
         }
+    }
+
+    private static void EnsureSucceeded(IdentityResult result, string message)
+    {
+        if (!result.Succeeded)
+            throw new InvalidOperationException(
+                message + " " + string.Join(" ", result.Errors.Select(error => error.Description)));
     }
 }

@@ -4,6 +4,8 @@ import type {
     AuthUser,
     LoginRequest,
     RegisterRequest,
+    VerificationChannel,
+    VerificationDispatch,
 } from "./auth-types";
 
 export const loginCustomer = (request: LoginRequest) =>
@@ -12,4 +14,15 @@ export const loginCustomer = (request: LoginRequest) =>
 export const registerCustomer = (request: RegisterRequest) =>
     apiPost<AuthResponse>("/auth/customer/register", request);
 
+export const signInWithGoogle = (credential: string) =>
+    apiPost<AuthResponse>("/auth/customer/google", { credential });
+
 export const getCurrentCustomer = () => apiGet<AuthUser>("/auth/me");
+
+export const sendVerificationCode = (channel: VerificationChannel) =>
+    apiPost<VerificationDispatch>("/auth/verification/send", { channel });
+
+export const confirmVerificationCode = (
+    channel: VerificationChannel,
+    code: string,
+) => apiPost<AuthUser>("/auth/verification/confirm", { channel, code });

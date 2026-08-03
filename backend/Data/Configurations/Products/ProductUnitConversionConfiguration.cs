@@ -30,7 +30,7 @@ public sealed class ProductUnitConversionConfiguration : IEntityTypeConfiguratio
         builder.HasIndex(x => new { x.ProductId, x.UnitId })
             .IsUnique()
             .HasFilter("[IsDeleted] = 0");
-        builder.HasIndex(x => new { x.TenantId, x.Barcode })
+        builder.HasIndex(x => x.Barcode)
             .IsUnique()
             .HasFilter("[Barcode] IS NOT NULL AND [IsDeleted] = 0");
         builder.HasIndex(x => x.ProductId)

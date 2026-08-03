@@ -16,7 +16,7 @@ public sealed class OperationsService(
     IDefaultCustomerTypeResolver defaultCustomerTypeResolver,
     IInventoryCostService inventoryCosts,
     IInventoryLotAllocator lotAllocator,
-    ICompanyContext companyContext) : IOperationsService
+    IBranchContext branchContext) : IOperationsService
 {
     private const string MainWarehouseCode = "MAIN";
 
@@ -24,10 +24,10 @@ public sealed class OperationsService(
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var first = new DateOnly(today.Year, today.Month, 1);
-        var purchases = await context.Purchases.Where(x => (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value) && x.PurchaseDate >= first && x.Status != PurchaseStatus.Cancelled).SumAsync(x => (decimal?)x.Total, ct) ?? 0;
-        var sales = await context.InventorySales.Where(x => (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value) && x.SaleDate >= first).SumAsync(x => (decimal?)x.Total, ct) ?? 0;
-        var expenses = await context.Expenses.Where(x => (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value) && x.ExpenseDate >= first).SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
-        var salaries = await context.StaffSalaryPayments.Where(x => (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value) && x.PaidDate >= first).SumAsync(x => (decimal?)x.PaidAmount, ct) ?? 0;
+        var purchases = await context.Purchases.Where(x => (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value) && x.PurchaseDate >= first && x.Status != PurchaseStatus.Cancelled).SumAsync(x => (decimal?)x.Total, ct) ?? 0;
+        var sales = await context.InventorySales.Where(x => (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value) && x.SaleDate >= first).SumAsync(x => (decimal?)x.Total, ct) ?? 0;
+        var expenses = await context.Expenses.Where(x => (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value) && x.ExpenseDate >= first).SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
+        var salaries = await context.StaffSalaryPayments.Where(x => (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value) && x.PaidDate >= first).SumAsync(x => (decimal?)x.PaidAmount, ct) ?? 0;
         var low = await context.Products.AsNoTracking().CountAsync(product =>
             product.IsActive &&
             !product.UsesDisplayStock &&
@@ -39,8 +39,7 @@ public sealed class OperationsService(
         bool canOverrideLineLimits,
         CancellationToken ct)
     {
-        var settings = await context.TenantSettings.AsNoTracking()
-            .Where(item => item.TenantId == companyContext.CompanyId)
+        var settings = await context.CompanySettings.AsNoTracking()
             .Select(item => new { item.MaximumPurchaseLines, item.MaximumManualSaleLines })
             .SingleOrDefaultAsync(ct);
 
@@ -103,7 +102,7 @@ public sealed class OperationsService(
     public async Task<IReadOnlyList<OperationCustomerLookup>> GetCustomerLookupsAsync(string? search, int take, CancellationToken ct)
     {
         var query = context.Customers.AsNoTracking()
-            .Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value);
+            .Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value);
         var clean = Clean(search);
         if (clean is not null)
             query = query.Where(x => x.FirstName.Contains(clean) || (x.LastName != null && x.LastName.Contains(clean)) || x.Phone.Contains(clean) || (x.Email != null && x.Email.Contains(clean)));
@@ -121,7 +120,7 @@ public sealed class OperationsService(
     public async Task<IReadOnlyList<SupplierResponse>> GetSuppliersAsync(string? search, int take, CancellationToken ct)
     {
         var query = context.Suppliers.AsNoTracking()
-            .Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value);
+            .Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value);
         var clean = Clean(search);
         if (clean is not null)
             query = query.Where(x => x.Name.Contains(clean) || (x.Phone != null && x.Phone.Contains(clean)) || (x.ContactPerson != null && x.ContactPerson.Contains(clean)));
@@ -137,7 +136,7 @@ public sealed class OperationsService(
         Supplier entity;
         if (id.HasValue)
             entity = await context.Suppliers.SingleOrDefaultAsync(
-                x => x.Id == id.Value && (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value),
+                x => x.Id == id.Value && (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value),
                 ct) ?? throw new KeyNotFoundException("Supplier not found.");
         else
         {
@@ -159,7 +158,7 @@ public sealed class OperationsService(
     public async Task<IReadOnlyList<PurchaseListItem>> GetPurchasesAsync(string? search, CancellationToken ct)
     {
         var query = context.Purchases.AsNoTracking()
-            .Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value);
+            .Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value);
         var clean = Clean(search);
         if (clean is not null)
             query = query.Where(x =>
@@ -179,7 +178,7 @@ public sealed class OperationsService(
     {
         var purchase = await context.Purchases.AsNoTracking()
             .Where(item => item.Id == id &&
-                (!companyContext.BranchId.HasValue || item.BranchId == companyContext.BranchId.Value))
+                (!branchContext.BranchId.HasValue || item.BranchId == branchContext.BranchId.Value))
             .Select(item => new PurchaseDetailsResponse(
                 item.Id,
                 item.PurchaseNumber,
@@ -264,7 +263,7 @@ public sealed class OperationsService(
         {
             supplierName = await context.Suppliers
                 .Where(x => x.Id == request.SupplierId && x.IsActive &&
-                    (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value))
+                    (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value))
                 .Select(x => x.Name)
                 .SingleOrDefaultAsync(ct);
             if (supplierName is null) throw new ArgumentException("Selected supplier does not exist or is inactive.");
@@ -318,7 +317,7 @@ public sealed class OperationsService(
         context.Purchases.Add(purchase);
         await context.SaveChangesAsync(ct);
         var warehouse = await context.Warehouses
-            .Where(x => x.IsActive && (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value))
+            .Where(x => x.IsActive && (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value))
             .OrderByDescending(x => x.Code == MainWarehouseCode)
             .ThenBy(x => x.Id)
             .FirstOrDefaultAsync(ct)
@@ -356,7 +355,7 @@ public sealed class OperationsService(
     }
 
     public async Task<IReadOnlyList<DocumentPaymentResponse>> GetPurchasePaymentsAsync(long purchaseId, CancellationToken ct) =>
-        await context.PurchasePayments.AsNoTracking().Where(x => x.PurchaseId == purchaseId && (!companyContext.BranchId.HasValue || x.Purchase.BranchId == companyContext.BranchId.Value)).OrderByDescending(x => x.PaymentDate).ThenByDescending(x => x.Id).Select(MapPurchasePayment()).ToListAsync(ct);
+        await context.PurchasePayments.AsNoTracking().Where(x => x.PurchaseId == purchaseId && (!branchContext.BranchId.HasValue || x.Purchase.BranchId == branchContext.BranchId.Value)).OrderByDescending(x => x.PaymentDate).ThenByDescending(x => x.Id).Select(MapPurchasePayment()).ToListAsync(ct);
 
     public async Task<PurchaseListItem> AddPurchasePaymentAsync(long purchaseId, RecordDocumentPaymentRequest request, string? userId, CancellationToken ct)
     {
@@ -365,7 +364,7 @@ public sealed class OperationsService(
         var purchase = await context.Purchases
             .FromSqlInterpolated($"SELECT * FROM [Purchases] WITH (UPDLOCK, ROWLOCK) WHERE [Id] = {purchaseId}")
             .Include(x => x.Supplier)
-            .Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value)
+            .Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value)
             .SingleOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Purchase not found.");
         var remaining = Math.Max(0, purchase.Total - purchase.PaidAmount);
@@ -381,7 +380,7 @@ public sealed class OperationsService(
     public async Task<IReadOnlyList<InventorySaleListItem>> GetSalesAsync(string? search, CancellationToken ct)
     {
         var query = context.InventorySales.AsNoTracking()
-            .Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value);
+            .Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value);
         var clean = Clean(search);
         if (clean is not null)
             query = query.Where(x =>
@@ -406,7 +405,7 @@ public sealed class OperationsService(
     {
         var saleExists = await context.InventorySales.AsNoTracking().AnyAsync(
             sale => sale.Id == saleId &&
-                (!companyContext.BranchId.HasValue || sale.BranchId == companyContext.BranchId.Value),
+                (!branchContext.BranchId.HasValue || sale.BranchId == branchContext.BranchId.Value),
             ct);
         if (!saleExists)
             throw new KeyNotFoundException("Manual sale not found.");
@@ -485,7 +484,7 @@ public sealed class OperationsService(
         {
             var customer = await context.Customers
                 .Where(x => x.Id == request.CustomerId &&
-                    (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value))
+                    (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value))
                 .Select(x => new { Name = (x.FirstName + " " + (x.LastName ?? "")).Trim(), x.Phone })
                 .SingleOrDefaultAsync(ct);
             if (customer is null) throw new ArgumentException("Customer not found.");
@@ -573,7 +572,7 @@ public sealed class OperationsService(
     }
 
     public async Task<IReadOnlyList<DocumentPaymentResponse>> GetSalePaymentsAsync(long saleId, CancellationToken ct) =>
-        await context.InventorySalePayments.AsNoTracking().Where(x => x.InventorySaleId == saleId && (!companyContext.BranchId.HasValue || x.InventorySale.BranchId == companyContext.BranchId.Value)).OrderByDescending(x => x.PaymentDate).ThenByDescending(x => x.Id).Select(MapSalePayment()).ToListAsync(ct);
+        await context.InventorySalePayments.AsNoTracking().Where(x => x.InventorySaleId == saleId && (!branchContext.BranchId.HasValue || x.InventorySale.BranchId == branchContext.BranchId.Value)).OrderByDescending(x => x.PaymentDate).ThenByDescending(x => x.Id).Select(MapSalePayment()).ToListAsync(ct);
 
     public async Task<InventorySaleListItem> AddSalePaymentAsync(long saleId, RecordDocumentPaymentRequest request, string? userId, CancellationToken ct)
     {
@@ -582,7 +581,7 @@ public sealed class OperationsService(
         var sale = await context.InventorySales
             .FromSqlInterpolated($"SELECT * FROM [InventorySales] WITH (UPDLOCK, ROWLOCK) WHERE [Id] = {saleId}")
             .Include(x => x.Customer)
-            .Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value)
+            .Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value)
             .SingleOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Sale not found.");
         var remaining = Math.Max(0, sale.Total - sale.PaidAmount);
@@ -598,7 +597,7 @@ public sealed class OperationsService(
     }
 
     public async Task<IReadOnlyList<StaffResponse>> GetStaffAsync(CancellationToken ct) =>
-        await context.StaffMembers.AsNoTracking().Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value).OrderByDescending(x => x.IsActive).ThenBy(x => x.FullName)
+        await context.StaffMembers.AsNoTracking().Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value).OrderByDescending(x => x.IsActive).ThenBy(x => x.FullName)
             .Select(x => new StaffResponse(x.Id, x.EmployeeNumber, x.FullName, x.Phone, x.Email, x.Position, x.Department, x.HireDate, x.BaseSalary, x.IsActive, x.Address, x.Notes)).ToListAsync(ct);
 
     public async Task<StaffResponse> SaveStaffAsync(long? id, StaffUpsertRequest request, CancellationToken ct)
@@ -609,12 +608,12 @@ public sealed class OperationsService(
         if (await context.StaffMembers.AnyAsync(x =>
             x.EmployeeNumber == request.EmployeeNumber.Trim() &&
             (!id.HasValue || x.Id != id) &&
-            (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value), ct))
+            (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value), ct))
             throw new ArgumentException("Employee number already exists.");
         Staff entity;
         if (id.HasValue)
             entity = await context.StaffMembers.SingleOrDefaultAsync(
-                x => x.Id == id && (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value),
+                x => x.Id == id && (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value),
                 ct) ?? throw new KeyNotFoundException("Staff member not found.");
         else { entity = new Staff(); context.StaffMembers.Add(entity); }
         entity.EmployeeNumber = request.EmployeeNumber.Trim();
@@ -635,14 +634,14 @@ public sealed class OperationsService(
     public async Task DeleteStaffAsync(long id, CancellationToken ct)
     {
         var entity = await context.StaffMembers.SingleOrDefaultAsync(
-            x => x.Id == id && (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value),
+            x => x.Id == id && (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value),
             ct) ?? throw new KeyNotFoundException("Staff member not found.");
         entity.IsActive = false;
         await context.SaveChangesAsync(ct);
     }
 
     public async Task<IReadOnlyList<SalaryPaymentResponse>> GetSalaryPaymentsAsync(CancellationToken ct) =>
-        await context.StaffSalaryPayments.AsNoTracking().Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value).OrderByDescending(x => x.PeriodYear).ThenByDescending(x => x.PeriodMonth).ThenByDescending(x => x.Id).Take(500)
+        await context.StaffSalaryPayments.AsNoTracking().Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value).OrderByDescending(x => x.PeriodYear).ThenByDescending(x => x.PeriodMonth).ThenByDescending(x => x.Id).Take(500)
             .Select(x => new SalaryPaymentResponse(x.Id, x.StaffId, x.Staff.FullName, x.PeriodYear, x.PeriodMonth, x.BaseSalary, x.Bonus, x.Deduction, x.NetAmount, x.PaidAmount, x.NetAmount > x.PaidAmount ? x.NetAmount - x.PaidAmount : 0, x.PaymentStatus, x.PaidDate, x.PaymentMethod, x.ReferenceNumber, x.CreatedAt)).ToListAsync(ct);
 
     public async Task<SalaryPaymentResponse> CreateSalaryPaymentAsync(CreateSalaryPaymentRequest request, string? userId, CancellationToken ct)
@@ -651,13 +650,13 @@ public sealed class OperationsService(
         if (request.Bonus < 0 || request.Deduction < 0) throw new ArgumentException("Bonus and deduction cannot be negative.");
         var staff = await context.StaffMembers.SingleOrDefaultAsync(
             x => x.Id == request.StaffId && x.IsActive &&
-                (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value),
+                (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value),
             ct) ?? throw new ArgumentException("Active staff member not found.");
         if (await context.StaffSalaryPayments.AnyAsync(x =>
             x.StaffId == request.StaffId &&
             x.PeriodYear == request.PeriodYear &&
             x.PeriodMonth == request.PeriodMonth &&
-            (!companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value), ct))
+            (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value), ct))
             throw new ArgumentException("Salary for this staff member and period is already recorded.");
         var net = staff.BaseSalary + request.Bonus - request.Deduction;
         if (net < 0) throw new ArgumentException("Deductions cannot exceed salary plus bonus.");
@@ -690,7 +689,7 @@ public sealed class OperationsService(
     }
 
     public async Task<IReadOnlyList<DocumentPaymentResponse>> GetSalaryInstallmentsAsync(long salaryId, CancellationToken ct) =>
-        await context.StaffSalaryInstallments.AsNoTracking().Where(x => x.StaffSalaryPaymentId == salaryId && (!companyContext.BranchId.HasValue || x.StaffSalaryPayment.BranchId == companyContext.BranchId.Value)).OrderByDescending(x => x.PaymentDate).ThenByDescending(x => x.Id).Select(MapSalaryPayment()).ToListAsync(ct);
+        await context.StaffSalaryInstallments.AsNoTracking().Where(x => x.StaffSalaryPaymentId == salaryId && (!branchContext.BranchId.HasValue || x.StaffSalaryPayment.BranchId == branchContext.BranchId.Value)).OrderByDescending(x => x.PaymentDate).ThenByDescending(x => x.Id).Select(MapSalaryPayment()).ToListAsync(ct);
 
     public async Task<SalaryPaymentResponse> AddSalaryInstallmentAsync(long salaryId, RecordDocumentPaymentRequest request, string? userId, CancellationToken ct)
     {
@@ -699,7 +698,7 @@ public sealed class OperationsService(
         var salary = await context.StaffSalaryPayments
             .FromSqlInterpolated($"SELECT * FROM [StaffSalaryPayments] WITH (UPDLOCK, ROWLOCK) WHERE [Id] = {salaryId}")
             .Include(x => x.Staff)
-            .Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value)
+            .Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value)
             .SingleOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Salary record not found.");
         var remaining = Math.Max(0, salary.NetAmount - salary.PaidAmount);
@@ -740,7 +739,7 @@ public sealed class OperationsService(
     }
 
     public async Task<IReadOnlyList<ExpenseResponse>> GetExpensesAsync(CancellationToken ct) =>
-        await context.Expenses.AsNoTracking().Where(x => !companyContext.BranchId.HasValue || x.BranchId == companyContext.BranchId.Value).OrderByDescending(x => x.ExpenseDate).ThenByDescending(x => x.Id).Take(500)
+        await context.Expenses.AsNoTracking().Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value).OrderByDescending(x => x.ExpenseDate).ThenByDescending(x => x.Id).Take(500)
             .Select(x => new ExpenseResponse(x.Id, x.ExpenseDate, x.GeneralTypeCategoryId ?? x.CategoryId ?? 0, x.GeneralTypeCategory != null ? x.GeneralTypeCategory.Name : (x.Category != null ? x.Category.Name : "Uncategorized"), x.Amount, x.Vendor, x.PaymentMethod, x.ReferenceNumber, x.Description, x.CreatedAt)).ToListAsync(ct);
 
     public async Task<ExpenseResponse> CreateExpenseAsync(CreateExpenseRequest request, string? userId, CancellationToken ct)
@@ -857,8 +856,7 @@ public sealed class OperationsService(
 
 
     private async Task<string> GetCurrencyCodeAsync(CancellationToken ct) =>
-        await context.TenantSettings.AsNoTracking()
-            .Where(item => item.TenantId == context.CurrentCompanyId)
+        await context.CompanySettings.AsNoTracking()
             .Select(item => item.MainCurrencyCode)
             .FirstOrDefaultAsync(ct) ?? "USD";
 
@@ -1034,8 +1032,7 @@ public sealed class OperationsService(
 
         if (canOverrideLineLimits) return;
 
-        var limits = await context.TenantSettings.AsNoTracking()
-            .Where(item => item.TenantId == companyContext.CompanyId)
+        var limits = await context.CompanySettings.AsNoTracking()
             .Select(item => new { item.MaximumPurchaseLines, item.MaximumManualSaleLines })
             .SingleOrDefaultAsync(ct);
         var maximum = isPurchase

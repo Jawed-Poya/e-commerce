@@ -23,10 +23,9 @@ public sealed class CompanyPermissionService(ApplicationDbContext context) : ICo
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
     {
-        var claimManagementEnabled = await context.TenantSettings
+        var claimManagementEnabled = await context.CompanySettings
             .AsNoTracking()
-            .Where(item => item.TenantId == ECommerce.Services.Company.CompanyContext.SingleCompanyId)
-            .Select(item => item.AllowTenantUserClaimManagement)
+            .Select(item => item.AllowUserClaimManagement)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (!claimManagementEnabled)
