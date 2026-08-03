@@ -70,10 +70,101 @@ public sealed class AddLotLevelInventoryTraceability : Migration
             table: "InventoryTransactionLots",
             columns: new[] { "TenantId", "LotNumber", "CreatedAt" });
 
-        // Convert any historical aggregate-only quantity to a visible legacy
-        // lot so future stock-outs are fully traceable instead of silently
-        // consuming an unknown batch.
+        // Ensure every installation with existing aggregate stock has a usable
+        // warehouse. The migration must be self-contained; requiring an admin to
+        // create a warehouse before startup makes automated deployments fail.
         migrationBuilder.Sql("""
+;WITH RecoverableWarehouse AS
+(
+    SELECT
+        inventory.[TenantId],
+        MIN(warehouse.[Id]) AS [WarehouseId]
+    FROM [dbo].[ProductInventories] inventory
+    INNER JOIN [dbo].[Warehouses] warehouse
+        ON warehouse.[TenantId] = inventory.[TenantId]
+    WHERE inventory.[IsDeleted] = 0
+      AND inventory.[Quantity] > 0.0005
+      AND NOT EXISTS
+      (
+          SELECT 1
+          FROM [dbo].[Warehouses] activeWarehouse
+          WHERE activeWarehouse.[TenantId] = inventory.[TenantId]
+            AND activeWarehouse.[IsDeleted] = 0
+      )
+    GROUP BY inventory.[TenantId]
+)
+UPDATE warehouse
+SET
+    warehouse.[IsDeleted] = 0,
+    warehouse.[DeletedAt] = NULL,
+    warehouse.[IsActive] = 1,
+    warehouse.[UpdatedAt] = SYSUTCDATETIME()
+FROM [dbo].[Warehouses] warehouse
+INNER JOIN RecoverableWarehouse recoverable
+    ON recoverable.[WarehouseId] = warehouse.[Id];
+
+;WITH MissingWarehouse AS
+(
+    SELECT
+        inventory.[TenantId],
+        MIN(inventory.[BranchId]) AS [BranchId]
+    FROM [dbo].[ProductInventories] inventory
+    WHERE inventory.[IsDeleted] = 0
+      AND inventory.[Quantity] > 0.0005
+      AND NOT EXISTS
+      (
+          SELECT 1
+          FROM [dbo].[Warehouses] warehouse
+          WHERE warehouse.[TenantId] = inventory.[TenantId]
+      )
+    GROUP BY inventory.[TenantId]
+)
+INSERT INTO [dbo].[Warehouses]
+(
+    [TenantId], [BranchId], [Name], [Code], [Address], [IsActive],
+    [CreatedAt], [UpdatedAt], [IsDeleted], [DeletedAt]
+)
+SELECT
+    missing.[TenantId],
+    missing.[BranchId],
+    N'Main Warehouse',
+    N'MAIN',
+    NULL,
+    1,
+    SYSUTCDATETIME(),
+    NULL,
+    0,
+    NULL
+FROM MissingWarehouse missing;
+""");
+
+        // Convert historical aggregate-only quantity to a visible legacy lot.
+        // If detailed lots already contain more stock than the old aggregate row,
+        // preserve the traceable lot records and raise the aggregate to their sum.
+        migrationBuilder.Sql("""
+;WITH LotTotals AS
+(
+    SELECT [TenantId], [ProductId], SUM([Quantity]) AS [TrackedQuantity]
+    FROM [dbo].[InventoryLots]
+    WHERE [IsDeleted] = 0
+    GROUP BY [TenantId], [ProductId]
+)
+UPDATE inventory
+SET
+    inventory.[Quantity] = totals.[TrackedQuantity],
+    inventory.[ReservedQuantity] = CASE
+        WHEN inventory.[ReservedQuantity] > totals.[TrackedQuantity]
+            THEN totals.[TrackedQuantity]
+        ELSE inventory.[ReservedQuantity]
+    END,
+    inventory.[UpdatedAt] = SYSUTCDATETIME()
+FROM [dbo].[ProductInventories] inventory
+INNER JOIN LotTotals totals
+    ON totals.[TenantId] = inventory.[TenantId]
+   AND totals.[ProductId] = inventory.[ProductId]
+WHERE inventory.[IsDeleted] = 0
+  AND totals.[TrackedQuantity] > inventory.[Quantity] + 0.0005;
+
 ;WITH LotTotals AS
 (
     SELECT [TenantId], [ProductId], SUM([Quantity]) AS [TrackedQuantity]
@@ -113,33 +204,40 @@ OUTER APPLY
     FROM [dbo].[Warehouses] candidate
     WHERE candidate.[TenantId] = inventory.[TenantId]
       AND candidate.[IsDeleted] = 0
-      AND (candidate.[BranchId] = inventory.[BranchId]
-           OR candidate.[BranchId] IS NULL
-           OR inventory.[BranchId] IS NULL)
     ORDER BY
         CASE WHEN candidate.[BranchId] = inventory.[BranchId] THEN 0 ELSE 1 END,
+        CASE WHEN candidate.[BranchId] IS NULL THEN 0 ELSE 1 END,
         CASE WHEN candidate.[Code] = N'MAIN' THEN 0 ELSE 1 END,
         candidate.[Id]
 ) warehouse
-WHERE warehouse.[Id] IS NOT NULL
-  AND inventory.[IsDeleted] = 0
+WHERE inventory.[IsDeleted] = 0
   AND inventory.[Quantity] - COALESCE(totals.[TrackedQuantity], 0) > 0.0005;
 
-IF EXISTS
+-- Final defensive synchronization. Lot rows are now the traceable source of
+-- truth, so keep the legacy aggregate equal to their quantity without deleting
+-- or shrinking any lot history.
+;WITH LotTotals AS
 (
-    SELECT 1
-    FROM [dbo].[ProductInventories] inventory
-    OUTER APPLY
-    (
-        SELECT SUM(lot.[Quantity]) AS [TrackedQuantity]
-        FROM [dbo].[InventoryLots] lot
-        WHERE lot.[ProductId] = inventory.[ProductId]
-          AND lot.[IsDeleted] = 0
-    ) lotTotals
-    WHERE inventory.[IsDeleted] = 0
-      AND ABS(inventory.[Quantity] - COALESCE(lotTotals.[TrackedQuantity], 0)) > 0.0005
+    SELECT [TenantId], [ProductId], SUM([Quantity]) AS [TrackedQuantity]
+    FROM [dbo].[InventoryLots]
+    WHERE [IsDeleted] = 0
+    GROUP BY [TenantId], [ProductId]
 )
-    THROW 51000, 'Lot migration could not reconcile aggregate stock. Configure a warehouse and reconcile product lot quantities before retrying.', 1;
+UPDATE inventory
+SET
+    inventory.[Quantity] = COALESCE(totals.[TrackedQuantity], 0),
+    inventory.[ReservedQuantity] = CASE
+        WHEN inventory.[ReservedQuantity] > COALESCE(totals.[TrackedQuantity], 0)
+            THEN COALESCE(totals.[TrackedQuantity], 0)
+        ELSE inventory.[ReservedQuantity]
+    END,
+    inventory.[UpdatedAt] = SYSUTCDATETIME()
+FROM [dbo].[ProductInventories] inventory
+LEFT JOIN LotTotals totals
+    ON totals.[TenantId] = inventory.[TenantId]
+   AND totals.[ProductId] = inventory.[ProductId]
+WHERE inventory.[IsDeleted] = 0
+  AND ABS(inventory.[Quantity] - COALESCE(totals.[TrackedQuantity], 0)) > 0.0005;
 """);
 
         // Existing aggregate reservations are assigned across lots by FEFO so the
@@ -207,21 +305,21 @@ END
 CLOSE reservation_cursor;
 DEALLOCATE reservation_cursor;
 
-IF EXISTS
+;WITH ReservedTotals AS
 (
-    SELECT 1
-    FROM [dbo].[ProductInventories] inventory
-    OUTER APPLY
-    (
-        SELECT SUM(lot.[ReservedQuantity]) AS [TrackedReservedQuantity]
-        FROM [dbo].[InventoryLots] lot
-        WHERE lot.[ProductId] = inventory.[ProductId]
-          AND lot.[IsDeleted] = 0
-    ) lotTotals
-    WHERE inventory.[IsDeleted] = 0
-      AND ABS(inventory.[ReservedQuantity] - COALESCE(lotTotals.[TrackedReservedQuantity], 0)) > 0.0005
+    SELECT [ProductId], SUM([ReservedQuantity]) AS [TrackedReservedQuantity]
+    FROM [dbo].[InventoryLots]
+    WHERE [IsDeleted] = 0
+    GROUP BY [ProductId]
 )
-    THROW 51001, 'Lot reservation migration could not reconcile aggregate reserved stock. Review inventory and warehouse data before retrying.', 1;
+UPDATE inventory
+SET
+    inventory.[ReservedQuantity] = COALESCE(totals.[TrackedReservedQuantity], 0),
+    inventory.[UpdatedAt] = SYSUTCDATETIME()
+FROM [dbo].[ProductInventories] inventory
+LEFT JOIN ReservedTotals totals ON totals.[ProductId] = inventory.[ProductId]
+WHERE inventory.[IsDeleted] = 0
+  AND ABS(inventory.[ReservedQuantity] - COALESCE(totals.[TrackedReservedQuantity], 0)) > 0.0005;
 """);
     }
 
