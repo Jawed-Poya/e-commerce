@@ -1077,7 +1077,13 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
 
     private async Task<DocumentCompanyProfile> GetDocumentCompanyAsync(CancellationToken cancellationToken)
     {
-        var company = await TransientSqlRetry.ExecuteAsync(
+        var currencyCode = await TransientSqlRetry.ExecuteAsync<string?>(
+            token => context.CompanySettings.AsNoTracking()
+                .Select(item => item.MainCurrencyCode)
+                .SingleOrDefaultAsync(token),
+            cancellationToken) ?? "USD";
+
+        var company = await TransientSqlRetry.ExecuteAsync<DocumentCompanyProfile?>(
             token => context.Companies.AsNoTracking()
                 .Select(item => new DocumentCompanyProfile(
                     item.Name,
@@ -1085,7 +1091,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
                     item.Phone,
                     item.Email,
                     item.Address,
-                    item.Setting != null ? item.Setting.MainCurrencyCode : "USD"))
+                    currencyCode))
                 .SingleOrDefaultAsync(token),
             cancellationToken);
 
