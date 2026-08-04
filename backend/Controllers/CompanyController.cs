@@ -11,7 +11,7 @@ namespace ECommerce.Controllers;
 [ApiController]
 [Route("api/company")]
 public sealed class CompanyController(
-    ICompanyService company,
+    ICompanyService companyService,
     IProductImageStorage imageStorage) : ControllerBase
 {
     [AllowAnonymous]
@@ -20,7 +20,7 @@ public sealed class CompanyController(
     {
         using var operation = ServerOperation.CreateReadScope();
         return Ok(ApiResponse<PublicCompanyProfileResponse>.Ok(await TransientSqlRetry.ExecuteAsync(
-            token => company.GetPublicProfileAsync(token),
+            token => companyService.GetPublicProfileAsync(token),
             operation.Token)));
     }
 
@@ -30,8 +30,8 @@ public sealed class CompanyController(
     public async Task<IActionResult> GetManifest([FromQuery] string? app = null)
     {
         using var operation = ServerOperation.CreateReadScope();
-        var profile = await TransientSqlRetry.ExecuteAsync(
-            token => company.GetPublicProfileAsync(token),
+        PublicCompanyProfileResponse profile = await TransientSqlRetry.ExecuteAsync<PublicCompanyProfileResponse>(
+            token => companyService.GetPublicProfileAsync(token),
             operation.Token);
 
         string? AssetUrl(string? path)
@@ -99,7 +99,7 @@ public sealed class CompanyController(
     {
         using var operation = ServerOperation.CreateReadScope();
         return Ok(ApiResponse<CompanyProfileResponse>.Ok(await TransientSqlRetry.ExecuteAsync(
-            token => company.GetProfileAsync(token),
+            token => companyService.GetProfileAsync(token),
             operation.Token)));
     }
 
@@ -108,7 +108,7 @@ public sealed class CompanyController(
     public async Task<ActionResult<ApiResponse<CompanyProfileResponse>>> UpdateProfile(UpdateCompanyProfileRequest request)
     {
         using var operation = ServerOperation.CreateWriteScope();
-        var updated = await company.UpdateProfileAsync(request, operation.Token);
+        var updated = await companyService.UpdateProfileAsync(request, operation.Token);
         return Ok(ApiResponse<CompanyProfileResponse>.Ok(updated, "Company profile updated."));
     }
 
@@ -145,7 +145,7 @@ public sealed class CompanyController(
     public async Task<ActionResult<ApiResponse<CompanyProfileResponse>>> UpdateSettings(UpdateCompanySettingsRequest request)
     {
         using var operation = ServerOperation.CreateWriteScope();
-        var updated = await company.UpdateSettingsAsync(request, operation.Token);
+        var updated = await companyService.UpdateSettingsAsync(request, operation.Token);
         return Ok(ApiResponse<CompanyProfileResponse>.Ok(updated, "Company settings updated."));
     }
 
@@ -155,7 +155,7 @@ public sealed class CompanyController(
         UpdateOperationLimitsRequest request)
     {
         using var operation = ServerOperation.CreateWriteScope();
-        var updated = await company.UpdateOperationLimitsAsync(request, operation.Token);
+        var updated = await companyService.UpdateOperationLimitsAsync(request, operation.Token);
         return Ok(ApiResponse<CompanyProfileResponse>.Ok(updated, "Operation line limits updated."));
     }
 
@@ -164,7 +164,7 @@ public sealed class CompanyController(
     public async Task<ActionResult<ApiResponse<CompanyBranchResponse>>> CreateBranch(UpsertCompanyBranchRequest request)
     {
         using var operation = ServerOperation.CreateWriteScope();
-        var created = await company.CreateBranchAsync(request, operation.Token);
+        var created = await companyService.CreateBranchAsync(request, operation.Token);
         return StatusCode(StatusCodes.Status201Created, ApiResponse<CompanyBranchResponse>.Ok(created, "Branch created."));
     }
 
@@ -173,7 +173,7 @@ public sealed class CompanyController(
     public async Task<ActionResult<ApiResponse<CompanyBranchResponse>>> UpdateBranch(long id, UpsertCompanyBranchRequest request)
     {
         using var operation = ServerOperation.CreateWriteScope();
-        var updated = await company.UpdateBranchAsync(id, request, operation.Token);
+        var updated = await companyService.UpdateBranchAsync(id, request, operation.Token);
         return Ok(ApiResponse<CompanyBranchResponse>.Ok(updated, "Branch updated."));
     }
 }

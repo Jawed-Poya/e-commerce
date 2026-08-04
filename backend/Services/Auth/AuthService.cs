@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using CustomerEntity = API.Entities.Customers.Customer;
 
 namespace ECommerce.Services.Auth;
 
@@ -189,7 +190,7 @@ public sealed class AuthService(
 
             user.LastLoginAt = DateTime.UtcNow;
             EnsureSucceeded(await userManager.UpdateAsync(user), "Could not update login information.");
-            roles = await userManager.GetRolesAsync(user);
+            roles = (await userManager.GetRolesAsync(user)).ToArray();
             await transaction.CommitAsync(cancellationToken);
         }
         catch
@@ -205,7 +206,8 @@ public sealed class AuthService(
     {
         var user = await FindCurrentUserAsync();
         if (user is null) return null;
-        return await BuildUserAsync(user, await userManager.GetRolesAsync(user), cancellationToken);
+        var roles = (await userManager.GetRolesAsync(user)).ToArray();
+        return await BuildUserAsync(user, roles, cancellationToken);
     }
 
     public async Task<UserProfileResponse?> GetProfileAsync(CancellationToken cancellationToken = default)
@@ -331,7 +333,7 @@ public sealed class AuthService(
             identityClaims.FirstOrDefault(claim => claim.Type == AuthClaims.CustomerId)?.Value,
             out var customerId) ? customerId : (long?)null;
 
-        Customer? customer = null;
+        CustomerEntity? customer = null;
         if (linkedCustomerId.HasValue)
         {
             customer = await context.Customers
