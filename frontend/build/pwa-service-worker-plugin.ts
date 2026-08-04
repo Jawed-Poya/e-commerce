@@ -1,10 +1,31 @@
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { Plugin, ResolvedConfig } from "vite";
 
 interface PwaServiceWorkerOptions {
     cachePrefix: string;
+}
+
+/**
+ * Minimal structural types used by the shared plugin.
+ *
+ * The plugin lives outside the web/admin package directories. Importing Vite
+ * types from this shared folder makes Node-style module resolution search from
+ * `frontend/build`, where no local `vite` package exists. A structural contract
+ * keeps the plugin shared and remains compatible with Vite in both apps.
+ */
+interface ResolvedBuildConfig {
+    root: string;
+    build: {
+        outDir: string;
+    };
+}
+
+interface BuildPlugin {
+    name: string;
+    apply: "build";
+    configResolved(resolved: ResolvedBuildConfig): void;
+    closeBundle(): Promise<void>;
 }
 
 async function walk(directory: string, root = directory): Promise<string[]> {
@@ -29,13 +50,13 @@ async function walk(directory: string, root = directory): Promise<string[]> {
  */
 export function pwaServiceWorkerPlugin({
     cachePrefix,
-}: PwaServiceWorkerOptions): Plugin {
-    let config: ResolvedConfig | null = null;
+}: PwaServiceWorkerOptions): BuildPlugin {
+    let config: ResolvedBuildConfig | null = null;
 
     return {
         name: "pharmacy-pwa-service-worker",
         apply: "build",
-        configResolved(resolved) {
+        configResolved(resolved: ResolvedBuildConfig) {
             config = resolved;
         },
         async closeBundle() {
