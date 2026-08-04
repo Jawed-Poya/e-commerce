@@ -32,6 +32,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { dashboardService } from "@/features/dashboard/dashboard-service";
+import { WhatsAppLink } from "@/features/customers/whatsapp-link";
 import type {
     SalesTrendPoint,
     TopProductItem,
@@ -268,7 +269,21 @@ export default function Dashboard() {
                                                 ).toLocaleString()}
                                             </p>
                                         </TableCell>
-                                        <TableCell>{order.customerName}</TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                <div className="min-w-0">
+                                                    <p className="truncate">{order.customerName}</p>
+                                                    <p className="truncate text-[11px] text-muted-foreground">
+                                                        {order.customerPhone}
+                                                    </p>
+                                                </div>
+                                                <WhatsAppLink
+                                                    url={order.whatsAppUrl}
+                                                    customerName={order.customerName}
+                                                    compact
+                                                />
+                                            </div>
+                                        </TableCell>
                                         <TableCell>
                                             <StatusBadge value={order.status} />
                                         </TableCell>

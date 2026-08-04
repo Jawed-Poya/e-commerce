@@ -4,14 +4,20 @@ using ECommerce.Entities.Dashboard.Contracts;
 using ECommerce.Entities.Orders;
 using ECommerce.Services.Notifications;
 using ECommerce.Services.Inventory;
+using ECommerce.Services.Customers;
+using ECommerce.Options;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace ECommerce.Services.Dashboard;
 
 public sealed class AdminDashboardService(
     ApplicationDbContext context,
-    StoreRealtimeMetrics realtimeMetrics) : IAdminDashboardService
+    StoreRealtimeMetrics realtimeMetrics,
+    IOptions<WhatsAppOptions> whatsAppOptions) : IAdminDashboardService
 {
+    private readonly WhatsAppOptions _whatsAppOptions = whatsAppOptions.Value;
+
     public async Task<AdminDashboardResponse> GetAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
@@ -181,20 +187,44 @@ public sealed class AdminDashboardService(
                 item.MinimumQuantity))
             .ToListAsync(cancellationToken);
 
-        var recentOrders = await context.Orders
+        var recentOrderRows = await context.Orders
             .AsNoTracking()
             .OrderByDescending(order => order.CreatedAt)
             .Take(8)
-            .Select(order => new RecentOrderItem(
+            .Select(order => new
+            {
                 order.Id,
                 order.OrderNumber,
-                order.Customer.FirstName + (order.Customer.LastName == null ? "" : " " + order.Customer.LastName),
-                order.Status.ToString(),
-                order.PaymentStatus.ToString(),
+                order.Customer.FirstName,
+                order.Customer.LastName,
+                order.Customer.Phone,
+                Status = order.Status.ToString(),
+                PaymentStatus = order.PaymentStatus.ToString(),
                 order.Total,
                 order.Currency,
-                order.CreatedAt))
+                order.CreatedAt
+            })
             .ToListAsync(cancellationToken);
+
+        var recentOrders = recentOrderRows.Select(order =>
+        {
+            var customerName = (order.FirstName + " " + (order.LastName ?? string.Empty)).Trim();
+            return new RecentOrderItem(
+                order.Id,
+                order.OrderNumber,
+                customerName,
+                order.Phone,
+                WhatsAppLinkBuilder.BuildOrder(
+                    order.Phone,
+                    customerName,
+                    order.OrderNumber,
+                    _whatsAppOptions),
+                order.Status,
+                order.PaymentStatus,
+                order.Total,
+                order.Currency,
+                order.CreatedAt);
+        }).ToList();
 
         return new AdminDashboardResponse(
             new DashboardKpis(

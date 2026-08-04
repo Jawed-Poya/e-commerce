@@ -35,7 +35,8 @@ public sealed class OrderService(
     IAdminNotificationService adminNotifications,
     IStorefrontContentService storefrontContent,
     IInventoryCostService inventoryCosts,
-    IOrderInventoryService orderInventory) : IOrderService
+    IOrderInventoryService orderInventory,
+    IOptions<WhatsAppOptions> whatsAppOptions) : IOrderService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -43,6 +44,7 @@ public sealed class OrderService(
     };
 
     private readonly CommerceOptions _options = commerceOptions.Value;
+    private readonly WhatsAppOptions _whatsAppOptions = whatsAppOptions.Value;
 
     public async Task<CheckoutConfigurationResponse> GetCheckoutConfigurationAsync(
         CancellationToken cancellationToken = default)
@@ -357,6 +359,11 @@ public sealed class OrderService(
             row.OrderNumber,
             BuildName(row.FirstName, row.LastName),
             row.Phone,
+            WhatsAppLinkBuilder.BuildOrder(
+                row.Phone,
+                BuildName(row.FirstName, row.LastName),
+                row.OrderNumber,
+                _whatsAppOptions),
             row.Status,
             row.PaymentStatus,
             ParsePaymentMethod(row.Provider),
@@ -627,6 +634,11 @@ public sealed class OrderService(
             row.OrderNumber,
             BuildName(row.FirstName, row.LastName),
             row.Phone,
+            WhatsAppLinkBuilder.BuildOrder(
+                row.Phone,
+                BuildName(row.FirstName, row.LastName),
+                row.OrderNumber,
+                _whatsAppOptions),
             row.Status,
             row.PaymentStatus,
             ParsePaymentMethod(row.Provider),
@@ -1019,6 +1031,11 @@ public sealed class OrderService(
                 order.Customer.Id,
                 BuildName(order.Customer.FirstName, order.Customer.LastName),
                 order.Customer.Phone,
+                WhatsAppLinkBuilder.BuildOrder(
+                    order.Customer.Phone,
+                    BuildName(order.Customer.FirstName, order.Customer.LastName),
+                    order.OrderNumber,
+                    _whatsAppOptions),
                 order.Customer.Email,
                 order.Customer.CustomerType?.Name),
             address,

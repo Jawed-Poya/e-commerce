@@ -3,6 +3,7 @@ import { Banknote, Box, Clock3, Layers3, MapPin, Phone, Truck, UserRound } from 
 import { Link } from "react-router-dom";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { WhatsAppLink } from "@/features/customers/whatsapp-link";
 import {
     Table,
     TableBody,
@@ -74,6 +75,11 @@ export function OrderCustomerAndShipping({ order }: Pick<OrderPanelProps, "order
                 <CardContent className="space-y-3">
                     <Info icon={<UserRound />} label={t("orders.name")} value={order.customer.name} />
                     <Info icon={<Phone />} label={t("orders.phone")} value={order.customer.phone} />
+                    <WhatsAppLink
+                        url={order.customer.whatsAppUrl}
+                        customerName={order.customer.name}
+                        className="w-full"
+                    />
                     <Info label={t("orders.email")} value={order.customer.email ?? "—"} />
                     <Info
                         label={t("orders.type")}

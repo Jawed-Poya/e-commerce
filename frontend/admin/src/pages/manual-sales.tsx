@@ -37,6 +37,7 @@ import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
 import { useCompany } from "@/features/company/company-context";
 import { ReceiptActions } from "@/features/company/receipt-actions";
+import { WhatsAppLink } from "@/features/customers/whatsapp-link";
 import { useI18n } from "@/i18n/i18n-provider";
 import {
     DocumentLines,
@@ -278,7 +279,14 @@ export default function ManualSalesPage() {
                                             ) : null}
                                         </TableCell>
                                         <TableCell>{date(sale.saleDate)}</TableCell>
-                                        <TableCell>{sale.customerName}</TableCell>
+                                        <TableCell>
+                                            <p>{sale.customerName}</p>
+                                            {sale.customerPhone ? (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {sale.customerPhone}
+                                                </p>
+                                            ) : null}
+                                        </TableCell>
                                         <TableCell>{sale.itemCount}</TableCell>
                                         <TableCell className="text-end">
                                             {formatMoney(sale.total)}
@@ -294,6 +302,11 @@ export default function ManualSalesPage() {
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex justify-end gap-2">
+                                                <WhatsAppLink
+                                                    url={sale.whatsAppUrl}
+                                                    customerName={sale.customerName}
+                                                    compact
+                                                />
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
@@ -366,6 +379,13 @@ export default function ManualSalesPage() {
                                 }
                                 placeholder="Search customer name, phone or email…"
                             />
+                            {selectedCustomer ? (
+                                <WhatsAppLink
+                                    url={selectedCustomer.whatsAppUrl}
+                                    customerName={selectedCustomer.name}
+                                    className="w-full sm:w-auto"
+                                />
+                            ) : null}
                         </div>
                         <Field label="Sale date">
                             <Input

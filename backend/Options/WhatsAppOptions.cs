@@ -16,4 +16,16 @@ public sealed class WhatsAppOptions
     /// </summary>
     public string CustomerMessageTemplate { get; set; } =
         "Hello {CustomerName}, we are contacting you about your account.";
+
+    /// <summary>
+    /// Supported placeholders: {CustomerName}, {Phone}, and {OrderNumber}.
+    /// </summary>
+    public string OrderMessageTemplate { get; set; } =
+        "Hello {CustomerName}, we are contacting you about order {OrderNumber}.";
+
+    /// <summary>
+    /// Supported placeholders: {CustomerName}, {Phone}, and {SaleNumber}.
+    /// </summary>
+    public string SaleMessageTemplate { get; set; } =
+        "Hello {CustomerName}, we are contacting you about sale {SaleNumber}.";
 }

@@ -18,6 +18,7 @@ export interface OrderListItem {
     orderNumber: string;
     customerName: string;
     customerPhone: string;
+    whatsAppUrl: string | null;
     status: OrderStatus;
     paymentStatus: PaymentStatus;
     paymentMethod: PaymentMethod;
@@ -59,7 +60,7 @@ export interface OrderDetails {
     createdAt: string;
     updatedAt: string | null;
     reservationExpiresAt: string | null;
-    customer: { id: number; name: string; phone: string; email: string | null; customerTypeName: string | null };
+    customer: { id: number; name: string; phone: string; whatsAppUrl: string | null; email: string | null; customerTypeName: string | null };
     shippingAddress: { label: string; recipientName: string; phone: string; addressLine1: string; addressLine2: string | null; city: string; state: string | null; country: string; postalCode: string | null };
     items: { id: number; productId: number; productName: string; productBarcode: string | null; quantity: number; unitId: number | null; unitName: string | null; conversionFactor: number; unitPrice: number; discount: number; tax: number; total: number; currency: string }[];
     lotMovements: OrderLotMovement[];

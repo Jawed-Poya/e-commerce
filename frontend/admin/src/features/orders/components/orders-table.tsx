@@ -12,6 +12,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { useCompany } from "@/features/company/company-context";
+import { WhatsAppLink } from "@/features/customers/whatsapp-link";
 import { useI18n } from "@/i18n/i18n-provider";
 import type { OrderListItem } from "../order-types";
 import { OrderStatusBadge } from "./order-status-badge";
@@ -88,10 +89,17 @@ export function OrdersTable({ orders, isLoading, isError }: OrdersTableProps) {
                                               {new Date(order.createdAt).toLocaleString(locale)}
                                           </TableCell>
                                           <TableCell>
-                                              <Button variant="outline" size="sm" render={<Link to={`/orders/${order.id}`} />}>
-                                                  <Eye />
-                                                  {t("orders.view")}
-                                              </Button>
+                                              <div className="flex justify-end gap-2">
+                                                  <WhatsAppLink
+                                                      url={order.whatsAppUrl}
+                                                      customerName={order.customerName}
+                                                      compact
+                                                  />
+                                                  <Button variant="outline" size="sm" render={<Link to={`/orders/${order.id}`} />}>
+                                                      <Eye />
+                                                      {t("orders.view")}
+                                                  </Button>
+                                              </div>
                                           </TableCell>
                                       </TableRow>
                                   ))

@@ -56,6 +56,8 @@ export interface RecentOrderItem {
     id: number;
     orderNumber: string;
     customerName: string;
+    customerPhone: string;
+    whatsAppUrl: string | null;
     status: string;
     paymentStatus: string;
     total: number;

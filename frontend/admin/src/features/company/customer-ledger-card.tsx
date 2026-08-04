@@ -7,16 +7,23 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { WhatsAppLink } from "@/features/customers/whatsapp-link";
 import { useCompany } from "./company-context";
 import { companyService } from "./company-service";
 
 interface CustomerLedgerCardProps {
     customerId: number;
+    customerName: string;
+    whatsAppUrl: string | null;
 }
 
 type Preset = "month" | "quarter" | "year" | "all";
 
-export function CustomerLedgerCard({ customerId }: CustomerLedgerCardProps) {
+export function CustomerLedgerCard({
+    customerId,
+    customerName,
+    whatsAppUrl,
+}: CustomerLedgerCardProps) {
     const { company, formatMoney } = useCompany();
     const [range, setRange] = useState(() => presetDates("month"));
     const [exporting, setExporting] = useState<"excel" | "pdf" | null>(null);
@@ -56,6 +63,10 @@ export function CustomerLedgerCard({ customerId }: CustomerLedgerCardProps) {
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                        <WhatsAppLink
+                            url={whatsAppUrl}
+                            customerName={customerName}
+                        />
                         <Button variant="outline" size="sm" disabled={Boolean(exporting)} onClick={() => void exportLedger("excel")}>
                             {exporting === "excel" ? <LoaderCircle className="animate-spin" /> : <FileSpreadsheet />}
                             Excel

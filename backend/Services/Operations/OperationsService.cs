@@ -7,7 +7,9 @@ using ECommerce.Entities.Products;
 using ECommerce.Services.Customers;
 using ECommerce.Services.Inventory;
 using ECommerce.Services.Company;
+using ECommerce.Options;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace ECommerce.Services.Operations;
 
@@ -16,9 +18,11 @@ public sealed class OperationsService(
     IDefaultCustomerTypeResolver defaultCustomerTypeResolver,
     IInventoryCostService inventoryCosts,
     IInventoryLotAllocator lotAllocator,
-    IBranchContext branchContext) : IOperationsService
+    IBranchContext branchContext,
+    IOptions<WhatsAppOptions> whatsAppOptions) : IOperationsService
 {
     private const string MainWarehouseCode = "MAIN";
+    private readonly WhatsAppOptions _whatsAppOptions = whatsAppOptions.Value;
 
     public async Task<OperationSummary> GetSummaryAsync(CancellationToken ct)
     {
@@ -123,14 +127,24 @@ public sealed class OperationsService(
         if (clean is not null)
             query = query.Where(x => x.FirstName.Contains(clean) || (x.LastName != null && x.LastName.Contains(clean)) || x.Phone.Contains(clean) || (x.Email != null && x.Email.Contains(clean)));
 
-        return await query.OrderByDescending(x => x.CreatedAt).Take(Math.Clamp(take, 1, 500))
-            .Select(x => new OperationCustomerLookup(
+        var rows = await query.OrderByDescending(x => x.CreatedAt).Take(Math.Clamp(take, 1, 500))
+            .Select(x => new
+            {
                 x.Id,
-                (x.FirstName + " " + (x.LastName ?? "")).Trim(),
+                Name = (x.FirstName + " " + (x.LastName ?? "")).Trim(),
                 x.Phone,
                 x.Email,
-                x.CustomerType == null ? null : x.CustomerType.Name))
+                CustomerTypeName = x.CustomerType == null ? null : x.CustomerType.Name
+            })
             .ToListAsync(ct);
+
+        return rows.Select(x => new OperationCustomerLookup(
+            x.Id,
+            x.Name,
+            x.Phone,
+            WhatsAppLinkBuilder.Build(x.Phone, x.Name, _whatsAppOptions),
+            x.Email,
+            x.CustomerTypeName)).ToList();
     }
 
     public async Task<IReadOnlyList<SupplierResponse>> GetSuppliersAsync(string? search, int take, CancellationToken ct)
@@ -414,9 +428,44 @@ public sealed class OperationsService(
                 x.Items.Any(item => item.Product.Name.Contains(clean) ||
                     (item.Product.Barcode != null && item.Product.Barcode.Contains(clean))));
 
-        return await query.OrderByDescending(x => x.SaleDate).ThenByDescending(x => x.Id).Take(500)
-            .Select(x => new InventorySaleListItem(x.Id, x.SaleNumber, x.ReferenceNumber, x.SaleDate, x.Customer != null ? (x.Customer.FirstName + " " + (x.Customer.LastName ?? "")).Trim() : (x.CustomerName ?? "Walk-in customer"), x.Items.Count, x.Total, x.PaidAmount, x.Total > x.PaidAmount ? x.Total - x.PaidAmount : 0, x.PaymentStatus, x.CreatedAt))
+        var rows = await query.OrderByDescending(x => x.SaleDate).ThenByDescending(x => x.Id).Take(500)
+            .Select(x => new
+            {
+                x.Id,
+                x.SaleNumber,
+                x.ReferenceNumber,
+                x.SaleDate,
+                CustomerName = x.Customer != null
+                    ? (x.Customer.FirstName + " " + (x.Customer.LastName ?? "")).Trim()
+                    : (x.CustomerName ?? "Walk-in customer"),
+                CustomerPhone = x.Customer != null ? x.Customer.Phone : x.CustomerPhone,
+                ItemCount = x.Items.Count,
+                x.Total,
+                x.PaidAmount,
+                RemainingAmount = x.Total > x.PaidAmount ? x.Total - x.PaidAmount : 0,
+                x.PaymentStatus,
+                x.CreatedAt
+            })
             .ToListAsync(ct);
+
+        return rows.Select(x => new InventorySaleListItem(
+            x.Id,
+            x.SaleNumber,
+            x.ReferenceNumber,
+            x.SaleDate,
+            x.CustomerName,
+            x.CustomerPhone,
+            WhatsAppLinkBuilder.BuildSale(
+                x.CustomerPhone,
+                x.CustomerName,
+                x.SaleNumber,
+                _whatsAppOptions),
+            x.ItemCount,
+            x.Total,
+            x.PaidAmount,
+            x.RemainingAmount,
+            x.PaymentStatus,
+            x.CreatedAt)).ToList();
     }
 
     public async Task<IReadOnlyList<InventorySaleLotMovementResponse>> GetSaleLotsAsync(
@@ -1111,7 +1160,29 @@ public sealed class OperationsService(
     private static System.Linq.Expressions.Expression<Func<StaffSalaryInstallment, DocumentPaymentResponse>> MapSalaryPayment() => x => new DocumentPaymentResponse(x.Id, x.Amount, x.PaymentDate, x.PaymentMethod, x.ReferenceNumber, x.Notes, x.CreatedAt);
 
     private static PurchaseListItem MapPurchase(Purchase x, string? supplierName) => new(x.Id, x.PurchaseNumber, x.ReferenceNumber, x.PurchaseDate, supplierName, x.Items.Count, x.Total, x.PaidAmount, Math.Max(0, x.Total - x.PaidAmount), x.PaymentStatus, x.Status, x.CreatedAt);
-    private static InventorySaleListItem MapSale(InventorySale x, string customerName) => new(x.Id, x.SaleNumber, x.ReferenceNumber, x.SaleDate, customerName.Trim(), x.Items.Count, x.Total, x.PaidAmount, Math.Max(0, x.Total - x.PaidAmount), x.PaymentStatus, x.CreatedAt);
+    private InventorySaleListItem MapSale(InventorySale x, string customerName)
+    {
+        var cleanName = customerName.Trim();
+        var customerPhone = x.Customer?.Phone ?? x.CustomerPhone;
+        return new InventorySaleListItem(
+            x.Id,
+            x.SaleNumber,
+            x.ReferenceNumber,
+            x.SaleDate,
+            cleanName,
+            customerPhone,
+            WhatsAppLinkBuilder.BuildSale(
+                customerPhone,
+                cleanName,
+                x.SaleNumber,
+                _whatsAppOptions),
+            x.Items.Count,
+            x.Total,
+            x.PaidAmount,
+            Math.Max(0, x.Total - x.PaidAmount),
+            x.PaymentStatus,
+            x.CreatedAt);
+    }
     private static SalaryPaymentResponse MapSalary(StaffSalaryPayment x, string staffName) => new(x.Id, x.StaffId, staffName, x.PeriodYear, x.PeriodMonth, x.BaseSalary, x.Bonus, x.Deduction, x.NetAmount, x.PaidAmount, Math.Max(0, x.NetAmount - x.PaidAmount), x.PaymentStatus, x.PaidDate, x.PaymentMethod, x.ReferenceNumber, x.CreatedAt);
     private static StaffResponse MapStaff(Staff x) => new(x.Id, x.EmployeeNumber, x.FullName, x.Phone, x.Email, x.Position, x.Department, x.HireDate, x.BaseSalary, x.IsActive, x.Address, x.Notes);
     private static SupplierResponse MapSupplier(Supplier x) => new(x.Id, x.Name, x.ContactPerson, x.Phone, x.Email, x.Address, x.TaxNumber, x.IsActive);

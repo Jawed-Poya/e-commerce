@@ -58,6 +58,8 @@ public sealed record RecentOrderItem(
     long Id,
     string OrderNumber,
     string CustomerName,
+    string CustomerPhone,
+    string? WhatsAppUrl,
     string Status,
     string PaymentStatus,
     decimal Total,

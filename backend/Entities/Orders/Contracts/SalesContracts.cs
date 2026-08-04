@@ -82,6 +82,7 @@ public sealed record OrderListItemResponse(
     string OrderNumber,
     string CustomerName,
     string CustomerPhone,
+    string? WhatsAppUrl,
     OrderStatus Status,
     PaymentStatus PaymentStatus,
     PaymentMethod PaymentMethod,
@@ -95,6 +96,7 @@ public sealed record OrderCustomerResponse(
     long Id,
     string Name,
     string Phone,
+    string? WhatsAppUrl,
     string? Email,
     string? CustomerTypeName
 );
