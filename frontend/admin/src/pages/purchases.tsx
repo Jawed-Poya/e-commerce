@@ -191,6 +191,15 @@ export default function PurchasesPage() {
         if (documentItems.some((item) => !isDocumentLineComplete(item))) {
             return toast.error(tr("Complete every purchase line."));
         }
+        const currentDate = today();
+        const expiredItem = documentItems.find(
+            (item) => item.expireDate && item.expireDate < currentDate,
+        );
+        if (expiredItem) {
+            return toast.error(
+                tr("Expired stock cannot be received. Return it to the supplier or record it through quarantine documentation."),
+            );
+        }
         const lotKeys = documentItems.map((item) =>
             [
                 item.productId,

@@ -9,6 +9,7 @@ using ECommerce.Entities.Products.Filters;
 using ECommerce.Entities.Products.Requests;
 using ECommerce.Services.Customers;
 using ECommerce.Services.Company;
+using ECommerce.Services.Inventory;
 using ECommerce.Shared;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -89,10 +90,22 @@ public class ProductService : IProductService
             products = filter.InStock.Value
                 ? products.Where(product => product.UsesDisplayStock
                     ? (product.DisplayStockQuantity ?? 0) > 0
-                    : product.Inventory != null && product.Inventory.Quantity - product.Inventory.ReservedQuantity > 0)
+                    : product.Inventory != null &&
+                      product.Inventory.Quantity - product.Inventory.ReservedQuantity -
+                      (_context.InventoryLots
+                          .Where(lot => lot.ProductId == product.Id &&
+                              lot.ExpiresAt.HasValue && lot.ExpiresAt.Value < today &&
+                              lot.Quantity - lot.ReservedQuantity > 0)
+                          .Sum(lot => (decimal?)(lot.Quantity - lot.ReservedQuantity)) ?? 0) > 0)
                 : products.Where(product => product.UsesDisplayStock
                     ? (product.DisplayStockQuantity ?? 0) <= 0
-                    : product.Inventory == null || product.Inventory.Quantity - product.Inventory.ReservedQuantity <= 0);
+                    : product.Inventory == null ||
+                      product.Inventory.Quantity - product.Inventory.ReservedQuantity -
+                      (_context.InventoryLots
+                          .Where(lot => lot.ProductId == product.Id &&
+                              lot.ExpiresAt.HasValue && lot.ExpiresAt.Value < today &&
+                              lot.Quantity - lot.ReservedQuantity > 0)
+                          .Sum(lot => (decimal?)(lot.Quantity - lot.ReservedQuantity)) ?? 0) <= 0);
         }
 
         var query = products.Select(product => new ProductListProjection
@@ -118,7 +131,14 @@ public class ProductService : IProductService
             InventoryStock = product.Inventory == null ? 0 : product.Inventory.Quantity - product.Inventory.ReservedQuantity,
             Stock = product.UsesDisplayStock
                 ? product.DisplayStockQuantity ?? 0
-                : product.Inventory == null ? 0 : product.Inventory.Quantity - product.Inventory.ReservedQuantity,
+                : product.Inventory == null
+                    ? 0
+                    : product.Inventory.Quantity - product.Inventory.ReservedQuantity -
+                      (_context.InventoryLots
+                          .Where(lot => lot.ProductId == product.Id &&
+                              lot.ExpiresAt.HasValue && lot.ExpiresAt.Value < today &&
+                              lot.Quantity - lot.ReservedQuantity > 0)
+                          .Sum(lot => (decimal?)(lot.Quantity - lot.ReservedQuantity)) ?? 0),
             HasRequestedPrice = product.Prices.Any(price => price.CustomerTypeId == effectiveTypeId),
             Price = product.Prices
                 .Where(price => price.CustomerTypeId == effectiveTypeId)
@@ -218,8 +238,8 @@ public class ProductService : IProductService
                 product.DisplayStockQuantity,
                 product.IsFeatured,
                 product.IsActive,
-                product.Stock,
-                product.InventoryStock,
+                Math.Max(0, product.Stock),
+                Math.Max(0, product.InventoryStock),
                 product.Price,
                 product.OldPrice,
                 product.PriceCustomerTypeName,
@@ -490,11 +510,28 @@ public class ProductService : IProductService
         var requestedTypeId = await _currentCustomer.GetCustomerTypeIdAsync(cancellationToken);
         var effectiveTypeId = requestedTypeId ?? defaultType.Id;
         var resolved = ResolvePrice(product.Prices, effectiveTypeId, defaultType.Id, today);
+        var expiredAvailableQuantity = product.Inventory is null
+            ? 0
+            : await _context.InventoryLots
+                .AsNoTracking()
+                .Where(lot => lot.ProductId == product.Id &&
+                    lot.ExpiresAt.HasValue && lot.ExpiresAt.Value < today &&
+                              lot.Quantity - lot.ReservedQuantity > 0)
+                .SumAsync(lot => (decimal?)(lot.Quantity - lot.ReservedQuantity), cancellationToken) ?? 0;
+        var physicalAvailableQuantity = product.Inventory is null
+            ? 0
+            : InventoryAvailability.PhysicalAvailable(
+                product.Inventory.Quantity,
+                product.Inventory.ReservedQuantity);
+        var sellableAvailableQuantity = product.Inventory is null
+            ? 0
+            : InventoryAvailability.SellableAvailable(
+                product.Inventory.Quantity,
+                product.Inventory.ReservedQuantity,
+                expiredAvailableQuantity);
         var availableBaseQuantity = product.UsesDisplayStock
             ? Math.Max(0, product.DisplayStockQuantity ?? 0)
-            : product.Inventory is null
-                ? 0
-                : Math.Max(0, product.Inventory.Quantity - product.Inventory.ReservedQuantity);
+            : sellableAvailableQuantity;
         var activeConversions = product.UnitConversions
             .Where(conversion => conversion.IsActive)
             .OrderByDescending(conversion => conversion.IsDefault)
@@ -557,14 +594,10 @@ public class ProductService : IProductService
             MaximumValue = product.MaximumValue,
             UsesDisplayStock = product.UsesDisplayStock,
             DisplayStockQuantity = product.DisplayStockQuantity,
-            InventoryStock = product.Inventory is null
-                ? 0
-                : Math.Max(0, product.Inventory.Quantity - product.Inventory.ReservedQuantity),
+            InventoryStock = physicalAvailableQuantity,
             Stock = product.UsesDisplayStock
                 ? Math.Max(0, product.DisplayStockQuantity ?? 0)
-                : product.Inventory is null
-                    ? 0
-                    : Math.Max(0, product.Inventory.Quantity - product.Inventory.ReservedQuantity),
+                : sellableAvailableQuantity,
             CategoryId = product.CategoryId,
             CategoryName = product.Category.Name,
             BrandId = product.BrandId,
@@ -590,7 +623,7 @@ public class ProductService : IProductService
             Inventory = product.Inventory is null ? null : new ProductInventoryDetailsDto(
                 product.Inventory.Quantity,
                 product.Inventory.ReservedQuantity,
-                Math.Max(0, product.Inventory.Quantity - product.Inventory.ReservedQuantity),
+                sellableAvailableQuantity,
                 product.Inventory.MinimumQuantity,
                 product.Inventory.ExpireDate),
             Images = product.Images

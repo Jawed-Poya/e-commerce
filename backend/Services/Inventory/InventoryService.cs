@@ -16,78 +16,139 @@ public sealed class InventoryService(
 {
     public async Task<InventoryOverviewResponse> GetOverviewAsync(InventoryFilter filter, CancellationToken ct = default)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = InventoryAvailability.UtcToday;
         var expiringThreshold = today.AddDays(30);
-        var baseQuery = context.Products.AsNoTracking().Where(x => !x.IsDeleted && !x.UsesDisplayStock);
 
-        var totals = await baseQuery
+        var catalogQuery = context.Products
+            .AsNoTracking()
+            .Where(product => !product.IsDeleted && !product.UsesDisplayStock)
+            .Select(product => new InventoryCatalogProjection
+            {
+                ProductId = product.Id,
+                Name = product.Name,
+                Strength = product.Strength,
+                Barcode = product.Barcode,
+                CategoryId = product.CategoryId,
+                CategoryName = product.Category.Name,
+                UnitName = product.Unit == null ? null : product.Unit.Name,
+                IsActive = product.IsActive,
+                Quantity = product.Inventory == null ? 0 : product.Inventory.Quantity,
+                ReservedQuantity = product.Inventory == null ? 0 : product.Inventory.ReservedQuantity,
+                PhysicalAvailableQuantity = product.Inventory == null
+                    ? 0
+                    : product.Inventory.Quantity - product.Inventory.ReservedQuantity,
+                ExpiredAvailableQuantity = context.InventoryLots
+                    .Where(lot => lot.ProductId == product.Id &&
+                        lot.ExpiresAt.HasValue && lot.ExpiresAt.Value < today &&
+                        lot.Quantity - lot.ReservedQuantity > 0)
+                    .Sum(lot => (decimal?)(lot.Quantity - lot.ReservedQuantity)) ?? 0,
+                MinimumQuantity = product.Inventory == null ? 0 : product.Inventory.MinimumQuantity,
+                ExpireDate = product.Inventory == null ? null : product.Inventory.ExpireDate,
+                ActiveLotCount = context.InventoryLots.Count(lot =>
+                    lot.ProductId == product.Id &&
+                    (lot.Quantity > 0 || lot.ReservedQuantity > 0)),
+                EarliestExpiry = context.InventoryLots
+                    .Where(lot => lot.ProductId == product.Id &&
+                        (lot.Quantity > 0 || lot.ReservedQuantity > 0) &&
+                        lot.ExpiresAt.HasValue)
+                    .Min(lot => lot.ExpiresAt),
+                EarliestSellableExpiry = context.InventoryLots
+                    .Where(lot => lot.ProductId == product.Id &&
+                        lot.Quantity - lot.ReservedQuantity > 0 &&
+                        lot.ExpiresAt.HasValue && lot.ExpiresAt.Value >= today)
+                    .Min(lot => lot.ExpiresAt),
+                PrimaryImageUrl = product.Images
+                    .Where(image => image.IsPrimary)
+                    .Select(image => "/" + image.ImagePath.Replace("\\", "/"))
+                    .FirstOrDefault(),
+                UpdatedAt = product.Inventory == null
+                    ? product.UpdatedAt ?? product.CreatedAt
+                    : product.Inventory.UpdatedAt ?? product.Inventory.CreatedAt
+            });
+
+        var totals = await catalogQuery
             .GroupBy(_ => 1)
             .Select(group => new InventorySummaryProjection
             {
                 TotalProducts = group.Count(),
-                ActiveProducts = group.Count(x => x.IsActive),
-                HealthyProducts = group.Count(x => x.Inventory != null && x.Inventory.Quantity - x.Inventory.ReservedQuantity > x.Inventory.MinimumQuantity),
-                LowStockProducts = group.Count(x => x.Inventory != null && x.Inventory.Quantity - x.Inventory.ReservedQuantity > 0 && x.Inventory.Quantity - x.Inventory.ReservedQuantity <= x.Inventory.MinimumQuantity),
-                OutOfStockProducts = group.Count(x => x.Inventory == null || x.Inventory.Quantity - x.Inventory.ReservedQuantity <= 0),
-                TotalQuantity = group.Sum(x => x.Inventory == null ? 0 : x.Inventory.Quantity),
-                ReservedQuantity = group.Sum(x => x.Inventory == null ? 0 : x.Inventory.ReservedQuantity),
-                AvailableQuantity = group.Sum(x => x.Inventory == null ? 0 : x.Inventory.Quantity - x.Inventory.ReservedQuantity)
+                ActiveProducts = group.Count(item => item.IsActive),
+                HealthyProducts = group.Count(item =>
+                    item.PhysicalAvailableQuantity - item.ExpiredAvailableQuantity > item.MinimumQuantity),
+                LowStockProducts = group.Count(item =>
+                    item.PhysicalAvailableQuantity - item.ExpiredAvailableQuantity > 0 &&
+                    item.PhysicalAvailableQuantity - item.ExpiredAvailableQuantity <= item.MinimumQuantity),
+                OutOfStockProducts = group.Count(item =>
+                    item.PhysicalAvailableQuantity - item.ExpiredAvailableQuantity <= 0),
+                ExpiredProducts = group.Count(item => item.ExpiredAvailableQuantity > 0),
+                TotalQuantity = group.Sum(item => item.Quantity),
+                ReservedQuantity = group.Sum(item => item.ReservedQuantity),
+                AvailableQuantity = group.Sum(item =>
+                    item.PhysicalAvailableQuantity - item.ExpiredAvailableQuantity),
+                ExpiredQuantity = group.Sum(item => item.ExpiredAvailableQuantity)
             })
             .SingleOrDefaultAsync(ct) ?? new InventorySummaryProjection();
 
-        var expiringSoonProducts = await context.InventoryLots.AsNoTracking()
-            .Where(lot => lot.Quantity > 0 &&
+        var expiringSoonProducts = await context.InventoryLots
+            .AsNoTracking()
+            .Where(lot => lot.Quantity - lot.ReservedQuantity > 0 &&
                 lot.ExpiresAt.HasValue && lot.ExpiresAt.Value >= today &&
                 lot.ExpiresAt.Value <= expiringThreshold)
             .Select(lot => lot.ProductId)
             .Distinct()
             .CountAsync(ct);
 
-        var query = baseQuery;
+        var query = catalogQuery;
         var search = filter.Search?.Trim();
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(x => x.Name.Contains(search) || (x.Barcode != null && x.Barcode.Contains(search)));
+            query = query.Where(item =>
+                item.Name.Contains(search) ||
+                (item.Barcode != null && item.Barcode.Contains(search)));
         }
 
         if (filter.CategoryId.HasValue)
-        {
-            query = query.Where(x => x.CategoryId == filter.CategoryId.Value);
-        }
+            query = query.Where(item => item.CategoryId == filter.CategoryId.Value);
 
         if (filter.IsActive.HasValue)
-        {
-            query = query.Where(x => x.IsActive == filter.IsActive.Value);
-        }
+            query = query.Where(item => item.IsActive == filter.IsActive.Value);
 
         query = filter.Status switch
         {
-            InventoryStockStatus.Healthy => query.Where(x => x.Inventory != null && x.Inventory.Quantity - x.Inventory.ReservedQuantity > x.Inventory.MinimumQuantity),
-            InventoryStockStatus.LowStock => query.Where(x => x.Inventory != null && x.Inventory.Quantity - x.Inventory.ReservedQuantity > 0 && x.Inventory.Quantity - x.Inventory.ReservedQuantity <= x.Inventory.MinimumQuantity),
-            InventoryStockStatus.OutOfStock => query.Where(x => x.Inventory == null || x.Inventory.Quantity - x.Inventory.ReservedQuantity <= 0),
+            InventoryStockStatus.Healthy => query.Where(item =>
+                item.PhysicalAvailableQuantity - item.ExpiredAvailableQuantity > item.MinimumQuantity),
+            InventoryStockStatus.LowStock => query.Where(item =>
+                item.PhysicalAvailableQuantity - item.ExpiredAvailableQuantity > 0 &&
+                item.PhysicalAvailableQuantity - item.ExpiredAvailableQuantity <= item.MinimumQuantity),
+            InventoryStockStatus.OutOfStock => query.Where(item =>
+                item.PhysicalAvailableQuantity - item.ExpiredAvailableQuantity <= 0),
+            InventoryStockStatus.Expired => query.Where(item =>
+                item.ExpiredAvailableQuantity > 0),
             _ => query
         };
 
         query = filter.SortBy?.ToLowerInvariant() switch
         {
-            "name" => filter.SortDescending ? query.OrderByDescending(x => x.Name) : query.OrderBy(x => x.Name),
+            "name" => filter.SortDescending
+                ? query.OrderByDescending(item => item.Name)
+                : query.OrderBy(item => item.Name),
             "quantity" => filter.SortDescending
-                ? query.OrderByDescending(x => x.Inventory == null ? 0 : x.Inventory.Quantity)
-                : query.OrderBy(x => x.Inventory == null ? 0 : x.Inventory.Quantity),
+                ? query.OrderByDescending(item => item.Quantity)
+                : query.OrderBy(item => item.Quantity),
             "available" => filter.SortDescending
-                ? query.OrderByDescending(x => x.Inventory == null ? 0 : x.Inventory.Quantity - x.Inventory.ReservedQuantity)
-                : query.OrderBy(x => x.Inventory == null ? 0 : x.Inventory.Quantity - x.Inventory.ReservedQuantity),
+                ? query.OrderByDescending(item => item.PhysicalAvailableQuantity - item.ExpiredAvailableQuantity)
+                : query.OrderBy(item => item.PhysicalAvailableQuantity - item.ExpiredAvailableQuantity),
             "expiry" => filter.SortDescending
-                ? query.OrderByDescending(x => x.Inventory == null ? null : x.Inventory.ExpireDate)
-                : query.OrderBy(x => x.Inventory == null ? null : x.Inventory.ExpireDate),
+                ? query.OrderByDescending(item => item.EarliestExpiry ?? item.ExpireDate)
+                : query.OrderBy(item => item.EarliestExpiry ?? item.ExpireDate),
             "updatedat" => filter.SortDescending
-                ? query.OrderByDescending(x => x.Inventory == null ? x.UpdatedAt ?? x.CreatedAt : x.Inventory.UpdatedAt ?? x.Inventory.CreatedAt)
-                : query.OrderBy(x => x.Inventory == null ? x.UpdatedAt ?? x.CreatedAt : x.Inventory.UpdatedAt ?? x.Inventory.CreatedAt),
+                ? query.OrderByDescending(item => item.UpdatedAt)
+                : query.OrderBy(item => item.UpdatedAt),
             _ => query
-                .OrderBy(x => x.Inventory == null || x.Inventory.Quantity - x.Inventory.ReservedQuantity <= 0
+                .OrderBy(item => item.PhysicalAvailableQuantity - item.ExpiredAvailableQuantity <= 0
                     ? 0
-                    : x.Inventory.Quantity - x.Inventory.ReservedQuantity <= x.Inventory.MinimumQuantity ? 1 : 2)
-                .ThenBy(x => x.Name)
+                    : item.PhysicalAvailableQuantity - item.ExpiredAvailableQuantity <= item.MinimumQuantity ? 1 : 2)
+                .ThenByDescending(item => item.ExpiredAvailableQuantity > 0)
+                .ThenBy(item => item.Name)
         };
 
         var page = Math.Max(1, filter.Page);
@@ -96,59 +157,57 @@ public sealed class InventoryService(
         var rows = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(x => new InventoryRowProjection
-            {
-                ProductId = x.Id,
-                Name = x.Name,
-                Strength = x.Strength,
-                Barcode = x.Barcode,
-                CategoryName = x.Category.Name,
-                UnitName = x.Unit == null ? null : x.Unit.Name,
-                IsActive = x.IsActive,
-                Quantity = x.Inventory == null ? 0 : x.Inventory.Quantity,
-                ReservedQuantity = x.Inventory == null ? 0 : x.Inventory.ReservedQuantity,
-                MinimumQuantity = x.Inventory == null ? 0 : x.Inventory.MinimumQuantity,
-                ExpireDate = x.Inventory == null ? null : x.Inventory.ExpireDate,
-                PrimaryImageUrl = x.Images.Where(image => image.IsPrimary).Select(image => "/" + image.ImagePath.Replace("\\", "/")).FirstOrDefault(),
-                UpdatedAt = x.Inventory == null ? x.UpdatedAt ?? x.CreatedAt : x.Inventory.UpdatedAt ?? x.Inventory.CreatedAt
-            })
             .ToListAsync(ct);
-
-        var pageProductIds = rows.Select(row => row.ProductId).ToArray();
-        var lotSummaries = pageProductIds.Length == 0
-            ? new Dictionary<long, LotSummaryProjection>()
-            : await context.InventoryLots.AsNoTracking()
-                .Where(lot => pageProductIds.Contains(lot.ProductId) && lot.Quantity > 0)
-                .GroupBy(lot => lot.ProductId)
-                .Select(group => new LotSummaryProjection
-                {
-                    ProductId = group.Key,
-                    ActiveLotCount = group.Count(),
-                    EarliestExpiry = group.Where(lot => lot.ExpiresAt.HasValue)
-                        .Min(lot => lot.ExpiresAt)
-                })
-                .ToDictionaryAsync(item => item.ProductId, ct);
 
         var items = rows.Select(row =>
         {
-            var available = row.Quantity - row.ReservedQuantity;
-            var status = available <= 0
+            var sellableAvailable = Math.Max(
+                0,
+                row.PhysicalAvailableQuantity - row.ExpiredAvailableQuantity);
+            var status = sellableAvailable <= 0
                 ? InventoryStockStatus.OutOfStock
-                : available <= row.MinimumQuantity ? InventoryStockStatus.LowStock : InventoryStockStatus.Healthy;
-            lotSummaries.TryGetValue(row.ProductId, out var lotSummary);
-            var expireDate = lotSummary?.EarliestExpiry ?? row.ExpireDate;
-            var isExpiringSoon = expireDate.HasValue && expireDate.Value >= today && expireDate.Value <= expiringThreshold && available > 0;
+                : sellableAvailable <= row.MinimumQuantity
+                    ? InventoryStockStatus.LowStock
+                    : InventoryStockStatus.Healthy;
+            var expireDate = row.EarliestExpiry ?? row.ExpireDate;
+            var isExpiringSoon = row.EarliestSellableExpiry.HasValue &&
+                row.EarliestSellableExpiry.Value <= expiringThreshold &&
+                sellableAvailable > 0;
+
             return new InventoryListItemResponse(
-                row.ProductId, row.Name, row.Strength, row.Barcode, row.CategoryName, row.UnitName, row.IsActive,
-                row.Quantity, row.ReservedQuantity, available, row.MinimumQuantity, expireDate,
-                lotSummary?.ActiveLotCount ?? 0, status, isExpiringSoon, row.PrimaryImageUrl, row.UpdatedAt);
+                row.ProductId,
+                row.Name,
+                row.Strength,
+                row.Barcode,
+                row.CategoryName,
+                row.UnitName,
+                row.IsActive,
+                row.Quantity,
+                row.ReservedQuantity,
+                sellableAvailable,
+                Math.Max(0, row.ExpiredAvailableQuantity),
+                row.MinimumQuantity,
+                expireDate,
+                row.ActiveLotCount,
+                status,
+                isExpiringSoon,
+                row.PrimaryImageUrl,
+                row.UpdatedAt);
         }).ToList();
 
         return new InventoryOverviewResponse(
             new InventorySummaryResponse(
-                totals.TotalProducts, totals.ActiveProducts, totals.HealthyProducts, totals.LowStockProducts,
-                totals.OutOfStockProducts, expiringSoonProducts, totals.TotalQuantity,
-                totals.ReservedQuantity, totals.AvailableQuantity),
+                totals.TotalProducts,
+                totals.ActiveProducts,
+                totals.HealthyProducts,
+                totals.LowStockProducts,
+                totals.OutOfStockProducts,
+                totals.ExpiredProducts,
+                expiringSoonProducts,
+                totals.TotalQuantity,
+                totals.ReservedQuantity,
+                Math.Max(0, totals.AvailableQuantity),
+                Math.Max(0, totals.ExpiredQuantity)),
             new PagedResult<InventoryListItemResponse>
             {
                 Items = items,
@@ -546,7 +605,8 @@ public sealed class InventoryService(
         if (commitQuantity)
         {
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            if (lot.ExpiresAt.HasValue && lot.ExpiresAt.Value < today)
+            if (lot.ExpiresAt.HasValue && lot.ExpiresAt.Value < today &&
+                        lot.Quantity - lot.ReservedQuantity > 0)
                 throw new InvalidOperationException(
                     $"Reserved lot '{DisplayLot(lot)}' expired on {lot.ExpiresAt:yyyy-MM-dd}. Release or replace the batch before completing the sale.");
             if (lot.Quantity + tolerance < quantity)
@@ -721,31 +781,32 @@ public sealed class InventoryService(
         public int HealthyProducts { get; init; }
         public int LowStockProducts { get; init; }
         public int OutOfStockProducts { get; init; }
+        public int ExpiredProducts { get; init; }
         public decimal TotalQuantity { get; init; }
         public decimal ReservedQuantity { get; init; }
         public decimal AvailableQuantity { get; init; }
+        public decimal ExpiredQuantity { get; init; }
     }
 
-    private sealed class LotSummaryProjection
-    {
-        public long ProductId { get; init; }
-        public int ActiveLotCount { get; init; }
-        public DateOnly? EarliestExpiry { get; init; }
-    }
-
-    private sealed class InventoryRowProjection
+    private sealed class InventoryCatalogProjection
     {
         public long ProductId { get; init; }
         public string Name { get; init; } = string.Empty;
         public string? Strength { get; init; }
         public string? Barcode { get; init; }
+        public long CategoryId { get; init; }
         public string CategoryName { get; init; } = string.Empty;
         public string? UnitName { get; init; }
         public bool IsActive { get; init; }
         public decimal Quantity { get; init; }
         public decimal ReservedQuantity { get; init; }
+        public decimal PhysicalAvailableQuantity { get; init; }
+        public decimal ExpiredAvailableQuantity { get; init; }
         public decimal MinimumQuantity { get; init; }
         public DateOnly? ExpireDate { get; init; }
+        public int ActiveLotCount { get; init; }
+        public DateOnly? EarliestExpiry { get; init; }
+        public DateOnly? EarliestSellableExpiry { get; init; }
         public string? PrimaryImageUrl { get; init; }
         public DateTime UpdatedAt { get; init; }
     }

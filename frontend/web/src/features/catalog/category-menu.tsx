@@ -164,6 +164,7 @@ function ActiveCategory({ category }: { category: CategoryNode }) {
                 pageSize: 8,
                 categoryId: category.id,
                 isActive: true,
+                inStock: true,
                 sortBy: "createdAt",
                 sortDescending: true,
             }),

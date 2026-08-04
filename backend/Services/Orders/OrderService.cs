@@ -115,6 +115,10 @@ public sealed class OrderService(
                 throw new InvalidOperationException("One or more products are unavailable.");
 
             var productById = products.ToDictionary(product => product.Id);
+            var expiredAvailableByProduct = await InventoryAvailability.LoadExpiredAvailableByProductAsync(
+                context,
+                productIds,
+                cancellationToken);
             var orderItems = new List<OrderItem>(groupedItems.Count);
             var productCosts = await inventoryCosts.GetCurrentUnitCostsAsync(productIds, cancellationToken);
             var defaultCustomerTypeId = await defaultCustomerType.GetIdAsync(cancellationToken);
@@ -171,9 +175,20 @@ public sealed class OrderService(
                         throw new InvalidOperationException(
                             $"Only {displayQuantity:N3} base unit(s) of '{product.Name}' are currently available to order.");
                 }
-                else if (product.Inventory is null || product.Inventory.AvailableQuantity < requiredBaseQuantity)
+                else
                 {
-                    throw new InvalidOperationException($"Insufficient stock for '{product.Name}'.");
+                    var expiredAvailable = expiredAvailableByProduct.GetValueOrDefault(product.Id);
+                    var sellableAvailable = product.Inventory is null
+                        ? 0
+                        : InventoryAvailability.SellableAvailable(
+                            product.Inventory.Quantity,
+                            product.Inventory.ReservedQuantity,
+                            expiredAvailable);
+                    if (sellableAvailable < requiredBaseQuantity)
+                    {
+                        throw new InvalidOperationException(
+                            $"Only {sellableAvailable:N3} unexpired base unit(s) of '{product.Name}' are available. Expired stock cannot be ordered.");
+                    }
                 }
             }
 

@@ -6,7 +6,8 @@ public enum InventoryStockStatus
 {
     Healthy = 1,
     LowStock = 2,
-    OutOfStock = 3
+    OutOfStock = 3,
+    Expired = 4
 }
 
 public sealed class InventoryFilter : PaginationFilter

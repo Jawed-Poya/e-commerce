@@ -1,4 +1,5 @@
 export type InventoryStatus = "Healthy" | "LowStock" | "OutOfStock";
+export type InventoryFilterStatus = InventoryStatus | "Expired";
 
 export type InventoryTransactionType =
     | "Purchase"
@@ -17,10 +18,12 @@ export interface InventorySummary {
     healthyProducts: number;
     lowStockProducts: number;
     outOfStockProducts: number;
+    expiredProducts: number;
     expiringSoonProducts: number;
     totalQuantity: number;
     reservedQuantity: number;
     availableQuantity: number;
+    expiredQuantity: number;
 }
 
 export interface InventoryListItem {
@@ -34,6 +37,7 @@ export interface InventoryListItem {
     quantity: number;
     reservedQuantity: number;
     availableQuantity: number;
+    expiredQuantity: number;
     minimumQuantity: number;
     expireDate: string | null;
     activeLotCount: number;
@@ -114,7 +118,7 @@ export interface InventoryFilters {
     search?: string;
     page?: number;
     pageSize?: number;
-    status?: InventoryStatus;
+    status?: InventoryFilterStatus;
     categoryId?: number;
     isActive?: boolean;
     sortBy?: "name" | "quantity" | "available" | "expiry" | "updatedAt";

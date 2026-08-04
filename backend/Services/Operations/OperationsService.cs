@@ -31,7 +31,14 @@ public sealed class OperationsService(
         var low = await context.Products.AsNoTracking().CountAsync(product =>
             product.IsActive &&
             !product.UsesDisplayStock &&
-            (product.Inventory == null || product.Inventory.Quantity - product.Inventory.ReservedQuantity <= product.Inventory.MinimumQuantity), ct);
+            (product.Inventory == null ||
+             product.Inventory.Quantity - product.Inventory.ReservedQuantity -
+             (context.InventoryLots
+                 .Where(lot => lot.ProductId == product.Id &&
+                     lot.ExpiresAt.HasValue && lot.ExpiresAt.Value < today &&
+                     lot.Quantity - lot.ReservedQuantity > 0)
+                 .Sum(lot => (decimal?)(lot.Quantity - lot.ReservedQuantity)) ?? 0) <=
+             product.Inventory.MinimumQuantity), ct);
         return new OperationSummary(purchases, sales, expenses, salaries, low);
     }
 
@@ -74,12 +81,21 @@ public sealed class OperationsService(
             .OrderBy(product => product.Name)
             .Take(Math.Clamp(take, 1, 500))
             .ToListAsync(ct);
+        var expiredAvailableByProduct = await InventoryAvailability.LoadExpiredAvailableByProductAsync(
+            context,
+            products.Select(product => product.Id),
+            ct);
 
         return products.Select(product =>
         {
             var availableBaseQuantity = product.UsesDisplayStock
                 ? Math.Max(0, product.DisplayStockQuantity ?? 0)
-                : Math.Max(0, product.Inventory?.Quantity - product.Inventory?.ReservedQuantity ?? 0);
+                : product.Inventory is null
+                    ? 0
+                    : InventoryAvailability.SellableAvailable(
+                        product.Inventory.Quantity,
+                        product.Inventory.ReservedQuantity,
+                        expiredAvailableByProduct.GetValueOrDefault(product.Id));
             var basePrice = ResolveDefaultPrice(product, today);
             var units = BuildOperationUnits(product, availableBaseQuantity, basePrice);
 
@@ -247,9 +263,13 @@ public sealed class OperationsService(
         if (displayOnly is not null)
             throw new ArgumentException("Display-stock products cannot be added to purchases because they do not update physical inventory.");
 
+        var today = InventoryAvailability.UtcToday;
         var normalizedItems = items.Select(item =>
         {
             var product = products[item.ProductId];
+            if (InventoryAvailability.IsExpired(item.ExpireDate, today))
+                throw new ArgumentException(
+                    $"Cannot receive expired stock for '{product.Name}'. Use supplier return or quarantine documentation instead.");
             var selectedUnit = ResolveOperationUnit(product, item.UnitId);
             var baseQuantity = decimal.Round(item.Quantity * selectedUnit.ConversionFactor, 3, MidpointRounding.AwayFromZero);
             var baseUnitCost = decimal.Round(item.UnitCost / selectedUnit.ConversionFactor, 4, MidpointRounding.AwayFromZero);
@@ -461,6 +481,10 @@ public sealed class OperationsService(
         var productIds = items.Select(item => item.ProductId).Distinct().ToArray();
         var products = await LoadProductsForUnitsAsync(productIds, ct);
         EnsureAllProductsExist(productIds, products);
+        var expiredAvailableByProduct = await InventoryAvailability.LoadExpiredAvailableByProductAsync(
+            context,
+            productIds,
+            ct);
 
         var normalizedItems = items.Select(item =>
         {
@@ -470,7 +494,15 @@ public sealed class OperationsService(
             var baseUnitPrice = decimal.Round(item.UnitPrice / selectedUnit.ConversionFactor, 4, MidpointRounding.AwayFromZero);
             if (baseQuantity <= 0)
                 throw new ArgumentException($"The quantity for '{product.Name}' is too small for base-unit precision.");
-            ValidateSaleQuantity(product, baseQuantity, selectedUnit);
+            var availableBaseQuantity = product.UsesDisplayStock
+                ? Math.Max(0, product.DisplayStockQuantity ?? 0)
+                : product.Inventory is null
+                    ? 0
+                    : InventoryAvailability.SellableAvailable(
+                        product.Inventory.Quantity,
+                        product.Inventory.ReservedQuantity,
+                        expiredAvailableByProduct.GetValueOrDefault(product.Id));
+            ValidateSaleQuantity(product, baseQuantity, selectedUnit, availableBaseQuantity);
             return new NormalizedSaleLine(item, product, selectedUnit, baseQuantity, baseUnitPrice);
         }).ToList();
 
@@ -837,16 +869,17 @@ public sealed class OperationsService(
         return new SelectedOperationUnit(conversion.UnitId, conversion.Unit.Name, conversion.ConversionFactor);
     }
 
-    private static void ValidateSaleQuantity(Product product, decimal baseQuantity, SelectedOperationUnit selectedUnit)
+    private static void ValidateSaleQuantity(
+        Product product,
+        decimal baseQuantity,
+        SelectedOperationUnit selectedUnit,
+        decimal availableBaseQuantity)
     {
-
-        var availableBaseQuantity = product.UsesDisplayStock
-            ? Math.Max(0, product.DisplayStockQuantity ?? 0)
-            : Math.Max(0, product.Inventory?.Quantity - product.Inventory?.ReservedQuantity ?? 0);
         if (baseQuantity > availableBaseQuantity)
         {
             var availableSelectedQuantity = availableBaseQuantity / selectedUnit.ConversionFactor;
-            throw new ArgumentException($"Only {availableSelectedQuantity:N3} {selectedUnit.UnitName} of '{product.Name}' are available.");
+            throw new ArgumentException(
+                $"Only {availableSelectedQuantity:N3} unexpired {selectedUnit.UnitName} of '{product.Name}' are available. Expired stock cannot be sold.");
         }
     }
 

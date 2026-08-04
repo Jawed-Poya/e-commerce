@@ -153,8 +153,7 @@ public sealed class InventoryLotAllocator(ApplicationDbContext context) : IInven
         var legacyLot = await context.InventoryLots.SingleOrDefaultAsync(item =>
             item.ProductId == productId &&
             item.WarehouseId == warehouse.Id &&
-            item.LotNumber == legacyNumber &&
-            !item.ExpiresAt.HasValue,
+            item.LotNumber == legacyNumber,
             cancellationToken);
 
         if (legacyLot is null)
@@ -166,9 +165,16 @@ public sealed class InventoryLotAllocator(ApplicationDbContext context) : IInven
                 Warehouse = warehouse,
                 LotNumber = legacyNumber,
                 Quantity = 0,
-                ReservedQuantity = 0
+                ReservedQuantity = 0,
+                ExpiresAt = inventory.ExpireDate
             };
             context.InventoryLots.Add(legacyLot);
+        }
+        else if (!legacyLot.ExpiresAt.HasValue && inventory.ExpireDate.HasValue)
+        {
+            // Older inventory records stored expiry at product-inventory level.
+            // Carry it into the traceable legacy lot so expired stock cannot be sold.
+            legacyLot.ExpiresAt = inventory.ExpireDate;
         }
 
         legacyLot.Quantity += unassignedQuantity;

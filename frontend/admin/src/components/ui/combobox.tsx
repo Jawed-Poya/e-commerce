@@ -65,6 +65,11 @@ function ComboboxInput({
       <ComboboxPrimitive.Input
         render={<InputGroupInput disabled={disabled} />}
         {...props}
+        autoComplete="off"
+        autoCapitalize="none"
+        spellCheck={false}
+        data-1p-ignore="true"
+        data-lpignore="true"
       />
       <InputGroupAddon align="inline-end">
         {showTrigger && (
@@ -269,6 +274,11 @@ function ComboboxChipsInput({
       data-slot="combobox-chip-input"
       className={cn("min-w-16 flex-1 outline-none", className)}
       {...props}
+      autoComplete="off"
+      autoCapitalize="none"
+      spellCheck={false}
+      data-1p-ignore="true"
+      data-lpignore="true"
     />
   )
 }

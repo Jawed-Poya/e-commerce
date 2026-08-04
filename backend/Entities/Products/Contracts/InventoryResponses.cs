@@ -14,10 +14,12 @@ public sealed record InventorySummaryResponse(
     int HealthyProducts,
     int LowStockProducts,
     int OutOfStockProducts,
+    int ExpiredProducts,
     int ExpiringSoonProducts,
     decimal TotalQuantity,
     decimal ReservedQuantity,
-    decimal AvailableQuantity
+    decimal AvailableQuantity,
+    decimal ExpiredQuantity
 );
 
 public sealed record InventoryListItemResponse(
@@ -31,6 +33,7 @@ public sealed record InventoryListItemResponse(
     decimal Quantity,
     decimal ReservedQuantity,
     decimal AvailableQuantity,
+    decimal ExpiredQuantity,
     decimal MinimumQuantity,
     DateOnly? ExpireDate,
     int ActiveLotCount,

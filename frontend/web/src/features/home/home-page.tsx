@@ -76,6 +76,7 @@ export function HomePage() {
         page: 1,
         pageSize: 30,
         isActive: true,
+        inStock: true,
         sortBy: "createdAt",
         sortDescending: true,
     });

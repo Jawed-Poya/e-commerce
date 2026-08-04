@@ -3,6 +3,7 @@ using ECommerce.Data;
 using ECommerce.Entities.Dashboard.Contracts;
 using ECommerce.Entities.Orders;
 using ECommerce.Services.Notifications;
+using ECommerce.Services.Inventory;
 using Microsoft.EntityFrameworkCore;
 
 namespace ECommerce.Services.Dashboard;
@@ -14,6 +15,7 @@ public sealed class AdminDashboardService(
     public async Task<AdminDashboardResponse> GetAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
+        var today = InventoryAvailability.UtcToday;
         var from30Days = now.Date.AddDays(-29);
 
         var productStats = await context.Products
@@ -48,17 +50,38 @@ public sealed class AdminDashboardService(
             .AsNoTracking()
             .CountAsync(notification => !notification.IsDeleted && notification.CreatedAt >= now.AddHours(-24), cancellationToken);
 
-        var inventory = await context.ProductInventories
+        var inventoryAvailability = context.ProductInventories
             .AsNoTracking()
             .Where(item => !item.Product.UsesDisplayStock)
+            .Select(item => new
+            {
+                item.ProductId,
+                ProductName = item.Product.Name,
+                ImageUrl = item.Product.Images
+                    .OrderBy(image => image.SortOrder)
+                    .Select(image => image.ImagePath)
+                    .FirstOrDefault(),
+                item.Quantity,
+                item.ReservedQuantity,
+                item.MinimumQuantity,
+                PhysicalAvailable = item.Quantity - item.ReservedQuantity,
+                ExpiredAvailable = context.InventoryLots
+                    .Where(lot => lot.ProductId == item.ProductId &&
+                        lot.ExpiresAt.HasValue && lot.ExpiresAt.Value < today &&
+                        lot.Quantity - lot.ReservedQuantity > 0)
+                    .Sum(lot => (decimal?)(lot.Quantity - lot.ReservedQuantity)) ?? 0
+            });
+
+        var inventory = await inventoryAvailability
             .GroupBy(_ => 1)
             .Select(group => new InventoryHealthSummary(
-                group.Count(item => item.Quantity - item.ReservedQuantity > item.MinimumQuantity),
-                group.Count(item => item.Quantity - item.ReservedQuantity > 0 && item.Quantity - item.ReservedQuantity <= item.MinimumQuantity),
-                group.Count(item => item.Quantity - item.ReservedQuantity <= 0),
+                group.Count(item => item.PhysicalAvailable - item.ExpiredAvailable > item.MinimumQuantity),
+                group.Count(item => item.PhysicalAvailable - item.ExpiredAvailable > 0 &&
+                    item.PhysicalAvailable - item.ExpiredAvailable <= item.MinimumQuantity),
+                group.Count(item => item.PhysicalAvailable - item.ExpiredAvailable <= 0),
                 group.Sum(item => item.Quantity),
                 group.Sum(item => item.ReservedQuantity),
-                group.Sum(item => item.Quantity - item.ReservedQuantity)))
+                group.Sum(item => item.PhysicalAvailable - item.ExpiredAvailable)))
             .SingleOrDefaultAsync(cancellationToken)
             ?? new InventoryHealthSummary(0, 0, 0, 0, 0, 0);
 
@@ -144,19 +167,17 @@ public sealed class AdminDashboardService(
                 item.Revenue);
         }).ToArray();
 
-        var lowStock = await context.ProductInventories
-            .AsNoTracking()
-            .Where(item => !item.Product.UsesDisplayStock)
-            .Where(item => item.Quantity - item.ReservedQuantity <= item.MinimumQuantity)
-            .OrderBy(item => item.Quantity - item.ReservedQuantity)
+        var lowStock = await inventoryAvailability
+            .Where(item => item.PhysicalAvailable - item.ExpiredAvailable <= item.MinimumQuantity)
+            .OrderBy(item => item.PhysicalAvailable - item.ExpiredAvailable)
             .Take(8)
             .Select(item => new LowStockItem(
                 item.ProductId,
-                item.Product.Name,
-                item.Product.Images.OrderBy(image => image.SortOrder).Select(image => image.ImagePath).FirstOrDefault(),
+                item.ProductName,
+                item.ImageUrl,
                 item.Quantity,
                 item.ReservedQuantity,
-                item.Quantity - item.ReservedQuantity,
+                item.PhysicalAvailable - item.ExpiredAvailable,
                 item.MinimumQuantity))
             .ToListAsync(cancellationToken);
 

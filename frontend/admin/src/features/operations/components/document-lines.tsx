@@ -130,6 +130,7 @@ export function DocumentLines({
     const { formatMoney } = useCompany();
     const { tr } = useI18n();
     const linesContainerRef = useRef<HTMLDivElement>(null);
+    const minimumExpiryDate = new Date().toISOString().slice(0, 10);
     const pendingScrollIndexRef = useRef<number | null>(null);
     const selectedIds = new Set(
         mode === "sale"
@@ -627,6 +628,7 @@ export function DocumentLines({
                                                     <Input
                                                         className="ps-9"
                                                         type="date"
+                                                        min={minimumExpiryDate}
                                                         value={
                                                             item.expireDate ?? ""
                                                         }
