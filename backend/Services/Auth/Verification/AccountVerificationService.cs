@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Net.Mail;
+using System.Net.Mime;
 using System.Security.Cryptography;
 using System.Text;
 using ECommerce.Data;
@@ -79,7 +80,13 @@ public sealed class AccountVerificationService(
         string? developmentCode;
         try
         {
-            developmentCode = await DeliverAsync(channel, destination, code, expiresAt, cancellationToken);
+            developmentCode = await DeliverAsync(
+                channel,
+                destination,
+                user.FullName,
+                code,
+                expiresAt,
+                cancellationToken);
         }
         catch (Exception exception)
         {
@@ -234,6 +241,7 @@ public sealed class AccountVerificationService(
     private async Task<string?> DeliverAsync(
         VerificationChannel channel,
         string destination,
+        string? recipientName,
         string code,
         DateTime expiresAt,
         CancellationToken cancellationToken)
@@ -242,7 +250,12 @@ public sealed class AccountVerificationService(
         {
             if (IsEmailProviderConfigured())
             {
-                await DeliverEmailAsync(destination, code, expiresAt, cancellationToken);
+                await DeliverEmailAsync(
+                    destination,
+                    recipientName,
+                    code,
+                    expiresAt,
+                    cancellationToken);
                 return null;
             }
 
@@ -324,6 +337,7 @@ public sealed class AccountVerificationService(
 
     private async Task DeliverEmailAsync(
         string destination,
+        string? recipientName,
         string code,
         DateTime expiresAt,
         CancellationToken cancellationToken)
@@ -337,14 +351,38 @@ public sealed class AccountVerificationService(
         if (!MailAddress.TryCreate(destination, out var recipient))
             throw new InvalidOperationException("The account email address is not valid.");
 
+        var brand = await GetEmailBrandAsync(email, cancellationToken);
+        var plainText = VerificationEmailTemplate.BuildPlainText(
+            brand,
+            recipientName,
+            code,
+            expiresAt);
+        var html = VerificationEmailTemplate.BuildHtml(
+            brand,
+            recipientName,
+            code,
+            expiresAt);
+
         using var message = new MailMessage(
-            new MailAddress(sender.Address, Clean(email.FromName) ?? "Store"),
+            new MailAddress(sender.Address, Clean(email.FromName) ?? brand.CompanyName),
             recipient)
         {
-            Subject = "Verify your account",
-            Body = $"Your verification code is {code}. It expires at {expiresAt:yyyy-MM-dd HH:mm:ss} UTC.",
+            Subject = VerificationEmailTemplate.BuildSubject(brand),
+            SubjectEncoding = Encoding.UTF8,
+            Body = plainText,
+            BodyEncoding = Encoding.UTF8,
             IsBodyHtml = false
         };
+        message.AlternateViews.Add(
+            AlternateView.CreateAlternateViewFromString(
+                plainText,
+                Encoding.UTF8,
+                MediaTypeNames.Text.Plain));
+        message.AlternateViews.Add(
+            AlternateView.CreateAlternateViewFromString(
+                html,
+                Encoding.UTF8,
+                MediaTypeNames.Text.Html));
 
         using var smtp = new SmtpClient(email.Host.Trim(), email.Port)
         {
@@ -374,6 +412,39 @@ public sealed class AccountVerificationService(
                 $"Email delivery failed through SMTP ({exception.StatusCode}). Check the host, port, TLS mode, username, password, and sender address.",
                 exception);
         }
+    }
+
+    private async Task<VerificationEmailBrand> GetEmailBrandAsync(
+        EmailDeliveryOptions email,
+        CancellationToken cancellationToken)
+    {
+        var company = await context.Companies
+            .AsNoTracking()
+            .Select(item => new
+            {
+                item.Name,
+                item.LogoUrl,
+                item.Email,
+                item.Phone
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var settings = await context.CompanySettings
+            .AsNoTracking()
+            .Select(item => new
+            {
+                item.StorefrontPrimaryColor,
+                item.StorefrontSecondaryColor
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return new VerificationEmailBrand(
+            Clean(company?.Name) ?? Clean(email.FromName) ?? "Store",
+            Clean(company?.LogoUrl),
+            Clean(settings?.StorefrontPrimaryColor) ?? "#0f766e",
+            Clean(settings?.StorefrontSecondaryColor) ?? "#12332d",
+            Clean(company?.Email) ?? ResolveSenderEmail(email),
+            Clean(company?.Phone));
     }
 
     private bool IsSmsProviderConfigured() =>
