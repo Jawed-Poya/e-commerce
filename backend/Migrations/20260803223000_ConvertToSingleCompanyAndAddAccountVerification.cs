@@ -295,8 +295,45 @@ END;
 -- Recreate the most important global indexes removed with TenantId. When legacy
 -- cross-company duplicates exist, keep a non-unique index so upgrade succeeds;
 -- application validation prevents new duplicates until those rows are cleaned.
-IF OBJECT_ID(N'[dbo].[Branches]', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[dbo].[Branches]') AND name=N'IX_Branches_Code')
-    CREATE UNIQUE INDEX [IX_Branches_Code] ON [dbo].[Branches]([Code]);
+-- ASP.NET Identity originally created PhoneNumber as nvarchar(max). SQL Server
+-- cannot use a MAX column as an index key, so normalize it before creating the
+-- filtered lookup index. Values beyond the supported phone length are truncated
+-- and marked unconfirmed rather than aborting the complete company conversion.
+IF OBJECT_ID(N'[dbo].[AspNetUsers]', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.AspNetUsers', N'PhoneNumber') IS NOT NULL
+BEGIN
+    IF COL_LENGTH(N'dbo.AspNetUsers', N'PhoneNumberConfirmed') IS NOT NULL
+        UPDATE [dbo].[AspNetUsers]
+        SET [PhoneNumberConfirmed] = 0
+        WHERE [PhoneNumber] IS NOT NULL
+          AND DATALENGTH(CONVERT(nvarchar(max), [PhoneNumber])) > 128;
+
+    UPDATE [dbo].[AspNetUsers]
+    SET [PhoneNumber] = LEFT([PhoneNumber], 64)
+    WHERE [PhoneNumber] IS NOT NULL
+          AND DATALENGTH(CONVERT(nvarchar(max), [PhoneNumber])) > 128;
+
+    IF EXISTS
+    (
+        SELECT 1
+        FROM sys.columns columnInfo
+        INNER JOIN sys.types typeInfo ON typeInfo.user_type_id = columnInfo.user_type_id
+        WHERE columnInfo.object_id = OBJECT_ID(N'[dbo].[AspNetUsers]')
+          AND columnInfo.name = N'PhoneNumber'
+          AND (typeInfo.name <> N'nvarchar' OR columnInfo.max_length <> 128)
+    )
+        ALTER TABLE [dbo].[AspNetUsers]
+            ALTER COLUMN [PhoneNumber] nvarchar(64) NULL;
+END;
+
+IF OBJECT_ID(N'[dbo].[Branches]', N'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'[dbo].[Branches]') AND name=N'IX_Branches_Code')
+BEGIN
+    IF NOT EXISTS (SELECT Code FROM [dbo].[Branches] GROUP BY Code HAVING COUNT(*) > 1)
+        CREATE UNIQUE INDEX [IX_Branches_Code] ON [dbo].[Branches]([Code]);
+    ELSE
+        CREATE INDEX [IX_Branches_Code] ON [dbo].[Branches]([Code]);
+END;
 
 IF OBJECT_ID(N'[dbo].[AspNetUsers]', N'U') IS NOT NULL
 BEGIN

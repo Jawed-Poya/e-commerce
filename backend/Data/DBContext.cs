@@ -181,6 +181,8 @@ public class ApplicationDbContext
         });
         builder.Entity<User>(entity =>
         {
+            entity.Property(item => item.PhoneNumber)
+                .HasMaxLength(64);
             entity.HasIndex(item => item.NormalizedEmail)
                 .IsUnique()
                 .HasFilter("[NormalizedEmail] IS NOT NULL");

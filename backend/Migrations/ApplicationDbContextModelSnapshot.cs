@@ -1794,7 +1794,8 @@ namespace ECommerce.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PhoneNumber")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
