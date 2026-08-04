@@ -15,11 +15,11 @@ internal sealed record VerificationEmailBrand(
 
 internal static class VerificationEmailTemplate
 {
-    private const string DefaultPrimaryColor = "#0f766e";
-    private const string DefaultSecondaryColor = "#12332d";
-
-    public static string BuildSubject(VerificationEmailBrand brand) =>
-        $"{CleanHeaderText(brand.CompanyName, "Store")} verification code";
+    public static string BuildSubject(VerificationEmailBrand brand)
+    {
+        var companyName = RequireText(brand.CompanyName, "Company name");
+        return $"{CleanHeaderText(companyName)} verification code";
+    }
 
     public static string BuildPlainText(
         VerificationEmailBrand brand,
@@ -27,7 +27,7 @@ internal static class VerificationEmailTemplate
         string code,
         DateTime expiresAt)
     {
-        var companyName = CleanText(brand.CompanyName, "Store");
+        var companyName = RequireText(brand.CompanyName, "Company name");
         var greetingName = CleanText(recipientName, "there");
         var expiresInMinutes = GetRemainingMinutes(expiresAt);
         var expiryText = FormatExpiry(expiresAt);
@@ -56,17 +56,24 @@ internal static class VerificationEmailTemplate
         string code,
         DateTime expiresAt)
     {
-        var companyName = Html(CleanText(brand.CompanyName, "Store"));
+        var rawCompanyName = RequireText(brand.CompanyName, "Company name");
+        var companyName = Html(rawCompanyName);
         var greetingName = Html(CleanText(recipientName, "there"));
-        var primaryColor = NormalizeColor(brand.PrimaryColor, DefaultPrimaryColor);
-        var secondaryColor = NormalizeColor(brand.SecondaryColor, DefaultSecondaryColor);
+        var primaryColor = RequireHexColor(brand.PrimaryColor, "Storefront primary color");
+        var secondaryColor = RequireHexColor(brand.SecondaryColor, "Storefront secondary color");
         var primaryForeground = GetContrastingTextColor(primaryColor);
+        var heroForeground = GetContrastingTextColor(MixColors(primaryColor, secondaryColor, 0.5));
+        var pageBackground = MixColors(primaryColor, "#ffffff", 0.94);
+        var softPrimary = MixColors(primaryColor, "#ffffff", 0.90);
+        var softerPrimary = MixColors(primaryColor, "#ffffff", 0.96);
+        var borderColor = MixColors(primaryColor, "#ffffff", 0.78);
+        var mutedBrandText = MixColors(secondaryColor, "#ffffff", 0.34);
         var expiresInMinutes = GetRemainingMinutes(expiresAt);
         var expiryText = Html(FormatExpiry(expiresAt));
-        var logo = BuildLogo(brand, companyName, primaryColor, primaryForeground);
-        var codeCells = BuildCodeCells(code, primaryColor, secondaryColor);
+        var logo = BuildLogo(brand, companyName, primaryColor, primaryForeground, softerPrimary, borderColor);
+        var codeCells = BuildCodeCells(code, primaryColor, secondaryColor, borderColor);
         var support = BuildHtmlSupport(brand, primaryColor);
-        var preheader = Html($"Your {CleanText(brand.CompanyName, "Store")} verification code is ready and expires soon.");
+        var preheader = Html($"Your {rawCompanyName} verification code is ready and expires soon.");
         var year = DateTime.UtcNow.Year;
         var plural = expiresInMinutes == 1 ? string.Empty : "s";
 
@@ -95,15 +102,15 @@ internal static class VerificationEmailTemplate
                 }
               </style>
             </head>
-            <body style="margin:0;padding:0;background-color:#edf4f2;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#10231f;">
+            <body style="margin:0;padding:0;background-color:{{pageBackground}};font-family:Inter,'Segoe UI',Arial,sans-serif;color:#10231f;">
               <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">{{preheader}}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
 
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background-color:#edf4f2;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background-color:{{pageBackground}};">
                 <tr>
                   <td align="center" style="padding:38px 12px;">
-                    <table role="presentation" class="verification-shell" width="640" cellpadding="0" cellspacing="0" border="0" style="width:640px;max-width:640px;background-color:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 18px 60px rgba(15,51,45,.13);">
+                    <table role="presentation" class="verification-shell" width="640" cellpadding="0" cellspacing="0" border="0" style="width:640px;max-width:640px;background-color:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 18px 60px rgba(15,23,42,.13);">
                       <tr>
-                        <td style="height:7px;background-color:{{primaryColor}};background-image:linear-gradient(90deg,{{primaryColor}},#14b8a6,#f59e0b);font-size:0;line-height:0;">&nbsp;</td>
+                        <td style="height:7px;background-color:{{primaryColor}};background-image:linear-gradient(90deg,{{primaryColor}},{{secondaryColor}});font-size:0;line-height:0;">&nbsp;</td>
                       </tr>
 
                       <tr>
@@ -112,7 +119,7 @@ internal static class VerificationEmailTemplate
                             <tr>
                               <td align="left" valign="middle">{{logo}}</td>
                               <td align="right" valign="middle">
-                                <span style="display:inline-block;padding:8px 13px;border:1px solid #dce9e5;border-radius:999px;background:#f5faf8;color:#526b65;font-size:12px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;">Secure verification</span>
+                                <span style="display:inline-block;padding:8px 13px;border:1px solid {{borderColor}};border-radius:999px;background:{{softerPrimary}};color:{{secondaryColor}};font-size:12px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;">Secure verification</span>
                               </td>
                             </tr>
                           </table>
@@ -125,8 +132,8 @@ internal static class VerificationEmailTemplate
                             <tr>
                               <td>
                                 <div style="width:54px;height:54px;line-height:54px;border-radius:17px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2);text-align:center;font-size:25px;margin-bottom:20px;">✦</div>
-                                <h1 class="hero-title" style="margin:0 0 11px;color:#ffffff;font-size:36px;line-height:43px;font-weight:800;letter-spacing:-1px;">Verify your email</h1>
-                                <p style="margin:0;color:#dff6f0;font-size:16px;line-height:26px;">One quick step keeps your account protected and ready to use.</p>
+                                <h1 class="hero-title" style="margin:0 0 11px;color:{{heroForeground}};font-size:36px;line-height:43px;font-weight:800;letter-spacing:-1px;">Verify your email</h1>
+                                <p style="margin:0;color:{{heroForeground}};opacity:.84;font-size:16px;line-height:26px;">One quick step keeps your account protected and ready to use.</p>
                               </td>
                             </tr>
                           </table>
@@ -142,10 +149,10 @@ internal static class VerificationEmailTemplate
 
                       <tr>
                         <td class="mobile-padding" style="padding:22px 48px 12px;background:#ffffff;">
-                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f8f6;border:1px solid #dce9e5;border-radius:20px;">
+                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:{{softerPrimary}};border:1px solid {{borderColor}};border-radius:20px;">
                             <tr>
                               <td align="center" style="padding:26px 16px 12px;">
-                                <div style="margin-bottom:15px;color:#6b7e79;font-size:11px;line-height:16px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase;">Your verification code</div>
+                                <div style="margin-bottom:15px;color:{{mutedBrandText}};font-size:11px;line-height:16px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase;">Your verification code</div>
                                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;border-spacing:7px 0;border-collapse:separate !important;">
                                   <tr>{{codeCells}}</tr>
                                 </table>
@@ -153,7 +160,7 @@ internal static class VerificationEmailTemplate
                             </tr>
                             <tr>
                               <td align="center" style="padding:10px 16px 25px;">
-                                <span style="display:inline-block;padding:8px 13px;border-radius:999px;background:#ffffff;border:1px solid #d9e7e3;color:{{primaryColor}};font-size:12px;line-height:18px;font-weight:800;">⏱ Expires in {{expiresInMinutes}} minute{{plural}}</span>
+                                <span style="display:inline-block;padding:8px 13px;border-radius:999px;background:#ffffff;border:1px solid {{borderColor}};color:{{primaryColor}};font-size:12px;line-height:18px;font-weight:800;">⏱ Expires in {{expiresInMinutes}} minute{{plural}}</span>
                                 <div style="margin-top:9px;color:#80918d;font-size:11px;line-height:17px;">{{expiryText}}</div>
                               </td>
                             </tr>
@@ -163,11 +170,11 @@ internal static class VerificationEmailTemplate
 
                       <tr>
                         <td class="mobile-padding" style="padding:18px 48px 8px;background:#ffffff;">
-                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-left:4px solid #f59e0b;background:#fffaf0;border-radius:12px;">
+                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-left:4px solid {{primaryColor}};background:{{softPrimary}};border-radius:12px;">
                             <tr>
                               <td style="padding:15px 16px;">
-                                <p style="margin:0 0 4px;color:#7a4a05;font-size:13px;line-height:20px;font-weight:800;">Keep this code private</p>
-                                <p style="margin:0;color:#8b672e;font-size:12px;line-height:19px;">{{companyName}} will never ask you to share this code by phone, chat, or another email.</p>
+                                <p style="margin:0 0 4px;color:{{secondaryColor}};font-size:13px;line-height:20px;font-weight:800;">Keep this code private</p>
+                                <p style="margin:0;color:{{mutedBrandText}};font-size:12px;line-height:19px;">{{companyName}} will never ask you to share this code by phone, chat, or another email.</p>
                               </td>
                             </tr>
                           </table>
@@ -182,7 +189,7 @@ internal static class VerificationEmailTemplate
                       </tr>
 
                       <tr>
-                        <td class="mobile-padding" style="padding:24px 48px;background:#f5f9f8;border-top:1px solid #e2ece9;">
+                        <td class="mobile-padding" style="padding:24px 48px;background:{{softerPrimary}};border-top:1px solid {{borderColor}};">
                           <p style="margin:0 0 6px;color:#536762;font-size:12px;line-height:18px;font-weight:700;">Sent securely by {{companyName}}</p>
                           <p style="margin:0;color:#8a9a96;font-size:11px;line-height:18px;">© {{year}} {{companyName}}. All rights reserved.</p>
                         </td>
@@ -202,7 +209,9 @@ internal static class VerificationEmailTemplate
         VerificationEmailBrand brand,
         string encodedCompanyName,
         string primaryColor,
-        string primaryForeground)
+        string primaryForeground,
+        string softPrimary,
+        string borderColor)
     {
         var logoUrl = CleanText(brand.LogoUrl, string.Empty);
         if (Uri.TryCreate(logoUrl, UriKind.Absolute, out var uri) &&
@@ -212,7 +221,7 @@ internal static class VerificationEmailTemplate
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                   <tr>
                     <td valign="middle" style="padding-right:12px;">
-                      <img src="{Html(uri.AbsoluteUri)}" width="44" height="44" alt="{encodedCompanyName}" style="width:44px;height:44px;object-fit:contain;border-radius:13px;background:#f3f8f6;border:1px solid #dce9e5;">
+                      <img src="{Html(uri.AbsoluteUri)}" width="44" height="44" alt="{encodedCompanyName}" style="width:44px;height:44px;object-fit:contain;border-radius:13px;background:{softPrimary};border:1px solid {borderColor};">
                     </td>
                     <td valign="middle" class="brand-name" style="max-width:300px;color:#10231f;font-size:19px;line-height:24px;font-weight:800;letter-spacing:-.2px;">{encodedCompanyName}</td>
                   </tr>
@@ -233,14 +242,14 @@ internal static class VerificationEmailTemplate
             """;
     }
 
-    private static string BuildCodeCells(string code, string primaryColor, string secondaryColor)
+    private static string BuildCodeCells(string code, string primaryColor, string secondaryColor, string borderColor)
     {
         var safeCode = new string(code.Where(char.IsDigit).Take(6).ToArray()).PadRight(6, '•');
         var builder = new StringBuilder();
         foreach (var character in safeCode)
         {
             builder.Append($"""
-                <td class="code-cell" width="44" height="58" align="center" valign="middle" style="width:44px;height:58px;border:1px solid #cfe0db;border-bottom:3px solid {primaryColor};border-radius:12px;background:#ffffff;color:{secondaryColor};font-family:'SFMono-Regular',Consolas,'Liberation Mono',monospace;font-size:30px;line-height:30px;font-weight:900;">{Html(character.ToString())}</td>
+                <td class="code-cell" width="44" height="58" align="center" valign="middle" style="width:44px;height:58px;border:1px solid {borderColor};border-bottom:3px solid {primaryColor};border-radius:12px;background:#ffffff;color:{secondaryColor};font-family:'SFMono-Regular',Consolas,'Liberation Mono',monospace;font-size:30px;line-height:30px;font-weight:900;">{Html(character.ToString())}</td>
                 """);
         }
 
@@ -292,23 +301,38 @@ internal static class VerificationEmailTemplate
 
     private static string GetInitials(string? companyName)
     {
-        var words = CleanText(companyName, "Store")
+        var words = RequireText(companyName, "Company name")
             .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (words.Length == 0)
-            return "ST";
         if (words.Length == 1)
             return words[0][..Math.Min(2, words[0].Length)].ToUpperInvariant();
         return $"{words[0][0]}{words[^1][0]}".ToUpperInvariant();
     }
 
-    private static string NormalizeColor(string? value, string fallback)
+    private static string RequireHexColor(string? value, string name)
     {
-        var color = CleanText(value, fallback);
+        var color = RequireText(value, name);
         if (color.Length == 4 && color[0] == '#' && color[1..].All(Uri.IsHexDigit))
             return $"#{color[1]}{color[1]}{color[2]}{color[2]}{color[3]}{color[3]}".ToLowerInvariant();
         if (color.Length == 7 && color[0] == '#' && color[1..].All(Uri.IsHexDigit))
             return color.ToLowerInvariant();
-        return fallback;
+
+        throw new InvalidOperationException($"{name} must use the #RRGGBB format before verification emails can be sent.");
+    }
+
+    private static string MixColors(string first, string second, double secondWeight)
+    {
+        var weight = Math.Clamp(secondWeight, 0, 1);
+        var firstRed = Convert.ToInt32(first.Substring(1, 2), 16);
+        var firstGreen = Convert.ToInt32(first.Substring(3, 2), 16);
+        var firstBlue = Convert.ToInt32(first.Substring(5, 2), 16);
+        var secondRed = Convert.ToInt32(second.Substring(1, 2), 16);
+        var secondGreen = Convert.ToInt32(second.Substring(3, 2), 16);
+        var secondBlue = Convert.ToInt32(second.Substring(5, 2), 16);
+
+        var red = (int)Math.Round(firstRed * (1 - weight) + secondRed * weight);
+        var green = (int)Math.Round(firstGreen * (1 - weight) + secondGreen * weight);
+        var blue = (int)Math.Round(firstBlue * (1 - weight) + secondBlue * weight);
+        return $"#{red:x2}{green:x2}{blue:x2}";
     }
 
     private static string GetContrastingTextColor(string color)
@@ -320,10 +344,16 @@ internal static class VerificationEmailTemplate
         return luminance > 0.62 ? "#10231f" : "#ffffff";
     }
 
-    private static string CleanHeaderText(string? value, string fallback) =>
-        CleanText(value, fallback)
-            .Replace('\r', ' ')
-            .Replace('\n', ' ');
+    private static string CleanHeaderText(string value) =>
+        value.Replace('\r', ' ').Replace('\n', ' ');
+
+    private static string RequireText(string? value, string name)
+    {
+        var clean = value?.Trim();
+        return string.IsNullOrWhiteSpace(clean)
+            ? throw new InvalidOperationException($"{name} must be configured before verification emails can be sent.")
+            : clean;
+    }
 
     private static string CleanText(string? value, string fallback)
     {

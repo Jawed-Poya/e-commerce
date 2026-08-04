@@ -364,7 +364,7 @@ public sealed class AccountVerificationService(
             expiresAt);
 
         using var message = new MailMessage(
-            new MailAddress(sender.Address, Clean(email.FromName) ?? brand.CompanyName),
+            new MailAddress(sender.Address, brand.CompanyName),
             recipient)
         {
             Subject = VerificationEmailTemplate.BuildSubject(brand),
@@ -427,7 +427,7 @@ public sealed class AccountVerificationService(
                 item.Email,
                 item.Phone
             })
-            .FirstOrDefaultAsync(cancellationToken);
+            .SingleOrDefaultAsync(cancellationToken);
 
         var settings = await context.CompanySettings
             .AsNoTracking()
@@ -436,15 +436,32 @@ public sealed class AccountVerificationService(
                 item.StorefrontPrimaryColor,
                 item.StorefrontSecondaryColor
             })
-            .FirstOrDefaultAsync(cancellationToken);
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (company is null)
+            throw new InvalidOperationException(
+                "Company profile must be configured before verification emails can be sent.");
+        if (settings is null)
+            throw new InvalidOperationException(
+                "Company storefront colors must be configured before verification emails can be sent.");
+
+        var companyName = Clean(company.Name)
+            ?? throw new InvalidOperationException(
+                "Company name must be configured before verification emails can be sent.");
+        var primaryColor = Clean(settings.StorefrontPrimaryColor)
+            ?? throw new InvalidOperationException(
+                "Storefront primary color must be configured before verification emails can be sent.");
+        var secondaryColor = Clean(settings.StorefrontSecondaryColor)
+            ?? throw new InvalidOperationException(
+                "Storefront secondary color must be configured before verification emails can be sent.");
 
         return new VerificationEmailBrand(
-            Clean(company?.Name) ?? Clean(email.FromName) ?? "Store",
-            Clean(company?.LogoUrl),
-            Clean(settings?.StorefrontPrimaryColor) ?? "#0f766e",
-            Clean(settings?.StorefrontSecondaryColor) ?? "#12332d",
-            Clean(company?.Email) ?? ResolveSenderEmail(email),
-            Clean(company?.Phone));
+            companyName,
+            Clean(company.LogoUrl),
+            primaryColor,
+            secondaryColor,
+            Clean(company.Email) ?? ResolveSenderEmail(email),
+            Clean(company.Phone));
     }
 
     private bool IsSmsProviderConfigured() =>
