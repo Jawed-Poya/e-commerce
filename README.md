@@ -65,7 +65,24 @@ AccountVerification__Sms__WebhookUrl=https://sms-provider.example.com/send
 AccountVerification__Sms__BearerToken=...
 ```
 
-In Development, when a delivery provider is not configured, the verification code is written to the backend log. Production refuses to dispatch codes until the selected provider and hash key are configured.
+The repository intentionally contains no real SMTP or SMS credentials. Configure them through environment variables, user secrets, IIS environment variables, or your deployment secret store. Empty values in `appsettings.json` do not send email or SMS.
+
+When the backend runs in Development and a provider is completely unconfigured, the API returns a development-only code and writes the same code to the backend log. The storefront fills that code into the confirmation field so the verification flow can still be tested locally. A partially configured SMTP provider returns a precise configuration error instead of pretending the message was sent. Production never returns verification codes and refuses to dispatch until the selected provider and hash key are configured.
+
+For a local shell, set the values before starting the backend:
+
+```text
+AccountVerification__HashKey=<at-least-32-random-bytes>
+AccountVerification__Email__Host=<smtp-host>
+AccountVerification__Email__Port=587
+AccountVerification__Email__UserName=<smtp-user>
+AccountVerification__Email__Password=<smtp-password-or-app-password>
+AccountVerification__Email__FromEmail=<verified-sender-address>
+AccountVerification__Email__FromName=Store
+AccountVerification__Email__EnableSsl=true
+```
+
+The SMS endpoint is a provider adapter, not a built-in SMS gateway. Your configured URL must accept the documented `{ to, message }` JSON payload and return a successful HTTP status. Providers with a different request format need a small provider-specific adapter.
 
 ## Expiry alert periods
 

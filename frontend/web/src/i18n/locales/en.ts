@@ -443,6 +443,7 @@ export const en: Messages = {
     "account.confirmCode": "Confirm code",
     "account.alreadyVerified": "This contact is already verified.",
     "account.codeSent": "A verification code was sent to {destination}.",
+    "account.developmentCode": "Development mode: no delivery provider is configured. Use code {code}.",
     "account.verificationComplete": "Your contact was verified successfully.",
     "account.verificationError": "Verification could not be completed.",
     "checkout.verifyBeforeOrder": "Verify your account before ordering",

@@ -114,9 +114,12 @@ public sealed class AuthController(
         try
         {
             var result = await verification.SendAsync(request.Channel, cancellationToken);
-            return Ok(ApiResponse<VerificationDispatchResponse>.Ok(result, result.AlreadyVerified
+            var message = result.AlreadyVerified
                 ? "This contact is already verified."
-                : "Verification code sent."));
+                : result.DevelopmentCode is null
+                    ? "Verification code sent."
+                    : "Development verification code generated.";
+            return Ok(ApiResponse<VerificationDispatchResponse>.Ok(result, message));
         }
         catch (UnauthorizedAccessException exception)
         {

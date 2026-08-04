@@ -6,6 +6,7 @@ public sealed class AccountVerificationOptions
     public int CodeLifetimeMinutes { get; set; } = 10;
     public int ResendCooldownSeconds { get; set; } = 60;
     public int MaximumAttempts { get; set; } = 5;
+    public int DeliveryTimeoutSeconds { get; set; } = 30;
     public string HashKey { get; set; } = string.Empty;
     public EmailDeliveryOptions Email { get; set; } = new();
     public SmsDeliveryOptions Sms { get; set; } = new();

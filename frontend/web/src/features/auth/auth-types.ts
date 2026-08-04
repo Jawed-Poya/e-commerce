@@ -41,4 +41,5 @@ export interface VerificationDispatch {
     destination: string;
     expiresAt: string;
     alreadyVerified: boolean;
+    developmentCode: string | null;
 }

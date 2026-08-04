@@ -66,4 +66,5 @@ public sealed record VerificationDispatchResponse(
     VerificationChannel Channel,
     string Destination,
     DateTime ExpiresAt,
-    bool AlreadyVerified);
+    bool AlreadyVerified,
+    string? DevelopmentCode);

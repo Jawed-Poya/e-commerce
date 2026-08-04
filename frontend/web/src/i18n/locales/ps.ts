@@ -445,6 +445,7 @@ export const ps: Messages = {
     "account.confirmCode": "کوډ تایید کړئ",
     "account.alreadyVerified": "دا د اړیکې معلومات مخکې تایید شوي دي.",
     "account.codeSent": "د تایید کوډ {destination} ته ولېږل شو.",
+    "account.developmentCode": "د پراختیا حالت: د لېږلو خدمت نه دی تنظیم شوی. د {code} کوډ وکاروئ.",
     "account.verificationComplete": "ستاسو د اړیکې معلومات په بریالیتوب تایید شول.",
     "account.verificationError": "تایید بشپړ نه شو.",
     "checkout.verifyBeforeOrder": "له فرمایش مخکې خپل حساب تایید کړئ",

@@ -50,12 +50,16 @@ export function AccountPage() {
         setVerificationBusy(true);
         setVerificationError(null);
         setVerificationMessage(null);
+        setVerificationCode("");
         try {
             const result = await sendVerificationCode(channel);
-            setVerificationChannel(channel);
+            setVerificationChannel(result.alreadyVerified ? null : channel);
+            setVerificationCode(result.alreadyVerified ? "" : result.developmentCode ?? "");
             setVerificationMessage(result.alreadyVerified
                 ? t("account.alreadyVerified")
-                : t("account.codeSent", { destination: result.destination }));
+                : result.developmentCode
+                    ? t("account.developmentCode", { code: result.developmentCode })
+                    : t("account.codeSent", { destination: result.destination }));
         } catch (error) {
             setVerificationError(error instanceof ApiError ? error.message : t("account.verificationError"));
         } finally {

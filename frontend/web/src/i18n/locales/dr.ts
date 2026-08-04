@@ -445,6 +445,7 @@ export const dr: Messages = {
     "account.confirmCode": "تأیید کد",
     "account.alreadyVerified": "این راه ارتباطی قبلاً تأیید شده است.",
     "account.codeSent": "کد تأیید به {destination} ارسال شد.",
+    "account.developmentCode": "حالت توسعه: ارائه‌دهنده ارسال تنظیم نشده است. از کد {code} استفاده کنید.",
     "account.verificationComplete": "راه ارتباطی شما موفقانه تأیید شد.",
     "account.verificationError": "تأیید انجام نشد.",
     "checkout.verifyBeforeOrder": "پیش از سفارش حساب خود را تأیید کنید",
