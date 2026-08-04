@@ -6,9 +6,11 @@ import { Button } from "../../shared/components/ui/button";
 import { cn } from "../../shared/lib/utils";
 import { useStoreNotifications } from "./notification-context";
 import { useI18n } from "../../i18n/i18n-provider";
+import { useCompany } from "../company/company-context";
 
 export function NotificationCenter() {
     const notifications = useStoreNotifications();
+    const { company } = useCompany();
     const { language, t } = useI18n();
     const locale = language === "en" ? "en-US" : "fa-AF";
 
@@ -61,7 +63,7 @@ export function NotificationCenter() {
                     {notifications.permission !== "granted" && (
                         <div className="border-b bg-primary/5 p-4">
                             <p className="text-xs leading-5 text-muted-foreground">
-                                {t("notifications.enableDescription")}
+                                {t("notifications.enableDescription", { company: company?.name ?? "" })}
                             </p>
                             <Button
                                 size="sm"

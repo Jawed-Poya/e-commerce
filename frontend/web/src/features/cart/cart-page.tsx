@@ -50,19 +50,19 @@ export function CartPage() {
 
     if (!cart.items.length) {
         return (
-            <main className="relative grid min-h-[70vh] place-items-center overflow-hidden px-4 py-20">
+            <main className="relative grid min-h-[62vh] place-items-center overflow-hidden px-4 py-14">
                 <div className="pointer-events-none absolute left-1/2 top-1/2 size-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/10 blur-3xl" />
 
                 <div className="relative mx-auto max-w-xl text-center">
-                    <span className="mx-auto grid size-20 place-items-center rounded-[28px] border bg-background text-primary shadow-xl shadow-primary/10 sm:size-24">
+                    <span className="mx-auto grid size-16 place-items-center rounded-2xl border bg-background text-primary shadow-xl shadow-primary/10 sm:size-20">
                         <ShoppingBag className="size-8 sm:size-10" />
                     </span>
 
-                    <p className="mt-7 text-xs font-bold uppercase tracking-[0.2em] text-primary">
+                    <p className="mt-5 text-xs font-bold uppercase tracking-[0.2em] text-primary">
                         {t("cart.title")}
                     </p>
 
-                    <h1 className="mt-3 text-3xl font-black tracking-[-0.04em] sm:text-5xl">
+                    <h1 className="mt-1.5 text-2xl font-black tracking-[-0.035em] sm:text-4xl">
                         {t("cart.emptyTitle")}
                     </h1>
 
@@ -73,7 +73,7 @@ export function CartPage() {
                     <Button
                         asChild
                         size="lg"
-                        className="mt-7 h-12 rounded-xl px-7 font-bold"
+                        className="mt-6 h-11 rounded-lg px-6 font-bold"
                     >
                         <Link viewTransition to="/products">
                             {t("wishlist.explore")}
@@ -87,14 +87,14 @@ export function CartPage() {
 
     return (
         <>
-            <main className="mx-auto w-full max-w-[1500px] px-4 pb-32 pt-7 sm:px-6 sm:pb-14 lg:px-8 lg:py-12">
-                <div className="flex flex-col justify-between gap-4 border-b pb-6 sm:flex-row sm:items-end">
+            <main className="mx-auto w-full max-w-[1380px] px-4 pb-28 pt-6 sm:px-6 sm:pb-12 lg:px-8 lg:py-9">
+                <div className="flex flex-col justify-between gap-4 border-b pb-5 sm:flex-row sm:items-end">
                     <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary sm:text-xs">
                             {t("checkout.orderSummary")}
                         </p>
 
-                        <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-5xl">
+                        <h1 className="mt-1.5 text-3xl font-black tracking-[-0.035em] sm:text-4xl">
                             {t("cart.title")}
                         </h1>
 
@@ -106,7 +106,7 @@ export function CartPage() {
                     <Button
                         asChild
                         variant="outline"
-                        className="hidden rounded-xl sm:flex"
+                        className="hidden rounded-lg sm:flex"
                     >
                         <Link viewTransition to="/products">
                             {t("common.continueShopping")}
@@ -115,17 +115,17 @@ export function CartPage() {
                     </Button>
                 </div>
 
-                <div className="mt-7 grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-10">
+                <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-6">
                     <section className="min-w-0">
-                        <div className="grid gap-3 sm:gap-4">
+                        <div className="grid gap-3">
                             {cart.items.map((item) => (
                                 <article
                                     key={item.lineKey}
-                                    className="grid min-w-0 grid-cols-[105px_minmax(0,1fr)] gap-3 rounded-2xl border bg-card p-2.5 shadow-[0_6px_22px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-md sm:grid-cols-[130px_minmax(0,1fr)_auto] sm:gap-5 sm:p-4"
+                                    className="grid min-w-0 grid-cols-[92px_minmax(0,1fr)] gap-3 rounded-xl border bg-card p-2.5 shadow-[0_6px_22px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-md sm:grid-cols-[112px_minmax(0,1fr)_auto] sm:gap-4 sm:p-3.5"
                                 >
                                     <Link viewTransition
                                         to={productPath(item)}
-                                        className="relative block overflow-hidden rounded-xl bg-muted"
+                                        className="relative block overflow-hidden rounded-lg bg-muted"
                                     >
                                         <img
                                             className="aspect-square size-full object-cover transition-transform duration-500 hover:scale-105"
@@ -156,17 +156,17 @@ export function CartPage() {
                                             {formatMoney(item.price)} {item.unitName ? `/ ${item.unitName}` : t("cart.each")}
                                         </p>
 
-                                        <p className="mt-2 text-lg font-black tracking-tight sm:hidden">
+                                        <p className="mt-1.5 text-base font-black tracking-tight sm:hidden">
                                             {formatMoney(item.price * item.quantity)}
                                         </p>
 
-                                        <div className="mt-auto flex items-end justify-between gap-3 pt-3">
-                                            <div className="inline-flex h-9 items-center overflow-hidden rounded-xl border bg-background shadow-sm">
+                                        <div className="mt-auto flex items-end justify-between gap-3 pt-2.5">
+                                            <div className="inline-flex h-8 items-center overflow-hidden rounded-lg border bg-background shadow-sm">
                                                 <Button
                                                     type="button"
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="size-9 rounded-none"
+                                                    className="size-8 rounded-none"
                                                     disabled={
                                                         item.quantity <= minimumCartQuantity(item)
                                                     }
@@ -190,7 +190,7 @@ export function CartPage() {
                                                     type="button"
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="size-9 rounded-none"
+                                                    className="size-8 rounded-none"
                                                     disabled={
                                                         item.quantity >= maximumCartQuantity(item)
                                                     }
@@ -210,7 +210,7 @@ export function CartPage() {
                                                 type="button"
                                                 variant="ghost"
                                                 size="icon"
-                                                className="size-9 shrink-0 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive sm:hidden"
+                                                className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive sm:hidden"
                                                 onClick={() =>
                                                     cart.removeItem(item.lineKey)
                                                 }
@@ -221,13 +221,13 @@ export function CartPage() {
                                         </div>
                                     </div>
 
-                                    <div className="hidden min-w-32 flex-col items-end justify-between py-1 sm:flex">
+                                    <div className="hidden min-w-28 flex-col items-end justify-between py-1 sm:flex">
                                         <div className="text-end">
                                             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                                                 {t("cart.itemTotal")}
                                             </p>
 
-                                            <p className="mt-1 text-xl font-black tracking-tight">
+                                            <p className="mt-1 text-lg font-black tracking-tight">
                                                 {formatMoney(item.price * item.quantity)}
                                             </p>
                                         </div>
@@ -250,9 +250,9 @@ export function CartPage() {
                         </div>
 
                         {rules?.shippingEnabled && threshold > 0 && subtotal < threshold && (
-                            <div className="mt-5 rounded-2xl border border-primary/15 bg-primary/5 p-4">
+                            <div className="mt-4 rounded-xl border border-primary/15 bg-primary/5 p-3.5">
                                 <div className="flex items-start gap-3">
-                                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                                    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
                                         <Truck className="size-5" />
                                     </span>
 
@@ -269,7 +269,7 @@ export function CartPage() {
                                             </span>
                                         </div>
 
-                                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-primary/10">
+                                        <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-primary/10">
                                             <div
                                                 className="h-full rounded-full bg-primary transition-all"
                                                 style={{
@@ -286,19 +286,19 @@ export function CartPage() {
                         )}
                     </section>
 
-                    <aside className="sticky top-32 hidden h-max overflow-hidden rounded-2xl border bg-card shadow-[0_18px_45px_rgba(15,23,42,0.08)] lg:block">
-                        <div className="border-b bg-muted/25 p-6">
+                    <aside className="sticky top-28 hidden h-max overflow-hidden rounded-xl border bg-card shadow-[0_18px_45px_rgba(15,23,42,0.08)] lg:block">
+                        <div className="border-b bg-muted/25 p-4">
                             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
                                 {t("checkout.orderSummary")}
                             </p>
 
-                            <h2 className="mt-2 text-3xl font-black tracking-[-0.04em]">
+                            <h2 className="mt-1.5 text-2xl font-black tracking-[-0.04em]">
                                 {formatMoney(total)}
                             </h2>
                         </div>
 
-                        <div className="p-6">
-                            <div className="grid gap-4 text-sm">
+                        <div className="p-4">
+                            <div className="grid gap-3 text-sm">
                                 <div className="flex items-center justify-between text-muted-foreground">
                                     <span>{t("common.subtotal")}</span>
 
@@ -317,7 +317,7 @@ export function CartPage() {
                                     </span>
                                 </div>
 
-                                <div className="flex items-center justify-between border-t pt-4 text-base font-bold">
+                                <div className="flex items-center justify-between border-t pt-3 text-base font-bold">
                                     <span>{t("common.total")}</span>
                                     <span className="text-xl">
                                         {formatMoney(total)}
@@ -327,7 +327,7 @@ export function CartPage() {
 
                             <Button
                                 asChild
-                                className="mt-6 h-12 w-full rounded-xl font-bold shadow-md shadow-primary/15"
+                                className="mt-4 h-11 w-full rounded-lg font-bold shadow-md shadow-primary/15"
                                 size="lg"
                             >
                                 <Link viewTransition to="/checkout">
@@ -336,7 +336,7 @@ export function CartPage() {
                                 </Link>
                             </Button>
 
-                            <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
+                            <p className="mt-3 text-center text-xs leading-5 text-muted-foreground">
                                 {t("cart.checkoutDisclaimer")}
                             </p>
                         </div>
@@ -344,14 +344,14 @@ export function CartPage() {
                 </div>
             </main>
 
-            <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-4 py-3 shadow-[0_-12px_35px_rgba(15,23,42,0.1)] backdrop-blur-xl lg:hidden">
+            <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-4 py-2.5 shadow-[0_-12px_35px_rgba(15,23,42,0.1)] backdrop-blur-xl lg:hidden">
                 <div className="mx-auto flex max-w-xl items-center gap-4">
                     <div className="min-w-0">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                             {t("common.total")}
                         </p>
 
-                        <p className="truncate text-xl font-black tracking-tight">
+                        <p className="truncate text-lg font-black tracking-tight">
                             {formatMoney(total)}
                         </p>
 
@@ -362,7 +362,7 @@ export function CartPage() {
                         </p>
                     </div>
 
-                    <Button asChild className="ms-auto h-12 min-w-44 rounded-xl px-5 font-bold shadow-md shadow-primary/15">
+                    <Button asChild className="ms-auto h-11 min-w-40 rounded-lg px-4 font-bold shadow-md shadow-primary/15">
                         <Link viewTransition to="/checkout">
                             {t("checkout.title")}
                             <ArrowRight className="size-4 rtl:rotate-180" />
@@ -424,7 +424,7 @@ function CartQuantityInput({ item, onChange }: { item: CartItem; onChange: (quan
             aria-label={t("cart.quantityInput", { name: item.name })}
             title={`${minimumCartQuantity(item)} – ${maximum}`}
             style={{ width: `${visibleCharacters}ch` }}
-            className="h-9 min-w-[4.5rem] max-w-[9rem] border-x border-border/80 bg-transparent px-2 text-center text-xs font-bold tabular-nums outline-none transition focus:bg-primary/5 focus:ring-2 focus:ring-inset focus:ring-primary/25 dark:border-white/10"
+            className="h-8 min-w-[4.25rem] max-w-[9rem] border-x border-border/80 bg-transparent px-2 text-center text-xs font-bold tabular-nums outline-none transition focus:bg-primary/5 focus:ring-2 focus:ring-inset focus:ring-primary/25 dark:border-white/10"
         />
     );
 }

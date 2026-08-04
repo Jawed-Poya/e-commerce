@@ -123,12 +123,12 @@ export function CheckoutPage() {
     }
     if (!auth.user?.canPlaceOrders) {
         return (
-            <main className="mx-auto grid min-h-[60vh] max-w-2xl place-items-center px-4 py-14">
-                <section className="w-full rounded-[28px] border bg-card p-8 text-center shadow-lg sm:p-12">
+            <main className="mx-auto grid min-h-[60vh] max-w-xl place-items-center px-4 py-10">
+                <section className="w-full rounded-2xl border bg-card p-6 text-center shadow-md sm:p-8">
                     <BadgeCheck className="mx-auto size-12 text-primary" />
-                    <h1 className="mt-5 text-3xl font-black tracking-tight">{t("checkout.verifyBeforeOrder")}</h1>
+                    <h1 className="mt-4 text-2xl font-black tracking-tight">{t("checkout.verifyBeforeOrder")}</h1>
                     <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-muted-foreground">{t("checkout.verifyBeforeOrderDescription")}</p>
-                    <Button asChild className="mt-6 rounded-xl"><Link viewTransition to="/account">{t("checkout.openVerification")}</Link></Button>
+                    <Button asChild className="mt-5 rounded-lg"><Link viewTransition to="/account">{t("checkout.openVerification")}</Link></Button>
                 </section>
             </main>
         );
@@ -219,20 +219,20 @@ export function CheckoutPage() {
     };
 
     return (
-        <main className="mx-auto w-full max-w-[1450px] px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
-            <div className="mb-8 flex items-center justify-between gap-4">
+        <main className="mx-auto w-full max-w-[1320px] px-4 py-6 sm:px-6 lg:px-8 lg:py-9">
+            <div className="mb-6 flex items-center justify-between gap-4">
                 <div>
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
                         {t("checkout.secure")}
                     </p>
-                    <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-5xl">
+                    <h1 className="mt-1.5 text-3xl font-black tracking-[-0.035em] sm:text-4xl">
                         {t("checkout.completeOrder")}
                     </h1>
                     <p className="mt-2 text-sm text-muted-foreground">
                         {t("checkout.serverCheck")}
                     </p>
                     {auth.user && (
-                        <p className="mt-3 inline-flex rounded-full bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary">
+                        <p className="mt-2.5 inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">
                             {t("checkout.signedIn", {
                                 name: auth.user.fullName,
                                 type: auth.user.customerTypeName ?? t("common.general"),
@@ -250,15 +250,15 @@ export function CheckoutPage() {
 
             <form
                 onSubmit={submit}
-                className="grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_410px]"
+                className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px]"
             >
-                <div className="grid gap-6">
+                <div className="grid gap-4">
                     <CheckoutSection
                         icon={<Phone />}
                         title={t("checkout.contact")}
                         description={t("checkout.contactDescription")}
                     >
-                        <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-2.5 sm:grid-cols-2">
                             <Field
                                 label={t("common.firstName")}
                                 required
@@ -301,7 +301,7 @@ export function CheckoutPage() {
                         title={t("checkout.address")}
                         description={t("checkout.addressDescription")}
                     >
-                        <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-2.5 sm:grid-cols-2">
                             <Field
                                 label={t("checkout.recipient")}
                                 required
@@ -362,7 +362,7 @@ export function CheckoutPage() {
                         title={t("checkout.paymentMethod")}
                         description={t("checkout.paymentDescription")}
                     >
-                        <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid gap-2.5 sm:grid-cols-2">
                             <PaymentCard
                                 active={
                                     form.paymentMethod === "CashOnDelivery"
@@ -389,14 +389,14 @@ export function CheckoutPage() {
                         </div>
 
                         {form.paymentMethod === "BankTransfer" && (
-                            <div className="mt-5 rounded-2xl border border-primary/20 bg-primary/5 p-5">
+                            <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
                                 {configQuery.isLoading ? (
                                     <p className="text-sm text-muted-foreground">
                                         {t("checkout.loadingBank")}
                                     </p>
                                 ) : bankOption?.bankDetails ? (
-                                    <div className="space-y-4">
-                                        <div className="grid gap-3 text-sm sm:grid-cols-2">
+                                    <div className="space-y-3">
+                                        <div className="grid gap-2 text-sm sm:grid-cols-2">
                                             <BankLine
                                                 label="Bank"
                                                 value={
@@ -468,17 +468,17 @@ export function CheckoutPage() {
                             onChange={(event) =>
                                 update("notes", event.target.value)
                             }
-                            rows={4}
-                            className="w-full rounded-xl border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                            rows={3}
+                            className="store-textarea"
                             placeholder="Call before delivery, preferred delivery time, landmark..."
                         />
                     </CheckoutSection>
                 </div>
 
-                <aside className="sticky top-32 overflow-hidden rounded-3xl border bg-card shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
-                    <div className="border-b bg-muted/30 p-6">
+                <aside className="sticky top-28 overflow-hidden rounded-2xl border bg-card shadow-[0_14px_38px_rgba(15,23,42,0.07)]">
+                    <div className="border-b bg-muted/25 p-4">
                         <div className="flex items-center gap-3">
-                            <span className="grid size-11 place-items-center rounded-2xl bg-primary/10 text-primary">
+                            <span className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
                                 <ShoppingBag />
                             </span>
                             <div>
@@ -490,7 +490,7 @@ export function CheckoutPage() {
                         </div>
                     </div>
 
-                    <div className="max-h-72 space-y-4 overflow-auto p-6">
+                    <div className="max-h-64 space-y-3 overflow-auto p-4">
                         {cart.items.map((item) => (
                             <div key={item.lineKey} className="flex gap-3">
                                 <img
@@ -499,7 +499,7 @@ export function CheckoutPage() {
                                         "/placeholder-product.svg"
                                     }
                                     alt={item.name}
-                                    className="size-16 rounded-xl border bg-muted object-cover"
+                                    className="size-14 rounded-lg border bg-muted object-cover"
                                 />
                                 <div className="min-w-0 flex-1">
                                     <p className="line-clamp-2 text-sm font-bold">
@@ -519,8 +519,8 @@ export function CheckoutPage() {
                         ))}
                     </div>
 
-                    <div className="border-t p-6">
-                        <div className="grid gap-3 text-sm">
+                    <div className="border-t p-4">
+                        <div className="grid gap-2.5 text-sm">
                             <SummaryLine
                                 label={t("common.subtotal")}
                                 value={formatMoney(
@@ -539,7 +539,7 @@ export function CheckoutPage() {
                                         : t("common.free")
                                 }
                             />
-                            <div className="flex items-center justify-between border-t pt-4 text-lg font-black">
+                            <div className="flex items-center justify-between border-t pt-3 text-base font-black">
                                 <span>{t("checkout.estimatedTotal")}</span>
                                 <span>
                                     {formatMoney(
@@ -551,7 +551,7 @@ export function CheckoutPage() {
                         </div>
 
                         {error && (
-                            <div className="mt-5 rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+                            <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
                                 {error}
                             </div>
                         )}
@@ -559,7 +559,7 @@ export function CheckoutPage() {
                         <Button
                             type="submit"
                             size="lg"
-                            className="mt-5 h-13 w-full rounded-xl font-bold"
+                            className="mt-4 h-11 w-full rounded-lg font-bold"
                             disabled={submitting || configQuery.isError}
                         >
                             {submitting ? (
@@ -570,11 +570,11 @@ export function CheckoutPage() {
                             {submitting ? t("checkout.creating") : t("checkout.placeOrder")}
                         </Button>
 
-                        <div className="mt-4 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+                        <div className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
                             <BadgeCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
                             {t("checkout.inventoryVerified")}
                         </div>
-                        <div className="mt-2 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+                        <div className="mt-1.5 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
                             <Truck className="mt-0.5 size-4 shrink-0 text-primary" />
                             {t("checkout.adminApproval")}
                         </div>
@@ -597,14 +597,14 @@ function CheckoutSection({
     children: React.ReactNode;
 }) {
     return (
-        <section className="rounded-3xl border bg-card p-5 shadow-[0_8px_35px_rgba(15,23,42,0.04)] sm:p-7">
-            <div className="mb-6 flex items-start gap-3">
-                <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary [&_svg]:size-5">
+        <section className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
+            <div className="mb-4 flex items-start gap-3">
+                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary [&_svg]:size-5">
                     {icon}
                 </span>
                 <div>
-                    <h2 className="text-lg font-black">{title}</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <h2 className="text-base font-black">{title}</h2>
+                    <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
                         {description}
                     </p>
                 </div>
@@ -634,7 +634,7 @@ function Field({
     disabled?: boolean;
 }) {
     return (
-        <label className={`grid gap-2 ${className ?? ""}`}>
+        <label className={`grid gap-1.5 ${className ?? ""}`}>
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 {label} {required && <span className="text-destructive">*</span>}
             </span>
@@ -644,7 +644,7 @@ function Field({
                 type={type}
                 placeholder={placeholder}
                 disabled={disabled}
-                className="h-12 rounded-xl border bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                className="store-input"
             />
         </label>
     );
@@ -667,14 +667,14 @@ function PaymentCard({
         <button
             type="button"
             onClick={onClick}
-            className={`flex min-h-32 items-start gap-4 rounded-2xl border p-5 text-left transition ${
+            className={`flex min-h-24 items-start gap-3 rounded-xl border p-4 text-left transition ${
                 active
-                    ? "border-primary bg-primary/5 ring-4 ring-primary/10"
+                    ? "border-primary bg-primary/5 ring-2 ring-primary/10"
                     : "hover:border-primary/40 hover:bg-muted/30"
             }`}
         >
             <span
-                className={`grid size-11 shrink-0 place-items-center rounded-xl [&_svg]:size-5 ${
+                className={`grid size-9 shrink-0 place-items-center rounded-lg [&_svg]:size-5 ${
                     active
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-muted-foreground"
@@ -684,7 +684,7 @@ function PaymentCard({
             </span>
             <span>
                 <span className="block font-bold">{title}</span>
-                <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                <span className="mt-1 block text-xs leading-4.5 text-muted-foreground">
                     {description}
                 </span>
             </span>
@@ -694,7 +694,7 @@ function PaymentCard({
 
 function BankLine({ label, value }: { label: string; value: string }) {
     return (
-        <div className="rounded-xl border bg-background p-3">
+        <div className="rounded-lg border bg-background p-2.5">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 {label}
             </p>

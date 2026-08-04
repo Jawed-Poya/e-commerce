@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Mail;
-using System.Text;
 
 namespace ECommerce.Services.Auth.Verification;
 
@@ -71,7 +70,7 @@ internal static class VerificationEmailTemplate
         var expiresInMinutes = GetRemainingMinutes(expiresAt);
         var expiryText = Html(FormatExpiry(expiresAt));
         var logo = BuildLogo(brand, companyName, primaryColor, primaryForeground, softerPrimary, borderColor);
-        var codeCells = BuildCodeCells(code, primaryColor, secondaryColor, borderColor);
+        var codeBadge = BuildCodeBadge(code, primaryColor, secondaryColor, borderColor);
         var support = BuildHtmlSupport(brand, primaryColor);
         var preheader = Html($"Your {rawCompanyName} verification code is ready and expires soon.");
         var year = DateTime.UtcNow.Year;
@@ -97,7 +96,7 @@ internal static class VerificationEmailTemplate
                   .verification-shell { width: 100% !important; }
                   .mobile-padding { padding-left: 22px !important; padding-right: 22px !important; }
                   .hero-title { font-size: 29px !important; line-height: 36px !important; }
-                  .code-cell { width: 38px !important; height: 52px !important; font-size: 27px !important; }
+                  .verification-code { padding: 17px 18px !important; font-size: 30px !important; letter-spacing: 7px !important; }
                   .brand-name { max-width: 210px !important; font-size: 17px !important; }
                 }
               </style>
@@ -153,9 +152,8 @@ internal static class VerificationEmailTemplate
                             <tr>
                               <td align="center" style="padding:26px 16px 12px;">
                                 <div style="margin-bottom:15px;color:{{mutedBrandText}};font-size:11px;line-height:16px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase;">Your verification code</div>
-                                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;border-spacing:7px 0;border-collapse:separate !important;">
-                                  <tr>{{codeCells}}</tr>
-                                </table>
+                                {{codeBadge}}
+                                <div style="margin-top:11px;color:#80918d;font-size:11px;line-height:17px;">Select or tap and hold the code to copy it.</div>
                               </td>
                             </tr>
                             <tr>
@@ -242,18 +240,19 @@ internal static class VerificationEmailTemplate
             """;
     }
 
-    private static string BuildCodeCells(string code, string primaryColor, string secondaryColor, string borderColor)
+    private static string BuildCodeBadge(
+        string code,
+        string primaryColor,
+        string secondaryColor,
+        string borderColor)
     {
-        var safeCode = new string(code.Where(char.IsDigit).Take(6).ToArray()).PadRight(6, '•');
-        var builder = new StringBuilder();
-        foreach (var character in safeCode)
-        {
-            builder.Append($"""
-                <td class="code-cell" width="44" height="58" align="center" valign="middle" style="width:44px;height:58px;border:1px solid {borderColor};border-bottom:3px solid {primaryColor};border-radius:12px;background:#ffffff;color:{secondaryColor};font-family:'SFMono-Regular',Consolas,'Liberation Mono',monospace;font-size:30px;line-height:30px;font-weight:900;">{Html(character.ToString())}</td>
-                """);
-        }
+        var safeCode = new string(code.Where(char.IsDigit).Take(6).ToArray());
+        if (safeCode.Length != 6)
+            throw new InvalidOperationException("The verification code must contain exactly six digits.");
 
-        return builder.ToString();
+        return $"""
+            <div class="verification-code" role="text" aria-label="Verification code {Html(safeCode)}" style="display:inline-block;min-width:250px;box-sizing:border-box;padding:19px 24px;border:1px solid {borderColor};border-bottom:4px solid {primaryColor};border-radius:15px;background:#ffffff;color:{secondaryColor};font-family:'SFMono-Regular',Consolas,'Liberation Mono',monospace;font-size:34px;line-height:38px;font-weight:900;letter-spacing:9px;text-align:center;white-space:nowrap;user-select:all;-webkit-user-select:all;cursor:text;box-shadow:0 10px 28px rgba(15,23,42,.07);">{Html(safeCode)}</div>
+            """;
     }
 
     private static string BuildHtmlSupport(VerificationEmailBrand brand, string primaryColor)

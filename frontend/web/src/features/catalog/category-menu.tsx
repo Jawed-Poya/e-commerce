@@ -1,10 +1,13 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
+    ArrowUpRight,
     ArrowRight,
+    Check,
     ChevronDown,
     ChevronRight,
     Menu,
     ShoppingBag,
+    Star,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -169,12 +172,12 @@ function ActiveCategory({ category }: { category: CategoryNode }) {
     });
 
     return (
-        <section className="relative min-w-0 overflow-hidden p-6 lg:p-7">
+        <section className="relative min-w-0 overflow-hidden p-4 lg:p-5">
             <div className="pointer-events-none absolute -right-24 -top-24 size-64 rounded-full bg-primary/8 blur-3xl dark:bg-primary/12" />
 
-            <div className="relative flex items-center justify-between gap-5 border-b border-border/80 pb-5 dark:border-white/10">
-                <div className="flex min-w-0 items-center gap-4">
-                    <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-border/80 bg-white p-2 shadow-sm dark:border-white/12 dark:bg-slate-950">
+            <div className="relative flex items-center justify-between gap-4 border-b border-border/80 pb-4 dark:border-white/10">
+                <div className="flex min-w-0 items-center gap-3">
+                    <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/80 bg-white p-2 shadow-sm dark:border-white/12 dark:bg-slate-950">
                         {category.imageUrl ? (
                             <img
                                 src={imageUrl(category.imageUrl) ?? ""}
@@ -220,7 +223,7 @@ function ActiveCategory({ category }: { category: CategoryNode }) {
                             <Link
                                 viewTransition
                                 to={`/products?categoryId=${subcategory.id}`}
-                                className="group min-w-0 rounded-2xl border border-border/75 bg-card/70 p-3 outline-none transition duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/5 hover:shadow-sm focus:border-primary/30 dark:border-white/10"
+                                className="group min-w-0 rounded-xl border border-border/75 bg-card/70 p-2.5 outline-none transition duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/5 hover:shadow-sm focus:border-primary/30 dark:border-white/10"
                             >
                                 <span className="flex items-center gap-3">
                                     <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/70 bg-white p-1.5 dark:border-white/10 dark:bg-slate-950">
@@ -245,7 +248,7 @@ function ActiveCategory({ category }: { category: CategoryNode }) {
             ) : products.isLoading ? (
                 <div className="grid grid-cols-2 gap-3 pt-6 lg:grid-cols-4">
                     {Array.from({ length: 8 }).map((_, index) => (
-                        <div key={index} className="h-36 animate-pulse rounded-2xl border border-border/70 bg-muted/60 dark:border-white/10" />
+                        <div key={index} className="h-28 animate-pulse rounded-xl border border-border/70 bg-muted/60 dark:border-white/10" />
                     ))}
                 </div>
             ) : (products.data?.items.length ?? 0) > 0 ? (
@@ -257,7 +260,7 @@ function ActiveCategory({ category }: { category: CategoryNode }) {
             ) : (
                 <div className="grid min-h-64 place-items-center text-center">
                     <div>
-                        <span className="mx-auto grid size-12 place-items-center rounded-2xl border border-border/80 bg-muted/50 text-primary dark:border-white/10">
+                        <span className="mx-auto grid size-10 place-items-center rounded-xl border border-border/80 bg-muted/50 text-primary dark:border-white/10">
                             <ShoppingBag className="size-5" />
                         </span>
                         <p className="mt-4 font-bold">{t("category.browseName", { name: category.name })}</p>
@@ -272,24 +275,113 @@ function ActiveCategory({ category }: { category: CategoryNode }) {
 }
 
 function MegaMenuProduct({ product }: { product: Product }) {
+    const { t } = useI18n();
+    const hasDiscount =
+        product.oldPrice != null &&
+        product.price != null &&
+        product.oldPrice > product.price;
+    const discount = hasDiscount
+        ? Math.round(
+              ((product.oldPrice! - product.price!) / product.oldPrice!) * 100,
+          )
+        : 0;
+
     return (
         <DropdownMenu.Item asChild>
             <Link
                 viewTransition
                 to={productPath(product)}
-                className="group min-w-0 overflow-hidden rounded-2xl border border-border/75 bg-card outline-none transition duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus:border-primary/30 dark:border-white/10"
+                className="group relative h-[158px] min-w-0 overflow-hidden rounded-xl border border-border/75 bg-card shadow-[0_12px_30px_-26px_rgba(15,23,42,.6)] outline-none transition duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_18px_38px_-24px_rgba(15,23,42,.45)] focus:border-primary/30 dark:border-white/[0.07]"
             >
-                <span className="grid aspect-[1.35] place-items-center bg-gradient-to-br from-white via-slate-50 to-slate-100 p-3 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
-                    <img
-                        src={imageUrl(product.primaryImageUrl) ?? "/placeholder-product.svg"}
-                        alt=""
-                        className="size-full object-contain drop-shadow-sm transition duration-300 group-hover:scale-[1.04]"
-                    />
+                <span className="absolute inset-0 bg-muted/20" />
+                <img
+                    src={
+                        imageUrl(product.primaryImageUrl) ??
+                        "/placeholder-product.svg"
+                    }
+                    alt={product.name}
+                    className="absolute inset-0 z-[1] size-full object-cover object-center transition duration-500 ease-out group-hover:scale-[1.02]"
+                />
+
+                <span className="absolute start-2 top-2 z-20 flex max-w-[72%] flex-wrap gap-1">
+                    {hasDiscount ? (
+                        <span className="rounded-md bg-brand-orange px-1.5 py-0.5 text-[9px] font-black text-white shadow-sm">
+                            -{discount}%
+                        </span>
+                    ) : null}
+                    {product.isFeatured ? (
+                        <span className="rounded-md bg-card/95 px-1.5 py-0.5 text-[9px] font-bold text-foreground shadow-sm ring-1 ring-black/[0.05] backdrop-blur dark:ring-white/[0.08]">
+                            {t("product.featured")}
+                        </span>
+                    ) : null}
                 </span>
-                <span className="block p-3">
-                    <span className="block truncate text-xs font-bold group-hover:text-primary">{product.name}</span>
-                    <span className="mt-1.5 block text-sm font-black">
-                        {product.price != null ? formatMoney(product.price) : "—"}
+
+                <span className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-20 bg-gradient-to-t from-background/55 via-background/10 to-transparent transition duration-300 group-hover:h-32 group-focus-visible:h-32" />
+
+                <span className="absolute inset-x-0 bottom-0 z-30 border-t border-border/80 bg-card/95 px-2.5 py-2 shadow-[0_-8px_24px_-20px_rgba(15,23,42,.4)] backdrop-blur-xl supports-[backdrop-filter]:bg-card/90 dark:border-white/[0.08]">
+                    <span className="flex min-w-0 items-start justify-between gap-2">
+                        <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[8px] font-black uppercase tracking-[0.11em] text-primary/80">
+                                {product.categoryName}
+                            </span>
+                            <span className="mt-0.5 block truncate text-xs font-black tracking-[-0.015em] text-foreground group-hover:text-primary group-focus-visible:text-primary">
+                                {product.name}
+                            </span>
+                        </span>
+
+                        <span className="shrink-0 text-end">
+                            <span className="block text-sm font-black tracking-[-0.025em] text-primary">
+                                {product.price != null
+                                    ? formatMoney(product.price)
+                                    : t("product.noPrice")}
+                            </span>
+                            {hasDiscount ? (
+                                <span className="block text-[8px] font-semibold text-muted-foreground line-through decoration-brand-orange decoration-2">
+                                    {formatMoney(product.oldPrice!)}
+                                </span>
+                            ) : null}
+                        </span>
+                    </span>
+
+                    <span className="grid grid-rows-[0fr] opacity-0 transition-[grid-template-rows,opacity,margin] duration-300 ease-out group-hover:mt-1.5 group-hover:grid-rows-[1fr] group-hover:opacity-100 group-focus-visible:mt-1.5 group-focus-visible:grid-rows-[1fr] group-focus-visible:opacity-100">
+                        <span className="overflow-hidden">
+                            <span className="flex items-center justify-between gap-2 border-t border-border/70 pt-1.5 dark:border-white/[0.07]">
+                                <span className="flex min-w-0 items-center gap-1.5 text-[8px] font-bold text-muted-foreground">
+                                    <span className="inline-flex shrink-0 items-center gap-1">
+                                        <Star className="size-2.5 fill-amber-400 text-amber-400" />
+                                        {product.reviewCount > 0
+                                            ? product.averageRating.toFixed(1)
+                                            : "—"}
+                                    </span>
+                                    <span
+                                        className={cn(
+                                            "inline-flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5",
+                                            product.stock > 0
+                                                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                                : "bg-destructive/10 text-destructive",
+                                        )}
+                                    >
+                                        {product.stock > 0 ? (
+                                            <Check className="size-2.5" />
+                                        ) : null}
+                                        <span className="truncate">
+                                            {product.stock > 0
+                                                ? t("product.inStock")
+                                                : t("product.unavailable")}
+                                        </span>
+                                    </span>
+                                    {product.unitName ? (
+                                        <span className="max-w-14 truncate">
+                                            {product.unitName}
+                                        </span>
+                                    ) : null}
+                                </span>
+
+                                <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm transition group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5">
+                                    <ArrowUpRight className="size-3.5 rtl:rotate-[-90deg]" />
+                                </span>
+                            </span>
+                        </span>
                     </span>
                 </span>
             </Link>
@@ -334,7 +426,7 @@ function CategoryLoading() {
     return (
         <div className="grid min-h-[420px] place-items-center">
             <div className="text-center">
-                <span className="mx-auto grid size-14 place-items-center rounded-2xl border bg-primary/10 text-primary shadow-sm">
+                <span className="mx-auto grid size-11 place-items-center rounded-xl border bg-primary/10 text-primary shadow-sm">
                     <ShoppingBag className="size-5 animate-pulse" />
                 </span>
 
@@ -353,7 +445,7 @@ function EmptyCategories() {
     return (
         <div className="grid min-h-72 place-items-center p-8 text-center">
             <div>
-                <span className="mx-auto grid size-14 place-items-center rounded-2xl border bg-muted/50 text-muted-foreground">
+                <span className="mx-auto grid size-11 place-items-center rounded-xl border bg-muted/50 text-muted-foreground">
                     <ShoppingBag className="size-6" />
                 </span>
 
@@ -405,7 +497,7 @@ function MobileCategoryBranch({
 }) {
     const { t } = useI18n();
     return (
-        <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
             <Link viewTransition
                 to={`/products?categoryId=${category.id}`}
                 onClick={onNavigate}

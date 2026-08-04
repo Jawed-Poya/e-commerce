@@ -41,13 +41,13 @@ export function OrderTrackingPage() {
     return (
         <main className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 lg:py-16">
             <div className="text-center">
-                <span className="mx-auto grid size-16 place-items-center rounded-3xl bg-primary/10 text-primary">
+                <span className="mx-auto grid size-12 place-items-center rounded-xl bg-primary/10 text-primary">
                     <PackageSearch className="size-8" />
                 </span>
                 <p className="mt-5 text-xs font-black uppercase tracking-[0.2em] text-primary">
                     {t("orders.trackingEyebrow")}
                 </p>
-                <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-5xl">
+                <h1 className="mt-2 text-3xl font-black tracking-[-0.035em] sm:text-4xl">
                     {t("orders.trackingTitle")}
                 </h1>
                 <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
@@ -57,11 +57,11 @@ export function OrderTrackingPage() {
 
             <form
                 onSubmit={submit}
-                className="mx-auto mt-8 grid max-w-3xl gap-4 rounded-3xl border bg-card p-5 shadow-[0_16px_50px_rgba(15,23,42,0.07)] sm:grid-cols-[1fr_1fr_auto] sm:p-7"
+                className="mx-auto mt-6 grid max-w-3xl gap-3 rounded-2xl border bg-card p-4 shadow-[0_16px_50px_rgba(15,23,42,0.07)] sm:grid-cols-[1fr_1fr_auto] sm:p-5"
             >
                 <TrackingField label={t("orders.orderNumber")} value={orderNumber} onChange={setOrderNumber} placeholder="ORD-20260719-123456" />
                 <TrackingField label={t("orders.phoneNumber")} value={phone} onChange={setPhone} placeholder="+93 ..." />
-                <Button type="submit" className="h-12 self-end rounded-xl px-6" disabled={!orderNumber.trim() || !phone.trim()}>
+                <Button type="submit" className="h-11 self-end rounded-lg px-5" disabled={!orderNumber.trim() || !phone.trim()}>
                     <Search /> {t("orders.trackAction")}
                 </Button>
             </form>
@@ -115,7 +115,7 @@ export function OrderTrackingPage() {
             )}
 
             {query.data && (
-                <section className="mx-auto mt-8 max-w-3xl overflow-hidden rounded-3xl border bg-card shadow-[0_18px_55px_rgba(15,23,42,0.07)]">
+                <section className="mx-auto mt-6 max-w-3xl overflow-hidden rounded-2xl border bg-card shadow-[0_18px_55px_rgba(15,23,42,0.07)]">
                     <div className="flex flex-col gap-4 border-b bg-muted/25 p-6 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t("common.order")}</p>
@@ -168,7 +168,7 @@ function TrackingField({ label, value, onChange, placeholder }: { label: string;
     return (
         <label className="grid gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
-            <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-12 rounded-xl border bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10" />
+            <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="store-input" />
         </label>
     );
 }

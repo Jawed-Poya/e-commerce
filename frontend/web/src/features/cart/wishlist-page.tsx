@@ -36,7 +36,7 @@ export function WishlistPage() {
           <p className="mt-7 text-xs font-bold uppercase tracking-[0.2em] text-primary">
             {t("wishlist.savedProducts")}
           </p>
-          <h1 className="mt-3 text-3xl font-black tracking-[-0.04em] sm:text-5xl">
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.035em] sm:text-4xl">
             {t("wishlist.emptyTitle")}
           </h1>
           <p className="mx-auto mt-4 max-w-md text-sm leading-7 text-muted-foreground sm:text-base">
@@ -45,7 +45,7 @@ export function WishlistPage() {
           <Button
             asChild
             size="lg"
-            className="mt-7 h-12 rounded-xl px-7 font-bold"
+            className="mt-6 h-11 rounded-lg px-6 font-bold"
           >
             <Link viewTransition to="/products">
               {t("wishlist.explore")}
@@ -64,7 +64,7 @@ export function WishlistPage() {
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
             {t("wishlist.savedForLater")}
           </p>
-          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-5xl">
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.035em] sm:text-4xl">
             {t("common.wishlist")}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">

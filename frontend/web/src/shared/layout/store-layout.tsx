@@ -121,9 +121,9 @@ function Logo({ inverse = false }: { inverse?: boolean }) {
         <Link
             viewTransition
             to="/"
-            className="group flex min-w-0 shrink-0 items-center gap-2.5"
+            className="group flex min-w-0 shrink-0 items-center gap-2"
         >
-            <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-primary text-xs font-black text-primary-foreground shadow-sm ring-1 ring-black/[0.05] transition duration-200 group-hover:-translate-y-0.5 dark:ring-white/[0.06]">
+            <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-primary text-xs font-black text-primary-foreground shadow-sm ring-1 ring-black/[0.05] transition duration-200 group-hover:-translate-y-0.5 dark:ring-white/[0.06]">
                 {company?.logoUrl ? (
                     <img
                         src={imageUrl(company.logoUrl) ?? company.logoUrl}
@@ -247,7 +247,7 @@ export function StoreLayout() {
         <div className="min-h-screen bg-background pb-20 text-foreground md:pb-0">
             <header className="sticky top-0 z-40 bg-background/[0.95] shadow-[0_1px_0_rgba(15,23,42,.07)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/88 dark:shadow-[0_1px_0_rgba(255,255,255,.055)]">
                 <div className="hidden bg-[var(--brand-surface-strong)] text-white sm:block">
-                    <div className="mx-auto flex h-9 w-full max-w-[1480px] items-center justify-between gap-4 px-4 text-[11px] sm:px-6 lg:px-8">
+                    <div className="mx-auto flex h-8 w-full max-w-[1380px] items-center justify-between gap-4 px-4 text-[11px] sm:px-6 lg:px-8">
                         <div className="flex min-w-0 items-center gap-2 font-semibold text-white/80">
                             <ShieldCheck className="size-3.5 shrink-0 text-emerald-400" />
                             <span className="truncate">{t("header.secure")}</span>
@@ -275,7 +275,7 @@ export function StoreLayout() {
                 </div>
 
                 <div className="bg-background/[0.95]">
-                    <div className="mx-auto flex min-h-[72px] w-full max-w-[1480px] items-center gap-3 px-4 py-3 sm:px-6 lg:gap-5 lg:px-8">
+                    <div className="mx-auto flex min-h-[64px] w-full max-w-[1380px] items-center gap-3 px-4 py-2 sm:px-6 lg:gap-5 lg:px-8">
                         <Logo />
 
                         <GlobalSearch className="mx-auto hidden max-w-2xl min-w-0 flex-1 md:block" />
@@ -313,6 +313,10 @@ export function StoreLayout() {
                                 <LanguageSwitcher />
                                 <ThemeToggle />
                                 <NotificationCenter />
+                            </div>
+
+                            <div className="sm:hidden [&_button]:size-9 [&_button]:rounded-lg [&_svg]:size-4.5">
+                                <ThemeToggle />
                             </div>
 
                             <Button
@@ -363,13 +367,13 @@ export function StoreLayout() {
                         </div>
                     </div>
 
-                    <div className="mx-auto w-full max-w-[1480px] px-4 pb-3 md:hidden sm:px-6">
+                    <div className="mx-auto w-full max-w-[1380px] px-4 pb-2.5 md:hidden sm:px-6">
                         <GlobalSearch compact />
                     </div>
                 </div>
 
                 <div className="hidden bg-background md:block">
-                    <div className="mx-auto flex h-12 w-full max-w-[1480px] items-center gap-4 px-6 lg:px-8">
+                    <div className="mx-auto flex min-h-11 w-full max-w-[1380px] items-center gap-3 px-6 pb-2 pt-1 lg:px-8">
                         <CategoryMegaMenu />
 
                         <nav className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
@@ -386,9 +390,9 @@ export function StoreLayout() {
                                         key={item.to}
                                         to={item.to}
                                         className={cn(
-                                            "relative shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground",
+                                            "relative shrink-0 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground",
                                             active &&
-                                                "bg-muted text-foreground after:absolute after:inset-x-3 after:-bottom-[7px] after:h-0.5 after:bg-primary",
+                                                "bg-muted text-foreground after:absolute after:inset-x-3 after:-bottom-[6px] after:h-0.5 after:rounded-full after:bg-primary",
                                         )}
                                     >
                                         {t(item.label)}
@@ -401,7 +405,7 @@ export function StoreLayout() {
                                     viewTransition
                                     key={category.id}
                                     to={`/products?categoryId=${category.id}`}
-                                    className="hidden min-w-0 truncate rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground 2xl:inline-flex"
+                                    className="hidden min-w-0 truncate rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground 2xl:inline-flex"
                                 >
                                     {category.name}
                                 </Link>
@@ -443,7 +447,7 @@ export function StoreLayout() {
                 )}
             >
                 <FooterTrustStrip />
-                <div className="mx-auto grid w-full max-w-[1480px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-[1.2fr_.72fr_.72fr_1.15fr] lg:px-8">
+                <div className="mx-auto grid w-full max-w-[1380px] gap-8 px-4 py-9 sm:px-6 md:grid-cols-2 lg:grid-cols-[1.2fr_.72fr_.72fr_1.15fr] lg:px-8">
                     <div>
                         <Logo />
                         <p className="mt-5 max-w-md text-sm leading-7 text-muted-foreground">
@@ -498,7 +502,7 @@ export function StoreLayout() {
                     </FooterColumn>
 
                     <FooterColumn title={t("footer.contactSupport")}>
-                        <div className="grid gap-2.5">
+                        <div className="grid gap-2">
                             {company?.email ? (
                                 <FooterContact
                                     icon={<Mail />}
@@ -529,7 +533,7 @@ export function StoreLayout() {
                 </div>
 
                 <div className="bg-muted/[0.22] dark:bg-white/[0.018]">
-                    <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-2 px-4 py-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+                    <div className="mx-auto flex w-full max-w-[1380px] flex-col gap-2 px-4 py-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
                         <span>
                             © {new Date().getFullYear()}{" "}
                             {company?.legalName ?? company?.name ?? "PharmaDB"}
@@ -542,7 +546,7 @@ export function StoreLayout() {
             {contactPhone ? (
                 <a
                     href={`tel:${contactPhone}`}
-                    className="fixed bottom-24 end-4 z-30 inline-flex size-12 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground shadow-xl shadow-primary/25 ring-1 ring-black/[0.06] transition hover:-translate-y-0.5 md:bottom-5 md:end-5 md:h-auto md:w-auto md:gap-2 md:px-4 md:py-3 dark:ring-white/[0.08]"
+                    className="fixed bottom-20 end-4 z-30 inline-flex size-11 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground shadow-xl shadow-primary/25 ring-1 ring-black/[0.06] transition hover:-translate-y-0.5 md:bottom-5 md:end-5 md:h-auto md:w-auto md:gap-2 md:px-3.5 md:py-2.5 dark:ring-white/[0.08]"
                     aria-label={t("footer.contactNow")}
                 >
                     <Phone className="size-4" />
@@ -557,7 +561,7 @@ export function StoreLayout() {
                 style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
                 aria-label={t("mobile.mainMenu")}
             >
-                <div className="grid h-[68px] grid-cols-5 px-1.5">
+                <div className="grid h-16 grid-cols-5 px-1.5">
                     {mobileNav.map((item) => {
                         const Icon = item.icon;
                         return (
@@ -572,11 +576,11 @@ export function StoreLayout() {
                             >
                                 <span
                                     className={cn(
-                                        "relative grid size-8 place-items-center rounded-xl transition",
+                                        "relative grid size-7 place-items-center rounded-lg transition",
                                         item.active && "bg-primary/10",
                                     )}
                                 >
-                                    <Icon className="size-[18px]" />
+                                    <Icon className="size-4" />
                                     {item.count ? (
                                         <CountBadge>{item.count}</CountBadge>
                                     ) : null}
@@ -593,7 +597,7 @@ export function StoreLayout() {
             <Dialog.Root open={mobileOpen} onOpenChange={setMobileOpen}>
                 <Dialog.Portal>
                     <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm" />
-                    <Dialog.Content className="fixed inset-y-0 end-0 z-50 w-[92%] max-w-sm overflow-y-auto bg-background p-5 shadow-2xl ring-1 ring-black/[0.08] outline-none dark:ring-white/[0.08]">
+                    <Dialog.Content className="fixed inset-y-0 end-0 z-50 w-[92%] max-w-sm overflow-y-auto bg-background p-4 shadow-2xl ring-1 ring-black/[0.08] outline-none dark:ring-white/[0.08]">
                         <div className="flex items-center justify-between">
                             <Logo />
                             <Dialog.Close asChild>
@@ -609,29 +613,29 @@ export function StoreLayout() {
 
                         <GlobalSearch
                             compact
-                            className="mt-6"
+                            className="mt-5"
                             onNavigate={() => setMobileOpen(false)}
                         />
 
-                        <nav className="mt-6 grid gap-1">
+                        <nav className="mt-5 grid gap-1">
                             {nav.map((item) => (
                                 <Link
                                     viewTransition
                                     key={item.to}
                                     to={item.to}
                                     onClick={() => setMobileOpen(false)}
-                                    className="rounded-lg px-4 py-3 text-sm font-bold transition hover:bg-muted hover:text-primary"
+                                    className="rounded-lg px-3 py-2.5 text-sm font-bold transition hover:bg-muted hover:text-primary"
                                 >
                                     {t(item.label)}
                                 </Link>
                             ))}
                         </nav>
 
-                        <div className="my-5 h-px bg-border" />
+                        <div className="my-4 h-px bg-border" />
                         <MobileCategoryLinks
                             onNavigate={() => setMobileOpen(false)}
                         />
-                        <div className="my-5 h-px bg-border" />
+                        <div className="my-4 h-px bg-border" />
 
                         <div className="grid grid-cols-2 gap-2">
                             <Button asChild variant="outline">
@@ -656,7 +660,7 @@ export function StoreLayout() {
                             </Button>
                         </div>
 
-                        <div className="mt-3 flex items-center justify-between rounded-xl bg-muted/35 p-2 dark:bg-white/[0.035]">
+                        <div className="mt-3 flex items-center justify-between rounded-lg bg-muted/35 p-1.5 dark:bg-white/[0.035]">
                             <LanguageSwitcher />
                             <ThemeToggle />
                             <NotificationCenter />
@@ -675,16 +679,16 @@ function FooterTrustStrip() {
 
     return (
         <section className="bg-muted/[0.42] dark:bg-white/[0.025]">
-            <div className="mx-auto grid w-full max-w-[1480px] gap-3 px-4 py-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
+            <div className="mx-auto grid w-full max-w-[1380px] gap-3 px-4 py-3 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
                 {footerTrustItems.map((item) => {
                     const Icon = item.icon;
                     return (
                         <div
                             key={item.title}
-                            className="flex min-w-0 items-center gap-3 rounded-2xl bg-background/80 p-4 shadow-[0_14px_34px_-32px_rgba(15,23,42,.45)] dark:bg-white/[0.035]"
+                            className="flex min-w-0 items-center gap-3 rounded-xl bg-background/80 p-3 shadow-[0_14px_34px_-32px_rgba(15,23,42,.45)] dark:bg-white/[0.035]"
                         >
-                            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
-                                <Icon className="size-5" />
+                            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                                <Icon className="size-4.5" />
                             </span>
                             <span className="min-w-0">
                                 <span className="block truncate text-sm font-black text-foreground">

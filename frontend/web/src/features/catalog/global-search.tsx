@@ -147,8 +147,8 @@ export function GlobalSearch({
                 className={cn(
                     "group flex w-full items-center border border-input bg-background transition duration-200 focus-within:border-primary/60 focus-within:ring-3 focus-within:ring-primary/10",
                     compact
-                        ? "h-11 rounded-xl p-1"
-                        : "h-11 rounded-xl p-1 shadow-sm",
+                        ? "h-10 rounded-lg p-1"
+                        : "h-10 rounded-lg p-1 shadow-sm",
                 )}
             >
                 <Search className="ms-3 size-4.5 shrink-0 text-muted-foreground transition-colors group-focus-within:text-primary" />
@@ -283,9 +283,9 @@ export function GlobalSearch({
                     </div>
 
                     {query.trim().length < 2 ? (
-                        <div className="grid min-h-40 place-items-center p-6 text-center">
+                        <div className="grid min-h-32 place-items-center p-4 text-center">
                             <div>
-                                <span className="mx-auto grid size-11 place-items-center rounded-2xl bg-primary/10 text-primary">
+                                <span className="mx-auto grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
                                     <PackageSearch className="size-5" />
                                 </span>
                                 <p className="mt-3 text-sm font-bold">
@@ -316,7 +316,7 @@ export function GlobalSearch({
                                                 setOpen(false);
                                                 onNavigate?.();
                                             }}
-                                            className="group flex min-w-0 items-center gap-3 rounded-2xl border border-transparent p-2 transition hover:border-primary/20 hover:bg-primary/5"
+                                            className="group flex min-w-0 items-center gap-3 rounded-xl border border-transparent p-2 transition hover:border-primary/20 hover:bg-primary/5"
                                         >
                                             <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl border bg-white p-1.5 dark:bg-slate-950">
                                                 <img
@@ -346,7 +346,7 @@ export function GlobalSearch({
                                         </Link>
                                     ))}
                                     {!products.data?.items.length ? (
-                                        <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                                        <div className="rounded-lg border border-dashed p-3 text-center text-sm text-muted-foreground">
                                             {t("catalog.noMatches")}
                                         </div>
                                     ) : null}
@@ -379,7 +379,7 @@ export function GlobalSearch({
                                         </Link>
                                     ))}
                                     {!categoryMatches.length ? (
-                                        <p className="rounded-xl border border-dashed p-4 text-center text-xs text-muted-foreground">
+                                        <p className="rounded-lg border border-dashed p-3 text-center text-xs text-muted-foreground">
                                             {t("search.noCategories")}
                                         </p>
                                     ) : null}

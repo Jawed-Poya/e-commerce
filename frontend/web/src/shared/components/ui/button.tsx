@@ -3,24 +3,24 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type { ButtonHTMLAttributes } from "react";
 import { cn } from "../../lib/utils";
 export const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-4",
+  "inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-bold transition-all duration-200 disabled:pointer-events-none disabled:opacity-45 active:translate-y-px [&_svg]:size-4",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
+          "bg-primary text-primary-foreground shadow-sm shadow-primary/10 hover:bg-primary/92 hover:shadow-md hover:shadow-primary/15",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/75",
-        outline: "border border-black/[0.08] bg-background hover:bg-muted dark:border-white/[0.08] dark:bg-transparent",
+        outline: "border border-border/90 bg-background shadow-sm hover:border-primary/25 hover:bg-muted/70 dark:border-white/[0.08] dark:bg-transparent",
         ghost: "hover:bg-muted",
         orange: "bg-brand-orange text-white shadow-sm hover:bg-brand-orange/90",
         destructive: "bg-destructive text-white hover:bg-destructive/90",
       },
       size: {
-        default: "h-10 px-4",
-        sm: "h-9 px-3",
-        lg: "h-12 px-6 text-base",
-        icon: "size-10 p-0",
+        default: "h-9 px-3.5",
+        sm: "h-8 px-3 text-xs",
+        lg: "h-11 px-5",
+        icon: "size-9 p-0",
       },
     },
     defaultVariants: { variant: "default", size: "default" },

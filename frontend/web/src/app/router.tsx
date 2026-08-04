@@ -1,12 +1,41 @@
-import { createBrowserRouter, Outlet, type RouteObject } from "react-router-dom";
+import { useEffect, useLayoutEffect } from "react";
+import {
+  createBrowserRouter,
+  Outlet,
+  useLocation,
+  type RouteObject,
+} from "react-router-dom";
 import { StoreLayout } from "../shared/layout/store-layout";
 import { NotFoundPage } from "../shared/components/not-found-page";
 import { OfflineBanner } from "../shared/components/navigation/offline-banner";
 import { RouteProgress } from "../shared/components/navigation/route-progress";
 
+function ScrollToTop() {
+  const location = useLocation();
+
+  useEffect(() => {
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [location.key]);
+
+  return null;
+}
+
 function RouterShell() {
   return (
     <>
+      <ScrollToTop />
       <RouteProgress />
       <OfflineBanner />
       <Outlet />

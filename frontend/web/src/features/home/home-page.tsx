@@ -208,7 +208,7 @@ export function HomePage() {
                     ) : (
                         <div
                             key={activeSlide.id}
-                            className="hero-copy-enter relative grid min-h-[570px] md:min-h-[520px] md:grid-cols-[minmax(0,.92fr)_minmax(360px,1.08fr)]"
+                            className="hero-copy-enter relative grid min-h-[570px] md:min-h-[470px] md:grid-cols-[minmax(0,.92fr)_minmax(360px,1.08fr)]"
                         >
                             <div className="relative z-10 flex flex-col justify-center px-6 pb-28 pt-10 sm:px-10 md:px-12 md:pb-24 lg:px-16">
                                 <div className="inline-flex w-fit items-center gap-2 rounded-full bg-white/[0.055] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--brand-highlight)] ring-1 ring-white/[0.12] backdrop-blur">
@@ -216,7 +216,7 @@ export function HomePage() {
                                     {activeSlide.eyebrow}
                                 </div>
 
-                                <h1 className="mt-6 max-w-2xl text-[39px] font-black leading-[1.02] tracking-[-0.055em] text-white sm:text-5xl lg:text-[64px]">
+                                <h1 className="mt-5 max-w-2xl text-[36px] font-black leading-[1.02] tracking-[-0.055em] text-white sm:text-5xl lg:text-[56px]">
                                     {activeSlide.title}
                                 </h1>
 
@@ -288,7 +288,7 @@ export function HomePage() {
                                 </div>
                             </div>
 
-                            <div className="relative min-h-[300px] px-5 pb-6 sm:px-8 md:min-h-[520px] md:px-8 md:py-12 lg:px-12">
+                            <div className="relative min-h-[300px] px-5 pb-6 sm:px-8 md:min-h-[470px] md:px-8 md:py-12 lg:px-12">
                                 <div className="pointer-events-none absolute inset-x-[14%] bottom-[10%] top-[17%] rounded-[38px] ring-1 ring-white/15 md:inset-x-[11%] md:bottom-[13%] md:top-[13%]" />
                                 <div className="pointer-events-none absolute inset-x-[20%] bottom-[16%] top-[11%] rounded-[34px] ring-1 ring-white/[0.08] md:inset-x-[17%] md:bottom-[9%] md:top-[19%]" />
 
@@ -426,7 +426,7 @@ export function HomePage() {
                 </div>
             </section>
 
-            <section id="categories" className="py-10 sm:py-14">
+            <section id="categories" className="py-8 sm:py-10">
                 <SectionHeading
                     eyebrow={t("home.browseCollection")}
                     title={t("home.shopByCategory")}
@@ -472,7 +472,11 @@ export function HomePage() {
                 ) : featuredProducts.length ? (
                     <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
                         {featuredProducts.slice(0, 5).map((product) => (
-                            <ProductCard key={product.id} product={product} />
+                            <ProductCard
+                                key={product.id}
+                                product={product}
+                                density="compact"
+                            />
                         ))}
                     </div>
                 ) : (
@@ -506,7 +510,7 @@ export function HomePage() {
                                 <BadgePercent className="size-4" />
                                 {t("home.limitedOffers")}
                             </span>
-                            <h2 className="mt-5 text-3xl font-black leading-tight tracking-[-0.045em] sm:text-4xl">
+                            <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] sm:text-4xl">
                                 {spotlightProduct?.name ??
                                     t("home.selectedForYou")}
                             </h2>
@@ -579,7 +583,11 @@ export function HomePage() {
                 ) : (
                     <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
                         {newestProducts.map((product) => (
-                            <ProductCard key={product.id} product={product} />
+                            <ProductCard
+                                key={product.id}
+                                product={product}
+                                density="compact"
+                            />
                         ))}
                     </div>
                 )}
@@ -633,78 +641,76 @@ function CategoryCard({
     const categoryImage = imageUrl(category.imageUrl);
     const categoryMeta = category.children.length
         ? category.children
-              .slice(0, 2)
+              .slice(0, 3)
               .map((child) => child.name)
               .join(" · ")
-        : `${t("home.productCount", {
-              count: category.productCount,
-          })} · ${t("home.categoryProducts")}`;
-
-    if (featured) {
-        return (
-            <Link
-                viewTransition
-                to={`/products?categoryId=${category.id}`}
-                className="group relative min-h-[310px] overflow-hidden rounded-2xl bg-slate-900 shadow-[0_18px_48px_-34px_rgba(15,23,42,.7)] ring-1 ring-black/[0.06] sm:min-h-[330px] lg:col-span-2 dark:ring-white/[0.05]"
-            >
-                {categoryImage ? (
-                    <img
-                        src={categoryImage}
-                        alt={category.name}
-                        className="absolute inset-0 size-full object-cover transition duration-700 group-hover:scale-[1.045]"
-                    />
-                ) : (
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,color-mix(in_srgb,var(--brand-highlight)_32%,transparent),transparent_38%),linear-gradient(135deg,var(--brand-surface),var(--brand-surface-strong))]" />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/[0.78] via-black/[0.15] to-black/[0.05]" />
-                <span className="absolute end-5 top-5 grid size-11 place-items-center rounded-full bg-white/[0.12] text-white ring-1 ring-white/[0.18] backdrop-blur transition group-hover:bg-white group-hover:text-slate-950">
-                    <ArrowUpRight className="size-5" />
-                </span>
-                <span className="absolute inset-x-0 bottom-0 p-6 sm:p-7">
-                    <span className="block text-2xl font-black tracking-[-0.035em] text-white sm:text-3xl">
-                        {category.name}
-                    </span>
-                    <span className="mt-2 block max-w-md text-xs font-semibold leading-5 text-white/[0.65] sm:text-sm">
-                        {categoryMeta}
-                    </span>
-                </span>
-            </Link>
-        );
-    }
+        : t("home.categoryProducts");
 
     return (
         <Link
             viewTransition
             to={`/products?categoryId=${category.id}`}
-            className="group flex min-h-[310px] flex-col overflow-hidden rounded-2xl bg-muted/[0.38] p-5 shadow-[0_14px_34px_-30px_rgba(15,23,42,.48)] ring-1 ring-black/[0.05] transition duration-300 hover:-translate-y-0.5 hover:bg-muted/[0.58] dark:bg-white/[0.03] dark:ring-white/[0.045]"
+            className={cn(
+                "group relative isolate overflow-hidden rounded-xl border border-border/75 bg-card shadow-[0_14px_38px_-32px_rgba(15,23,42,.52)] transition duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_24px_52px_-30px_rgba(15,23,42,.46)] dark:border-white/[0.07]",
+                featured
+                    ? "min-h-[310px] sm:min-h-[330px] lg:col-span-2"
+                    : "min-h-[270px] sm:min-h-[290px]",
+            )}
         >
-            <span className="flex items-start gap-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-background text-foreground shadow-sm ring-1 ring-black/[0.05] transition group-hover:bg-primary group-hover:text-primary-foreground dark:bg-white/[0.055] dark:ring-white/[0.06]">
-                    <ArrowUpRight className="size-4" />
-                </span>
-                <span className="min-w-0 pt-1">
-                    <span className="block text-xl font-black tracking-[-0.03em]">
-                        {category.name}
-                    </span>
-                    <span className="mt-2 line-clamp-2 block text-xs leading-5 text-muted-foreground">
-                        {categoryMeta}
-                    </span>
-                </span>
-            </span>
-
-            <span className="mt-5 block min-h-0 flex-1 overflow-hidden rounded-xl bg-background/[0.80]">
-                {categoryImage ? (
-                    <img
-                        src={categoryImage}
-                        alt={category.name}
-                        className="size-full min-h-[170px] object-cover transition duration-700 group-hover:scale-[1.045]"
-                    />
-                ) : (
-                    <span className="grid min-h-[170px] place-items-center bg-gradient-to-br from-primary/[0.12] to-muted text-primary">
+            <div className="absolute inset-0 bg-muted/25" />
+            {categoryImage ? (
+                <img
+                    src={categoryImage}
+                    alt={category.name}
+                    loading="lazy"
+                    decoding="async"
+                    className="absolute inset-0 size-full object-cover object-center transition duration-700 ease-out group-hover:scale-[1.035]"
+                />
+            ) : (
+                <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_75%_20%,color-mix(in_srgb,var(--brand-highlight)_28%,transparent),transparent_34%),linear-gradient(135deg,color-mix(in_srgb,var(--primary)_14%,var(--background)),var(--muted))] text-primary">
+                    <span className="grid size-24 place-items-center rounded-[28px] border border-primary/15 bg-background/75 shadow-xl backdrop-blur-sm">
                         <ShoppingBag className="size-10" />
                     </span>
+                </div>
+            )}
+
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-background/45 via-background/10 to-transparent" />
+
+            <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 p-3 sm:p-4">
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-black/[0.05] bg-card/95 px-2.5 py-1.5 text-[10px] font-black text-foreground shadow-sm backdrop-blur dark:border-white/[0.08]">
+                    <ShoppingBag className="size-3 text-primary" />
+                    {t("home.productCount", {
+                        count: category.productCount,
+                    })}
+                </span>
+                <span className="grid size-9 place-items-center rounded-lg border border-black/[0.05] bg-card/95 text-foreground shadow-sm backdrop-blur transition duration-300 group-hover:bg-primary group-hover:text-primary-foreground dark:border-white/[0.08]">
+                    <ArrowUpRight className="size-4" />
+                </span>
+            </div>
+
+            <div
+                className={cn(
+                    "absolute inset-x-0 bottom-0 z-30 border-t border-border/80 bg-card/95 shadow-[0_-10px_30px_-24px_rgba(15,23,42,.42)] backdrop-blur-xl supports-[backdrop-filter]:bg-card/90 dark:border-white/[0.08]",
+                    featured ? "px-5 py-4 sm:px-6 sm:py-5" : "px-4 py-3.5",
                 )}
-            </span>
+            >
+                <p
+                    className={cn(
+                        "truncate font-black tracking-[-0.035em] text-foreground transition group-hover:text-primary",
+                        featured ? "text-xl sm:text-2xl" : "text-lg",
+                    )}
+                >
+                    {category.name}
+                </p>
+                <div className="mt-1.5 flex min-w-0 items-center justify-between gap-3">
+                    <p className="min-w-0 truncate text-[11px] font-semibold text-muted-foreground sm:text-xs">
+                        {categoryMeta}
+                    </p>
+                    <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.12em] text-primary">
+                        {t("common.open")}
+                    </span>
+                </div>
+            </div>
         </Link>
     );
 }
@@ -820,7 +826,7 @@ function ProductGridSkeleton() {
             {Array.from({ length: 5 }).map((_, index) => (
                 <Skeleton
                     key={index}
-                    className="h-[196px] rounded-2xl sm:h-[410px]"
+                    className="h-[172px] rounded-2xl sm:h-[340px]"
                 />
             ))}
         </div>
@@ -829,14 +835,14 @@ function ProductGridSkeleton() {
 
 function HeroSkeleton() {
     return (
-        <div className="grid min-h-[570px] items-center gap-8 px-8 py-10 md:min-h-[520px] md:grid-cols-2">
+        <div className="grid min-h-[500px] items-center gap-6 px-6 py-8 md:min-h-[470px] md:grid-cols-2">
             <div className="space-y-5">
                 <Skeleton className="h-8 w-44 rounded-full bg-white/10" />
                 <Skeleton className="h-28 w-full rounded-2xl bg-white/10" />
                 <Skeleton className="h-20 w-full rounded-2xl bg-white/10" />
                 <Skeleton className="h-11 w-48 rounded-xl bg-white/10" />
             </div>
-            <Skeleton className="h-[340px] rounded-3xl bg-white/10" />
+            <Skeleton className="h-[300px] rounded-2xl bg-white/10" />
         </div>
     );
 }

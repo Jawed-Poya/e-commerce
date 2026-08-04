@@ -52,12 +52,12 @@ export function ProductReviews({ productId }: { productId: number }) {
 
     return (
         <section className="mx-auto w-full max-w-[1500px] px-4 pb-20 sm:px-6 lg:px-8">
-            <div className="rounded-[26px] border bg-card p-5 shadow-sm sm:p-8 lg:p-10">
-                <div className="grid gap-8 lg:grid-cols-[0.38fr_0.62fr]">
+            <div className="rounded-2xl border bg-card p-4 shadow-sm sm:p-6 lg:p-7">
+                <div className="grid gap-5 lg:grid-cols-[0.38fr_0.62fr]">
                     <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">{t("reviews.title")}</p>
                         <div className="mt-4 flex items-end gap-3">
-                            <strong className="text-5xl font-black tracking-tight">{data?.averageRating.toFixed(1) ?? "0.0"}</strong>
+                            <strong className="text-4xl font-black tracking-tight">{data?.averageRating.toFixed(1) ?? "0.0"}</strong>
                             <div className="pb-1">
                                 <Stars value={Math.round(data?.averageRating ?? 0)} />
                                 <p className="mt-1 text-xs text-muted-foreground">{t("reviews.summary", { count: data?.reviewCount ?? 0 })}</p>

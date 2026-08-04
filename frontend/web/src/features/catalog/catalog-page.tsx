@@ -223,8 +223,8 @@ export function CatalogPage() {
     );
 
     return (
-        <div className="mx-auto w-full max-w-[1480px] px-4 py-7 sm:px-6 lg:px-8 lg:py-10">
-            <nav className="mb-6 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <div className="mx-auto w-full max-w-[1380px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+            <nav className="mb-4 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Link viewTransition
                     to="/"
                     className="rounded-md px-1 py-1 transition-colors hover:text-primary"
@@ -237,33 +237,33 @@ export function CatalogPage() {
                 <span className="text-foreground">{t("catalog.shop")}</span>
             </nav>
 
-            <section className="relative mb-7 overflow-hidden rounded-2xl bg-card px-6 py-8 shadow-[0_16px_42px_-36px_rgba(15,23,42,.48)] ring-1 ring-black/[0.05] sm:px-9 lg:px-10 lg:py-10 dark:bg-white/[0.03] dark:ring-white/[0.05]">
+            <section className="relative mb-5 overflow-hidden rounded-xl bg-card px-5 py-6 shadow-[0_16px_42px_-36px_rgba(15,23,42,.48)] ring-1 ring-black/[0.05] sm:px-7 lg:px-8 lg:py-7 dark:bg-white/[0.03] dark:ring-white/[0.05]">
                 <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-primary/[0.08] blur-3xl" />
                 <div className="pointer-events-none absolute -bottom-28 left-1/3 size-64 rounded-full bg-brand-orange/[0.08] blur-3xl" />
 
-                <div className="relative flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+                <div className="relative flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
                     <div>
                         <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/[0.07] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
                             <PackageSearch className="size-3.5" />
                             {t("catalog.curated")}
                         </div>
 
-                        <h1 className="mt-4 max-w-3xl text-4xl font-black tracking-[-0.045em] sm:text-5xl">
+                        <h1 className="mt-3 max-w-3xl text-3xl font-black tracking-[-0.045em] sm:text-4xl">
                             {t("catalog.heroTitle")}
                         </h1>
 
-                        <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+                        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
                             {t("catalog.heroDescription")}
                         </p>
                     </div>
 
                     {!query.isLoading && query.data && (
-                        <div className="w-fit rounded-xl bg-background/[0.80] px-5 py-4 ring-1 ring-black/[0.05] dark:bg-white/[0.04] dark:ring-white/[0.05]">
+                        <div className="w-fit rounded-xl bg-background/[0.80] px-4 py-3 ring-1 ring-black/[0.05] dark:bg-white/[0.04] dark:ring-white/[0.05]">
                             <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                                 {t("catalog.availableNow")}
                             </span>
 
-                            <span className="mt-1 block text-2xl font-black">
+                            <span className="mt-1 block text-xl font-black">
                                 {query.data.totalCount}
                             </span>
 
@@ -276,12 +276,12 @@ export function CatalogPage() {
             </section>
 
             {rootCategories.length > 0 ? (
-                <div className="mb-7 overflow-x-auto rounded-xl bg-card p-2 shadow-[0_12px_30px_-28px_rgba(15,23,42,.45)] ring-1 ring-black/[0.05] dark:bg-white/[0.025] dark:ring-white/[0.05]">
+                <div className="mb-5 overflow-x-auto rounded-xl bg-card p-1.5 shadow-[0_12px_30px_-28px_rgba(15,23,42,.45)] ring-1 ring-black/[0.05] dark:bg-white/[0.025] dark:ring-white/[0.05]">
                     <div className="flex min-w-max items-center gap-2">
                         <button
                             type="button"
                             onClick={() => update("categoryId")}
-                            className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${
+                            className={`rounded-lg px-3 py-2 text-[13px] font-bold transition ${
                                 !params.get("categoryId")
                                     ? "bg-primary text-primary-foreground shadow-sm"
                                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -294,7 +294,7 @@ export function CatalogPage() {
                                 key={item.id}
                                 type="button"
                                 onClick={() => update("categoryId", String(item.id))}
-                                className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${
+                                className={`rounded-lg px-3 py-2 text-[13px] font-bold transition ${
                                     params.get("categoryId") === String(item.id)
                                         ? "bg-primary text-primary-foreground shadow-sm"
                                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -310,9 +310,9 @@ export function CatalogPage() {
                 </div>
             ) : null}
 
-            <div className="grid items-start gap-8 lg:grid-cols-[310px_minmax(0,1fr)]">
-                <aside className="sticky top-36 hidden overflow-hidden rounded-2xl bg-card shadow-[0_16px_38px_-34px_rgba(15,23,42,.48)] ring-1 ring-black/[0.05] lg:block dark:bg-white/[0.025] dark:ring-white/[0.05]">
-                    <div className="bg-muted/35 p-5 dark:bg-white/[0.025]">
+            <div className="grid items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+                <aside className="sticky top-28 hidden overflow-hidden rounded-xl bg-card shadow-[0_16px_38px_-34px_rgba(15,23,42,.48)] ring-1 ring-black/[0.05] lg:block dark:bg-white/[0.025] dark:ring-white/[0.05]">
+                    <div className="bg-muted/35 p-4 dark:bg-white/[0.025]">
                         <p className="text-xs font-black uppercase tracking-[0.14em] text-primary">
                             {t("catalog.filterProducts")}
                         </p>
@@ -320,15 +320,15 @@ export function CatalogPage() {
                             {t("catalog.filterDescription")}
                         </p>
                     </div>
-                    <div className="p-5">{filterPanel}</div>
+                    <div className="p-4">{filterPanel}</div>
                 </aside>
 
                 <section className="min-w-0">
-                    <div className="mb-6 rounded-2xl bg-card p-3 shadow-[0_12px_30px_-28px_rgba(15,23,42,.45)] ring-1 ring-black/[0.05] dark:bg-white/[0.025] dark:ring-white/[0.05]">
+                    <div className="mb-4 rounded-xl bg-card p-2.5 shadow-[0_12px_30px_-28px_rgba(15,23,42,.45)] ring-1 ring-black/[0.05] dark:bg-white/[0.025] dark:ring-white/[0.05]">
                         <div className="flex flex-col gap-3 sm:flex-row">
                             <form
                                 onSubmit={submit}
-                                className="group flex h-12 min-w-0 flex-1 items-center rounded-xl border bg-background p-1 transition focus-within:border-primary focus-within:ring-3 focus-within:ring-primary/10"
+                                className="group flex h-10 min-w-0 flex-1 items-center rounded-lg border bg-background p-1 transition focus-within:border-primary focus-within:ring-3 focus-within:ring-primary/10"
                             >
                                 <Search className="ml-3 size-4.5 shrink-0 text-muted-foreground transition-colors group-focus-within:text-primary" />
 
@@ -341,7 +341,7 @@ export function CatalogPage() {
                                     placeholder={t("catalog.searchPlaceholder")}
                                 />
 
-                                <Button className="h-10 rounded-lg px-5 font-semibold">
+                                <Button className="h-8 rounded-md px-4 font-semibold">
                                     {t("catalog.searchAction")}
                                 </Button>
                             </form>
@@ -353,7 +353,7 @@ export function CatalogPage() {
                                 <Dialog.Trigger asChild>
                                     <Button
                                         variant="outline"
-                                        className="h-12 rounded-xl lg:hidden"
+                                        className="h-10 rounded-lg lg:hidden"
                                     >
                                         <SlidersHorizontal className="size-4" />
                                         {t("catalog.filters")}
@@ -391,7 +391,7 @@ export function CatalogPage() {
                                             </Dialog.Close>
                                         </div>
 
-                                        <div className="p-5">{filterPanel}</div>
+                                        <div className="p-4">{filterPanel}</div>
 
                                         <div className="sticky bottom-0 border-t bg-background/[0.95] p-5 backdrop-blur">
                                             <Dialog.Close asChild>
@@ -408,7 +408,7 @@ export function CatalogPage() {
                                 value={sort}
                                 onValueChange={(value) => update("sort", value)}
                             >
-                                <SelectTrigger className="h-12 rounded-xl sm:w-56">
+                                <SelectTrigger className="h-10 rounded-lg sm:w-52">
                                     <SelectValue />
                                 </SelectTrigger>
 
@@ -792,7 +792,7 @@ function PriceRange({
     selectedMaximum: string;
     onChange: (minimum: number, maximum: number) => void;
 }) {
-    const { t } = useI18n();
+    const { t, direction } = useI18n();
     const span = Math.max(1, maximum - minimum);
     const step = span <= 100 ? 1 : span <= 500 ? 5 : span <= 2000 ? 10 : 50;
 
@@ -835,10 +835,17 @@ function PriceRange({
 
                 <div
                     className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-primary shadow-sm"
-                    style={{
-                        left: `${minimumPercent}%`,
-                        right: `${100 - maximumPercent}%`,
-                    }}
+                    style={
+                        direction === "rtl"
+                            ? {
+                                  right: `${minimumPercent}%`,
+                                  left: `${100 - maximumPercent}%`,
+                              }
+                            : {
+                                  left: `${minimumPercent}%`,
+                                  right: `${100 - maximumPercent}%`,
+                              }
+                    }
                 />
 
                 <input
@@ -859,6 +866,7 @@ function PriceRange({
                     onPointerUp={commit}
                     onKeyUp={commit}
                     onBlur={commit}
+                    dir={direction}
                     className="price-range-input absolute inset-0 z-20 w-full"
                 />
 
@@ -880,6 +888,7 @@ function PriceRange({
                     onPointerUp={commit}
                     onKeyUp={commit}
                     onBlur={commit}
+                    dir={direction}
                     className="price-range-input absolute inset-0 z-30 w-full"
                 />
             </div>

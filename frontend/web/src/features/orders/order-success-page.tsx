@@ -47,15 +47,15 @@ export function OrderSuccessPage() {
 
     return (
         <main className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 lg:py-16">
-            <section className="overflow-hidden rounded-[32px] border bg-card shadow-[0_24px_70px_rgba(15,23,42,0.09)]">
-                <div className="bg-gradient-to-br from-emerald-500/15 via-primary/10 to-transparent p-8 text-center sm:p-12">
+            <section className="overflow-hidden rounded-2xl border bg-card shadow-[0_24px_70px_rgba(15,23,42,0.09)]">
+                <div className="bg-gradient-to-br from-emerald-500/15 via-primary/10 to-transparent p-6 text-center sm:p-8">
                     <span className="mx-auto grid size-20 place-items-center rounded-full bg-emerald-500 text-white shadow-xl shadow-emerald-500/20"><CheckCircle2 className="size-10" /></span>
                     <p className="mt-6 text-xs font-black uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-400">{t("orders.received")}</p>
-                    <h1 className="mt-3 text-3xl font-black tracking-[-0.04em] sm:text-5xl">{t("orders.thankYou")}</h1>
+                    <h1 className="mt-2 text-3xl font-black tracking-[-0.035em] sm:text-4xl">{t("orders.thankYou")}</h1>
                     <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-muted-foreground sm:text-base">{t("orders.reservedDescription")}</p>
                 </div>
 
-                <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_0.9fr] lg:p-10">
+                <div className="grid gap-4 p-5 sm:p-6 lg:grid-cols-[1fr_0.9fr] lg:p-7">
                     <div className="space-y-5">
                         <div className="rounded-2xl border bg-muted/25 p-5">
                             <div className="flex items-start justify-between gap-4">
@@ -92,7 +92,7 @@ export function OrderSuccessPage() {
                         </div>
                     </div>
 
-                    <div className="rounded-3xl border bg-background p-6">
+                    <div className="rounded-xl border bg-background p-4">
                         <h2 className="text-xl font-black">{isBank ? t("orders.completeBank") : t("orders.next")}</h2>
                         {isBank && confirmation.bankDetails ? (
                             <div className="mt-5 space-y-4">

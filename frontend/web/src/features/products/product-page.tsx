@@ -23,6 +23,7 @@ import { maximumCartQuantity, minimumCartQuantity, useCart } from "../cart/cart-
 import { useStoreNotifications } from "../notifications/notification-context";
 import { ProductReviews } from "../reviews/product-reviews";
 import { useI18n } from "../../i18n/i18n-provider";
+import { useCompany } from "../company/company-context";
 
 export function ProductPage() {
   const { id: identifier } = useParams();
@@ -43,6 +44,7 @@ export function ProductPage() {
   const [selected, setSelected] = useState<number | null>(null);
   const [selectedUnitId, setSelectedUnitId] = useState<number | null>(null);
   const cart = useCart();
+  const { company } = useCompany();
   const {
     trackProduct,
     permission: notificationPermission,
@@ -77,7 +79,7 @@ export function ProductPage() {
       <div className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
         <div className="grid gap-7 lg:grid-cols-2 lg:gap-14">
           <div>
-            <Skeleton className="aspect-square rounded-3xl" />
+            <Skeleton className="aspect-square rounded-2xl" />
 
             <div className="mt-3 flex gap-3 overflow-hidden">
               {Array.from({ length: 4 }).map((_, index) => (
@@ -91,7 +93,7 @@ export function ProductPage() {
 
           <div className="space-y-5 py-2">
             <Skeleton className="h-6 w-32 rounded-full" />
-            <Skeleton className="h-14 w-4/5 rounded-xl" />
+            <Skeleton className="h-11 w-4/5 rounded-xl" />
             <Skeleton className="h-20 w-full rounded-xl" />
             <Skeleton className="h-12 w-40 rounded-xl" />
             <Skeleton className="h-20 w-full rounded-2xl" />
@@ -106,7 +108,7 @@ export function ProductPage() {
     return (
       <div className="mx-auto grid min-h-[65vh] max-w-xl place-items-center px-4 py-20 text-center">
         <div>
-          <span className="mx-auto grid size-16 place-items-center rounded-3xl border bg-muted text-muted-foreground">
+          <span className="mx-auto grid size-12 place-items-center rounded-2xl border bg-muted text-muted-foreground">
             <ShoppingBag className="size-7" />
           </span>
 
@@ -226,9 +228,9 @@ export function ProductPage() {
         <div className="grid items-start gap-7 lg:grid-cols-[1.05fr_.95fr] lg:gap-14 xl:gap-20">
           {/* Product gallery */}
           <section className="min-w-0 lg:sticky lg:top-32">
-            <div className="relative aspect-square overflow-hidden rounded-3xl border bg-gradient-to-b from-muted/40 to-muted shadow-[0_20px_60px_-35px_rgba(15,23,42,0.35)]">
+            <div className="relative aspect-square overflow-hidden rounded-2xl border bg-gradient-to-b from-muted/40 to-muted shadow-[0_20px_60px_-35px_rgba(15,23,42,0.35)]">
               <img
-                className="size-full object-contain p-3 transition-all duration-500 sm:p-6 lg:p-8"
+                className="size-full object-contain p-3 transition-all duration-500 sm:p-5 lg:p-6"
                 src={imageUrl(active?.url) || "/placeholder-product.svg"}
                 alt={p.name}
               />
@@ -310,7 +312,7 @@ export function ProductPage() {
               )}
             </div>
 
-            <h1 className="mt-4 text-3xl font-black leading-tight tracking-[-0.04em] sm:mt-5 sm:text-4xl lg:text-5xl">
+            <h1 className="mt-3 text-2xl font-black leading-tight tracking-[-0.035em] sm:mt-4 sm:text-3xl lg:text-4xl">
               {p.name}
             </h1>
 
@@ -335,7 +337,7 @@ export function ProductPage() {
                   {t("product.currentPrice")}
                 </p>
 
-                <p className="mt-1 text-3xl font-black tracking-[-0.04em] text-primary sm:text-4xl">
+                <p className="mt-1 text-2xl font-black tracking-[-0.035em] text-primary sm:text-3xl">
                   {hasPrice ? formatMoney(price) : t("product.noPrice")}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -448,13 +450,13 @@ export function ProductPage() {
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span>{t("product.alertTrackingDescription")}</span>
+              <span>{t("product.alertTrackingDescription", { company: company?.name ?? "" })}</span>
             </div>
 
             <div className="mt-6 hidden gap-3 sm:flex">
               <Button
                 size="lg"
-                className="h-12 flex-1 rounded-xl font-bold shadow-md shadow-primary/15"
+                className="h-11 flex-1 rounded-lg font-bold shadow-md shadow-primary/15"
                 disabled={!canAddToCart}
                 onClick={addToCart}
               >
@@ -468,7 +470,7 @@ export function ProductPage() {
                 disabled={notificationPermission === "denied" || notificationPermission === "unsupported"}
                 onClick={() => void enableBrowserNotifications()}
                 className={cn(
-                  "h-12 rounded-xl px-5",
+                  "h-11 rounded-lg px-4",
                   notificationPermission === "granted" &&
                     "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300",
                 )}
@@ -481,7 +483,7 @@ export function ProductPage() {
                 size="lg"
                 variant="outline"
                 className={cn(
-                  "h-12 rounded-xl px-5",
+                  "h-11 rounded-lg px-4",
                   liked &&
                     "border-brand-orange bg-brand-orange/5 text-brand-orange",
                 )}
@@ -543,7 +545,7 @@ export function ProductPage() {
       </div>
 
       {/* Mobile app purchase bar */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-4 py-3 shadow-[0_-10px_35px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-4 py-2.5 shadow-[0_-10px_35px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:hidden">
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
