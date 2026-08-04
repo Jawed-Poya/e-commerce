@@ -1,7 +1,9 @@
 using System.Text.Json;
 using ECommerce.Data;
 using ECommerce.Dtos.Company;
-using ECommerce.Entities.Company;
+using BranchEntity = ECommerce.Entities.Company.Branch;
+using CompanyEntity = ECommerce.Entities.Company.Company;
+using CompanySettingEntity = ECommerce.Entities.Company.CompanySetting;
 using Microsoft.EntityFrameworkCore;
 
 namespace ECommerce.Services.Company;
@@ -119,7 +121,7 @@ public sealed class CompanyService(ApplicationDbContext context) : ICompanyServi
                 cancellationToken);
         }
 
-        var branch = new Branch
+        var branch = new BranchEntity
         {
             Name = request.Name.Trim(),
             Code = code,
@@ -189,20 +191,20 @@ public sealed class CompanyService(ApplicationDbContext context) : ICompanyServi
             Map(settings));
     }
 
-    private async Task<Company> LoadCompanyAsync(bool tracked, CancellationToken cancellationToken)
+    private async Task<CompanyEntity> LoadCompanyAsync(bool tracked, CancellationToken cancellationToken)
     {
         var query = tracked ? context.Companies : context.Companies.AsNoTracking();
         return await query.SingleOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException("Company profile was not found.");
     }
 
-    private async Task<CompanySetting?> LoadSettingsAsync(bool tracked, CancellationToken cancellationToken)
+    private async Task<CompanySettingEntity?> LoadSettingsAsync(bool tracked, CancellationToken cancellationToken)
     {
         var query = tracked ? context.CompanySettings : context.CompanySettings.AsNoTracking();
         return await query.SingleOrDefaultAsync(cancellationToken);
     }
 
-    private async Task<IReadOnlyCollection<Branch>> LoadBranchesAsync(
+    private async Task<IReadOnlyCollection<BranchEntity>> LoadBranchesAsync(
         bool activeOnly,
         CancellationToken cancellationToken)
     {
@@ -214,10 +216,10 @@ public sealed class CompanyService(ApplicationDbContext context) : ICompanyServi
             .ToArrayAsync(cancellationToken);
     }
 
-    private static CompanyBranchResponse Map(Branch branch) => new(
+    private static CompanyBranchResponse Map(BranchEntity branch) => new(
         branch.Id, branch.Name, branch.Code, branch.Phone, branch.Address, branch.IsMain, branch.IsActive);
 
-    private static CompanySettingsResponse Map(CompanySetting settings) => new(
+    private static CompanySettingsResponse Map(CompanySettingEntity settings) => new(
         settings.MainCurrencyCode,
         settings.CurrencySymbol,
         settings.CurrencyPosition,
@@ -240,7 +242,7 @@ public sealed class CompanyService(ApplicationDbContext context) : ICompanyServi
         settings.MaximumManualSaleLines,
         settings.AllowUserClaimManagement);
 
-    private static CompanySetting DefaultSettings() => new();
+    private static CompanySettingEntity DefaultSettings() => new();
 
     private static int[] ParseExpiryPeriods(string? json)
     {
