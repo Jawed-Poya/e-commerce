@@ -23,7 +23,7 @@ public sealed class DefaultCustomerTypeResolver(
         if (cache.TryGetValue<GeneralType>(CacheKey, out var cached) && cached is not null)
             return cached;
 
-        var customerType = await TransientSqlRetry.ExecuteAsync(
+        var customerType = await TransientSqlRetry.ExecuteAsync<GeneralType>(
             async token =>
             {
                 GeneralType? resolved = null;
@@ -92,7 +92,10 @@ public sealed class DefaultCustomerTypeResolver(
                         .Where(type => type.Group == GeneralTypeEnum.CustomerType && type.Name == "General")
                         .OrderBy(type => type.Id)
                         .FirstOrDefaultAsync(token);
-                    return concurrent ?? throw;
+                    if (concurrent is not null)
+                        return concurrent;
+
+                    throw;
                 }
             },
             cancellationToken);
