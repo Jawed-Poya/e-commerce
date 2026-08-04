@@ -6,6 +6,7 @@ export interface CustomerListItem {
     id: number;
     name: string;
     phone: string;
+    whatsAppUrl: string | null;
     email: string | null;
     customerTypeName: string | null;
     orderCount: number;
@@ -19,6 +20,7 @@ export interface CustomerDetails {
     firstName: string;
     lastName: string | null;
     phone: string;
+    whatsAppUrl: string | null;
     email: string | null;
     address: string | null;
     customerTypeId: number | null;

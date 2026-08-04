@@ -28,10 +28,26 @@ builder.Services.AddCatalog();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddSignalR();
 
-var allowedOrigins = builder.Configuration
+var configuredOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
-    .Get<string[]>()
-    ?? ["http://localhost:5173", "http://localhost:5174", "http://localhost:4173", "http://localhost:4174"];
+    .Get<string[]>();
+
+var allowedOrigins = (configuredOrigins ?? [])
+    .Where(origin => !string.IsNullOrWhiteSpace(origin))
+    .Select(origin => origin.Trim().TrimEnd('/'))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+
+if (allowedOrigins.Length == 0)
+{
+    allowedOrigins =
+    [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:4173",
+        "http://localhost:4174"
+    ];
+}
 
 builder.Services.AddCors(options =>
 {

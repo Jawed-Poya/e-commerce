@@ -4,14 +4,19 @@ using ECommerce.Entities.Common;
 using ECommerce.Entities.Customers.Contracts;
 using ECommerce.Entities.Customers.Filters;
 using ECommerce.Entities.Orders;
+using ECommerce.Options;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace ECommerce.Services.Customers;
 
 public sealed class CustomerService(
     ApplicationDbContext context,
-    IDefaultCustomerTypeResolver defaultCustomerType) : ICustomerService
+    IDefaultCustomerTypeResolver defaultCustomerType,
+    IOptions<WhatsAppOptions> whatsAppOptions) : ICustomerService
 {
+    private readonly WhatsAppOptions _whatsAppOptions = whatsAppOptions.Value;
+
     public async Task<PagedResult<CustomerListItemResponse>> GetAsync(
         CustomerFilter filter,
         CancellationToken cancellationToken = default)
@@ -60,16 +65,21 @@ public sealed class CustomerService(
 
         return new PagedResult<CustomerListItemResponse>
         {
-            Items = rows.Select(row => new CustomerListItemResponse(
-                row.Id,
-                BuildName(row.FirstName, row.LastName),
-                row.Phone,
-                row.Email,
-                row.CustomerTypeName,
-                row.OrderCount,
-                row.TotalSpent,
-                row.LastOrderAt,
-                row.CreatedAt)).ToList(),
+            Items = rows.Select(row =>
+            {
+                var name = BuildName(row.FirstName, row.LastName);
+                return new CustomerListItemResponse(
+                    row.Id,
+                    name,
+                    row.Phone,
+                    WhatsAppLinkBuilder.Build(row.Phone, name, _whatsAppOptions),
+                    row.Email,
+                    row.CustomerTypeName,
+                    row.OrderCount,
+                    row.TotalSpent,
+                    row.LastOrderAt,
+                    row.CreatedAt);
+            }).ToList(),
             Page = page,
             PageSize = pageSize,
             TotalCount = totalCount
@@ -207,44 +217,50 @@ public sealed class CustomerService(
             throw new ArgumentException("Enter a valid email address.");
     }
 
-    private static CustomerDetailsResponse MapDetails(Customer customer) => new(
-        customer.Id,
-        customer.FirstName,
-        customer.LastName,
-        customer.Phone,
-        customer.Email,
-        customer.Address,
-        customer.CustomerTypeId,
-        customer.CustomerType?.Name,
-        customer.CreatedAt,
-        customer.UpdatedAt,
-        customer.Addresses
-            .OrderByDescending(address => address.IsDefaultShipping)
-            .ThenBy(address => address.Id)
-            .Select(address => new CustomerAddressResponse(
-                address.Id,
-                address.Label,
-                address.RecipientName,
-                address.Phone,
-                address.AddressLine1,
-                address.AddressLine2,
-                address.City,
-                address.State,
-                address.Country,
-                address.PostalCode,
-                address.IsDefaultShipping,
-                address.IsDefaultBilling))
-            .ToList(),
-        customer.Orders
-            .OrderByDescending(order => order.CreatedAt)
-            .Select(order => new CustomerOrderSummaryResponse(
-                order.Id,
-                order.OrderNumber,
-                order.Status,
-                order.Total,
-                order.Currency,
-                order.CreatedAt))
-            .ToList());
+    private CustomerDetailsResponse MapDetails(Customer customer)
+    {
+        var name = BuildName(customer.FirstName, customer.LastName);
+
+        return new CustomerDetailsResponse(
+            customer.Id,
+            customer.FirstName,
+            customer.LastName,
+            customer.Phone,
+            WhatsAppLinkBuilder.Build(customer.Phone, name, _whatsAppOptions),
+            customer.Email,
+            customer.Address,
+            customer.CustomerTypeId,
+            customer.CustomerType?.Name,
+            customer.CreatedAt,
+            customer.UpdatedAt,
+            customer.Addresses
+                .OrderByDescending(address => address.IsDefaultShipping)
+                .ThenBy(address => address.Id)
+                .Select(address => new CustomerAddressResponse(
+                    address.Id,
+                    address.Label,
+                    address.RecipientName,
+                    address.Phone,
+                    address.AddressLine1,
+                    address.AddressLine2,
+                    address.City,
+                    address.State,
+                    address.Country,
+                    address.PostalCode,
+                    address.IsDefaultShipping,
+                    address.IsDefaultBilling))
+                .ToList(),
+            customer.Orders
+                .OrderByDescending(order => order.CreatedAt)
+                .Select(order => new CustomerOrderSummaryResponse(
+                    order.Id,
+                    order.OrderNumber,
+                    order.Status,
+                    order.Total,
+                    order.Currency,
+                    order.CreatedAt))
+                .ToList());
+    }
 
     private static string NormalizePhone(string value) =>
         new(value.Trim().Where(character =>

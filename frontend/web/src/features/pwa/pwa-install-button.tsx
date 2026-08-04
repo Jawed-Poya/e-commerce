@@ -1,4 +1,4 @@
-import { Download, Smartphone } from "lucide-react";
+import { Smartphone } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { useI18n } from "../../i18n/i18n-provider";
@@ -48,8 +48,9 @@ export function PwaInstallButton({ compact = false }: { compact?: boolean }) {
             className="rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary"
             onClick={() => void install()}
             aria-label={t("pwa.install")}
+            title={t("pwa.install")}
         >
-            <Download className="size-5" />
+            <Smartphone className="size-5" />
         </Button>
     ) : (
         <Button variant="outline" className="w-full rounded-xl" onClick={() => void install()}>

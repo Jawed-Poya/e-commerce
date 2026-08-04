@@ -82,6 +82,7 @@ public static class DependencyInjection
         services.Configure<SeedAdminOptions>(configuration.GetSection(SeedAdminOptions.SectionName));
         services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
         services.Configure<AccountVerificationOptions>(configuration.GetSection(AccountVerificationOptions.SectionName));
+        services.Configure<WhatsAppOptions>(configuration.GetSection(WhatsAppOptions.SectionName));
         services.AddHttpClient();
 
         services.AddDbContext<ApplicationDbContext>(options =>
