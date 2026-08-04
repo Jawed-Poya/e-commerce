@@ -552,7 +552,7 @@ export default function ManualSalesPage() {
             </Dialog>
 
             {selectedSale ? (
-                <PaymentLedgerDialog
+                <PaymentLedgerDialog<ManualSale>
                     open={Boolean(selectedSale)}
                     onOpenChange={(next) => {
                         if (!next) setSelectedSale(null);

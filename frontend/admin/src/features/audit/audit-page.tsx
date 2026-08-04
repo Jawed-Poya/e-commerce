@@ -25,7 +25,12 @@ import {
 } from "@/components/ui/table";
 import { useI18n } from "@/i18n/i18n-provider";
 import { auditService } from "./audit-service";
-import { AuditActions, type ActivityAction, type ActivityLogItem, type CustomerVisitItem } from "./audit-types";
+import {
+    AuditActions,
+    type AuditAction,
+    type ActivityLogItem,
+    type CustomerVisitItem,
+} from "./audit-types";
 
 const PageSize = 50;
 
@@ -33,7 +38,7 @@ export default function AuditPage() {
     const { tr } = useI18n();
     const [view, setView] = useState<"activities" | "visits">("activities");
     const [search, setSearch] = useState("");
-    const [action, setAction] = useState<ActivityAction | "">("");
+    const [action, setAction] = useState<AuditAction | "">("");
     const [page, setPage] = useState(1);
     const deferredSearch = useDeferredValue(search.trim());
 

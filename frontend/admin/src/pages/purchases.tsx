@@ -775,7 +775,7 @@ export default function PurchasesPage() {
             />
 
             {selectedPurchase ? (
-                <PaymentLedgerDialog
+                <PaymentLedgerDialog<Purchase>
                     open={Boolean(selectedPurchase)}
                     onOpenChange={(open) => {
                         if (!open) setSelectedPurchase(null);
