@@ -101,7 +101,11 @@ BEGIN
         FROM sys.default_constraints dc
         INNER JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
         WHERE dc.parent_object_id = OBJECT_ID(N'[dbo].[CompanySettings]') AND c.name = N'ExpiryAlertLeadDays';
-        IF @leadDefault IS NOT NULL EXEC(N'ALTER TABLE [dbo].[CompanySettings] DROP CONSTRAINT ' + QUOTENAME(@leadDefault));
+        IF @leadDefault IS NOT NULL
+        BEGIN
+            SET @sql = N'ALTER TABLE [dbo].[CompanySettings] DROP CONSTRAINT ' + QUOTENAME(@leadDefault) + N';';
+            EXEC sys.sp_executesql @sql;
+        END;
         ALTER TABLE [dbo].[CompanySettings] DROP COLUMN [ExpiryAlertLeadDays];
     END;
 END;
