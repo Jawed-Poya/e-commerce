@@ -334,7 +334,7 @@ export function AuthPage() {
                                             onChange={(value) =>
                                                 update("phone", value)
                                             }
-                                            placeholder="+93 ..."
+                                            placeholder="07xxxxxxxx"
                                         />
                                         <AuthField
                                             label={t("common.email")}

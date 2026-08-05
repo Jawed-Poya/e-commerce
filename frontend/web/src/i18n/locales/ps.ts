@@ -366,7 +366,7 @@ export const ps: Messages = {
     "auth.optionalHelp": "حساب اختیاري دی؛ هر وخت دا پاڼه تړلی او د مېلمه په توګه پېرود ته دوام ورکولی شئ.",
     "auth.requestError": "د حساب غوښتنه بشپړه نه شوه.",
     "auth.optionalEmail": "اختیاري، خو سپارښتنه کېږي",
-    "auth.identifierPlaceholder": "you@example.com یا +93 …",
+    "auth.identifierPlaceholder": "you@example.com یا 07xxxxxxxx",
     "auth.passwordPlaceholder": "لږ تر لږه ۶ توري",
     "auth.secureAccess": "د پېرودونکي خوندي لاسرسی",
     "auth.backToStore": "پېرود ته ستنېدل",

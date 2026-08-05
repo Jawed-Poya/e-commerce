@@ -366,7 +366,7 @@ export const dr: Messages = {
     "auth.optionalHelp": "داشتن حساب اختیاری است؛ هر زمان می‌توانید این صفحه را ببندید و به‌صورت مهمان خرید کنید.",
     "auth.requestError": "درخواست حساب تکمیل نشد.",
     "auth.optionalEmail": "اختیاری، اما پیشنهاد می‌شود",
-    "auth.identifierPlaceholder": "you@example.com یا +93 …",
+    "auth.identifierPlaceholder": "you@example.com یا 07xxxxxxxx",
     "auth.passwordPlaceholder": "حداقل ۶ نویسه",
     "auth.secureAccess": "دسترسی امن مشتری",
     "auth.backToStore": "بازگشت به خرید",

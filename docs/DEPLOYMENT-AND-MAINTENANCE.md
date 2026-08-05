@@ -49,7 +49,7 @@ High-impact actions require an exact typed confirmation. Clearing business data 
 
 ## Professional demo reset
 
-The admin maintenance page can replace current business data with a compact pharmacy demo: six products with lightweight SVG images, opening stock and lots, supplier and purchase, two customers, manual sale, storefront order, expense, and staff record.
+The admin maintenance page can replace current business data with a neutral professional demo: `Default Company` identity, dark-blue/orange branding, 20 illustrated products, an image for every category, opening stock and lots, 3 sample suppliers, 10 placeholder customers, 10 multi-item purchases, 10 multi-item sales, 5 storefront orders, expenses, and staff. Purchase `PUR-DEMO-…-001` contains all 20 product lines, and every purchase and sale includes a readable `BILL-PUR-…` or `BILL-SALE-…` reference.
 
 For a controlled command-line deployment task, the same operation is available after normal database initialization:
 

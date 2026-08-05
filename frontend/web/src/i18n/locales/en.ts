@@ -364,7 +364,7 @@ export const en: Messages = {
     "auth.optionalHelp": "An account is optional. You can close this page and continue shopping as a guest at any time.",
     "auth.requestError": "The account request could not be completed.",
     "auth.optionalEmail": "Optional, but recommended",
-    "auth.identifierPlaceholder": "you@example.com or +93 …",
+    "auth.identifierPlaceholder": "you@example.com or 07xxxxxxxx",
     "auth.passwordPlaceholder": "At least 6 characters",
     "auth.secureAccess": "Secure customer access",
     "auth.backToStore": "Back to shopping",

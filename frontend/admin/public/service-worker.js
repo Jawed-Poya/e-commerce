@@ -1,7 +1,7 @@
 const BUILD_PRECACHE = [];
 const CACHE_VERSION = "__BUILD_CACHE_VERSION__";
 const IS_DEVELOPMENT_WORKER = CACHE_VERSION === "__BUILD_CACHE_VERSION__";
-const CACHE_PREFIX = "pharmadb-admin";
+const CACHE_PREFIX = "commerce-admin";
 const SHELL_CACHE = `${CACHE_PREFIX}-${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_PREFIX}-${CACHE_VERSION}-static`;
 const IMAGE_CACHE = `${CACHE_PREFIX}-${CACHE_VERSION}-images`;

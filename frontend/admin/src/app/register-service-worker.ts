@@ -59,7 +59,7 @@ async function installServiceWorker() {
         }
 
         await warmLoadedResources(readyRegistration);
-        window.dispatchEvent(new CustomEvent("pharmadb-pwa-ready"));
+        window.dispatchEvent(new CustomEvent("commerce-pwa-ready"));
     } catch (error) {
         console.warn("Admin PWA registration failed.", error);
     }
@@ -112,7 +112,7 @@ async function clearDevelopmentPwaState() {
                 keys
                     .filter(
                         (key) =>
-                            key.startsWith("pharmadb-admin-") ||
+                            key.startsWith("commerce-admin-") ||
                             key.startsWith("pharmacy-admin-") ||
                             key.startsWith("admin-"),
                     )

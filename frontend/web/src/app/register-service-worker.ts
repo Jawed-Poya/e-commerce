@@ -52,7 +52,7 @@ async function installServiceWorker() {
     }
 
     await warmLoadedResources(readyRegistration);
-    window.dispatchEvent(new CustomEvent("pharmadb-pwa-ready"));
+    window.dispatchEvent(new CustomEvent("commerce-pwa-ready"));
   } catch (error) {
     console.warn("Storefront PWA registration failed.", error);
   }
@@ -104,7 +104,7 @@ async function clearDevelopmentPwaState() {
         keys
           .filter(
             (key) =>
-              key.startsWith("pharmadb-storefront-") ||
+              key.startsWith("commerce-storefront-") ||
               key.startsWith("pharmacy-store-") ||
               key.startsWith("storefront-"),
           )

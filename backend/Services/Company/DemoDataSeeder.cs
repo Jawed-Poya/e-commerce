@@ -33,6 +33,8 @@ public sealed class DemoDataSeeder(
     IWebHostEnvironment environment,
     ILogger<DemoDataSeeder> logger) : IDemoDataSeeder
 {
+    private const string DefaultPrimaryColor = "#0B1F3A";
+    private const string DefaultSecondaryColor = "#F97316";
     private readonly FileStorageOptions _storage = storageOptions.Value;
 
     public async Task<DemoSeedResult> ResetAndSeedAsync(
@@ -45,15 +47,24 @@ public sealed class DemoDataSeeder(
             .ThenByDescending(item => item.IsMain)
             .ThenBy(item => item.Id)
             .FirstAsync(cancellationToken);
+        var company = await context.Companies.SingleAsync(cancellationToken);
+        var settings = await context.CompanySettings.FirstAsync(cancellationToken);
+        ApplyNeutralCompanyDefaults(company, branch, settings);
+        await context.SaveChangesAsync(cancellationToken);
+
         var branchId = branch.Id;
-        var settings = await context.CompanySettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
-        var currency = settings?.MainCurrencyCode ?? "USD";
+        var currency = settings.MainCurrencyCode;
+        var productImages = CopySeedImages("products");
+        var categoryImages = CopySeedImages("categories");
 
         var generalCustomer = await GetOrCreateTypeAsync(GeneralTypeEnum.CustomerType, "General", branchId, 0, cancellationToken);
+        var piece = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductUnit, "Piece (Dana)", branchId, 0, cancellationToken);
         var tablet = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductUnit, "Tablet", branchId, 1, cancellationToken);
         var capsule = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductUnit, "Capsule", branchId, 2, cancellationToken);
-        var bottle = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductUnit, "Bottle", branchId, 4, cancellationToken);
-        var piece = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductUnit, "Piece (Dana)", branchId, 0, cancellationToken);
+        var box = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductUnit, "Box", branchId, 4, cancellationToken);
+        var bottle = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductUnit, "Bottle", branchId, 5, cancellationToken);
+        var pack = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductUnit, "Pack", branchId, 6, cancellationToken);
+        var sachet = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductUnit, "Sachet", branchId, 9, cancellationToken);
 
         var painRelief = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductCategory, "Pain Relief", branchId, 1, cancellationToken);
         var antibiotics = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductCategory, "Antibiotics", branchId, 2, cancellationToken);
@@ -61,19 +72,39 @@ public sealed class DemoDataSeeder(
         var coldCare = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductCategory, "Cold & Flu Care", branchId, 4, cancellationToken);
         var firstAid = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductCategory, "First Aid & Devices", branchId, 5, cancellationToken);
 
-        var healthCare = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductBrand, "HealthCare Labs", branchId, 1, cancellationToken);
-        var medica = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductBrand, "Medica", branchId, 2, cancellationToken);
-        var vitaPlus = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductBrand, "VitaPlus", branchId, 3, cancellationToken);
+        painRelief.ImageUrl = categoryImages["pain-relief.svg"].PublicUrl;
+        antibiotics.ImageUrl = categoryImages["antibiotics.svg"].PublicUrl;
+        vitamins.ImageUrl = categoryImages["vitamins.svg"].PublicUrl;
+        coldCare.ImageUrl = categoryImages["cold-care.svg"].PublicUrl;
+        firstAid.ImageUrl = categoryImages["first-aid.svg"].PublicUrl;
+        await context.SaveChangesAsync(cancellationToken);
 
-        var images = CopySeedImages();
+        var brandA = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductBrand, "Demo Brand A", branchId, 1, cancellationToken);
+        var brandB = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductBrand, "Demo Brand B", branchId, 2, cancellationToken);
+        var brandC = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductBrand, "Demo Brand C", branchId, 3, cancellationToken);
+
         var samples = new[]
         {
-            new ProductSample("Paracetamol", "500 mg", "890100000001", "paracetamol-500mg", painRelief.Id, healthCare.Id, tablet.Id, 2.50m, 0.45m, 118m, 20m, "paracetamol.svg", "Reliable everyday fever and pain relief."),
-            new ProductSample("Amoxicillin", "500 mg", "890100000002", "amoxicillin-500mg", antibiotics.Id, medica.Id, capsule.Id, 6.75m, 1.20m, 74m, 15m, "amoxicillin.svg", "Prescription antibiotic capsules in a sealed retail pack."),
-            new ProductSample("Vitamin C", "1000 mg", "890100000003", "vitamin-c-1000mg", vitamins.Id, vitaPlus.Id, tablet.Id, 8.90m, 2.10m, 92m, 18m, "vitamin-c.svg", "Orange-flavour effervescent tablets for daily supplementation."),
-            new ProductSample("Herbal Cough Syrup", "100 ml", "890100000004", "herbal-cough-syrup-100ml", coldCare.Id, healthCare.Id, bottle.Id, 5.40m, 1.50m, 46m, 10m, "cough-syrup.svg", "Soothing non-drowsy herbal syrup for dry cough."),
-            new ProductSample("Sterile Adhesive Bandages", "20 pack", "890100000005", "sterile-bandages-20", firstAid.Id, medica.Id, piece.Id, 3.25m, 0.80m, 65m, 12m, "bandage.svg", "Individually wrapped, breathable first-aid bandages."),
-            new ProductSample("Digital Thermometer", null, "890100000006", "digital-thermometer", firstAid.Id, medica.Id, piece.Id, 12.00m, 4.50m, 28m, 6m, "thermometer.svg", "Fast, clear digital temperature readings for home use.")
+            new ProductSample("Paracetamol", "500 mg", "890100000001", "paracetamol-500mg", painRelief.Id, brandA.Id, tablet.Id, 2.50m, 0.45m, 220m, 30m, "paracetamol.svg", "Reliable everyday fever and pain relief."),
+            new ProductSample("Amoxicillin", "500 mg", "890100000002", "amoxicillin-500mg", antibiotics.Id, brandB.Id, capsule.Id, 6.75m, 1.20m, 180m, 25m, "amoxicillin.svg", "Prescription antibiotic capsules in a sealed retail pack."),
+            new ProductSample("Vitamin C", "1000 mg", "890100000003", "vitamin-c-1000mg", vitamins.Id, brandC.Id, tablet.Id, 8.90m, 2.10m, 200m, 30m, "vitamin-c.svg", "Orange-flavour effervescent tablets for daily supplementation."),
+            new ProductSample("Herbal Cough Syrup", "100 ml", "890100000004", "herbal-cough-syrup-100ml", coldCare.Id, brandA.Id, bottle.Id, 5.40m, 1.50m, 125m, 18m, "cough-syrup.svg", "Soothing non-drowsy herbal syrup for dry cough."),
+            new ProductSample("Sterile Adhesive Bandages", "20 pack", "890100000005", "sterile-bandages-20", firstAid.Id, brandB.Id, pack.Id, 3.25m, 0.80m, 155m, 20m, "bandage.svg", "Individually wrapped, breathable first-aid bandages."),
+            new ProductSample("Digital Thermometer", null, "890100000006", "digital-thermometer", firstAid.Id, brandB.Id, piece.Id, 12.00m, 4.50m, 70m, 10m, "thermometer.svg", "Fast, clear digital temperature readings for home use."),
+            new ProductSample("Ibuprofen", "400 mg", "890100000007", "ibuprofen-400mg", painRelief.Id, brandC.Id, tablet.Id, 3.10m, 0.62m, 210m, 30m, "paracetamol.svg", "Anti-inflammatory tablets for short-term pain relief."),
+            new ProductSample("Low-dose Aspirin", "81 mg", "890100000008", "aspirin-81mg", painRelief.Id, brandA.Id, tablet.Id, 2.85m, 0.50m, 190m, 25m, "paracetamol.svg", "Low-dose aspirin tablets in a compact sample pack."),
+            new ProductSample("Azithromycin", "250 mg", "890100000009", "azithromycin-250mg", antibiotics.Id, brandB.Id, capsule.Id, 7.80m, 1.75m, 140m, 20m, "amoxicillin.svg", "Example prescription antibiotic capsule product."),
+            new ProductSample("Oral Rehydration Salts", "20.5 g", "890100000010", "oral-rehydration-salts", vitamins.Id, brandC.Id, sachet.Id, 1.20m, 0.22m, 260m, 40m, "vitamin-c.svg", "Single-use electrolyte powder sachet."),
+            new ProductSample("Vitamin D3", "1000 IU", "890100000011", "vitamin-d3-1000iu", vitamins.Id, brandA.Id, tablet.Id, 7.50m, 1.85m, 175m, 25m, "vitamin-c.svg", "Daily vitamin D supplement tablets."),
+            new ProductSample("Daily Multivitamin", "30 tablets", "890100000012", "daily-multivitamin-30", vitamins.Id, brandC.Id, box.Id, 9.95m, 2.60m, 135m, 18m, "vitamin-c.svg", "Balanced daily multivitamin example product."),
+            new ProductSample("Zinc Supplement", "20 mg", "890100000013", "zinc-20mg", vitamins.Id, brandB.Id, tablet.Id, 4.20m, 0.90m, 165m, 22m, "vitamin-c.svg", "Simple zinc supplement tablet sample."),
+            new ProductSample("Saline Nasal Spray", "30 ml", "890100000014", "saline-nasal-spray-30ml", coldCare.Id, brandA.Id, bottle.Id, 4.75m, 1.10m, 120m, 16m, "cough-syrup.svg", "Gentle saline spray for everyday nasal care."),
+            new ProductSample("Honey Throat Lozenges", "16 pack", "890100000015", "honey-throat-lozenges-16", coldCare.Id, brandC.Id, pack.Id, 3.60m, 0.75m, 145m, 20m, "cough-syrup.svg", "Honey-flavour lozenges in a lightweight pack."),
+            new ProductSample("Cold Relief Tablets", "20 tablets", "890100000016", "cold-relief-tablets-20", coldCare.Id, brandB.Id, box.Id, 5.85m, 1.30m, 150m, 20m, "paracetamol.svg", "Multi-symptom cold relief example pack."),
+            new ProductSample("Cotton Roll", "100 g", "890100000017", "cotton-roll-100g", firstAid.Id, brandA.Id, pack.Id, 2.40m, 0.55m, 130m, 18m, "bandage.svg", "Soft absorbent cotton for first-aid use."),
+            new ProductSample("Antiseptic Solution", "100 ml", "890100000018", "antiseptic-solution-100ml", firstAid.Id, brandB.Id, bottle.Id, 4.95m, 1.25m, 115m, 15m, "cough-syrup.svg", "General-purpose antiseptic solution example."),
+            new ProductSample("Disposable Face Masks", "50 pack", "890100000019", "disposable-face-masks-50", firstAid.Id, brandC.Id, box.Id, 6.50m, 1.70m, 160m, 22m, "bandage.svg", "Lightweight disposable face-mask box."),
+            new ProductSample("First Aid Kit", "24 pieces", "890100000020", "first-aid-kit-24", firstAid.Id, brandA.Id, box.Id, 18.50m, 6.25m, 60m, 8m, "bandage.svg", "Compact first-aid kit with essential sample items.")
         };
 
         var products = samples.Select((sample, index) => new Product
@@ -90,7 +121,7 @@ public sealed class DemoDataSeeder(
             Description = $"{sample.Description} Professional sample product created by the demo-data seed.",
             MinimumValue = (int)sample.MinimumQuantity,
             MaximumValue = 500,
-            IsFeatured = index is 0 or 2 or 5,
+            IsFeatured = index is 0 or 2 or 5 or 11 or 19,
             IsActive = true,
             Inventory = new ProductInventory
             {
@@ -104,11 +135,11 @@ public sealed class DemoDataSeeder(
                 new ProductImage
                 {
                     BranchId = branchId,
-                    ImagePath = images[sample.ImageFile].PublicPath,
+                    ImagePath = productImages[sample.ImageFile].DatabasePath,
                     FileName = sample.ImageFile,
                     OriginalFileName = sample.ImageFile,
                     ContentType = "image/svg+xml",
-                    Size = images[sample.ImageFile].Size,
+                    Size = productImages[sample.ImageFile].Size,
                     IsPrimary = true,
                     SortOrder = 0
                 }
@@ -151,6 +182,7 @@ public sealed class DemoDataSeeder(
         }
         else
         {
+            warehouse.Name = "Main Warehouse";
             warehouse.IsDeleted = false;
             warehouse.DeletedAt = null;
             warehouse.IsActive = true;
@@ -162,166 +194,330 @@ public sealed class DemoDataSeeder(
             BranchId = branchId,
             ProductId = product.Id,
             WarehouseId = warehouse.Id,
-            LotNumber = $"DEMO-{today:yyyyMM}-{index + 1:00}",
+            LotNumber = $"LOT-DEMO-{today:yyyyMM}-{index + 1:000}",
             Quantity = samples[index].Quantity,
             ReservedQuantity = 0,
             UnitCost = samples[index].UnitCost,
             ManufacturedAt = today.AddMonths(-2),
-            ExpiresAt = index == 5 ? null : today.AddMonths(18 + index)
+            ExpiresAt = index is 5 or 19 ? null : today.AddMonths(18 + index % 8)
         }));
 
-        var supplier = new Supplier
+        var suppliers = Enumerable.Range(1, 3).Select(index => new Supplier
         {
             BranchId = branchId,
-            Name = "Kabul Medical Distribution",
-            ContactPerson = "Ahmad Rahimi",
-            Phone = "+93 700 123 456",
-            Email = "sales@kmd.example",
-            Address = "Shahr-e-Naw, Kabul",
-            TaxNumber = "AF-TAX-10482",
+            Name = $"Sample Supplier {index:00}",
+            ContactPerson = $"Contact {index:00}",
+            Phone = $"07020000{index:00}",
+            Email = $"supplier{index:00}@example.com",
+            Address = $"Sample supplier address {index:00}",
+            TaxNumber = $"TAX-DEMO-{index:000}",
             IsActive = true
-        };
-        var customer = new Customer
+        }).ToArray();
+
+        var customers = Enumerable.Range(1, 10).Select(index => new Customer
         {
             BranchId = branchId,
-            FirstName = "Mariam",
-            LastName = "Ahmadi",
-            Phone = "+93700111222",
-            Email = "mariam.ahmadi@example.com",
-            Address = "Kart-e-Se, Kabul",
+            FirstName = "Sample",
+            LastName = $"Customer {index:00}",
+            Phone = $"07010000{index:00}",
+            Email = $"customer{index:00}@example.com",
+            Address = $"Sample customer address {index:00}",
             CustomerTypeId = generalCustomer.Id
-        };
-        var secondCustomer = new Customer
-        {
-            BranchId = branchId,
-            FirstName = "Farid",
-            LastName = "Karimi",
-            Phone = "+93700999888",
-            Email = "farid.karimi@example.com",
-            Address = "Dasht-e-Barchi, Kabul",
-            CustomerTypeId = generalCustomer.Id
-        };
-        context.AddRange(supplier, customer, secondCustomer);
+        }).ToArray();
+
+        context.AddRange(suppliers);
+        context.AddRange(customers);
         await context.SaveChangesAsync(cancellationToken);
 
-        var purchase = new Purchase
-        {
-            BranchId = branchId,
-            PurchaseNumber = $"PUR-DEMO-{today:yyyyMMdd}",
-            SupplierId = supplier.Id,
-            PurchaseDate = today.AddDays(-10),
-            Status = PurchaseStatus.Received,
-            PaymentStatus = DocumentPaymentStatus.Paid,
-            Subtotal = 201m,
-            Total = 201m,
-            PaidAmount = 201m,
-            CurrencyCode = currency,
-            ReferenceNumber = "KMD-INV-2408",
-            Notes = "Opening sample inventory purchase.",
-            Items =
-            [
-                PurchaseLine(products[0], branchId, 100, samples[0].UnitCost, tablet),
-                PurchaseLine(products[1], branchId, 60, samples[1].UnitCost, capsule),
-                PurchaseLine(products[2], branchId, 40, samples[2].UnitCost, tablet)
-            ],
-            Payments =
-            [
-                new PurchasePayment
-                {
-                    BranchId = branchId,
-                    Amount = 201m,
-                    PaymentDate = today.AddDays(-10),
-                    PaymentMethod = "Bank transfer",
-                    ReferenceNumber = "BANK-DEMO-001"
-                }
-            ]
-        };
-
-        var manualSale = new InventorySale
-        {
-            BranchId = branchId,
-            SaleNumber = $"SAL-DEMO-{today:yyyyMMdd}",
-            CustomerId = customer.Id,
-            CustomerName = "Mariam Ahmadi",
-            CustomerPhone = customer.Phone,
-            SaleDate = today.AddDays(-2),
-            PaymentStatus = DocumentPaymentStatus.Paid,
-            PaymentMethod = "Cash",
-            Subtotal = 13.65m,
-            Total = 13.65m,
-            PaidAmount = 13.65m,
-            CurrencyCode = currency,
-            Notes = "Walk-in sample sale.",
-            Items =
-            [
-                SaleLine(products[0], branchId, 2, samples[0].Price, samples[0].UnitCost, tablet),
-                SaleLine(products[3], branchId, 1, samples[3].Price, samples[3].UnitCost, bottle),
-                SaleLine(products[4], branchId, 1, samples[4].Price, samples[4].UnitCost, piece)
-            ],
-            Payments =
-            [
-                new InventorySalePayment
-                {
-                    BranchId = branchId,
-                    Amount = 13.65m,
-                    PaymentDate = today.AddDays(-2),
-                    PaymentMethod = "Cash"
-                }
-            ]
-        };
-
-        var order = new Order
-        {
-            BranchId = branchId,
-            OrderNumber = $"ORD-DEMO-{today:yyyyMMdd}",
-            CustomerId = secondCustomer.Id,
-            Status = ECommerce.Entities.Orders.OrderStatus.Delivered,
-            PaymentStatus = PaymentStatus.Paid,
-            FulfillmentStatus = FulfillmentStatus.Fulfilled,
-            Subtotal = samples[2].Price + samples[5].Price,
-            Total = samples[2].Price + samples[5].Price,
-            Currency = currency,
-            Notes = "Delivered sample storefront order.",
-            ShippingAddressJson = "{\"recipientName\":\"Farid Karimi\",\"city\":\"Kabul\"}",
-            Items =
-            [
-                OrderLine(products[2], branchId, samples[2].Price, samples[2].UnitCost, tablet, currency),
-                OrderLine(products[5], branchId, samples[5].Price, samples[5].UnitCost, piece, currency)
-            ]
-        };
+        var unitsById = new[] { piece, tablet, capsule, box, bottle, pack, sachet }
+            .ToDictionary(item => item.Id);
+        var purchases = CreatePurchases(products, samples, unitsById, suppliers, branchId, currency, today);
+        var sales = CreateSales(products, samples, unitsById, customers, branchId, currency, today);
+        var orders = CreateOrders(products, samples, unitsById, customers, branchId, currency, today);
 
         var rentCategory = await GetOrCreateTypeAsync(GeneralTypeEnum.ExpenseCategory, "Rent", branchId, 0, cancellationToken);
-        var expense = new Expense
+        var officeCategory = await GetOrCreateTypeAsync(GeneralTypeEnum.ExpenseCategory, "Office", branchId, 3, cancellationToken);
+        var expenses = Enumerable.Range(1, 4).Select(index => new Expense
         {
             BranchId = branchId,
-            ExpenseDate = today.AddDays(-5),
-            GeneralTypeCategoryId = rentCategory.Id,
-            Amount = 450m,
+            ExpenseDate = today.AddDays(-(index * 4)),
+            GeneralTypeCategoryId = index % 2 == 0 ? officeCategory.Id : rentCategory.Id,
+            Amount = 75m * index,
             CurrencyCode = currency,
-            Vendor = "Kabul City Properties",
-            PaymentMethod = "Bank transfer",
-            ReferenceNumber = "RENT-DEMO-01",
-            Description = "Monthly main-branch shop rent (sample)."
-        };
-        var staff = new Staff
+            Vendor = $"Sample Vendor {index:00}",
+            PaymentMethod = index % 2 == 0 ? "Cash" : "Bank transfer",
+            ReferenceNumber = $"BILL-EXP-{today:yyyyMM}-{index:000}",
+            Description = $"Example operating expense {index:00}."
+        }).ToArray();
+
+        var staff = Enumerable.Range(1, 3).Select(index => new Staff
         {
             BranchId = branchId,
-            EmployeeNumber = "EMP-DEMO-001",
-            FullName = "Laila Noori",
-            Phone = "+93700888777",
-            Position = "Pharmacy Assistant",
-            Department = "Sales",
-            HireDate = today.AddMonths(-8),
-            BaseSalary = 350m,
+            EmployeeNumber = $"EMP-DEMO-{index:000}",
+            FullName = $"Sample Staff {index:00}",
+            Phone = $"07030000{index:00}",
+            Email = $"staff{index:00}@example.com",
+            Position = index == 1 ? "Store Assistant" : index == 2 ? "Inventory Clerk" : "Sales Associate",
+            Department = index == 2 ? "Inventory" : "Sales",
+            HireDate = today.AddMonths(-(4 + index * 2)),
+            BaseSalary = 300m + index * 50m,
             IsActive = true,
-            Address = "Kabul"
-        };
+            Address = $"Sample staff address {index:00}"
+        }).ToArray();
 
-        context.AddRange(purchase, manualSale, order, expense, staff);
+        context.AddRange(purchases);
+        context.AddRange(sales);
+        context.AddRange(orders);
+        context.AddRange(expenses);
+        context.AddRange(staff);
         await context.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Loaded professional demo data with {ProductCount} products for branch {BranchId}.", products.Length, branchId);
 
-        return new DemoSeedResult(branchId, products.Length, 2, 1, 1, 1, images.Count);
+        logger.LogInformation(
+            "Loaded neutral demo data with {ProductCount} products, {PurchaseCount} purchases, and {SaleCount} sales for branch {BranchId}.",
+            products.Length,
+            purchases.Length,
+            sales.Length,
+            branchId);
+
+        return new DemoSeedResult(
+            branchId,
+            products.Length,
+            customers.Length,
+            purchases.Length,
+            sales.Length,
+            orders.Length,
+            productImages.Count + categoryImages.Count);
+    }
+
+    private static void ApplyNeutralCompanyDefaults(
+        ECommerce.Entities.Company.Company company,
+        ECommerce.Entities.Company.Branch branch,
+        ECommerce.Entities.Company.CompanySetting settings)
+    {
+        company.Name = "Default Company";
+        company.LegalName = "Default Company";
+        company.RegistrationNumber = "REG-DEMO-0001";
+        company.Email = "contact@example.com";
+        company.Phone = "0700000000";
+        company.Address = "Sample company address";
+        company.LogoUrl = null;
+        company.FaviconUrl = null;
+        company.IsActive = true;
+        company.UpdatedAt = DateTime.UtcNow;
+
+        branch.Name = "Main Branch";
+        branch.Phone = "0700000000";
+        branch.Address = "Sample branch address";
+        branch.IsActive = true;
+        branch.UpdatedAt = DateTime.UtcNow;
+
+        settings.AdminPrimaryColor = DefaultPrimaryColor;
+        settings.AdminSecondaryColor = DefaultSecondaryColor;
+        settings.StorefrontPrimaryColor = DefaultPrimaryColor;
+        settings.StorefrontSecondaryColor = DefaultSecondaryColor;
+        settings.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static Purchase[] CreatePurchases(
+        IReadOnlyList<Product> products,
+        IReadOnlyList<ProductSample> samples,
+        IReadOnlyDictionary<long, GeneralType> unitsById,
+        IReadOnlyList<Supplier> suppliers,
+        long branchId,
+        string currency,
+        DateOnly today)
+    {
+        return Enumerable.Range(0, 10).Select(index =>
+        {
+            var purchaseDate = today.AddDays(-(30 - index * 2));
+            var lineCount = index == 0 ? products.Count : 6 + index % 5;
+            var items = Enumerable.Range(0, lineCount).Select(lineIndex =>
+            {
+                var productIndex = (index * 3 + lineIndex) % products.Count;
+                var quantity = 12m + (index * 5 + lineIndex * 3) % 29;
+                return PurchaseLine(
+                    products[productIndex],
+                    branchId,
+                    quantity,
+                    samples[productIndex].UnitCost,
+                    unitsById[samples[productIndex].UnitId],
+                    $"LOT-PUR-{index + 1:000}-{productIndex + 1:000}",
+                    productIndex is 5 or 19 ? null : purchaseDate.AddMonths(18 + productIndex % 8));
+            }).ToArray();
+
+            var subtotal = items.Sum(item => item.LineTotal);
+            var discount = index % 4 == 0 ? Math.Min(5m, subtotal) : 0m;
+            var otherCost = index % 3 == 0 ? 2.50m : 0m;
+            var total = subtotal - discount + otherCost;
+            var paymentStatus = index == 9
+                ? DocumentPaymentStatus.Unpaid
+                : index is 3 or 7
+                    ? DocumentPaymentStatus.Partial
+                    : DocumentPaymentStatus.Paid;
+            var paidAmount = paymentStatus switch
+            {
+                DocumentPaymentStatus.Paid => total,
+                DocumentPaymentStatus.Partial => Math.Round(total * 0.60m, 2),
+                _ => 0m
+            };
+            var purchase = new Purchase
+            {
+                BranchId = branchId,
+                PurchaseNumber = $"PUR-DEMO-{today:yyyyMM}-{index + 1:000}",
+                SupplierId = suppliers[index % suppliers.Count].Id,
+                PurchaseDate = purchaseDate,
+                Status = PurchaseStatus.Received,
+                PaymentStatus = paymentStatus,
+                Subtotal = subtotal,
+                Discount = discount,
+                OtherCost = otherCost,
+                Total = total,
+                PaidAmount = paidAmount,
+                CurrencyCode = currency,
+                ReferenceNumber = $"BILL-PUR-{today:yyyyMM}-{1001 + index}",
+                Notes = index == 0
+                    ? "Twenty-line example purchase covering the complete demo catalog."
+                    : $"Example supplier purchase {index + 1:00} with {lineCount} items.",
+                Items = items
+            };
+
+            if (paidAmount > 0)
+            {
+                purchase.Payments.Add(new PurchasePayment
+                {
+                    BranchId = branchId,
+                    Amount = paidAmount,
+                    PaymentDate = purchaseDate,
+                    PaymentMethod = index % 2 == 0 ? "Bank transfer" : "Cash",
+                    ReferenceNumber = $"PAY-PUR-{today:yyyyMM}-{index + 1:000}"
+                });
+            }
+
+            return purchase;
+        }).ToArray();
+    }
+
+    private static InventorySale[] CreateSales(
+        IReadOnlyList<Product> products,
+        IReadOnlyList<ProductSample> samples,
+        IReadOnlyDictionary<long, GeneralType> unitsById,
+        IReadOnlyList<Customer> customers,
+        long branchId,
+        string currency,
+        DateOnly today)
+    {
+        return Enumerable.Range(0, 10).Select(index =>
+        {
+            var customer = customers[index % customers.Count];
+            var lineCount = 3 + index % 4;
+            var items = Enumerable.Range(0, lineCount).Select(lineIndex =>
+            {
+                var productIndex = (index * 2 + lineIndex) % products.Count;
+                var quantity = 1m + (index + lineIndex) % 3;
+                return SaleLine(
+                    products[productIndex],
+                    branchId,
+                    quantity,
+                    samples[productIndex].Price,
+                    samples[productIndex].UnitCost,
+                    unitsById[samples[productIndex].UnitId]);
+            }).ToArray();
+            var subtotal = items.Sum(item => item.LineTotal);
+            var discount = index % 4 == 1 ? 1m : 0m;
+            var total = subtotal - discount;
+            var paymentStatus = index == 8
+                ? DocumentPaymentStatus.Unpaid
+                : index is 4 or 9
+                    ? DocumentPaymentStatus.Partial
+                    : DocumentPaymentStatus.Paid;
+            var paidAmount = paymentStatus switch
+            {
+                DocumentPaymentStatus.Paid => total,
+                DocumentPaymentStatus.Partial => Math.Round(total * 0.50m, 2),
+                _ => 0m
+            };
+            var saleDate = today.AddDays(-(10 - index));
+            var sale = new InventorySale
+            {
+                BranchId = branchId,
+                SaleNumber = $"SAL-DEMO-{today:yyyyMM}-{index + 1:000}",
+                CustomerId = customer.Id,
+                CustomerName = $"{customer.FirstName} {customer.LastName}",
+                CustomerPhone = customer.Phone,
+                SaleDate = saleDate,
+                PaymentStatus = paymentStatus,
+                PaymentMethod = index % 2 == 0 ? "Cash" : "Card",
+                Subtotal = subtotal,
+                Discount = discount,
+                Total = total,
+                PaidAmount = paidAmount,
+                CurrencyCode = currency,
+                ReferenceNumber = $"BILL-SALE-{today:yyyyMM}-{2001 + index}",
+                Notes = $"Example counter sale {index + 1:00} with {lineCount} items.",
+                Items = items
+            };
+
+            if (paidAmount > 0)
+            {
+                sale.Payments.Add(new InventorySalePayment
+                {
+                    BranchId = branchId,
+                    Amount = paidAmount,
+                    PaymentDate = saleDate,
+                    PaymentMethod = sale.PaymentMethod,
+                    ReferenceNumber = $"PAY-SALE-{today:yyyyMM}-{index + 1:000}"
+                });
+            }
+
+            return sale;
+        }).ToArray();
+    }
+
+    private static Order[] CreateOrders(
+        IReadOnlyList<Product> products,
+        IReadOnlyList<ProductSample> samples,
+        IReadOnlyDictionary<long, GeneralType> unitsById,
+        IReadOnlyList<Customer> customers,
+        long branchId,
+        string currency,
+        DateOnly today)
+    {
+        return Enumerable.Range(0, 5).Select(index =>
+        {
+            var customer = customers[(index + 5) % customers.Count];
+            var items = Enumerable.Range(0, 2 + index % 3).Select(lineIndex =>
+            {
+                var productIndex = (index * 4 + lineIndex) % products.Count;
+                var quantity = 1m + (index + lineIndex) % 2;
+                return OrderLine(
+                    products[productIndex],
+                    branchId,
+                    quantity,
+                    samples[productIndex].Price,
+                    samples[productIndex].UnitCost,
+                    unitsById[samples[productIndex].UnitId],
+                    currency);
+            }).ToArray();
+            var subtotal = items.Sum(item => item.Total);
+
+            return new Order
+            {
+                BranchId = branchId,
+                OrderNumber = $"ORD-DEMO-{today:yyyyMM}-{index + 1:000}",
+                CustomerId = customer.Id,
+                Status = index == 4
+                    ? ECommerce.Entities.Orders.OrderStatus.Processing
+                    : ECommerce.Entities.Orders.OrderStatus.Delivered,
+                PaymentStatus = index == 4 ? PaymentStatus.Authorized : PaymentStatus.Paid,
+                FulfillmentStatus = index == 4 ? FulfillmentStatus.Processing : FulfillmentStatus.Fulfilled,
+                Subtotal = subtotal,
+                Total = subtotal,
+                Currency = currency,
+                Notes = $"Example storefront order {index + 1:00}.",
+                ShippingAddressJson = $"{{\"recipientName\":\"{customer.FirstName} {customer.LastName}\",\"address\":\"Sample delivery address {index + 1:00}\"}}",
+                Items = items
+            };
+        }).ToArray();
     }
 
     private async Task<GeneralType> GetOrCreateTypeAsync(
@@ -356,10 +552,10 @@ public sealed class DemoDataSeeder(
         return type;
     }
 
-    private IReadOnlyDictionary<string, SeedImage> CopySeedImages()
+    private IReadOnlyDictionary<string, SeedImage> CopySeedImages(string collection)
     {
-        var sourceRoot = Path.Combine(environment.ContentRootPath, "SeedAssets", "products");
-        var destinationRoot = Path.Combine(_storage.ResolveRootPath(environment), "demo", "products");
+        var sourceRoot = Path.Combine(environment.ContentRootPath, "SeedAssets", collection);
+        var destinationRoot = Path.Combine(_storage.ResolveRootPath(environment), "demo", collection);
         Directory.CreateDirectory(destinationRoot);
         var result = new Dictionary<string, SeedImage>(StringComparer.OrdinalIgnoreCase);
         foreach (var sourcePath in Directory.EnumerateFiles(sourceRoot, "*.svg", SearchOption.TopDirectoryOnly))
@@ -367,8 +563,8 @@ public sealed class DemoDataSeeder(
             var fileName = Path.GetFileName(sourcePath);
             var destinationPath = Path.Combine(destinationRoot, fileName);
             File.Copy(sourcePath, destinationPath, overwrite: true);
-            var publicPath = $"{_storage.ResolveRequestPath().Trim('/')}/demo/products/{fileName}";
-            result[fileName] = new SeedImage(publicPath, new FileInfo(destinationPath).Length);
+            var databasePath = $"{_storage.ResolveRequestPath().Trim('/')}/demo/{collection}/{fileName}";
+            result[fileName] = new SeedImage(databasePath, $"/{databasePath}", new FileInfo(destinationPath).Length);
         }
 
         return result;
@@ -379,7 +575,9 @@ public sealed class DemoDataSeeder(
         long branchId,
         decimal quantity,
         decimal unitCost,
-        GeneralType unit) => new()
+        GeneralType unit,
+        string lotNumber,
+        DateOnly? expireDate) => new()
     {
         BranchId = branchId,
         ProductId = product.Id,
@@ -391,7 +589,8 @@ public sealed class DemoDataSeeder(
         UnitConversionFactor = 1,
         EnteredUnitCost = unitCost,
         LineTotal = quantity * unitCost,
-        LotNumber = "DEMO-OPENING"
+        LotNumber = lotNumber,
+        ExpireDate = expireDate
     };
 
     private static InventorySaleItem SaleLine(
@@ -418,6 +617,7 @@ public sealed class DemoDataSeeder(
     private static OrderItem OrderLine(
         Product product,
         long branchId,
+        decimal quantity,
         decimal unitPrice,
         decimal unitCost,
         GeneralType unit,
@@ -425,8 +625,8 @@ public sealed class DemoDataSeeder(
     {
         BranchId = branchId,
         ProductId = product.Id,
-        Quantity = 1,
-        OrderedQuantity = 1,
+        Quantity = quantity,
+        OrderedQuantity = quantity,
         SelectedUnitId = unit.Id,
         SelectedUnitName = unit.Name,
         UnitConversionFactor = 1,
@@ -455,5 +655,5 @@ public sealed class DemoDataSeeder(
         string ImageFile,
         string Description);
 
-    private sealed record SeedImage(string PublicPath, long Size);
+    private sealed record SeedImage(string DatabasePath, string PublicUrl, long Size);
 }

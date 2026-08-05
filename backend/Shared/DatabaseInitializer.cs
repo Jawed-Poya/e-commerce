@@ -123,6 +123,10 @@ END;
             {
                 Name = "Default Company",
                 LegalName = "Default Company",
+                RegistrationNumber = "REG-000000",
+                Email = "contact@example.com",
+                Phone = "0700000000",
+                Address = "Sample company address",
                 IsActive = true
             };
             context.Companies.Add(company);
@@ -143,6 +147,8 @@ END;
             {
                 Name = "Main Branch",
                 Code = "MAIN",
+                Phone = "0700000000",
+                Address = "Sample branch address",
                 IsMain = true,
                 IsActive = true
             };

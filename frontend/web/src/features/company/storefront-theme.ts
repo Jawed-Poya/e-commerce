@@ -1,8 +1,8 @@
 type Rgb = { r: number; g: number; b: number };
 type Hsl = { h: number; s: number; l: number };
 
-const FALLBACK_PRIMARY = "#0f766e";
-const FALLBACK_SECONDARY = "#f59e0b";
+const FALLBACK_PRIMARY = "#0B1F3A";
+const FALLBACK_SECONDARY = "#F97316";
 
 function clamp(value: number, minimum = 0, maximum = 1) {
     return Math.min(maximum, Math.max(minimum, value));

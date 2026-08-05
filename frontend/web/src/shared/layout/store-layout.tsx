@@ -109,7 +109,7 @@ function isStoreNavItemActive(
 function Logo({ inverse = false }: { inverse?: boolean }) {
     const { company } = useCompany();
     const { t } = useI18n();
-    const name = company?.name ?? "PharmaDB";
+    const name = company?.name ?? "Default Company";
     const initials = name
         .split(/\s+/)
         .slice(0, 2)
@@ -536,7 +536,7 @@ export function StoreLayout() {
                     <div className="mx-auto flex w-full max-w-[1380px] flex-col gap-2 px-4 py-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
                         <span>
                             © {new Date().getFullYear()}{" "}
-                            {company?.legalName ?? company?.name ?? "PharmaDB"}
+                            {company?.legalName ?? company?.name ?? "Default Company"}
                         </span>
                         <span>{t("header.secure")}</span>
                     </div>

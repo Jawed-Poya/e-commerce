@@ -282,7 +282,7 @@ export function CheckoutPage() {
                                             phone: value,
                                         }));
                                 }}
-                                placeholder="+93 ..."
+                                placeholder="07xxxxxxxx"
                                 disabled={auth.user.phoneVerified}
                             />
                             <Field

@@ -41,10 +41,10 @@ public sealed class CompanySetting
     [MaxLength(8)] public string CurrencySymbol { get; set; } = "$";
     [MaxLength(10)] public string CurrencyPosition { get; set; } = "before";
     public int CurrencyDecimalPlaces { get; set; } = 2;
-    [MaxLength(20)] public string AdminPrimaryColor { get; set; } = "#2563eb";
-    [MaxLength(20)] public string AdminSecondaryColor { get; set; } = "#0f172a";
-    [MaxLength(20)] public string StorefrontPrimaryColor { get; set; } = "#2563eb";
-    [MaxLength(20)] public string StorefrontSecondaryColor { get; set; } = "#0f172a";
+    [MaxLength(20)] public string AdminPrimaryColor { get; set; } = "#0B1F3A";
+    [MaxLength(20)] public string AdminSecondaryColor { get; set; } = "#F97316";
+    [MaxLength(20)] public string StorefrontPrimaryColor { get; set; } = "#0B1F3A";
+    [MaxLength(20)] public string StorefrontSecondaryColor { get; set; } = "#F97316";
     [MaxLength(120)] public string EnglishFontFamily { get; set; } = "Inter";
     [MaxLength(120)] public string DariFontFamily { get; set; } = "Vazirmatn";
     [MaxLength(120)] public string PashtoFontFamily { get; set; } = "Noto Sans Arabic";

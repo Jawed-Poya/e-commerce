@@ -60,7 +60,7 @@ export function OrderTrackingPage() {
                 className="mx-auto mt-6 grid max-w-3xl gap-3 rounded-2xl border bg-card p-4 shadow-[0_16px_50px_rgba(15,23,42,0.07)] sm:grid-cols-[1fr_1fr_auto] sm:p-5"
             >
                 <TrackingField label={t("orders.orderNumber")} value={orderNumber} onChange={setOrderNumber} placeholder="ORD-20260719-123456" />
-                <TrackingField label={t("orders.phoneNumber")} value={phone} onChange={setPhone} placeholder="+93 ..." />
+                <TrackingField label={t("orders.phoneNumber")} value={phone} onChange={setPhone} placeholder="07xxxxxxxx" />
                 <Button type="submit" className="h-11 self-end rounded-lg px-5" disabled={!orderNumber.trim() || !phone.trim()}>
                     <Search /> {t("orders.trackAction")}
                 </Button>

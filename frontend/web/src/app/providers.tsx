@@ -30,10 +30,10 @@ function PwaQueryCacheWarmer() {
             void client.invalidateQueries({ refetchType: "active" });
         };
 
-        window.addEventListener("pharmadb-pwa-ready", warmActiveQueries);
+        window.addEventListener("commerce-pwa-ready", warmActiveQueries);
         return () =>
             window.removeEventListener(
-                "pharmadb-pwa-ready",
+                "commerce-pwa-ready",
                 warmActiveQueries,
             );
     }, [client]);
