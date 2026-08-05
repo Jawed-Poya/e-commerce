@@ -113,6 +113,7 @@ export default function PurchasesPage() {
     const [detailsPurchase, setDetailsPurchase] = useState<Purchase | null>(null);
     const [saving, setSaving] = useState(false);
     const [exportingPdf, setExportingPdf] = useState(false);
+    const [lineLimitOverrideEnabled, setLineLimitOverrideEnabled] = useState(false);
     const [items, setItems] = useState<DocumentItem[]>([newDocumentItem()]);
     const [form, setForm] = useState({
         purchaseDate: today(),
@@ -139,6 +140,7 @@ export default function PurchasesPage() {
 
     const resetPurchase = () => {
         setItems([newDocumentItem()]);
+        setLineLimitOverrideEnabled(false);
         setSelectedSupplier(null);
         setForm({
             purchaseDate: today(),
@@ -175,12 +177,12 @@ export default function PurchasesPage() {
         if (!canManage) return;
         const documentItems = getSubmittableDocumentLines(items);
         const configuredLineLimit = operationPolicy?.maximumPurchaseLines ?? 50;
-        const effectiveLineLimit = operationPolicy?.canOverrideLineLimits
+        const effectiveLineLimit = operationPolicy?.canOverrideLineLimits && lineLimitOverrideEnabled
             ? 500
             : configuredLineLimit;
         if (documentItems.length > effectiveLineLimit) {
             return toast.error(
-                operationPolicy?.canOverrideLineLimits
+                operationPolicy?.canOverrideLineLimits && lineLimitOverrideEnabled
                     ? tr("A document cannot contain more than 500 product lines.")
                     : `${tr("The configured product-line limit is")} ${configuredLineLimit}.`,
             );
@@ -222,6 +224,7 @@ export default function PurchasesPage() {
         try {
             const response = await operationsService.createPurchase({
                 ...form,
+                overrideLineLimit: lineLimitOverrideEnabled,
                 supplierId: selectedSupplier?.id ?? null,
                 paymentReferenceNumber: nullable(form.paymentReferenceNumber),
                 referenceNumber: nullable(form.referenceNumber),
@@ -549,6 +552,8 @@ export default function PurchasesPage() {
                         mode="purchase"
                         maximumLines={operationPolicy?.maximumPurchaseLines ?? 50}
                         canOverrideLineLimit={operationPolicy?.canOverrideLineLimits ?? false}
+                        overrideLineLimit={lineLimitOverrideEnabled}
+                        onOverrideLineLimitChange={setLineLimitOverrideEnabled}
                     />
                     <Separator />
 

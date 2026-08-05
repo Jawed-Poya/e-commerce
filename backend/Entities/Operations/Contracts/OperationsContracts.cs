@@ -43,6 +43,7 @@ public sealed record SupplierResponse(long Id, string Name, string? ContactPerso
 
 public sealed class CreatePurchaseRequest
 {
+    public bool OverrideLineLimit { get; set; }
     public long? SupplierId { get; set; }
     public DateOnly PurchaseDate { get; set; }
     public decimal Discount { get; set; }
@@ -106,6 +107,7 @@ public sealed record PurchaseDetailsResponse(
 
 public sealed class CreateInventorySaleRequest
 {
+    public bool OverrideLineLimit { get; set; }
     public long? CustomerId { get; set; }
     public string? CustomerName { get; set; }
     public string? CustomerPhone { get; set; }

@@ -42,7 +42,7 @@ class ApiClient {
         document.body.appendChild(link);
         link.click();
         link.remove();
-        URL.revokeObjectURL(href);
+        window.setTimeout(() => URL.revokeObjectURL(href), 60_000);
     }
 
     async createObjectUrl(url: string, params?: object): Promise<string> {
@@ -69,6 +69,20 @@ class ApiClient {
                 }
             }
             throw candidate;
+        }
+        const contentType = (response.headers["content-type"] as string | undefined)?.toLowerCase() ?? "";
+        if (contentType.includes("application/json")) {
+            let message = "The server returned an unexpected response instead of a file.";
+            try {
+                const body = JSON.parse(await response.data.text()) as { message?: string };
+                if (body.message?.trim()) message = body.message;
+            } catch {
+                // Keep the safe download-specific message for malformed JSON.
+            }
+            throw new Error(message);
+        }
+        if (response.data.size === 0) {
+            throw new Error("The generated file was empty. Please try again.");
         }
         const disposition = response.headers["content-disposition"] as string | undefined;
         const encoded = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];

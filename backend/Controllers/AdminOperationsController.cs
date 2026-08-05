@@ -63,7 +63,7 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
 
     [Authorize(Policy = AppPermissions.PurchasesManage)]
     [HttpPost("purchases")]
-    public Task<IActionResult> CreatePurchase(CreatePurchaseRequest request, CancellationToken ct) => Handle(async () => ApiResponse<PurchaseListItem>.Ok(await service.CreatePurchaseAsync(request, UserId(), HasAnyPermission(AppPermissions.OperationLineLimitsOverride), ct), "Purchase received and stock updated."));
+    public Task<IActionResult> CreatePurchase(CreatePurchaseRequest request, CancellationToken ct) => Handle(async () => ApiResponse<PurchaseListItem>.Ok(await service.CreatePurchaseAsync(request, UserId(), request.OverrideLineLimit && HasAnyPermission(AppPermissions.OperationLineLimitsOverride), ct), "Purchase received and stock updated."));
 
     [Authorize(Policy = AppPermissions.PurchasesView)]
     [HttpGet("purchases/{id:long}/payments")]
@@ -85,7 +85,7 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
 
     [Authorize(Policy = AppPermissions.ManualSalesManage)]
     [HttpPost("sales")]
-    public Task<IActionResult> CreateSale(CreateInventorySaleRequest request, CancellationToken ct) => Handle(async () => ApiResponse<InventorySaleListItem>.Ok(await service.CreateSaleAsync(request, UserId(), HasAnyPermission(AppPermissions.OperationLineLimitsOverride), ct), "Sale recorded and stock updated."));
+    public Task<IActionResult> CreateSale(CreateInventorySaleRequest request, CancellationToken ct) => Handle(async () => ApiResponse<InventorySaleListItem>.Ok(await service.CreateSaleAsync(request, UserId(), request.OverrideLineLimit && HasAnyPermission(AppPermissions.OperationLineLimitsOverride), ct), "Sale recorded and stock updated."));
 
     [Authorize(Policy = AppPermissions.ManualSalesView)]
     [HttpGet("sales/{id:long}/payments")]

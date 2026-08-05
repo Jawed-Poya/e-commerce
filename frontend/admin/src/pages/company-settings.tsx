@@ -105,8 +105,9 @@ export default function CompanySettingsPage() {
     });
     const saveOperationLimits = useMutation({
         mutationFn: companyService.updateOperationLimits,
-        onSuccess: (updated) => {
+        onSuccess: async (updated) => {
             applyCompany(updated);
+            await queryClient.invalidateQueries({ queryKey: ["operations", "policy"] });
             toast.success(tr("Operation line limits updated."));
         },
         onError: (error) => toast.error(tr(message(error))),
@@ -322,7 +323,7 @@ export default function CompanySettingsPage() {
                                 {tr("Operation product-line limits")}
                             </CardTitle>
                             <p className="mt-1 text-xs text-muted-foreground">
-                                {tr("Control how many products a normal purchase or manual sale can contain. Users with the override permission can continue up to the 500-line safety limit.")}
+                                {tr("Control how many products a normal purchase or manual sale can contain. Trusted users must explicitly activate their override permission for a document before continuing to the 500-line safety limit.")}
                             </p>
                         </div>
                         <Badge variant="outline">{tr("System safety limit")}: 500</Badge>

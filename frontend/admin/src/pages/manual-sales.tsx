@@ -88,6 +88,7 @@ export default function ManualSalesPage() {
     );
     const [open, setOpen] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [lineLimitOverrideEnabled, setLineLimitOverrideEnabled] = useState(false);
     const [selectedSale, setSelectedSale] = useState<ManualSale | null>(null);
     const [lotSale, setLotSale] = useState<ManualSale | null>(null);
     const { data: saleLots, isLoading: saleLotsLoading } = useOperationQuery(
@@ -122,6 +123,7 @@ export default function ManualSalesPage() {
     const reset = () => {
         setSelectedCustomer(null);
         setItems([newDocumentItem()]);
+        setLineLimitOverrideEnabled(false);
         setForm({
             customerName: "",
             customerPhone: "",
@@ -140,12 +142,12 @@ export default function ManualSalesPage() {
         if (!canManage) return;
         const documentItems = getSubmittableDocumentLines(items);
         const configuredLineLimit = operationPolicy?.maximumManualSaleLines ?? 50;
-        const effectiveLineLimit = operationPolicy?.canOverrideLineLimits
+        const effectiveLineLimit = operationPolicy?.canOverrideLineLimits && lineLimitOverrideEnabled
             ? 500
             : configuredLineLimit;
         if (documentItems.length > effectiveLineLimit) {
             return toast.error(
-                operationPolicy?.canOverrideLineLimits
+                operationPolicy?.canOverrideLineLimits && lineLimitOverrideEnabled
                     ? tr("A document cannot contain more than 500 product lines.")
                     : `${tr("The configured product-line limit is")} ${configuredLineLimit}.`,
             );
@@ -181,6 +183,7 @@ export default function ManualSalesPage() {
         setSaving(true);
         try {
             const response = await operationsService.createSale({
+                overrideLineLimit: lineLimitOverrideEnabled,
                 customerId: selectedCustomer?.id ?? null,
                 customerName: selectedCustomer
                     ? null
@@ -476,6 +479,8 @@ export default function ManualSalesPage() {
                         mode="sale"
                         maximumLines={operationPolicy?.maximumManualSaleLines ?? 50}
                         canOverrideLineLimit={operationPolicy?.canOverrideLineLimits ?? false}
+                        overrideLineLimit={lineLimitOverrideEnabled}
+                        onOverrideLineLimitChange={setLineLimitOverrideEnabled}
                     />
                     <Separator />
 

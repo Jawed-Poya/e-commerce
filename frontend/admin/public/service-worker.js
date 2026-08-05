@@ -237,6 +237,13 @@ function isApiRequest(url) {
   return url.pathname.toLowerCase().startsWith("/api/");
 }
 
+function isFileDownloadRequest(url) {
+  const path = url.pathname.toLowerCase();
+  return path.startsWith("/api/admin/documents/") ||
+    path.startsWith("/api/admin/receipts/") ||
+    path.includes("/export/");
+}
+
 function isRealtimeRequest(url) {
   return url.pathname.toLowerCase().startsWith("/hubs/");
 }
@@ -250,7 +257,10 @@ self.addEventListener("fetch", (event) => {
   if (isRealtimeRequest(url)) return;
 
   if (isApiRequest(url)) {
-    if (url.pathname.toLowerCase().startsWith("/api/auth/")) return;
+    if (
+      url.pathname.toLowerCase().startsWith("/api/auth/") ||
+      isFileDownloadRequest(url)
+    ) return;
     event.respondWith(privateApiNetworkFirst(request));
     return;
   }

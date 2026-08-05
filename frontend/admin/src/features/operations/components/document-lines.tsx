@@ -9,6 +9,7 @@ import {
     PackageSearch,
     Plus,
     Scale,
+    ShieldCheck,
     Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
@@ -42,6 +43,8 @@ interface DocumentLinesProps {
     mode: "purchase" | "sale";
     maximumLines: number;
     canOverrideLineLimit: boolean;
+    overrideLineLimit: boolean;
+    onOverrideLineLimitChange: (enabled: boolean) => void;
 }
 
 const emptyItem = createEmptyDocumentItem;
@@ -126,6 +129,8 @@ export function DocumentLines({
     mode,
     maximumLines,
     canOverrideLineLimit,
+    overrideLineLimit,
+    onOverrideLineLimitChange,
 }: DocumentLinesProps) {
     const { formatMoney } = useCompany();
     const { tr } = useI18n();
@@ -138,7 +143,8 @@ export function DocumentLines({
             : [],
     );
     const safeMaximumLines = Math.max(1, Math.min(maximumLines || 1, 500));
-    const effectiveMaximumLines = canOverrideLineLimit ? 500 : safeMaximumLines;
+    const overrideActive = canOverrideLineLimit && overrideLineLimit;
+    const effectiveMaximumLines = overrideActive ? 500 : safeMaximumLines;
     const atLineLimit = items.length >= effectiveMaximumLines;
 
     const summary = useMemo(() => {
@@ -266,7 +272,7 @@ export function DocumentLines({
                                 {items.length} {tr("lines")}
                             </Badge>
                             <Badge variant={atLineLimit ? "destructive" : "outline"}>
-                                {items.length}/{effectiveMaximumLines} {tr("line limit")}
+                                {items.length}/{effectiveMaximumLines} {tr(overrideActive ? "safety limit" : "line limit")}
                             </Badge>
                             {summary.ready > 0 ? (
                                 <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
@@ -293,13 +299,34 @@ export function DocumentLines({
                                 : tr("selling price.")}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                            {canOverrideLineLimit
-                                ? tr("You can override the configured line limit up to the system safety limit of 500 lines.")
-                                : `${tr("Configured maximum")}: ${safeMaximumLines} ${tr("lines")}.`}
+                            {overrideActive
+                                ? tr("Override active. This document can contain up to 500 product lines.")
+                                : canOverrideLineLimit
+                                    ? `${tr("Configured maximum")}: ${safeMaximumLines} ${tr("lines")}. ${tr("Override access is available when business operations require it.")}`
+                                    : `${tr("Configured maximum")}: ${safeMaximumLines} ${tr("lines")}.`}
                         </p>
                     </div>
 
                     <div className="flex items-center justify-between gap-3 sm:justify-end">
+                        {canOverrideLineLimit ? (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant={overrideActive ? "outline" : "secondary"}
+                                aria-pressed={overrideActive}
+                                disabled={overrideActive && items.length > safeMaximumLines}
+                                onClick={() => onOverrideLineLimitChange(!overrideActive)}
+                            >
+                                <ShieldCheck className="me-1 size-4" />
+                                {tr(
+                                    overrideActive
+                                        ? items.length > safeMaximumLines
+                                            ? "Override active"
+                                            : "Use configured limit"
+                                        : "Override line limit",
+                                )}
+                            </Button>
+                        ) : null}
                         <div className="text-end">
                             <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                                 {tr("Lines total")}
