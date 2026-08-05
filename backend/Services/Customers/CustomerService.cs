@@ -13,6 +13,7 @@ namespace ECommerce.Services.Customers;
 public sealed class CustomerService(
     ApplicationDbContext context,
     IDefaultCustomerTypeResolver defaultCustomerType,
+    ECommerce.Services.Company.IRecordDeletionPolicy deletionPolicy,
     IOptions<WhatsAppOptions> whatsAppOptions) : ICustomerService
 {
     private readonly WhatsAppOptions _whatsAppOptions = whatsAppOptions.Value;
@@ -165,9 +166,7 @@ public sealed class CustomerService(
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Customer not found.");
 
-        if (await context.Orders.AnyAsync(order => order.CustomerId == id, cancellationToken))
-            throw new InvalidOperationException(
-                "Customers with order history cannot be deleted. Keep the customer for auditing.");
+        await deletionPolicy.EnsureCustomerCanBeArchivedAsync(id, cancellationToken);
 
         customer.IsDeleted = true;
         customer.DeletedAt = DateTime.UtcNow;

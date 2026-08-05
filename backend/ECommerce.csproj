@@ -24,4 +24,8 @@
     <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Update="SeedAssets\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

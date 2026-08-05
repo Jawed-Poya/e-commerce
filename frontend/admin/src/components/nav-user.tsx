@@ -5,7 +5,12 @@ import {
     DropdownMenuGroup,
     DropdownMenuItem,
     DropdownMenuLabel,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
     DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -16,12 +21,17 @@ import {
 } from "@/components/ui/sidebar";
 import { CaretUpDownIcon, CheckCircleIcon, SignOutIcon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
-import { useI18n } from "@/i18n/i18n-provider";
+import { useI18n, type Language } from "@/i18n/i18n-provider";
 import { useAdminAuth } from "@/features/auth/auth-context";
 import { useNavigate } from "react-router-dom";
+import { Languages, Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
+
+const languages: Language[] = ["en", "ps", "dr"];
 
 function UserDropdownContent({ side = "bottom" }: { side?: "bottom" | "right" }) {
-    const { t } = useI18n();
+    const { t, tr, language, setLanguage } = useI18n();
+    const { resolvedTheme, setTheme } = useTheme();
     const auth = useAdminAuth();
     const navigate = useNavigate();
     const user = auth.user;
@@ -41,7 +51,21 @@ function UserDropdownContent({ side = "bottom" }: { side?: "bottom" | "right" })
                 </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuGroup><DropdownMenuItem onClick={() => navigate("/profile")}><CheckCircleIcon />{t("common.profile")}</DropdownMenuItem></DropdownMenuGroup>
+            <DropdownMenuGroup>
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger><Languages />{tr("Language")}</DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-44">
+                        <DropdownMenuRadioGroup value={language} onValueChange={(value) => setLanguage(value as Language)}>
+                            {languages.map((item) => <DropdownMenuRadioItem key={item} value={item}>{t(`language.${item}`)}</DropdownMenuRadioItem>)}
+                        </DropdownMenuRadioGroup>
+                    </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuItem onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>
+                    {resolvedTheme === "dark" ? <Sun /> : <Moon />}
+                    {tr(resolvedTheme === "dark" ? "Light theme" : "Dark theme")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/profile")}><CheckCircleIcon />{t("common.profile")}</DropdownMenuItem>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={auth.logout}><SignOutIcon />{t("common.logout")}</DropdownMenuItem>
         </DropdownMenuContent>

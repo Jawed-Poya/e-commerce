@@ -9,12 +9,11 @@ namespace ECommerce.Services.Storefront;
 
 public sealed class StorefrontContentService(
     ApplicationDbContext context,
-    IWebHostEnvironment environment,
+    ECommerce.Services.Products.IProductImageStorage imageStorage,
     IMemoryCache cache) : IStorefrontContentService
 {
     private const string CacheKey = "storefront:content";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly string[] AllowedExtensions = [".jpg", ".jpeg", ".png", ".webp", ".avif"];
 
     public async Task<StorefrontContentResponse> GetAsync(CancellationToken cancellationToken = default)
     {
@@ -66,22 +65,15 @@ public sealed class StorefrontContentService(
         IFormFile image,
         CancellationToken cancellationToken = default)
     {
-        if (image.Length <= 0 || image.Length > 8 * 1024 * 1024)
-            throw new ArgumentException("Hero image must be between 1 byte and 8 MB.");
-
-        var extension = Path.GetExtension(image.FileName).ToLowerInvariant();
-        if (!AllowedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
-            throw new ArgumentException("Use a JPG, PNG, WebP, or AVIF hero image.");
-
-        var root = environment.WebRootPath ?? Path.Combine(environment.ContentRootPath, "wwwroot");
-        var directory = Path.Combine(root, "uploads", "storefront");
-        Directory.CreateDirectory(directory);
-        var fileName = $"hero-{Guid.NewGuid():N}{extension}";
-        var path = Path.Combine(directory, fileName);
-
-        await using var stream = File.Create(path);
-        await image.CopyToAsync(stream, cancellationToken);
-        return $"/uploads/storefront/{fileName}";
+        try
+        {
+            var stored = await imageStorage.SaveAsync(image, "storefront", cancellationToken);
+            return stored.PublicUrl;
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new ArgumentException(exception.Message, exception);
+        }
     }
 
     private static StorefrontContentResponse Map(StorefrontContent entity)

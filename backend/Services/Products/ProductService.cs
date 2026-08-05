@@ -33,19 +33,22 @@ public class ProductService : IProductService
     private readonly IProductImageStorage _imageStorage;
     private readonly ICurrentCustomerAccessor _currentCustomer;
     private readonly IDefaultCustomerTypeResolver _defaultCustomerType;
+    private readonly IRecordDeletionPolicy _deletionPolicy;
 
     public ProductService(
         ApplicationDbContext context,
         IProductImageStorage imageStorage,
         ILogger<ProductService> logger,
         ICurrentCustomerAccessor currentCustomer,
-        IDefaultCustomerTypeResolver defaultCustomerType)
+        IDefaultCustomerTypeResolver defaultCustomerType,
+        IRecordDeletionPolicy deletionPolicy)
     {
         _context = context;
         _imageStorage = imageStorage;
         _logger = logger;
         _currentCustomer = currentCustomer;
         _defaultCustomerType = defaultCustomerType;
+        _deletionPolicy = deletionPolicy;
     }
 
     public async Task<PagedResult<ProductListItemResponse>> GetAsync(ProductFilter filter)
@@ -731,6 +734,8 @@ public class ProductService : IProductService
 
         if (product == null)
             throw new KeyNotFoundException("Product not found.");
+
+        await _deletionPolicy.EnsureProductCanBeArchivedAsync(id);
 
         product.IsDeleted = true;
         product.DeletedAt = DateTime.UtcNow;

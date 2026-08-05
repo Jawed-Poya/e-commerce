@@ -2,8 +2,10 @@ using API.Entities.Types;
 using ECommerce.Dtos;
 using ECommerce.Services.GeneralTypes;
 using ECommerce.Services.Products;
+using ECommerce.Options;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Options;
 using ECommerce.Shared;
 
 namespace ECommerce.Controllers;
@@ -14,13 +16,16 @@ public class GeneralTypesController : ControllerBase
 {
     private readonly IGeneralTypeService _service;
     private readonly IProductImageStorage _imageStorage;
+    private readonly string _ownedImagePrefix;
 
     public GeneralTypesController(
         IGeneralTypeService service,
-        IProductImageStorage imageStorage)
+        IProductImageStorage imageStorage,
+        IOptions<FileStorageOptions> storageOptions)
     {
         _service = service;
         _imageStorage = imageStorage;
+        _ownedImagePrefix = $"{storageOptions.Value.ResolveRequestPath()}/types/";
     }
 
     [HttpGet]
@@ -234,11 +239,9 @@ public class GeneralTypesController : ControllerBase
 
     private async Task DeleteOwnedImageSafelyAsync(string? imageUrl)
     {
-        const string ownedPrefix = "/uploads/types/";
-
         if (string.IsNullOrWhiteSpace(imageUrl) ||
             !imageUrl.StartsWith(
-                ownedPrefix,
+                _ownedImagePrefix,
                 StringComparison.OrdinalIgnoreCase
             ))
         {

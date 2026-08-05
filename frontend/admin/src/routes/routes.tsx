@@ -254,6 +254,20 @@ const routes: RouteObject[] = [
                         ),
                     },
                     {
+                        path: "system/maintenance",
+                        lazy: lazyAllowed(
+                            [
+                                Permissions.DatabaseMaintenanceView,
+                                Permissions.DatabaseBackup,
+                                Permissions.DatabaseRestore,
+                                Permissions.BranchDataClear,
+                                Permissions.AllBusinessDataClear,
+                                Permissions.DemoDataSeed,
+                            ],
+                            () => import("@/pages/database-maintenance").then((module) => module.default),
+                        ),
+                    },
+                    {
                         path: "*",
                         lazy: lazyPage(loadNotFound),
                     },

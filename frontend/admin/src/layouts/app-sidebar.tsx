@@ -5,6 +5,7 @@ import {
     BriefcaseBusiness,
     Building2,
     Crown,
+    Database,
     LayoutDashboard,
     PackageIcon,
     SettingsIcon,
@@ -13,6 +14,7 @@ import {
     Trash2,
     Users,
     Warehouse,
+    X,
 } from "lucide-react";
 
 import { NavMain, type NavigationGroup } from "@/components/nav-main";
@@ -23,7 +25,9 @@ import {
     SidebarFooter,
     SidebarHeader,
     SidebarRail,
+    useSidebar,
 } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
 import { useI18n, type TranslationKey } from "@/i18n/i18n-provider";
 import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
@@ -178,6 +182,19 @@ const navigation: ProtectedGroup[] = [
                 permission: Permissions.AuditLogsView,
             },
             {
+                titleKey: "nav.databaseMaintenance",
+                url: "/system/maintenance",
+                icon: <Database />,
+                permission: [
+                    Permissions.DatabaseMaintenanceView,
+                    Permissions.DatabaseBackup,
+                    Permissions.DatabaseRestore,
+                    Permissions.BranchDataClear,
+                    Permissions.AllBusinessDataClear,
+                    Permissions.DemoDataSeed,
+                ],
+            },
+            {
                 titleKey: "nav.trash",
                 url: "/trash",
                 icon: <Trash2 />,
@@ -195,9 +212,10 @@ function canAccess(user: Parameters<typeof hasPermission>[0], permission?: strin
 }
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
-    const { language, t } = useI18n();
+    const { language, t, tr } = useI18n();
     const { user } = useAdminAuth();
     const { company } = useCompany();
+    const { isMobile, setOpenMobile } = useSidebar();
     const groups: NavigationGroup[] = navigation
         .map((group) => ({
             labelKey: group.labelKey,
@@ -257,6 +275,18 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
                             {t("nav.controlCenter")}
                         </span>
                     </div>
+                    {isMobile ? (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            className="ms-auto shrink-0"
+                            aria-label={tr("Close")}
+                            onClick={() => setOpenMobile(false)}
+                        >
+                            <X className="size-4" />
+                        </Button>
+                    ) : null}
                 </div>
             </SidebarHeader>
             <SidebarContent>

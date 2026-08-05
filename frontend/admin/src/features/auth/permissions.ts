@@ -41,6 +41,12 @@ export const Permissions = {
     NotificationsManage: "company.notifications.manage",
     GeneralTypesManage: "system.general-types.manage",
     StorefrontManage: "system.storefront.manage",
+    DatabaseMaintenanceView: "database-maintenance.view",
+    DatabaseBackup: "database.backup",
+    DatabaseRestore: "database.restore",
+    BranchDataClear: "data.clear.branch",
+    AllBusinessDataClear: "data.clear.all",
+    DemoDataSeed: "data.seed.demo",
 } as const;
 
 export function isSystemAdministrator(
@@ -55,6 +61,7 @@ const legacyPermissionParents: Readonly<Record<string, readonly string[]>> = {
     [Permissions.NotificationsManage]: [Permissions.OrdersManage],
     [Permissions.GeneralTypesManage]: [Permissions.SystemManage],
     [Permissions.StorefrontManage]: [Permissions.SystemManage],
+    [Permissions.BranchDataClear]: [Permissions.AllBusinessDataClear],
 };
 
 export function hasPermission(
@@ -91,5 +98,13 @@ export function getDefaultAdminRoute(
     if (set.has(Permissions.AuditLogsView)) return "/audit";
     if (set.has(Permissions.GeneralTypesManage) || set.has(Permissions.SystemManage)) return "/system/general-types";
     if (set.has(Permissions.StorefrontManage)) return "/system/storefront";
+    if (
+        set.has(Permissions.DatabaseMaintenanceView) ||
+        set.has(Permissions.DatabaseBackup) ||
+        set.has(Permissions.DatabaseRestore) ||
+        set.has(Permissions.BranchDataClear) ||
+        set.has(Permissions.AllBusinessDataClear) ||
+        set.has(Permissions.DemoDataSeed)
+    ) return "/system/maintenance";
     return "/dashboard";
 }

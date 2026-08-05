@@ -8,6 +8,7 @@ using ECommerce.Services.Company;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -126,6 +127,20 @@ builder.Services.AddAuthorization(options =>
             AppPermissions.IsGranted(context.User, AppPermissions.OrdersView) ||
             AppPermissions.IsGranted(context.User, AppPermissions.InventoryView) ||
             AppPermissions.IsGranted(context.User, AppPermissions.ReviewsView)));
+
+    options.AddPolicy(AppPermissions.DatabaseMaintenanceAccessPolicy, policy =>
+        policy.RequireAssertion(context =>
+            AppPermissions.IsGranted(context.User, AppPermissions.DatabaseMaintenanceView) ||
+            AppPermissions.IsGranted(context.User, AppPermissions.DatabaseBackup) ||
+            AppPermissions.IsGranted(context.User, AppPermissions.DatabaseRestore) ||
+            AppPermissions.IsGranted(context.User, AppPermissions.BranchDataClear) ||
+            AppPermissions.IsGranted(context.User, AppPermissions.AllBusinessDataClear) ||
+            AppPermissions.IsGranted(context.User, AppPermissions.DemoDataSeed)));
+
+    options.AddPolicy(AppPermissions.DatabaseBackupReadPolicy, policy =>
+        policy.RequireAssertion(context =>
+            AppPermissions.IsGranted(context.User, AppPermissions.DatabaseBackup) ||
+            AppPermissions.IsGranted(context.User, AppPermissions.DatabaseRestore)));
 });
 
 builder.Services.Configure<FormOptions>(options =>
@@ -136,6 +151,14 @@ builder.Services.Configure<FormOptions>(options =>
 var app = builder.Build();
 
 await app.InitializeDatabaseAsync();
+
+if (args.Any(argument => string.Equals(argument, "--seed-demo", StringComparison.OrdinalIgnoreCase)))
+{
+    await using var seedScope = app.Services.CreateAsyncScope();
+    await seedScope.ServiceProvider
+        .GetRequiredService<IDemoDataSeeder>()
+        .ResetAndSeedAsync();
+}
 
 // Resolve the original client IP and scheme before redirects and audit logging.
 // The development frontends use the HTTP launch profile by default, so HTTPS
@@ -148,6 +171,17 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 app.UseStaticFiles();
+var fileStorage = app.Services
+    .GetRequiredService<Microsoft.Extensions.Options.IOptions<FileStorageOptions>>()
+    .Value;
+var uploadRoot = fileStorage.ResolveRootPath(app.Environment);
+Directory.CreateDirectory(uploadRoot);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadRoot),
+    RequestPath = fileStorage.ResolveRequestPath(),
+    ServeUnknownFileTypes = false
+});
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseCors("CorsPolicy");
 app.UseAuthentication();

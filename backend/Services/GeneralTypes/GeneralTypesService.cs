@@ -4,20 +4,28 @@ using API.Entities.Types;
 using ECommerce.Data;
 using ECommerce.Dtos;
 using ECommerce.Entities.Common;
+using ECommerce.Options;
 using ECommerce.Services.Customers;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 public class GeneralTypesService : IGeneralTypeService
 {
     private readonly ApplicationDbContext _context;
     private readonly IDefaultCustomerTypeResolver _defaultCustomerType;
+    private readonly ECommerce.Services.Company.IRecordDeletionPolicy _deletionPolicy;
+    private readonly string _ownedImagePrefix;
 
     public GeneralTypesService(
         ApplicationDbContext context,
-        IDefaultCustomerTypeResolver defaultCustomerType)
+        IDefaultCustomerTypeResolver defaultCustomerType,
+        ECommerce.Services.Company.IRecordDeletionPolicy deletionPolicy,
+        IOptions<FileStorageOptions> storageOptions)
     {
         _context = context;
         _defaultCustomerType = defaultCustomerType;
+        _deletionPolicy = deletionPolicy;
+        _ownedImagePrefix = $"{storageOptions.Value.ResolveRequestPath()}/types/";
     }
 
     public async Task<List<GeneralTypeDto>> GetAsync(string? group)
@@ -162,7 +170,7 @@ public class GeneralTypesService : IGeneralTypeService
         return false;
     }
 
-    private static string? NormalizeImageUrl(string? imageUrl)
+    private string? NormalizeImageUrl(string? imageUrl)
     {
         if (string.IsNullOrWhiteSpace(imageUrl))
         {
@@ -171,10 +179,8 @@ public class GeneralTypesService : IGeneralTypeService
 
         var normalized = imageUrl.Trim();
 
-        if (normalized.StartsWith(
-                "/uploads/types/",
-                StringComparison.OrdinalIgnoreCase
-            ))
+        if (normalized.StartsWith(_ownedImagePrefix, StringComparison.OrdinalIgnoreCase) ||
+            normalized.StartsWith("/uploads/types/", StringComparison.OrdinalIgnoreCase))
         {
             return normalized;
         }
@@ -210,19 +216,10 @@ public class GeneralTypesService : IGeneralTypeService
             throw new InvalidOperationException("The General customer type is required and cannot be deleted.");
         }
 
-        var hasChildren = await _context.Types
-            .AnyAsync(x => x.ParentId == id);
+        await _deletionPolicy.EnsureGeneralTypeCanBeArchivedAsync(id);
 
-
-        if (hasChildren)
-        {
-            throw new InvalidOperationException(
-                "Cannot delete type with children.");
-        }
-
-
-
-        _context.Types.Remove(entity);
+        entity.IsDeleted = true;
+        entity.DeletedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
         if (entity.Group == GeneralTypeEnum.CustomerType)

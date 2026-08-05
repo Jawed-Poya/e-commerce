@@ -12,6 +12,7 @@ import {
     SidebarMenuSub,
     SidebarMenuSubButton,
     SidebarMenuSubItem,
+    useSidebar,
 } from "@/components/ui/sidebar";
 import { useI18n, type TranslationKey } from "@/i18n/i18n-provider";
 import { CaretRightIcon } from "@phosphor-icons/react";
@@ -32,6 +33,7 @@ export interface NavigationGroup {
 export function NavMain({ groups }: { groups: NavigationGroup[] }) {
     const { t, language } = useI18n();
     const { pathname } = useLocation();
+    const { setOpenMobile } = useSidebar();
     const matches = (url: string) =>
         pathname === url ||
         pathname.startsWith(`${url}/`) ||
@@ -56,7 +58,7 @@ export function NavMain({ groups }: { groups: NavigationGroup[] }) {
                                         <SidebarMenuButton
                                             tooltip={t(item.titleKey)}
                                             isActive={active}
-                                            render={<Link to={item.url} />}
+                                            render={<Link to={item.url} onClick={() => setOpenMobile(false)} />}
                                         >
                                             <span className="shrink-0">
                                                 {item.icon}
@@ -101,6 +103,7 @@ export function NavMain({ groups }: { groups: NavigationGroup[] }) {
                                                                     to={
                                                                         child.url
                                                                     }
+                                                                    onClick={() => setOpenMobile(false)}
                                                                 />
                                                             }
                                                         >

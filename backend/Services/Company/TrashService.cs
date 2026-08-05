@@ -35,6 +35,7 @@ public interface ITrashService
 
 public sealed class TrashService(
     ApplicationDbContext context,
+    IRecordDeletionPolicy deletionPolicy,
     ILogger<TrashService> logger) : ITrashService
 {
     public async Task<IReadOnlyCollection<TrashItemResponse>> GetAsync(
@@ -103,6 +104,10 @@ public sealed class TrashService(
             throw new InvalidOperationException("The deleted entity identifier is invalid.");
         try
         {
+            await deletionPolicy.EnsureCanBePermanentlyDeletedAsync(
+                trash.EntityType,
+                entityId,
+                cancellationToken);
             await DeleteEntityAsync(trash.EntityType, entityId, cancellationToken);
             trash.PurgedAt = DateTime.UtcNow;
             await context.SaveChangesAsync(cancellationToken);
@@ -132,7 +137,13 @@ public sealed class TrashService(
             try
             {
                 if (long.TryParse(item.EntityId, out var entityId))
+                {
+                    await deletionPolicy.EnsureCanBePermanentlyDeletedAsync(
+                        item.EntityType,
+                        entityId,
+                        cancellationToken);
                     await DeleteEntityAsync(item.EntityType, entityId, cancellationToken);
+                }
                 item.PurgedAt = DateTime.UtcNow;
                 purged++;
             }

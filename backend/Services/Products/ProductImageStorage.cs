@@ -1,19 +1,22 @@
 ﻿namespace ECommerce.Services.Products;
 
+using ECommerce.Options;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 
 public sealed class LocalProductImageStorage : IProductImageStorage
 {
-    private const long MaximumImageSize = 5 * 1024 * 1024;
-
     private readonly IWebHostEnvironment _environment;
+    private readonly FileStorageOptions _options;
 
     public LocalProductImageStorage(
-        IWebHostEnvironment environment
+        IWebHostEnvironment environment,
+        IOptions<FileStorageOptions> options
     )
     {
         _environment = environment;
+        _options = options.Value;
     }
 
     public Task<StoredProductImage> SaveAsync(
@@ -27,7 +30,7 @@ public sealed class LocalProductImageStorage : IProductImageStorage
         CancellationToken cancellationToken = default
     )
     {
-        if (collection is not ("products" or "types" or "company"))
+        if (collection is not ("products" or "types" or "company" or "storefront"))
         {
             throw new InvalidOperationException(
                 "The image collection is not supported."
@@ -41,10 +44,14 @@ public sealed class LocalProductImageStorage : IProductImageStorage
             );
         }
 
-        if (file.Length > MaximumImageSize)
+        var maximumSize = Math.Clamp(
+            _options.MaximumImageSizeBytes,
+            1024L,
+            100L * 1024L * 1024L);
+        if (file.Length > maximumSize)
         {
             throw new InvalidOperationException(
-                "The image must not exceed 5 MB."
+                $"The image must not exceed {Math.Ceiling(maximumSize / 1024d / 1024d):0} MB."
             );
         }
 
@@ -60,21 +67,20 @@ public sealed class LocalProductImageStorage : IProductImageStorage
             );
         }
 
-        var webRootPath = GetWebRootPath();
+        var storageRootPath = GetStorageRootPath();
 
         var year = DateTime.UtcNow.Year.ToString();
         var month = DateTime.UtcNow.Month.ToString("00");
 
-        var relativeDirectory = Path.Combine(
-            "uploads",
+        var storageRelativeDirectory = Path.Combine(
             collection,
             year,
             month
         );
 
         var absoluteDirectory = Path.Combine(
-            webRootPath,
-            relativeDirectory
+            storageRootPath,
+            storageRelativeDirectory
         );
 
         Directory.CreateDirectory(absoluteDirectory);
@@ -112,15 +118,16 @@ public sealed class LocalProductImageStorage : IProductImageStorage
             throw;
         }
 
-        var relativePath = Path.Combine(
-                relativeDirectory,
+        var publicRelativePath = Path.Combine(
+                _options.ResolveRequestPath().Trim('/'),
+                storageRelativeDirectory,
                 fileName
             )
             .Replace("\\", "/");
 
         return new StoredProductImage(
-            RelativePath: relativePath,
-            PublicUrl: $"/{relativePath}",
+            RelativePath: publicRelativePath,
+            PublicUrl: $"/{publicRelativePath}",
             FileName: fileName,
             ContentType: imageType.ContentType,
             Size: file.Length
@@ -139,19 +146,28 @@ public sealed class LocalProductImageStorage : IProductImageStorage
             return Task.CompletedTask;
         }
 
-        var rootPath = Path.GetFullPath(
-            GetWebRootPath()
-        );
+        var rootPath = GetStorageRootPath();
 
         var normalizedRoot = rootPath.TrimEnd(
             Path.DirectorySeparatorChar,
             Path.AltDirectorySeparatorChar
         ) + Path.DirectorySeparatorChar;
 
-        var normalizedRelativePath = relativePath.Replace(
-            '/',
-            Path.DirectorySeparatorChar
-        );
+        var normalizedRelativePath = relativePath
+            .Trim()
+            .TrimStart('/', '\\')
+            .Replace('/', Path.DirectorySeparatorChar);
+        var requestPrefix = _options.ResolveRequestPath()
+            .Trim('/')
+            .Replace('/', Path.DirectorySeparatorChar);
+        if (normalizedRelativePath.Equals(requestPrefix, StringComparison.OrdinalIgnoreCase))
+            return Task.CompletedTask;
+        if (normalizedRelativePath.StartsWith(
+                requestPrefix + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            normalizedRelativePath = normalizedRelativePath[(requestPrefix.Length + 1)..];
+        }
 
         var absolutePath = Path.GetFullPath(
             Path.Combine(
@@ -162,7 +178,9 @@ public sealed class LocalProductImageStorage : IProductImageStorage
 
         if (!absolutePath.StartsWith(
                 normalizedRoot,
-                StringComparison.OrdinalIgnoreCase
+                OperatingSystem.IsWindows()
+                    ? StringComparison.OrdinalIgnoreCase
+                    : StringComparison.Ordinal
             ))
         {
             throw new InvalidOperationException(
@@ -178,23 +196,11 @@ public sealed class LocalProductImageStorage : IProductImageStorage
         return Task.CompletedTask;
     }
 
-    private string GetWebRootPath()
+    private string GetStorageRootPath()
     {
-        if (!string.IsNullOrWhiteSpace(
-                _environment.WebRootPath
-            ))
-        {
-            return _environment.WebRootPath;
-        }
-
-        var webRootPath = Path.Combine(
-            _environment.ContentRootPath,
-            "wwwroot"
-        );
-
-        Directory.CreateDirectory(webRootPath);
-
-        return webRootPath;
+        var rootPath = _options.ResolveRootPath(_environment);
+        Directory.CreateDirectory(rootPath);
+        return rootPath;
     }
 
     private static async Task<DetectedImageType?> DetectImageTypeAsync(

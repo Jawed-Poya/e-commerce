@@ -18,6 +18,8 @@ public static class AppRoles
 public static class AppPermissions
 {
     public const string AdminNotificationsViewPolicy = "admin.notifications.view";
+    public const string DatabaseMaintenanceAccessPolicy = "database.maintenance.access";
+    public const string DatabaseBackupReadPolicy = "database.backup.read";
 
     public const string DashboardView = "dashboard.view";
 
@@ -68,6 +70,13 @@ public static class AppPermissions
     public const string StorefrontManage = "system.storefront.manage";
     public const string SystemManage = "system.manage";
 
+    public const string DatabaseMaintenanceView = "database-maintenance.view";
+    public const string DatabaseBackup = "database.backup";
+    public const string DatabaseRestore = "database.restore";
+    public const string BranchDataClear = "data.clear.branch";
+    public const string AllBusinessDataClear = "data.clear.all";
+    public const string DemoDataSeed = "data.seed.demo";
+
     public static readonly IReadOnlyCollection<string> All =
     [
         DashboardView,
@@ -109,7 +118,13 @@ public static class AppPermissions
         NotificationsManage,
         GeneralTypesManage,
         StorefrontManage,
-        SystemManage
+        SystemManage,
+        DatabaseMaintenanceView,
+        DatabaseBackup,
+        DatabaseRestore,
+        BranchDataClear,
+        AllBusinessDataClear,
+        DemoDataSeed
     ];
 
 
@@ -120,7 +135,8 @@ public static class AppPermissions
             [ReviewsManage] = [ProductsManage],
             [NotificationsManage] = [OrdersManage],
             [GeneralTypesManage] = [SystemManage],
-            [StorefrontManage] = [SystemManage]
+            [StorefrontManage] = [SystemManage],
+            [BranchDataClear] = [AllBusinessDataClear]
         };
 
     public static bool IsGranted(System.Security.Claims.ClaimsPrincipal user, string permission) =>
@@ -195,6 +211,15 @@ public static class AppPermissions
                 new(GeneralTypesManage, "Manage general types", "Create and maintain categories, brands, units, customer types, and reusable types."),
                 new(StorefrontManage, "Manage storefront content", "Update storefront hero content and promotional media."),
                 new(SystemManage, "Manage all system settings", "Legacy broad permission that also grants general-types and storefront management.")
+            ],
+            ["Database maintenance"] =
+            [
+                new(DatabaseMaintenanceView, "View database maintenance", "View backup configuration, available backups, and safe data-maintenance tools."),
+                new(DatabaseBackup, "Create database backups", "Create full copy-only SQL Server backups."),
+                new(DatabaseRestore, "Restore database backups", "Restore the database from a verified server-side backup. This permission is highly sensitive."),
+                new(BranchDataClear, "Clear branch business data", "Permanently clear business data for one selected branch while preserving users and configuration."),
+                new(AllBusinessDataClear, "Clear all business data", "Permanently clear business data for every branch while preserving access and company configuration."),
+                new(DemoDataSeed, "Load demo data", "Clear current business data and load the professional sample catalog and transactions.")
             ]
         };
 }

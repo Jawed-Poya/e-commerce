@@ -35,6 +35,9 @@ public static class DependencyInjection
         services.AddScoped<ICompanyPermissionService, CompanyPermissionService>();
         services.AddScoped<ICompanyService, CompanyService>();
         services.AddScoped<ITrashService, TrashService>();
+        services.AddScoped<IRecordDeletionPolicy, RecordDeletionPolicy>();
+        services.AddScoped<IDatabaseMaintenanceService, DatabaseMaintenanceService>();
+        services.AddScoped<IDemoDataSeeder, DemoDataSeeder>();
         services.AddHostedService<TrashCleanupHostedService>();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IProductPricingService, ProductPricingService>();
@@ -83,6 +86,8 @@ public static class DependencyInjection
         services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
         services.Configure<AccountVerificationOptions>(configuration.GetSection(AccountVerificationOptions.SectionName));
         services.Configure<WhatsAppOptions>(configuration.GetSection(WhatsAppOptions.SectionName));
+        services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
+        services.Configure<DatabaseMaintenanceOptions>(configuration.GetSection(DatabaseMaintenanceOptions.SectionName));
         services.AddHttpClient();
 
         services.AddDbContext<ApplicationDbContext>(options =>
