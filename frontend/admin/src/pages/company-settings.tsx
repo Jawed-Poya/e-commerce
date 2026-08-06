@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, CheckCircle2, ImagePlus, ListChecks, LoaderCircle, MapPin, MonitorSmartphone, Pencil, Play, Plus, Save, Settings2, Siren, UploadCloud, Volume2, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { apiOrigin } from "@/api/axios";
+import { resolveApiAssetUrl } from "@/api/axios";
 import { PageHeader } from "@/components/page-header";
 import { SimpleCombobox } from "@/components/simple-combobox";
 import { Badge } from "@/components/ui/badge";
@@ -605,11 +605,7 @@ function BrandAssetUploader({
         if (!disabled && !upload.isPending) choose(event.dataTransfer.files[0]);
     };
 
-    const preview = value
-        ? /^https?:/i.test(value)
-            ? value
-            : `${apiOrigin}${value.startsWith("/") ? value : `/${value}`}`
-        : null;
+    const preview = resolveApiAssetUrl(value);
 
     return (
         <div

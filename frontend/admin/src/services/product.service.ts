@@ -1,10 +1,8 @@
 import apiClient from "@/api/api-client";
-import { apiOrigin } from "@/api/axios";
+import { resolveApiAssetUrl } from "@/api/axios";
 
 export function resolveProductImageUrl(path: string | null | undefined) {
-    if (!path) return null;
-    if (/^https?:\/\//i.test(path) || path.startsWith("blob:")) return path;
-    return new URL(path.startsWith("/") ? path : `/${path}`, apiOrigin).toString();
+    return resolveApiAssetUrl(path);
 }
 
 export interface ProductListItem {

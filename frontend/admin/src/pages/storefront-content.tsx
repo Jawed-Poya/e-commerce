@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { apiOrigin } from "@/api/axios";
+import { resolveApiAssetUrl } from "@/api/axios";
 import { storefrontContentService } from "@/features/storefront-content/storefront-content-service";
 import type {
     LocalizedHeroContent,
@@ -82,11 +82,7 @@ export default function StorefrontContentPage() {
             },
         }));
 
-    const previewImage = form.heroImageUrl
-        ? /^https?:/.test(form.heroImageUrl)
-            ? form.heroImageUrl
-            : `${apiOrigin}${form.heroImageUrl}`
-        : null;
+    const previewImage = resolveApiAssetUrl(form.heroImageUrl);
 
     return (
         <div className="space-y-5">

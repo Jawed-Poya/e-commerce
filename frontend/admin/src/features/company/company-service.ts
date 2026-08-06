@@ -1,5 +1,5 @@
 import apiClient from "@/api/api-client";
-import axiosInstance, { apiOrigin } from "@/api/axios";
+import axiosInstance, { resolveApiAssetUrl } from "@/api/axios";
 import type {
     CompanyBranch,
     CompanyProfile,
@@ -16,10 +16,7 @@ export type UpdateCompanyProfile = Pick<
 export type UpsertCompanyBranch = Omit<CompanyBranch, "id">;
 
 export function resolveCompanyAssetUrl(path: string | null | undefined) {
-    if (!path) return null;
-    return /^https?:/i.test(path)
-        ? path
-        : `${apiOrigin}${path.startsWith("/") ? path : `/${path}`}`;
+    return resolveApiAssetUrl(path);
 }
 
 export const companyService = {

@@ -1,9 +1,14 @@
-export const apiBaseUrl = (
-    import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5188/api"
-).replace(/\/+$/, "");
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 
-export const apiOrigin = new URL(apiBaseUrl, window.location.origin).origin;
+export const apiBaseUrl = (configuredApiBaseUrl || "/api").replace(/\/+$/, "");
+
+const absoluteApiBaseUrl = new URL(`${apiBaseUrl}/`, window.location.origin);
+
 export const customerTokenKey = "easycart-customer-token";
+
+export function apiUrl(path: string) {
+    return new URL(path.replace(/^\/+/, ""), absoluteApiBaseUrl).toString();
+}
 
 type ApiEnvelope<T> = {
     success: boolean;
@@ -75,7 +80,7 @@ export async function apiGet<T>(
         string | number | boolean | (string | number)[] | undefined
     >,
 ) {
-    const url = new URL(`${apiBaseUrl}${path}`);
+    const url = new URL(apiUrl(path));
 
     Object.entries(params ?? {}).forEach(([key, value]) => {
         if (Array.isArray(value)) {
@@ -94,7 +99,7 @@ export async function apiGet<T>(
 
 export async function apiPost<T>(path: string, body?: unknown) {
     return readResponse<T>(
-        await fetch(`${apiBaseUrl}${path}`, {
+        await fetch(apiUrl(path), {
             method: "POST",
             headers: requestHeaders(true),
             body: body === undefined ? undefined : JSON.stringify(body),
@@ -104,7 +109,7 @@ export async function apiPost<T>(path: string, body?: unknown) {
 
 export async function apiPut<T>(path: string, body?: unknown) {
     return readResponse<T>(
-        await fetch(`${apiBaseUrl}${path}`, {
+        await fetch(apiUrl(path), {
             method: "PUT",
             headers: requestHeaders(true),
             body: body === undefined ? undefined : JSON.stringify(body),
@@ -114,7 +119,7 @@ export async function apiPut<T>(path: string, body?: unknown) {
 
 export async function apiPatch<T>(path: string, body?: unknown) {
     return readResponse<T>(
-        await fetch(`${apiBaseUrl}${path}`, {
+        await fetch(apiUrl(path), {
             method: "PATCH",
             headers: requestHeaders(true),
             body: body === undefined ? undefined : JSON.stringify(body),
@@ -124,7 +129,7 @@ export async function apiPatch<T>(path: string, body?: unknown) {
 
 export async function apiDelete<T>(path: string) {
     return readResponse<T>(
-        await fetch(`${apiBaseUrl}${path}`, {
+        await fetch(apiUrl(path), {
             method: "DELETE",
             headers: requestHeaders(),
         }),
@@ -133,7 +138,25 @@ export async function apiDelete<T>(path: string) {
 
 export function imageUrl(path?: string | null) {
     if (!path) return null;
-    return /^https?:/.test(path)
-        ? path
-        : `${apiOrigin}${path.startsWith("/") ? path : `/${path}`}`;
+
+    const value = path.trim();
+    if (!value) return null;
+    if (/^(https?:|blob:|data:)/i.test(value)) return value;
+    if (value.startsWith("//")) {
+        return new URL(value, window.location.origin).toString();
+    }
+
+    const relativePath = value.replace(/\\/g, "/").replace(/^\/+/, "");
+    const apiPathPrefix = absoluteApiBaseUrl.pathname
+        .replace(/^\/+|\/+$/g, "");
+
+    if (
+        apiPathPrefix &&
+        (relativePath === apiPathPrefix ||
+            relativePath.startsWith(`${apiPathPrefix}/`))
+    ) {
+        return new URL(`/${relativePath}`, absoluteApiBaseUrl.origin).toString();
+    }
+
+    return new URL(relativePath, absoluteApiBaseUrl).toString();
 }

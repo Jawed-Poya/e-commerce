@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -103,7 +104,8 @@ builder.Services
             {
                 var accessToken = context.Request.Query["access_token"];
                 if (!string.IsNullOrWhiteSpace(accessToken) &&
-                    context.HttpContext.Request.Path.StartsWithSegments("/hubs/store-notifications"))
+                    (context.HttpContext.Request.Path.StartsWithSegments("/hubs/store-notifications") ||
+                     context.HttpContext.Request.Path.StartsWithSegments("/api/hubs/store-notifications")))
                 {
                     context.Token = accessToken;
                 }
@@ -176,12 +178,50 @@ var fileStorage = app.Services
     .Value;
 var uploadRoot = fileStorage.ResolveRootPath(app.Environment);
 Directory.CreateDirectory(uploadRoot);
-app.UseStaticFiles(new StaticFileOptions
+var uploadRequestPath = fileStorage.ResolveRequestPath();
+var uploadFileProvider = new PhysicalFileProvider(uploadRoot);
+var uploadContentTypes = new FileExtensionContentTypeProvider();
+uploadContentTypes.Mappings[".avif"] = "image/avif";
+
+void UseUploadFiles(IFileProvider fileProvider, string requestPath) =>
+    app.UseStaticFiles(
+        new StaticFileOptions
+        {
+            FileProvider = fileProvider,
+            ContentTypeProvider = uploadContentTypes,
+            RequestPath = requestPath,
+            ServeUnknownFileTypes = false
+        });
+
+// Keep the original public path for existing database values and installations.
+UseUploadFiles(uploadFileProvider, uploadRequestPath);
+
+// Linux deployments commonly proxy only /api through Nginx. Serving the same
+// files below /api keeps uploaded images on that proxy boundary without a data
+// migration and without breaking the legacy /uploads URLs.
+if (!uploadRequestPath.Equals("/api", StringComparison.OrdinalIgnoreCase) &&
+    !uploadRequestPath.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
 {
-    FileProvider = new PhysicalFileProvider(uploadRoot),
-    RequestPath = fileStorage.ResolveRequestPath(),
-    ServeUnknownFileTypes = false
-});
+    UseUploadFiles(uploadFileProvider, $"/api{uploadRequestPath}");
+}
+
+// Before configurable storage was introduced, uploads lived in
+// wwwroot/uploads. Let the API-prefixed path fall through to that directory so
+// old database rows continue to work while installations migrate their files.
+var webRootPath = app.Environment.WebRootPath ??
+    Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+var legacyUploadRoot = Path.GetFullPath(Path.Combine(webRootPath, "uploads"));
+var storagePathComparison = OperatingSystem.IsWindows()
+    ? StringComparison.OrdinalIgnoreCase
+    : StringComparison.Ordinal;
+if (Directory.Exists(legacyUploadRoot) &&
+    !legacyUploadRoot.Equals(uploadRoot, storagePathComparison))
+{
+    UseUploadFiles(
+        new PhysicalFileProvider(legacyUploadRoot),
+        "/api/uploads");
+}
+
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseCors("CorsPolicy");
 app.UseAuthentication();
@@ -190,6 +230,7 @@ app.UseMiddleware<ActivityAuditMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<StoreNotificationHub>("/hubs/store-notifications");
+app.MapHub<StoreNotificationHub>("/api/hubs/store-notifications");
 app.ValidateAdminEndpointAuthorization();
 
 app.Run();

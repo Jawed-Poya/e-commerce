@@ -14,7 +14,7 @@ import {
     type PropsWithChildren,
 } from "react";
 
-import { apiOrigin, customerTokenKey } from "../../shared/api/api-client";
+import { apiUrl, customerTokenKey } from "../../shared/api/api-client";
 import { useAuth } from "../auth/auth-context";
 import { useCart } from "../cart/cart-context";
 import {
@@ -28,7 +28,7 @@ import {
 
 const lastCheckKey = "easycart-notifications-last-check";
 const seenKey = "easycart-notifications-seen";
-const hubUrl = `${apiOrigin}/hubs/store-notifications`;
+const hubUrl = apiUrl("/hubs/store-notifications");
 
 type RealtimeStatus = "connecting" | "live" | "reconnecting" | "polling";
 

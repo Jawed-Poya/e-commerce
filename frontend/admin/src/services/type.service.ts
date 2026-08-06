@@ -1,9 +1,6 @@
 import apiClient from "@/api/api-client";
+import { resolveApiAssetUrl } from "@/api/axios";
 import type { GeneralType } from "@/schemas/type.schema";
-
-const apiBaseUrl =
-    import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5188/api";
-const apiOrigin = new URL(apiBaseUrl, window.location.origin).origin;
 
 export interface GeneralTypeSubmission {
     data: GeneralType;
@@ -13,13 +10,7 @@ export interface GeneralTypeSubmission {
 export function resolveGeneralTypeImageUrl(
     path: string | null | undefined,
 ) {
-    if (!path) return null;
-    if (/^https?:\/\//i.test(path) || path.startsWith("blob:")) return path;
-
-    return new URL(
-        path.startsWith("/") ? path : `/${path}`,
-        apiOrigin,
-    ).toString();
+    return resolveApiAssetUrl(path);
 }
 
 function toFormData({ data, image }: GeneralTypeSubmission) {

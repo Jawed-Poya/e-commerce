@@ -9,10 +9,36 @@ import {
 } from "@/features/auth/auth-storage";
 import { literalTranslations } from "@/i18n/literal-translations";
 
-export const apiBaseUrl = (
-    import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5188/api"
-).replace(/\/+$/, "");
-export const apiOrigin = new URL(apiBaseUrl, window.location.origin).origin;
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+
+export const apiBaseUrl = (configuredApiBaseUrl || "/api").replace(/\/+$/, "");
+
+const absoluteApiBaseUrl = new URL(`${apiBaseUrl}/`, window.location.origin);
+
+export function resolveApiAssetUrl(path: string | null | undefined) {
+    if (!path) return null;
+
+    const value = path.trim();
+    if (!value) return null;
+    if (/^(https?:|blob:|data:)/i.test(value)) return value;
+    if (value.startsWith("//")) {
+        return new URL(value, window.location.origin).toString();
+    }
+
+    const relativePath = value.replace(/\\/g, "/").replace(/^\/+/, "");
+    const apiPathPrefix = absoluteApiBaseUrl.pathname
+        .replace(/^\/+|\/+$/g, "");
+
+    if (
+        apiPathPrefix &&
+        (relativePath === apiPathPrefix ||
+            relativePath.startsWith(`${apiPathPrefix}/`))
+    ) {
+        return new URL(`/${relativePath}`, absoluteApiBaseUrl.origin).toString();
+    }
+
+    return new URL(relativePath, absoluteApiBaseUrl).toString();
+}
 
 type AdminRequestConfig = InternalAxiosRequestConfig & {
     adminAccessToken?: string;

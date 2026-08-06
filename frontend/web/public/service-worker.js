@@ -245,18 +245,31 @@ function isPublicApiRequest(url) {
     path.includes("/api/general-types");
 }
 
+function isUploadedImageRequest(url) {
+  const path = url.pathname.toLowerCase();
+  return path.startsWith("/api/uploads/") || path.startsWith("/uploads/");
+}
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
   if (request.method !== "GET") return;
 
+  if (request.destination === "image" && isUploadedImageRequest(url)) {
+    event.respondWith(imageResponse(request));
+    return;
+  }
+
   if (isPublicApiRequest(url)) {
     event.respondWith(publicApiNetworkFirst(request));
     return;
   }
 
-  if (url.pathname.toLowerCase().startsWith("/api/") || url.pathname.toLowerCase().startsWith("/hubs/")) {
+  if (
+    url.pathname.toLowerCase().startsWith("/api/") ||
+    url.pathname.toLowerCase().startsWith("/hubs/")
+  ) {
     return;
   }
 

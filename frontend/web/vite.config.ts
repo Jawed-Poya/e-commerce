@@ -12,4 +12,13 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] }),
     pwaServiceWorkerPlugin({ cachePrefix: "pharmacy-store" }),
   ],
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://localhost:5188",
+        changeOrigin: true,
+        ws: true,
+      },
+    },
+  },
 });

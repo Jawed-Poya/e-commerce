@@ -245,7 +245,13 @@ function isFileDownloadRequest(url) {
 }
 
 function isRealtimeRequest(url) {
-  return url.pathname.toLowerCase().startsWith("/hubs/");
+  const path = url.pathname.toLowerCase();
+  return path.startsWith("/hubs/") || path.startsWith("/api/hubs/");
+}
+
+function isUploadedImageRequest(url) {
+  const path = url.pathname.toLowerCase();
+  return path.startsWith("/api/uploads/") || path.startsWith("/uploads/");
 }
 
 self.addEventListener("fetch", (event) => {
@@ -255,6 +261,11 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   if (isRealtimeRequest(url)) return;
+
+  if (request.destination === "image" && isUploadedImageRequest(url)) {
+    event.respondWith(imageResponse(request));
+    return;
+  }
 
   if (isApiRequest(url)) {
     if (

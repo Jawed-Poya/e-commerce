@@ -20,10 +20,17 @@ public sealed class FileStorageOptions
             ? "App_Data/uploads"
             : Environment.ExpandEnvironmentVariables(RootPath.Trim());
 
+        // A Linux systemd service can start with "/" as its working directory.
+        // Resolve production-relative storage beside the published application
+        // instead of allowing the process working directory to move the files.
+        var relativeBasePath = environment.IsDevelopment()
+            ? environment.ContentRootPath
+            : AppContext.BaseDirectory;
+
         return Path.GetFullPath(
             Path.IsPathRooted(configured)
                 ? configured
-                : Path.Combine(environment.ContentRootPath, configured));
+                : Path.Combine(relativeBasePath, configured));
     }
 
     public string ResolveRequestPath()
