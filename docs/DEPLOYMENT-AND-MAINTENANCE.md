@@ -20,7 +20,7 @@ Uploaded product, type, company-brand, and storefront images use one configurabl
 
 The API creates missing subdirectories, validates image signatures, generates safe names, stores platform-neutral URL paths, and serves the configured directory at `RequestPath`. Existing files under `wwwroot/uploads` remain readable for compatibility; move them to the configured root during a planned deployment when standardizing an older installation.
 
-The configured upload directory is also exposed below `/api` (for example, `/api/uploads/...`). The storefront and admin clients use this API-prefixed route. This matters on Linux because Nginx deployments normally proxy `/api/` to ASP.NET Core while serving the React application at `/`; a root `/uploads/...` URL would otherwise be handled by the React host and return `404`.
+Uploaded files are public static assets and are served only from `RequestPath` (for example, `/uploads/...`). They are intentionally not exposed below `/api`; this keeps API routing, authentication, caching, and static-file delivery separate.
 
 ### Linux upload and reverse-proxy setup
 
@@ -36,9 +36,16 @@ Set the production environment value on the API service:
 Environment=FileStorage__RootPath=/var/lib/easycart/uploads
 ```
 
-The frontend defaults to the same-origin API path `VITE_API_BASE_URL=/api`. If the API uses a different host, set a full **HTTPS** URL ending in `/api` during the frontend build. Never publish a build that points to `localhost` or plain HTTP: `localhost` means the visitor's own computer, and an HTTPS page will block HTTP images as mixed content.
+The frontend uses separate bases for API requests and uploaded assets:
 
-Use an Nginx location that preserves the `/api` prefix. The `proxy_pass` value intentionally has no trailing slash:
+```ini
+VITE_API_BASE_URL=/api
+VITE_ASSET_BASE_URL=/
+```
+
+When the backend uses another host, set `VITE_API_BASE_URL` to the full **HTTPS** API URL ending in `/api`. The asset base is automatically derived by removing the final `/api`, or it can be overridden with `VITE_ASSET_BASE_URL` when uploads use another host or CDN. Never publish a build that points to `localhost` or plain HTTP: `localhost` means the visitor's own computer, and an HTTPS page will block HTTP images as mixed content.
+
+Proxy API requests and public uploads separately. Both `proxy_pass` values intentionally have no trailing slash:
 
 ```nginx
 location /api/ {
@@ -50,9 +57,17 @@ location /api/ {
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
 }
+
+location /uploads/ {
+    proxy_pass http://127.0.0.1:5188;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
 ```
 
-After deployment, verify one uploaded file directly at `https://your-domain.example/api/uploads/...`. A `404` usually means the proxy path or stored file is missing; a `403` or an upload failure usually means the service account cannot read/write the configured directory. Linux paths and filenames are case-sensitive, so do not rename an uploaded file or change the case of a stored path manually.
+After deployment, verify one uploaded file directly at `https://your-domain.example/uploads/...`. A `404` usually means the `/uploads/` proxy path or stored file is missing; a `403` or an upload failure usually means the service account cannot read/write the configured directory. Linux paths and filenames are case-sensitive, so do not rename an uploaded file or change the case of a stored path manually.
 
 ## SQL Server backup and restore
 

@@ -10,34 +10,87 @@ import {
 import { literalTranslations } from "@/i18n/literal-translations";
 
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+const configuredAssetBaseUrl = import.meta.env.VITE_ASSET_BASE_URL?.trim();
 
 export const apiBaseUrl = (configuredApiBaseUrl || "/api").replace(/\/+$/, "");
 
 const absoluteApiBaseUrl = new URL(`${apiBaseUrl}/`, window.location.origin);
 
-export function resolveApiAssetUrl(path: string | null | undefined) {
-    if (!path) return null;
+function getDefaultAssetBaseUrl() {
+    const url = new URL(absoluteApiBaseUrl);
+    const apiPath = url.pathname.replace(/\/+$/, "");
 
-    const value = path.trim();
-    if (!value) return null;
-    if (/^(https?:|blob:|data:)/i.test(value)) return value;
-    if (value.startsWith("//")) {
-        return new URL(value, window.location.origin).toString();
-    }
+    url.pathname = apiPath.toLowerCase().endsWith("/api")
+        ? apiPath.slice(0, -4) || "/"
+        : apiPath || "/";
+    url.search = "";
+    url.hash = "";
 
-    const relativePath = value.replace(/\\/g, "/").replace(/^\/+/, "");
-    const apiPathPrefix = absoluteApiBaseUrl.pathname
-        .replace(/^\/+|\/+$/g, "");
+    return url.toString().replace(/\/+$/, "");
+}
+
+export const assetBaseUrl =
+    (configuredAssetBaseUrl || getDefaultAssetBaseUrl()).replace(/\/+$/, "") ||
+    "/";
+
+const absoluteAssetBaseUrl = new URL(assetBaseUrl, window.location.origin);
+absoluteAssetBaseUrl.pathname = `${absoluteAssetBaseUrl.pathname.replace(/\/+$/, "")}/`;
+absoluteAssetBaseUrl.search = "";
+absoluteAssetBaseUrl.hash = "";
+
+function removeApiPrefix(pathname: string) {
+    const relativePath = pathname.replace(/\\/g, "/").replace(/^\/+/, "");
+    const apiPathPrefix = absoluteApiBaseUrl.pathname.replace(
+        /^\/+|\/+$/g,
+        "",
+    );
 
     if (
         apiPathPrefix &&
         (relativePath === apiPathPrefix ||
             relativePath.startsWith(`${apiPathPrefix}/`))
     ) {
-        return new URL(`/${relativePath}`, absoluteApiBaseUrl.origin).toString();
+        return relativePath.slice(apiPathPrefix.length).replace(/^\/+/, "");
     }
 
-    return new URL(relativePath, absoluteApiBaseUrl).toString();
+    if (relativePath.toLowerCase().startsWith("api/uploads/")) {
+        return relativePath.slice(4);
+    }
+
+    return relativePath;
+}
+
+function resolveManagedAssetUrl(url: URL) {
+    const assetPath = removeApiPrefix(url.pathname);
+    const isManagedUpload = assetPath.toLowerCase().startsWith("uploads/");
+
+    if (!isManagedUpload || url.origin !== absoluteApiBaseUrl.origin) {
+        return url.toString();
+    }
+
+    const resolvedUrl = new URL(assetPath, absoluteAssetBaseUrl);
+    resolvedUrl.search = url.search;
+    resolvedUrl.hash = url.hash;
+    return resolvedUrl.toString();
+}
+
+export function resolveApiAssetUrl(path: string | null | undefined) {
+    if (!path) return null;
+
+    const value = path.trim();
+    if (!value) return null;
+    if (/^(blob:|data:)/i.test(value)) return value;
+
+    if (/^(https?:)?\/\//i.test(value)) {
+        return resolveManagedAssetUrl(new URL(value, window.location.origin));
+    }
+
+    const relativeUrl = new URL(value.replace(/\\/g, "/"), window.location.origin);
+    const assetPath = removeApiPrefix(relativeUrl.pathname);
+    const resolvedUrl = new URL(assetPath, absoluteAssetBaseUrl);
+    resolvedUrl.search = relativeUrl.search;
+    resolvedUrl.hash = relativeUrl.hash;
+    return resolvedUrl.toString();
 }
 
 type AdminRequestConfig = InternalAxiosRequestConfig & {

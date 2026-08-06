@@ -1,8 +1,67 @@
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+const configuredAssetBaseUrl = import.meta.env.VITE_ASSET_BASE_URL?.trim();
 
 export const apiBaseUrl = (configuredApiBaseUrl || "/api").replace(/\/+$/, "");
 
 const absoluteApiBaseUrl = new URL(`${apiBaseUrl}/`, window.location.origin);
+
+function getDefaultAssetBaseUrl() {
+  const url = new URL(absoluteApiBaseUrl);
+  const apiPath = url.pathname.replace(/\/+$/, "");
+
+  url.pathname = apiPath.toLowerCase().endsWith("/api")
+    ? apiPath.slice(0, -4) || "/"
+    : apiPath || "/";
+  url.search = "";
+  url.hash = "";
+
+  return url.toString().replace(/\/+$/, "");
+}
+
+export const assetBaseUrl =
+  (configuredAssetBaseUrl || getDefaultAssetBaseUrl()).replace(/\/+$/, "") ||
+  "/";
+
+const absoluteAssetBaseUrl = new URL(assetBaseUrl, window.location.origin);
+absoluteAssetBaseUrl.pathname = `${absoluteAssetBaseUrl.pathname.replace(/\/+$/, "")}/`;
+absoluteAssetBaseUrl.search = "";
+absoluteAssetBaseUrl.hash = "";
+
+function removeApiPrefix(pathname: string) {
+  const relativePath = pathname.replace(/\\/g, "/").replace(/^\/+/, "");
+  const apiPathPrefix = absoluteApiBaseUrl.pathname.replace(
+    /^\/+|\/+$/g,
+    "",
+  );
+
+  if (
+    apiPathPrefix &&
+    (relativePath === apiPathPrefix ||
+      relativePath.startsWith(`${apiPathPrefix}/`))
+  ) {
+    return relativePath.slice(apiPathPrefix.length).replace(/^\/+/, "");
+  }
+
+  if (relativePath.toLowerCase().startsWith("api/uploads/")) {
+    return relativePath.slice(4);
+  }
+
+  return relativePath;
+}
+
+function resolveManagedAssetUrl(url: URL) {
+  const assetPath = removeApiPrefix(url.pathname);
+  const isManagedUpload = assetPath.toLowerCase().startsWith("uploads/");
+
+  if (!isManagedUpload || url.origin !== absoluteApiBaseUrl.origin) {
+    return url.toString();
+  }
+
+  const resolvedUrl = new URL(assetPath, absoluteAssetBaseUrl);
+  resolvedUrl.search = url.search;
+  resolvedUrl.hash = url.hash;
+  return resolvedUrl.toString();
+}
 
 export const customerTokenKey = "easycart-customer-token";
 
@@ -137,26 +196,20 @@ export async function apiDelete<T>(path: string) {
 }
 
 export function imageUrl(path?: string | null) {
-    if (!path) return null;
+  if (!path) return null;
 
-    const value = path.trim();
-    if (!value) return null;
-    if (/^(https?:|blob:|data:)/i.test(value)) return value;
-    if (value.startsWith("//")) {
-        return new URL(value, window.location.origin).toString();
-    }
+  const value = path.trim();
+  if (!value) return null;
+  if (/^(blob:|data:)/i.test(value)) return value;
 
-    const relativePath = value.replace(/\\/g, "/").replace(/^\/+/, "");
-    const apiPathPrefix = absoluteApiBaseUrl.pathname
-        .replace(/^\/+|\/+$/g, "");
+  if (/^(https?:)?\/\//i.test(value)) {
+    return resolveManagedAssetUrl(new URL(value, window.location.origin));
+  }
 
-    if (
-        apiPathPrefix &&
-        (relativePath === apiPathPrefix ||
-            relativePath.startsWith(`${apiPathPrefix}/`))
-    ) {
-        return new URL(`/${relativePath}`, absoluteApiBaseUrl.origin).toString();
-    }
-
-    return new URL(relativePath, absoluteApiBaseUrl).toString();
+  const relativeUrl = new URL(value.replace(/\\/g, "/"), window.location.origin);
+  const assetPath = removeApiPrefix(relativeUrl.pathname);
+  const resolvedUrl = new URL(assetPath, absoluteAssetBaseUrl);
+  resolvedUrl.search = relativeUrl.search;
+  resolvedUrl.hash = relativeUrl.hash;
+  return resolvedUrl.toString();
 }

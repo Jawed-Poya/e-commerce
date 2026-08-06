@@ -247,7 +247,7 @@ function isPublicApiRequest(url) {
 
 function isUploadedImageRequest(url) {
   const path = url.pathname.toLowerCase();
-  return path.startsWith("/api/uploads/") || path.startsWith("/uploads/");
+  return path.startsWith("/uploads/");
 }
 
 self.addEventListener("fetch", (event) => {

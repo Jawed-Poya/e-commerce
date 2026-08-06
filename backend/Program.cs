@@ -193,34 +193,9 @@ void UseUploadFiles(IFileProvider fileProvider, string requestPath) =>
             ServeUnknownFileTypes = false
         });
 
-// Keep the original public path for existing database values and installations.
+// Uploads are public static assets. Keep them outside the /api route so API
+// routing, authentication rules, caching, and reverse-proxy policies stay separate.
 UseUploadFiles(uploadFileProvider, uploadRequestPath);
-
-// Linux deployments commonly proxy only /api through Nginx. Serving the same
-// files below /api keeps uploaded images on that proxy boundary without a data
-// migration and without breaking the legacy /uploads URLs.
-if (!uploadRequestPath.Equals("/api", StringComparison.OrdinalIgnoreCase) &&
-    !uploadRequestPath.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
-{
-    UseUploadFiles(uploadFileProvider, $"/api{uploadRequestPath}");
-}
-
-// Before configurable storage was introduced, uploads lived in
-// wwwroot/uploads. Let the API-prefixed path fall through to that directory so
-// old database rows continue to work while installations migrate their files.
-var webRootPath = app.Environment.WebRootPath ??
-    Path.Combine(app.Environment.ContentRootPath, "wwwroot");
-var legacyUploadRoot = Path.GetFullPath(Path.Combine(webRootPath, "uploads"));
-var storagePathComparison = OperatingSystem.IsWindows()
-    ? StringComparison.OrdinalIgnoreCase
-    : StringComparison.Ordinal;
-if (Directory.Exists(legacyUploadRoot) &&
-    !legacyUploadRoot.Equals(uploadRoot, storagePathComparison))
-{
-    UseUploadFiles(
-        new PhysicalFileProvider(legacyUploadRoot),
-        "/api/uploads");
-}
 
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseCors("CorsPolicy");
