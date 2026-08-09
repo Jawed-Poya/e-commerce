@@ -112,6 +112,7 @@ export const ps: Messages = {
     "product.inStock": "موجود",
     "product.unavailable": "ناموجود",
     "product.addToCart": "ټوکرۍ ته اضافه",
+    "product.inCart": "په ټوکرۍ کې",
     "product.notifyMe": "ما خبر کړئ",
     "product.enableAlerts": "د براوزر خبرتیاوې فعالې کړئ",
     "product.alertsEnabled": "خبرتیاوې فعالې دي",

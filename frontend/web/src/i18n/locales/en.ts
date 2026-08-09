@@ -109,6 +109,7 @@ export const en: Messages = {
     "product.inStock": "In stock",
     "product.unavailable": "Unavailable",
     "product.addToCart": "Add to cart",
+    "product.inCart": "In cart",
     "product.notifyMe": "Notify me",
     "product.enableAlerts": "Enable browser alerts",
     "product.alertsEnabled": "Alerts enabled",

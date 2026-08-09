@@ -112,6 +112,7 @@ export const dr: Messages = {
     "product.inStock": "موجود",
     "product.unavailable": "ناموجود",
     "product.addToCart": "افزودن به سبد",
+    "product.inCart": "در سبد",
     "product.notifyMe": "به من اطلاع بده",
     "product.enableAlerts": "فعال‌سازی اعلان مرورگر",
     "product.alertsEnabled": "اعلان‌ها فعال است",

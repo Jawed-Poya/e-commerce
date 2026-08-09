@@ -31,6 +31,7 @@ export function ProductCard({
     const { t } = useI18n();
     const compact = density === "compact";
     const liked = cart.wishlist.includes(product.id);
+    const isInCart = cart.items.some((item) => item.id === product.id);
     const primary =
         imageUrl(product.primaryImageUrl) || "/placeholder-product.svg";
     const hasPrice = product.price != null;
@@ -205,16 +206,33 @@ export function ProductCard({
                                     )}
                                 />
                             </Button>
-                            <Button
-                                type="button"
-                                size="icon"
-                                className="size-8 rounded-lg shadow-none"
-                                disabled={product.stock < 1 || !hasPrice}
-                                onClick={addToCart}
-                                aria-label={t("product.addToCart")}
-                            >
-                                <ShoppingBag className="size-3.5" />
-                            </Button>
+                            {isInCart ? (
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    size="icon"
+                                    className="size-8 rounded-lg border-emerald-500/35 bg-emerald-500/10 text-emerald-700 shadow-none hover:border-emerald-500/50 hover:bg-emerald-500/15 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+                                >
+                                    <Link
+                                        viewTransition
+                                        to="/cart"
+                                        aria-label={t("product.inCart")}
+                                    >
+                                        <Check className="size-3.5" />
+                                    </Link>
+                                </Button>
+                            ) : (
+                                <Button
+                                    type="button"
+                                    size="icon"
+                                    className="size-8 rounded-lg shadow-none"
+                                    disabled={product.stock < 1 || !hasPrice}
+                                    onClick={addToCart}
+                                    aria-label={t("product.addToCart")}
+                                >
+                                    <ShoppingBag className="size-3.5" />
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -384,25 +402,45 @@ export function ProductCard({
                                         />
                                     </Button>
 
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        className="h-8 min-w-0 flex-1 rounded-lg px-2.5 text-[10px] font-black shadow-none"
-                                        disabled={
-                                            product.stock < 1 || !hasPrice
-                                        }
-                                        onClick={addToCart}
-                                        aria-label={t("product.addToCart")}
-                                    >
-                                        <ShoppingBag className="size-3.5" />
-                                        <span className="truncate">
-                                            {product.stock < 1
-                                                ? t("product.soldOut")
-                                                : hasPrice
-                                                  ? t("product.addToCart")
-                                                  : t("product.noPrice")}
-                                        </span>
-                                    </Button>
+                                    {isInCart ? (
+                                        <Button
+                                            asChild
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 min-w-0 flex-1 rounded-lg border-emerald-500/35 bg-emerald-500/10 px-2.5 text-[10px] font-black text-emerald-700 shadow-none hover:border-emerald-500/50 hover:bg-emerald-500/15 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+                                        >
+                                            <Link
+                                                viewTransition
+                                                to="/cart"
+                                                aria-label={t("product.inCart")}
+                                            >
+                                                <Check className="size-3.5" />
+                                                <span className="truncate">
+                                                    {t("product.inCart")}
+                                                </span>
+                                            </Link>
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            className="h-8 min-w-0 flex-1 rounded-lg px-2.5 text-[10px] font-black shadow-none"
+                                            disabled={
+                                                product.stock < 1 || !hasPrice
+                                            }
+                                            onClick={addToCart}
+                                            aria-label={t("product.addToCart")}
+                                        >
+                                            <ShoppingBag className="size-3.5" />
+                                            <span className="truncate">
+                                                {product.stock < 1
+                                                    ? t("product.soldOut")
+                                                    : hasPrice
+                                                      ? t("product.addToCart")
+                                                      : t("product.noPrice")}
+                                            </span>
+                                        </Button>
+                                    )}
 
                                     <Button
                                         asChild

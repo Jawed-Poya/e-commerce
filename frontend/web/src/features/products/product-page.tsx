@@ -1,5 +1,6 @@
 import {
   BellRing,
+  Check,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -19,7 +20,12 @@ import { Skeleton } from "../../shared/components/ui/skeleton";
 import { formatMoney } from "../../shared/lib/money";
 import { cn } from "../../shared/lib/utils";
 import type { ProductDetails } from "../../shared/types/product";
-import { maximumCartQuantity, minimumCartQuantity, useCart } from "../cart/cart-context";
+import {
+  cartLineKey,
+  maximumCartQuantity,
+  minimumCartQuantity,
+  useCart,
+} from "../cart/cart-context";
 import { useStoreNotifications } from "../notifications/notification-context";
 import { ProductReviews } from "../reviews/product-reviews";
 import { useI18n } from "../../i18n/i18n-provider";
@@ -168,6 +174,13 @@ export function ProductPage() {
     p.images[0];
 
   const liked = cart.wishlist.includes(p.id);
+  const selectedCartLineKey = cartLineKey(
+    p.id,
+    selectedUnit?.unitId ?? p.unitId,
+  );
+  const isInCart = cart.items.some(
+    (item) => item.lineKey === selectedCartLineKey,
+  );
   const minimumQuantity = minimumCartQuantity({ stock });
   const maximumQuantity = maximumCartQuantity({ stock });
   const canAddToCart = hasPrice && maximumQuantity >= minimumQuantity;
@@ -454,15 +467,29 @@ export function ProductPage() {
             </div>
 
             <div className="mt-6 hidden gap-3 sm:flex">
-              <Button
-                size="lg"
-                className="h-11 flex-1 rounded-lg font-bold shadow-md shadow-primary/15"
-                disabled={!canAddToCart}
-                onClick={addToCart}
-              >
-                <ShoppingBag className="size-4.5" />
-                {t("product.addToCart")}
-              </Button>
+              {isInCart ? (
+                <Button
+                  asChild
+                  size="lg"
+                  variant="outline"
+                  className="h-11 flex-1 rounded-lg border-emerald-500/35 bg-emerald-500/10 font-bold text-emerald-700 shadow-sm hover:border-emerald-500/50 hover:bg-emerald-500/15 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+                >
+                  <Link viewTransition to="/cart">
+                    <Check className="size-4.5" />
+                    {t("product.inCart")}
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  size="lg"
+                  className="h-11 flex-1 rounded-lg font-bold shadow-md shadow-primary/15"
+                  disabled={!canAddToCart}
+                  onClick={addToCart}
+                >
+                  <ShoppingBag className="size-4.5" />
+                  {t("product.addToCart")}
+                </Button>
+              )}
 
               <Button
                 size="lg"
@@ -573,15 +600,28 @@ export function ProductPage() {
             <Heart className={cn("size-4.5", liked && "fill-current")} />
           </Button>
 
-          <Button
-            type="button"
-            className="h-11 min-w-36 rounded-xl px-5 font-bold shadow-md shadow-primary/15"
-            disabled={!canAddToCart}
-            onClick={addToCart}
-          >
-            <ShoppingBag className="size-4" />
-            {t("product.addToCart")}
-          </Button>
+          {isInCart ? (
+            <Button
+              asChild
+              variant="outline"
+              className="h-11 min-w-36 rounded-xl border-emerald-500/35 bg-emerald-500/10 px-5 font-bold text-emerald-700 shadow-sm hover:border-emerald-500/50 hover:bg-emerald-500/15 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+            >
+              <Link viewTransition to="/cart">
+                <Check className="size-4" />
+                {t("product.inCart")}
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              className="h-11 min-w-36 rounded-xl px-5 font-bold shadow-md shadow-primary/15"
+              disabled={!canAddToCart}
+              onClick={addToCart}
+            >
+              <ShoppingBag className="size-4" />
+              {t("product.addToCart")}
+            </Button>
+          )}
         </div>
       </div>
       <ProductReviews productId={p.id} />
