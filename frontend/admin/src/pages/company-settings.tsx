@@ -248,26 +248,26 @@ export default function CompanySettingsPage() {
                             <Field label="Registration number"><Input value={profile.registrationNumber ?? ""} onChange={(event) => setProfile({ ...profile, registrationNumber: nullable(event.target.value) })} /></Field>
                             <Field label="Email"><Input type="email" value={profile.email ?? ""} onChange={(event) => setProfile({ ...profile, email: nullable(event.target.value) })} /></Field>
                             <Field label="Phone"><Input value={profile.phone ?? ""} onChange={(event) => setProfile({ ...profile, phone: nullable(event.target.value) })} /></Field>
-                            <section className="min-w-0 overflow-hidden border bg-muted/20 sm:col-span-2">
+                            <section className="min-w-0 overflow-hidden rounded-xl border bg-muted/20 sm:col-span-2">
                                 <div className="flex flex-col gap-3 border-b bg-background/60 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
                                     <div className="flex min-w-0 items-start gap-3">
-                                        <div className="grid size-10 shrink-0 place-items-center bg-primary/10 text-primary">
+                                        <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
                                             <MonitorSmartphone className="size-5" />
                                         </div>
                                         <div className="min-w-0">
-                                            <p className="font-semibold">Brand identity assets</p>
-                                            <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-                                                Upload the official company logo and favicon used across the storefront, admin experience, receipts, PDF documents, browser tabs, and installed app shortcuts.
+                                            <p className="text-sm font-semibold sm:text-base">Brand identity assets</p>
+                                            <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground sm:text-sm">
+                                                Manage the logo and favicon used across the app.
                                             </p>
                                         </div>
                                     </div>
-                                    <Badge variant="outline" className="w-fit shrink-0">Logo + favicon</Badge>
+                                    <Badge variant="outline" className="hidden w-fit shrink-0 sm:inline-flex">Logo + favicon</Badge>
                                 </div>
-                                <div className="grid min-w-0 gap-3 p-3 sm:p-4 lg:grid-cols-2">
+                                <div className="grid min-w-0 grid-cols-1 gap-4 p-3 sm:p-4 xl:grid-cols-2">
                                     <BrandAssetUploader
                                         assetType="logo"
                                         label="Company logo"
-                                        description="Primary company mark for storefront headers, admin branding, receipts, and generated documents. Use a transparent image when possible; recommended size 512 × 256 or larger."
+                                        description="For storefront, receipts, and documents."
                                         value={profile.logoUrl}
                                         disabled={!canManageProfile}
                                         companyName={profile.name}
@@ -275,8 +275,8 @@ export default function CompanySettingsPage() {
                                     />
                                     <BrandAssetUploader
                                         assetType="favicon"
-                                        label="Favicon and app icon"
-                                        description="Square browser and app icon used for tabs, bookmarks, shortcuts, and installed PWA surfaces. Recommended size 512 × 512 or larger."
+                                        label="Favicon"
+                                        description="For browser tabs and app shortcuts."
                                         value={profile.faviconUrl}
                                         disabled={!canManageProfile}
                                         companyName={profile.name}
@@ -614,7 +614,7 @@ function BrandAssetUploader({
         <div
             onDragOver={(event) => event.preventDefault()}
             onDrop={handleDrop}
-            className="border bg-background p-3 transition-colors hover:border-primary/35"
+            className="rounded-xl border bg-background p-4 transition-colors hover:border-primary/35"
         >
                 <input
                     ref={inputRef}
@@ -628,31 +628,37 @@ function BrandAssetUploader({
                     }}
                 />
 
-                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
-                    <div className={`grid shrink-0 place-items-center overflow-hidden border bg-muted/30 p-2 ${assetType === "favicon" ? "size-16" : "h-16 w-full sm:w-28"}`}>
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <Label className="text-sm font-semibold sm:text-base">{label}</Label>
+                        <p className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">{description}</p>
+                    </div>
+                    {value ? (
+                        <Badge variant="secondary" className="shrink-0 gap-1">
+                            <CheckCircle2 className="size-3" /> Ready
+                        </Badge>
+                    ) : (
+                        <Badge variant="outline" className="shrink-0">Empty</Badge>
+                    )}
+                </div>
+
+                <div
+                    className={`mt-4 grid place-items-center overflow-hidden rounded-lg border border-dashed bg-muted/20 p-4 ${
+                        assetType === "favicon" ? "min-h-28" : "min-h-32"
+                    }`}
+                >
+                    <div className={assetType === "favicon" ? "size-16 sm:size-20" : "h-20 w-full max-w-52 sm:h-24"}>
                         {preview ? (
                             <img src={preview} alt={`${companyName} ${label}`} className="size-full object-contain" />
                         ) : (
-                            <ImagePlus className="size-6 text-muted-foreground" />
+                            <div className="grid size-full place-items-center">
+                                <ImagePlus className="size-7 text-muted-foreground" />
+                            </div>
                         )}
                     </div>
-                    <div className="min-w-0 flex-1">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                            <div className="min-w-0">
-                                <Label className="font-semibold">{label}</Label>
-                                <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{description}</p>
-                            </div>
-                            {value ? (
-                                <Badge variant="secondary" className="shrink-0 gap-1">
-                                    <CheckCircle2 className="size-3" /> Ready
-                                </Badge>
-                            ) : (
-                                <Badge variant="outline" className="shrink-0">Empty</Badge>
-                            )}
-                        </div>
-                    </div>
                 </div>
-                <div className="mt-3 flex flex-col gap-2 border-t pt-3 sm:flex-row sm:flex-wrap sm:items-center">
+
+                <div className="mt-4 flex flex-col gap-2 border-t pt-3 sm:flex-row sm:flex-wrap sm:items-center">
                     <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" disabled={disabled || upload.isPending} onClick={() => inputRef.current?.click()}>
                         {upload.isPending ? <LoaderCircle className="animate-spin" /> : <UploadCloud />}
                         {upload.isPending ? tr("Uploading…") : tr(value ? "Replace" : "Upload")}
