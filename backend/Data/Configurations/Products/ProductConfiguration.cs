@@ -41,9 +41,19 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(x => x.DisplayStockQuantity)
             .HasPrecision(18, 3);
 
-        builder.ToTable(table => table.HasCheckConstraint(
-            "CK_Product_DisplayStockQuantity",
-            "[DisplayStockQuantity] IS NULL OR [DisplayStockQuantity] >= 0"));
+        builder.Property(x => x.OrderQuantityStep)
+            .HasPrecision(18, 3)
+            .HasDefaultValue(1m);
+
+        builder.ToTable(table =>
+        {
+            table.HasCheckConstraint(
+                "CK_Product_DisplayStockQuantity",
+                "[DisplayStockQuantity] IS NULL OR [DisplayStockQuantity] >= 0");
+            table.HasCheckConstraint(
+                "CK_Product_OrderQuantityStep",
+                "[OrderQuantityStep] > 0");
+        });
 
         builder.HasIndex(x => x.Barcode)
             .IsUnique()

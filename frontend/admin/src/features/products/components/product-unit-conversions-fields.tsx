@@ -42,6 +42,7 @@ export function createEmptyUnitConversion(
         barcode: null,
         priceOverride: null,
         oldPriceOverride: null,
+        orderQuantityStep: 1,
         isDefault: index === 0,
         isActive: true,
         sortOrder: index,
@@ -68,7 +69,9 @@ export function validateUnitConversions(
                 !unit.unitId ||
                 unit.unitId === baseUnitId ||
                 !Number.isFinite(unit.conversionFactor) ||
-                unit.conversionFactor < 1,
+                unit.conversionFactor < 1 ||
+                !Number.isFinite(unit.orderQuantityStep) ||
+                unit.orderQuantityStep <= 0,
         )
     ) {
         return "productUnits.invalidConversionError";
@@ -213,7 +216,7 @@ export function ProductUnitConversionsFields({
                         return (
                             <div
                                 key={`${unit.id ?? "new"}-${index}`}
-                                className="grid gap-3 rounded-xl bg-background/75 p-3 ring-1 ring-border/70 dark:bg-white/[0.025] dark:ring-white/[0.07] md:grid-cols-2 xl:grid-cols-4"
+                                className="grid gap-3 rounded-xl bg-background/75 p-3 ring-1 ring-border/70 dark:bg-white/[0.025] dark:ring-white/[0.07] md:grid-cols-2 xl:grid-cols-5"
                             >
                                 <Field label={t("productUnits.sellingUnit")}>
                                     <SimpleCombobox<number>
@@ -252,7 +255,29 @@ export function ProductUnitConversionsFields({
                                     />
                                 </Field>
 
+                                <Field label={t("productUnits.orderStep")}>
+                                    <Input
+                                        type="number"
+                                        min="0.001"
+                                        step="any"
+                                        disabled={disabled}
+                                        value={unit.orderQuantityStep}
+                                        onChange={(event) =>
+                                            updateUnit(index, {
+                                                orderQuantityStep:
+                                                    event.target.value === ""
+                                                        ? 0
+                                                        : Number(event.target.value),
+                                            })
+                                        }
+                                    />
+                                    <p className="text-[10px] leading-4 text-muted-foreground">
+                                        {t("productUnits.orderStepHelp")}
+                                    </p>
+                                </Field>
+
                                 <Field label={t("productUnits.barcode")}>
+
                                     <Input
                                         disabled={disabled}
                                         value={unit.barcode ?? ""}

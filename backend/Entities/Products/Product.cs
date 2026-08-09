@@ -25,6 +25,12 @@ public class Product : BaseEntity
     public int? MaximumValue { get; set; }
 
     /// <summary>
+    /// Quantity changed by one storefront + / - action for the base selling unit.
+    /// Keep at 1 for normal retail, or use values such as 20, 30, or 50 for case/wholesale ordering.
+    /// </summary>
+    public decimal OrderQuantityStep { get; set; } = 1;
+
+    /// <summary>
     /// Uses a storefront-only quantity that never reserves or reduces physical inventory.
     /// Useful for supplier-backed, made-to-order, or display catalog products.
     /// </summary>

@@ -129,6 +129,7 @@ public sealed class OrderService(
             {
                 var product = productById[requested.ProductId];
                 var selectedUnit = ResolveSelectedUnit(product, requested.UnitId);
+                ValidateOrderQuantityStep(product.Name, selectedUnit.UnitName, requested.Quantity, selectedUnit.OrderQuantityStep);
                 var baseQuantity = decimal.Round(requested.Quantity * selectedUnit.ConversionFactor, 3);
                 if (baseQuantity <= 0)
                     throw new InvalidOperationException("Product quantities must be greater than zero.");
@@ -957,11 +958,11 @@ public sealed class OrderService(
         {
             if (requestedUnitId.HasValue)
                 throw new InvalidOperationException($"A base unit is not configured for '{product.Name}'.");
-            return new SelectedProductUnit(null, "Unit", 1, product.Barcode, null);
+            return new SelectedProductUnit(null, "Unit", 1, product.Barcode, null, product.OrderQuantityStep <= 0 ? 1 : product.OrderQuantityStep);
         }
 
         if (!requestedUnitId.HasValue || requestedUnitId.Value == product.UnitId.Value)
-            return new SelectedProductUnit(product.UnitId, product.Unit.Name, 1, product.Barcode, null);
+            return new SelectedProductUnit(product.UnitId, product.Unit.Name, 1, product.Barcode, null, product.OrderQuantityStep <= 0 ? 1 : product.OrderQuantityStep);
 
         var conversion = product.UnitConversions.FirstOrDefault(item =>
             item.UnitId == requestedUnitId.Value && item.IsActive);
@@ -973,7 +974,8 @@ public sealed class OrderService(
             conversion.Unit.Name,
             conversion.ConversionFactor,
             conversion.Barcode,
-            conversion.PriceOverride);
+            conversion.PriceOverride,
+            conversion.OrderQuantityStep <= 0 ? 1 : conversion.OrderQuantityStep);
     }
 
     private sealed record SelectedProductUnit(
@@ -981,7 +983,22 @@ public sealed class OrderService(
         string UnitName,
         decimal ConversionFactor,
         string? Barcode,
-        decimal? PriceOverride);
+        decimal? PriceOverride,
+        decimal OrderQuantityStep);
+
+    private static void ValidateOrderQuantityStep(
+        string productName,
+        string unitName,
+        decimal quantity,
+        decimal step)
+    {
+        var normalizedStep = step <= 0 ? 1 : step;
+        if (quantity < normalizedStep || decimal.Remainder(quantity, normalizedStep) != 0)
+        {
+            throw new InvalidOperationException(
+                $"'{productName}' must be ordered in increments of {normalizedStep:N3} {unitName}. Adjust the cart quantity and try again.");
+        }
+    }
 
     private static decimal? ResolveEffectivePrice(
         Product product,

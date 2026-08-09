@@ -83,6 +83,8 @@ function createProductsFormData(request: CreateBulkProductsRequest): FormData {
             product.maximumValue,
         );
 
+        formData.append(`${prefix}.OrderQuantityStep`, String(product.orderQuantityStep));
+
         appendOptionalValue(
             formData,
             `${prefix}.MinimumStockQuantity`,
@@ -132,6 +134,7 @@ function createProductsFormData(request: CreateBulkProductsRequest): FormData {
                 `${unitPrefix}.OldPriceOverride`,
                 unit.oldPriceOverride,
             );
+            formData.append(`${unitPrefix}.OrderQuantityStep`, String(unit.orderQuantityStep));
             formData.append(`${unitPrefix}.IsDefault`, String(unit.isDefault));
             formData.append(`${unitPrefix}.IsActive`, String(unit.isActive));
             formData.append(`${unitPrefix}.SortOrder`, String(unit.sortOrder));

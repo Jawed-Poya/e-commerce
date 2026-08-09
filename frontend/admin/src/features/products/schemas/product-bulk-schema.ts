@@ -67,6 +67,10 @@ export const ProductBulkItemSchema = z
             .nonnegative("Maximum value cannot be negative.")
             .nullable(),
 
+        orderQuantityStep: z
+            .number()
+            .positive("Cart quantity step must be greater than zero."),
+
         minimumStockQuantity: z
             .number()
             .nonnegative("Minimum stock quantity cannot be negative."),
@@ -98,6 +102,7 @@ export const ProductBulkItemSchema = z
                 barcode: z.string().max(100).nullable(),
                 priceOverride: z.number().nullable(),
                 oldPriceOverride: z.number().nullable(),
+                orderQuantityStep: z.number().positive(),
                 isDefault: z.boolean(),
                 isActive: z.boolean(),
                 sortOrder: z.number().int().nonnegative(),

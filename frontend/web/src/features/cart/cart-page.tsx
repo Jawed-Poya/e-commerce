@@ -150,7 +150,10 @@ export function CartPage() {
                                         >
                                             {item.name}
                                         </Link>
-                                        {item.unitName ? <span className="mt-1 inline-flex w-fit rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-[10px] font-bold text-primary">{formatNumber(item.quantity)} {item.unitName}</span> : null}
+                                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                            {item.unitName ? <span className="inline-flex w-fit rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-[10px] font-bold text-primary">{formatNumber(item.quantity)} {item.unitName}</span> : null}
+                                            {cartQuantityStep(item) > 1 ? <span className="inline-flex w-fit rounded-full border border-primary/10 bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">{t("cart.quantityStep", { count: formatNumber(cartQuantityStep(item)) })}</span> : null}
+                                        </div>
 
                                         <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
                                             {formatMoney(item.price)} {item.unitName ? `/ ${item.unitName}` : t("cart.each")}

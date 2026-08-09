@@ -11,6 +11,7 @@ public sealed class ProductUnitConversionConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.ConversionFactor).HasPrecision(18, 6);
         builder.Property(x => x.PriceOverride).HasPrecision(18, 2);
         builder.Property(x => x.OldPriceOverride).HasPrecision(18, 2);
+        builder.Property(x => x.OrderQuantityStep).HasPrecision(18, 3).HasDefaultValue(1m);
         builder.Property(x => x.Barcode).HasMaxLength(100);
         builder.Property(x => x.IsActive).HasDefaultValue(true);
 
@@ -22,6 +23,9 @@ public sealed class ProductUnitConversionConfiguration : IEntityTypeConfiguratio
             table.HasCheckConstraint(
                 "CK_ProductUnitConversion_Prices",
                 "[PriceOverride] IS NULL OR ([PriceOverride] >= 0 AND ([OldPriceOverride] IS NULL OR [OldPriceOverride] >= [PriceOverride]))");
+            table.HasCheckConstraint(
+                "CK_ProductUnitConversion_OrderQuantityStep",
+                "[OrderQuantityStep] > 0");
             table.HasCheckConstraint(
                 "CK_ProductUnitConversion_DefaultActive",
                 "[IsDefault] = 0 OR [IsActive] = 1");

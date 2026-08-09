@@ -1,6 +1,5 @@
 import {
   BellRing,
-  Check,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -28,6 +27,7 @@ import {
 } from "../cart/cart-context";
 import { useStoreNotifications } from "../notifications/notification-context";
 import { ProductReviews } from "../reviews/product-reviews";
+import { CartQuantityControl } from "../cart/cart-quantity-control";
 import { useI18n } from "../../i18n/i18n-provider";
 import { useCompany } from "../company/company-context";
 
@@ -149,6 +149,7 @@ export function ProductPage() {
         barcode: p.barcode,
         priceOverride: null,
         oldPriceOverride: null,
+        orderQuantityStep: p.orderQuantityStep || 1,
         isBaseUnit: true,
         isDefault: true,
         isActive: true,
@@ -178,11 +179,12 @@ export function ProductPage() {
     p.id,
     selectedUnit?.unitId ?? p.unitId,
   );
-  const isInCart = cart.items.some(
+  const cartItem = cart.items.find(
     (item) => item.lineKey === selectedCartLineKey,
   );
-  const minimumQuantity = minimumCartQuantity({ stock });
-  const maximumQuantity = maximumCartQuantity({ stock });
+  const quantityStep = selectedUnit?.orderQuantityStep || p.orderQuantityStep || 1;
+  const minimumQuantity = minimumCartQuantity({ stock, quantityStep });
+  const maximumQuantity = maximumCartQuantity({ stock, quantityStep });
   const canAddToCart = hasPrice && maximumQuantity >= minimumQuantity;
   const notificationLabel =
     notificationPermission === "granted"
@@ -203,6 +205,7 @@ export function ProductPage() {
       unitId: selectedUnit?.unitId ?? p.unitId,
       unitName: selectedUnit?.unitName ?? p.unitName,
       conversionFactor: factor,
+      quantityStep,
       slug: p.slug,
       minimumValue: null,
       maximumValue: null,
@@ -424,6 +427,11 @@ export function ProductPage() {
                       <span className="block text-sm font-black">{unit.unitName}</span>
                       <span className="mt-1 block text-[10px] text-muted-foreground">{unit.isBaseUnit ? t("product.baseInventoryUnit") : t("product.unitEquation", { unit: unit.unitName, factor: unit.conversionFactor, baseUnit: p.unitName ?? t("product.unit") })}</span>
                       <span className="mt-2 block text-xs font-bold text-primary">{unit.price != null ? formatMoney(unit.price) : t("product.noPrice")}</span>
+                      {unit.orderQuantityStep > 1 ? (
+                        <Badge variant="secondary" className="mt-2 h-5 border border-primary/15 bg-primary/[0.06] px-1.5 text-[9px] font-black text-primary">
+                          {t("cart.quantityStep", { count: unit.orderQuantityStep })}
+                        </Badge>
+                      ) : null}
                     </button>
                   ))}
                 </div>
@@ -467,18 +475,11 @@ export function ProductPage() {
             </div>
 
             <div className="mt-6 hidden gap-3 sm:flex">
-              {isInCart ? (
-                <Button
-                  asChild
-                  size="lg"
-                  variant="outline"
-                  className="h-11 flex-1 rounded-lg border-emerald-500/35 bg-emerald-500/10 font-bold text-emerald-700 shadow-sm hover:border-emerald-500/50 hover:bg-emerald-500/15 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
-                >
-                  <Link viewTransition to="/cart">
-                    <Check className="size-4.5" />
-                    {t("product.inCart")}
-                  </Link>
-                </Button>
+              {cartItem ? (
+                <CartQuantityControl
+                  item={cartItem}
+                  className="min-w-0 flex-1"
+                />
               ) : (
                 <Button
                   size="lg"
@@ -600,17 +601,11 @@ export function ProductPage() {
             <Heart className={cn("size-4.5", liked && "fill-current")} />
           </Button>
 
-          {isInCart ? (
-            <Button
-              asChild
-              variant="outline"
-              className="h-11 min-w-36 rounded-xl border-emerald-500/35 bg-emerald-500/10 px-5 font-bold text-emerald-700 shadow-sm hover:border-emerald-500/50 hover:bg-emerald-500/15 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
-            >
-              <Link viewTransition to="/cart">
-                <Check className="size-4" />
-                {t("product.inCart")}
-              </Link>
-            </Button>
+          {cartItem ? (
+            <CartQuantityControl
+              item={cartItem}
+              className="ms-auto"
+            />
           ) : (
             <Button
               type="button"

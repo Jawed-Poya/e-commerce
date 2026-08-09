@@ -17,6 +17,7 @@ export interface CartProduct {
   unitId?: number | null;
   unitName?: string | null;
   conversionFactor?: number;
+  quantityStep?: number;
   minimumValue?: number | null;
   maximumValue?: number | null;
 }
@@ -52,29 +53,41 @@ export function cartLineKey(productId: number, unitId?: number | null) {
   return `${productId}:${unitId ?? "base"}`;
 }
 
-type QuantityLimitedProduct = Pick<CartProduct, "stock" | "minimumValue" | "maximumValue">;
+type QuantityLimitedProduct = Pick<CartProduct, "stock" | "quantityStep" | "minimumValue" | "maximumValue">;
 
-export function minimumCartQuantity(_product: QuantityLimitedProduct) {
-  return 1;
-}
-
-export function maximumCartQuantity(product: QuantityLimitedProduct) {
-  return Math.max(0, product.stock);
+function roundCartQuantity(value: number) {
+  return Math.round((value + Number.EPSILON) * 1000) / 1000;
 }
 
 export function cartQuantityStep(product: QuantityLimitedProduct) {
-  const minimum = minimumCartQuantity(product);
-  return minimum < 1 ? minimum : 1;
+  const configured = Number(product.quantityStep ?? 1);
+  return Number.isFinite(configured) && configured > 0
+    ? roundCartQuantity(configured)
+    : 1;
+}
+
+export function minimumCartQuantity(product: QuantityLimitedProduct) {
+  return cartQuantityStep(product);
+}
+
+export function maximumCartQuantity(product: QuantityLimitedProduct) {
+  const stock = Math.max(0, Number(product.stock) || 0);
+  const step = cartQuantityStep(product);
+  if (stock < step) return 0;
+  return roundCartQuantity(Math.floor((stock + Number.EPSILON) / step) * step);
 }
 
 export function normalizeCartQuantity(product: QuantityLimitedProduct, quantity: number) {
   const minimum = minimumCartQuantity(product);
   const maximum = maximumCartQuantity(product);
+  const step = cartQuantityStep(product);
   if (maximum < minimum) return 0;
   if (!Number.isFinite(quantity)) return minimum;
+  if (quantity <= 0) return 0;
 
   const bounded = Math.min(maximum, Math.max(minimum, quantity));
-  return Math.round((bounded + Number.EPSILON) * 1000) / 1000;
+  const stepped = Math.floor((bounded + Number.EPSILON) / step) * step;
+  return roundCartQuantity(Math.max(minimum, stepped));
 }
 
 function normalizeStoredItem(item: CartItem | (CartProduct & { quantity: number })) {
@@ -84,6 +97,7 @@ function normalizeStoredItem(item: CartItem | (CartProduct & { quantity: number 
     unitId,
     unitName: item.unitName ?? null,
     conversionFactor: item.conversionFactor && item.conversionFactor > 0 ? item.conversionFactor : 1,
+    quantityStep: cartQuantityStep(item),
     lineKey: "lineKey" in item && item.lineKey ? item.lineKey : cartLineKey(item.id, unitId),
     quantity: normalizeCartQuantity(item, item.quantity),
   };

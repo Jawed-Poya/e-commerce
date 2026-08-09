@@ -87,6 +87,7 @@ export default function ProductDetailsPage() {
                                 <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
                                     <Detail label="Available" value={`${formatNumber(unit.availableQuantity)} ${unit.unitName}`} />
                                     <Detail label="Price" value={money(unit.price)} />
+                                    <Detail label="Cart step" value={formatNumber(unit.orderQuantityStep)} />
                                 </div>
                                 {unit.barcode ? <p className="mt-3 truncate font-mono text-[11px] text-muted-foreground">{unit.barcode}</p> : null}
                             </div>

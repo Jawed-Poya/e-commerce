@@ -15,6 +15,7 @@ public sealed record ProductListItemResponse(
     string? UnitName,
     int? MinimumValue,
     int? MaximumValue,
+    decimal OrderQuantityStep,
     bool UsesDisplayStock,
     decimal? DisplayStockQuantity,
     bool IsFeatured,

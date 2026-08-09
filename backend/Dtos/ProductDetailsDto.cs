@@ -11,6 +11,7 @@ public sealed class ProductDetailsDto
     public string? Description { get; set; }
     public int? MinimumValue { get; set; }
     public int? MaximumValue { get; set; }
+    public decimal OrderQuantityStep { get; set; } = 1;
     public bool UsesDisplayStock { get; set; }
     public decimal? DisplayStockQuantity { get; set; }
     public decimal Stock { get; set; }

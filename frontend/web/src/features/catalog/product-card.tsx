@@ -16,7 +16,8 @@ import { formatMoney } from "../../shared/lib/money";
 import { productPath } from "../../shared/lib/product-path";
 import { cn } from "../../shared/lib/utils";
 import type { Product } from "../../shared/types/product";
-import { useCart } from "../cart/cart-context";
+import { CartQuantityControl } from "../cart/cart-quantity-control";
+import { cartLineKey, useCart } from "../cart/cart-context";
 
 type ProductCardProps = {
     product: Product;
@@ -31,10 +32,13 @@ export function ProductCard({
     const { t } = useI18n();
     const compact = density === "compact";
     const liked = cart.wishlist.includes(product.id);
-    const isInCart = cart.items.some((item) => item.id === product.id);
+    const productLineKey = cartLineKey(product.id, product.unitId);
+    const cartItem = cart.items.find((item) => item.lineKey === productLineKey);
     const primary =
         imageUrl(product.primaryImageUrl) || "/placeholder-product.svg";
     const hasPrice = product.price != null;
+    const quantityStep = product.orderQuantityStep > 0 ? product.orderQuantityStep : 1;
+    const canAddToCart = hasPrice && product.stock >= quantityStep;
     const hasDiscount =
         product.oldPrice != null &&
         product.price != null &&
@@ -57,6 +61,7 @@ export function ProductCard({
             unitId: product.unitId,
             unitName: product.unitName,
             conversionFactor: 1,
+            quantityStep,
             slug: product.slug,
             minimumValue: product.minimumValue,
             maximumValue: product.maximumValue,
@@ -157,6 +162,11 @@ export function ProductCard({
                                 </span>
                             </span>
                         ) : null}
+                        {product.orderQuantityStep > 1 ? (
+                            <span className="inline-flex shrink-0 rounded-md bg-primary/[0.08] px-1.5 py-0.5 text-primary">
+                                {t("cart.quantityStep", { count: product.orderQuantityStep })}
+                            </span>
+                        ) : null}
                     </div>
 
                     <div className="mt-auto flex items-end justify-between gap-2 pt-2">
@@ -206,27 +216,18 @@ export function ProductCard({
                                     )}
                                 />
                             </Button>
-                            {isInCart ? (
-                                <Button
-                                    asChild
-                                    variant="outline"
-                                    size="icon"
-                                    className="size-8 rounded-lg border-emerald-500/35 bg-emerald-500/10 text-emerald-700 shadow-none hover:border-emerald-500/50 hover:bg-emerald-500/15 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
-                                >
-                                    <Link
-                                        viewTransition
-                                        to="/cart"
-                                        aria-label={t("product.inCart")}
-                                    >
-                                        <Check className="size-3.5" />
-                                    </Link>
-                                </Button>
+                            {cartItem ? (
+                                <CartQuantityControl
+                                    item={cartItem}
+                                    compact
+                                    showStepBadge={false}
+                                />
                             ) : (
                                 <Button
                                     type="button"
                                     size="icon"
                                     className="size-8 rounded-lg shadow-none"
-                                    disabled={product.stock < 1 || !hasPrice}
+                                    disabled={!canAddToCart}
                                     onClick={addToCart}
                                     aria-label={t("product.addToCart")}
                                 >
@@ -366,6 +367,11 @@ export function ProductCard({
                                                 </span>
                                             </span>
                                         ) : null}
+                                        {product.orderQuantityStep > 1 ? (
+                                            <span className="inline-flex shrink-0 rounded-md bg-primary/[0.08] px-1.5 py-1 text-primary">
+                                                {t("cart.quantityStep", { count: product.orderQuantityStep })}
+                                            </span>
+                                        ) : null}
                                     </div>
 
                                     {product.strength ? (
@@ -402,38 +408,25 @@ export function ProductCard({
                                         />
                                     </Button>
 
-                                    {isInCart ? (
-                                        <Button
-                                            asChild
-                                            variant="outline"
-                                            size="sm"
-                                            className="h-8 min-w-0 flex-1 rounded-lg border-emerald-500/35 bg-emerald-500/10 px-2.5 text-[10px] font-black text-emerald-700 shadow-none hover:border-emerald-500/50 hover:bg-emerald-500/15 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
-                                        >
-                                            <Link
-                                                viewTransition
-                                                to="/cart"
-                                                aria-label={t("product.inCart")}
-                                            >
-                                                <Check className="size-3.5" />
-                                                <span className="truncate">
-                                                    {t("product.inCart")}
-                                                </span>
-                                            </Link>
-                                        </Button>
+                                    {cartItem ? (
+                                        <CartQuantityControl
+                                            item={cartItem}
+                                            compact
+                                            className="min-w-0 flex-1 justify-center"
+                                            showStepBadge={false}
+                                        />
                                     ) : (
                                         <Button
                                             type="button"
                                             size="sm"
                                             className="h-8 min-w-0 flex-1 rounded-lg px-2.5 text-[10px] font-black shadow-none"
-                                            disabled={
-                                                product.stock < 1 || !hasPrice
-                                            }
+                                            disabled={!canAddToCart}
                                             onClick={addToCart}
                                             aria-label={t("product.addToCart")}
                                         >
                                             <ShoppingBag className="size-3.5" />
                                             <span className="truncate">
-                                                {product.stock < 1
+                                                {product.stock < quantityStep
                                                     ? t("product.soldOut")
                                                     : hasPrice
                                                       ? t("product.addToCart")

@@ -489,6 +489,12 @@ namespace ECommerce.Migrations
                     b.Property<int?>("MinimumValue")
                         .HasColumnType("int");
 
+                    b.Property<decimal>("OrderQuantityStep")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasDefaultValue(1m);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -535,6 +541,7 @@ namespace ECommerce.Migrations
                     b.ToTable("Products", t =>
                         {
                             t.HasCheckConstraint("CK_Product_DisplayStockQuantity", "[DisplayStockQuantity] IS NULL OR [DisplayStockQuantity] >= 0");
+                            t.HasCheckConstraint("CK_Product_OrderQuantityStep", "[OrderQuantityStep] > 0");
                         });
                 });
 
@@ -578,6 +585,12 @@ namespace ECommerce.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal>("OrderQuantityStep")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasDefaultValue(1m);
+
                     b.Property<decimal?>("PriceOverride")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -620,6 +633,7 @@ namespace ECommerce.Migrations
                         {
                             t.HasCheckConstraint("CK_ProductUnitConversion_Factor", "[ConversionFactor] >= 1");
                             t.HasCheckConstraint("CK_ProductUnitConversion_Prices", "[PriceOverride] IS NULL OR ([PriceOverride] >= 0 AND ([OldPriceOverride] IS NULL OR [OldPriceOverride] >= [PriceOverride]))");
+                            t.HasCheckConstraint("CK_ProductUnitConversion_OrderQuantityStep", "[OrderQuantityStep] > 0");
                             t.HasCheckConstraint("CK_ProductUnitConversion_DefaultActive", "[IsDefault] = 0 OR [IsActive] = 1");
                         });
                 });

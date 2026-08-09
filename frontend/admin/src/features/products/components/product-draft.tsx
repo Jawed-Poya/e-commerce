@@ -351,7 +351,7 @@ export function ProductDraftCard({
                         )}
                     />
 
-                    <div className="grid gap-4 md:grid-cols-3">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <div className="space-y-1.5">
                             <Label>{t("form.minimum")}</Label>
 
@@ -412,6 +412,27 @@ export function ProductDraftCard({
                             <FieldError
                                 message={productErrors?.maximumValue?.message}
                             />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label>{t("productUnits.baseOrderStep")}</Label>
+                            <Controller
+                                control={control}
+                                name={`products.${index}.orderQuantityStep`}
+                                render={({ field }) => (
+                                    <Input
+                                        type="number"
+                                        min="0.001"
+                                        step="any"
+                                        disabled={disabled}
+                                        value={field.value}
+                                        onChange={(event) =>
+                                            field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                                        }
+                                    />
+                                )}
+                            />
+                            <FieldError message={productErrors?.orderQuantityStep?.message} />
                         </div>
 
                         <div className="space-y-1.5">

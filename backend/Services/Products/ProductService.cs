@@ -175,6 +175,7 @@ public class ProductService : IProductService
             UnitName = product.Unit == null ? null : product.Unit.Name,
             MinimumValue = product.MinimumValue,
             MaximumValue = product.MaximumValue,
+            OrderQuantityStep = product.OrderQuantityStep,
             UsesDisplayStock = product.UsesDisplayStock,
             DisplayStockQuantity = product.DisplayStockQuantity,
             IsFeatured = product.IsFeatured,
@@ -278,6 +279,7 @@ public class ProductService : IProductService
                 product.UnitName,
                 product.MinimumValue,
                 product.MaximumValue,
+                product.OrderQuantityStep,
                 product.UsesDisplayStock,
                 product.DisplayStockQuantity,
                 product.IsFeatured,
@@ -393,12 +395,13 @@ public class ProductService : IProductService
                 if (string.IsNullOrWhiteSpace(item.Name) ||
                     !item.UnitId.HasValue || item.UnitId.Value <= 0 ||
                     (item.MinimumValue.HasValue && item.MaximumValue.HasValue && item.MinimumValue > item.MaximumValue) ||
+                    item.OrderQuantityStep <= 0 ||
                     item.MinimumStockQuantity < 0 ||
                     (item.UsesDisplayStock && !item.DisplayStockQuantity.HasValue) ||
                     (item.DisplayStockQuantity.HasValue && item.DisplayStockQuantity < 0))
                     throw new ProductValidationException(new Dictionary<string, string[]>
                     {
-                        ["Products"] = ["Names and base inventory units are required, maximum value must be at least minimum value, minimum stock cannot be negative, and display stock requires a non-negative customer-visible quantity."]
+                        ["Products"] = ["Names and base inventory units are required, maximum value must be at least minimum value, order quantity step must be greater than zero, minimum stock cannot be negative, and display stock requires a non-negative customer-visible quantity."]
                     });
 
                 ValidateUnitConversions(item.UnitId, item.UnitConversions, $"Products[{item.Id}].UnitConversions");
@@ -415,6 +418,7 @@ public class ProductService : IProductService
                 product.UnitId = item.UnitId;
                 product.MinimumValue = item.MinimumValue;
                 product.MaximumValue = item.MaximumValue;
+                product.OrderQuantityStep = item.OrderQuantityStep;
                 product.UsesDisplayStock = item.UsesDisplayStock;
                 product.DisplayStockQuantity = item.UsesDisplayStock
                     ? item.DisplayStockQuantity ?? 0
@@ -593,6 +597,7 @@ public class ProductService : IProductService
                 product.Barcode,
                 null,
                 null,
+                product.OrderQuantityStep <= 0 ? 1 : product.OrderQuantityStep,
                 true,
                 activeConversions.All(conversion => !conversion.IsDefault),
                 true,
@@ -616,6 +621,7 @@ public class ProductService : IProductService
                 conversion.Barcode,
                 conversion.PriceOverride,
                 conversion.OldPriceOverride,
+                conversion.OrderQuantityStep <= 0 ? 1 : conversion.OrderQuantityStep,
                 false,
                 conversion.IsDefault,
                 conversion.IsActive,
@@ -636,6 +642,7 @@ public class ProductService : IProductService
             Slug = product.Slug,
             MinimumValue = product.MinimumValue,
             MaximumValue = product.MaximumValue,
+            OrderQuantityStep = product.OrderQuantityStep,
             UsesDisplayStock = product.UsesDisplayStock,
             DisplayStockQuantity = product.DisplayStockQuantity,
             InventoryStock = physicalAvailableQuantity,
@@ -758,6 +765,7 @@ public class ProductService : IProductService
 
         entity.MinimumValue = model.MinimumValue;
         entity.MaximumValue = model.MaximumValue;
+        entity.OrderQuantityStep = model.OrderQuantityStep <= 0 ? 1 : model.OrderQuantityStep;
         entity.UsesDisplayStock = model.UsesDisplayStock;
         entity.DisplayStockQuantity = model.UsesDisplayStock
             ? model.DisplayStockQuantity ?? 0
@@ -904,6 +912,7 @@ public class ProductService : IProductService
                         item.Request.MinimumValue,
                     MaximumValue =
                         item.Request.MaximumValue,
+                    OrderQuantityStep = item.Request.OrderQuantityStep,
                     UsesDisplayStock = item.Request.UsesDisplayStock,
                     DisplayStockQuantity = item.Request.UsesDisplayStock
                         ? item.Request.DisplayStockQuantity ?? 0
@@ -1294,6 +1303,7 @@ public class ProductService : IProductService
         Barcode = NormalizeOptional(conversion.Barcode),
         PriceOverride = conversion.PriceOverride,
         OldPriceOverride = conversion.OldPriceOverride,
+        OrderQuantityStep = conversion.OrderQuantityStep,
         IsDefault = conversion.IsDefault,
         IsActive = conversion.IsActive,
         SortOrder = conversion.SortOrder
@@ -1333,6 +1343,7 @@ public class ProductService : IProductService
             existing.Barcode = NormalizeOptional(request.Barcode);
             existing.PriceOverride = request.PriceOverride;
             existing.OldPriceOverride = request.OldPriceOverride;
+            existing.OrderQuantityStep = request.OrderQuantityStep;
             existing.IsDefault = request.IsDefault;
             existing.IsActive = request.IsActive;
             existing.SortOrder = request.SortOrder;
@@ -1358,8 +1369,8 @@ public class ProductService : IProductService
             throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["The storefront default selling unit must be active."] });
         foreach (var item in conversions)
         {
-            if (item.UnitId <= 0 || item.ConversionFactor < 1)
-                throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Every selling unit requires a valid unit and a conversion factor of at least one base unit."] });
+            if (item.UnitId <= 0 || item.ConversionFactor < 1 || item.OrderQuantityStep <= 0)
+                throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Every selling unit requires a valid unit, a conversion factor of at least one base unit, and an order quantity step greater than zero."] });
             if (item.PriceOverride < 0 || item.OldPriceOverride < 0 ||
                 (item.PriceOverride.HasValue && item.OldPriceOverride.HasValue && item.OldPriceOverride < item.PriceOverride))
                 throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Unit prices cannot be negative and old price cannot be lower than the selling price."] });
@@ -1416,6 +1427,7 @@ public class ProductService : IProductService
         public string? UnitName { get; init; }
         public int? MinimumValue { get; init; }
         public int? MaximumValue { get; init; }
+        public decimal OrderQuantityStep { get; init; }
         public bool UsesDisplayStock { get; init; }
         public decimal? DisplayStockQuantity { get; init; }
         public bool IsFeatured { get; init; }
@@ -1501,6 +1513,15 @@ public class ProductService : IProductService
                     errors,
                     $"Products[{index}].MaximumValue",
                     "Maximum value must be greater than or equal to minimum value."
+                );
+            }
+
+            if (product.OrderQuantityStep <= 0)
+            {
+                AddError(
+                    errors,
+                    $"Products[{index}].OrderQuantityStep",
+                    "Order quantity step must be greater than zero."
                 );
             }
 

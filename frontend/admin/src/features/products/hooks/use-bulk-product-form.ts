@@ -64,6 +64,7 @@ function createProductDraft(file: File): ProductBulkItemFormValues {
 
         minimumValue: null,
         maximumValue: null,
+        orderQuantityStep: 1,
         minimumStockQuantity: 0,
         usesDisplayStock: false,
         displayStockQuantity: null,
