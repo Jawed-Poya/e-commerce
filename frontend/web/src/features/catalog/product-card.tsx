@@ -217,39 +217,66 @@ export function ProductCard({
                             </p>
                         </div>
 
-                        <div className="mt-2 flex min-w-0 items-start gap-1.5">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                onClick={() => cart.toggleWishlist(product.id)}
-                                className={cn(
-                                    "size-8 shrink-0 rounded-lg shadow-none",
-                                    liked &&
-                                        "border-brand-orange/30 bg-brand-orange text-white hover:bg-brand-orange/90 hover:text-white",
-                                )}
-                                aria-label={
-                                    liked
-                                        ? t("wishlist.remove")
-                                        : t("wishlist.add")
-                                }
-                            >
-                                <Heart
-                                    className={cn(
-                                        "size-3.5",
-                                        liked && "fill-current",
-                                    )}
-                                />
-                            </Button>
-                            {cartItem && canAddToCart ? (
+                        {cartItem && canAddToCart ? (
+                            <div className="mt-2 rounded-xl border border-primary/12 bg-primary/[0.025] p-1.5 shadow-sm">
                                 <CartQuantityControl
                                     item={liveCartItem!}
                                     compact
-                                    className="min-w-0 flex-1"
+                                    className="w-full"
                                     showStepBadge={false}
                                     showQuickQuantities
                                 />
-                            ) : (
+                                <div className="mt-1.5 flex justify-end">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => cart.toggleWishlist(product.id)}
+                                        className={cn(
+                                            "size-7 rounded-lg text-muted-foreground shadow-none hover:bg-background hover:text-foreground",
+                                            liked &&
+                                                "bg-brand-orange text-white hover:bg-brand-orange/90 hover:text-white",
+                                        )}
+                                        aria-label={
+                                            liked
+                                                ? t("wishlist.remove")
+                                                : t("wishlist.add")
+                                        }
+                                    >
+                                        <Heart
+                                            className={cn(
+                                                "size-3.5",
+                                                liked && "fill-current",
+                                            )}
+                                        />
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="mt-2 flex min-w-0 items-center gap-1.5">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => cart.toggleWishlist(product.id)}
+                                    className={cn(
+                                        "size-8 shrink-0 rounded-lg shadow-none",
+                                        liked &&
+                                            "border-brand-orange/30 bg-brand-orange text-white hover:bg-brand-orange/90 hover:text-white",
+                                    )}
+                                    aria-label={
+                                        liked
+                                            ? t("wishlist.remove")
+                                            : t("wishlist.add")
+                                    }
+                                >
+                                    <Heart
+                                        className={cn(
+                                            "size-3.5",
+                                            liked && "fill-current",
+                                        )}
+                                    />
+                                </Button>
                                 <Button
                                     type="button"
                                     size="icon"
@@ -260,8 +287,8 @@ export function ProductCard({
                                 >
                                     <ShoppingBag className="size-3.5" />
                                 </Button>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </article>
@@ -369,8 +396,8 @@ export function ProductCard({
                         </div>
                     </div>
 
-                    <div className="grid grid-rows-[0fr] opacity-0 transition-[grid-template-rows,opacity,margin] duration-300 ease-out group-hover:mt-2 group-hover:grid-rows-[1fr] group-hover:opacity-100 group-focus-within:mt-2 group-focus-within:grid-rows-[1fr] group-focus-within:opacity-100">
-                        <div className="overflow-hidden">
+                    <div className="max-h-0 overflow-hidden opacity-0 transition-[max-height,opacity,margin] duration-300 ease-out group-hover:mt-2 group-hover:max-h-56 group-hover:opacity-100 group-focus-within:mt-2 group-focus-within:max-h-56 group-focus-within:opacity-100">
+                        <div>
                             <div className="border-t border-border/70 pt-2 dark:border-white/[0.07]">
                                 <div className="flex min-w-0 items-center justify-between gap-2">
                                     <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[9px] font-bold">
@@ -412,42 +439,82 @@ export function ProductCard({
                                     ) : null}
                                 </div>
 
-                                <div className="mt-2 flex items-center gap-1.5">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        onClick={() =>
-                                            cart.toggleWishlist(product.id)
-                                        }
-                                        className={cn(
-                                            "size-8 rounded-lg bg-background/70 shadow-none",
-                                            liked &&
-                                                "border-brand-orange/30 bg-brand-orange text-white hover:bg-brand-orange/90 hover:text-white",
-                                        )}
-                                        aria-label={
-                                            liked
-                                                ? t("wishlist.remove")
-                                                : t("wishlist.add")
-                                        }
-                                    >
-                                        <Heart
-                                            className={cn(
-                                                "size-3.5",
-                                                liked && "fill-current",
-                                            )}
-                                        />
-                                    </Button>
-
-                                    {cartItem && canAddToCart ? (
+                                {cartItem && canAddToCart ? (
+                                    <div className="mt-2 rounded-xl border border-primary/12 bg-primary/[0.035] p-2 shadow-sm ring-1 ring-primary/[0.025]">
                                         <CartQuantityControl
                                             item={liveCartItem!}
                                             compact
-                                            className="min-w-0 flex-1 justify-center"
+                                            className="w-full"
                                             showStepBadge={false}
                                             showQuickQuantities
                                         />
-                                    ) : (
+                                        <div className="mt-1.5 flex items-center justify-between gap-2 border-t border-primary/10 pt-1.5">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => cart.toggleWishlist(product.id)}
+                                                className={cn(
+                                                    "h-7 rounded-lg px-2 text-[9px] font-bold text-muted-foreground shadow-none hover:bg-background hover:text-foreground",
+                                                    liked &&
+                                                        "bg-brand-orange text-white hover:bg-brand-orange/90 hover:text-white",
+                                                )}
+                                                aria-label={
+                                                    liked
+                                                        ? t("wishlist.remove")
+                                                        : t("wishlist.add")
+                                                }
+                                            >
+                                                <Heart className={cn("size-3", liked && "fill-current")} />
+                                                <span className="hidden lg:inline">
+                                                    {liked ? t("wishlist.remove") : t("wishlist.add")}
+                                                </span>
+                                            </Button>
+
+                                            <Button
+                                                asChild
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 rounded-lg px-2 text-[9px] font-bold text-primary shadow-none hover:bg-background hover:text-primary"
+                                            >
+                                                <Link
+                                                    viewTransition
+                                                    to={productPath(product)}
+                                                    aria-label={`View ${product.name}`}
+                                                >
+                                                    <span>{t("product.details")}</span>
+                                                    <ArrowUpRight className="size-3" />
+                                                </Link>
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="mt-2 flex items-center gap-1.5">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={() => cart.toggleWishlist(product.id)}
+                                            className={cn(
+                                                "size-8 rounded-lg bg-background/70 shadow-none",
+                                                liked &&
+                                                    "border-brand-orange/30 bg-brand-orange text-white hover:bg-brand-orange/90 hover:text-white",
+                                            )}
+                                            aria-label={
+                                                liked
+                                                    ? t("wishlist.remove")
+                                                    : t("wishlist.add")
+                                            }
+                                        >
+                                            <Heart
+                                                className={cn(
+                                                    "size-3.5",
+                                                    liked && "fill-current",
+                                                )}
+                                            />
+                                        </Button>
+
                                         <Button
                                             type="button"
                                             size="sm"
@@ -465,24 +532,24 @@ export function ProductCard({
                                                       : t("product.noPrice")}
                                             </span>
                                         </Button>
-                                    )}
 
-                                    <Button
-                                        asChild
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        className="size-8 rounded-lg bg-background/70 shadow-none"
-                                    >
-                                        <Link
-                                            viewTransition
-                                            to={productPath(product)}
-                                            aria-label={`View ${product.name}`}
+                                        <Button
+                                            asChild
+                                            type="button"
+                                            variant="outline"
+                                            size="icon"
+                                            className="size-8 rounded-lg bg-background/70 shadow-none"
                                         >
-                                            <ArrowUpRight className="size-3.5" />
-                                        </Link>
-                                    </Button>
-                                </div>
+                                            <Link
+                                                viewTransition
+                                                to={productPath(product)}
+                                                aria-label={`View ${product.name}`}
+                                            >
+                                                <ArrowUpRight className="size-3.5" />
+                                            </Link>
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
