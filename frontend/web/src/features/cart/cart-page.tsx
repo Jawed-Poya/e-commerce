@@ -1,4 +1,5 @@
 import {
+    AlertTriangle,
     ArrowRight,
     Minus,
     Plus,
@@ -15,6 +16,7 @@ import { Button } from "../../shared/components/ui/button";
 import { formatMoney } from "../../shared/lib/money";
 import { productPath } from "../../shared/lib/product-path";
 import { getCheckoutConfiguration } from "../checkout/checkout-api";
+import { getProducts } from "../catalog/catalog-api";
 import {
     cartQuantityStep,
     maximumCartQuantity,
@@ -33,6 +35,42 @@ export function CartPage() {
         queryFn: getCheckoutConfiguration,
         staleTime: 5 * 60_000,
     });
+    const productIds = Array.from(new Set(cart.items.map((item) => item.id))).sort((a, b) => a - b);
+    const availability = useQuery({
+        queryKey: ["cart-product-availability", productIds],
+        queryFn: async () => {
+            const chunks: number[][] = [];
+            for (let index = 0; index < productIds.length; index += 100) {
+                chunks.push(productIds.slice(index, index + 100));
+            }
+            const pages = await Promise.all(
+                chunks.map((ids) => getProducts({ ids, page: 1, pageSize: 100, isActive: true })),
+            );
+            return pages.flatMap((page) => page.items);
+        },
+        enabled: productIds.length > 0,
+        staleTime: 15_000,
+        refetchOnWindowFocus: true,
+    });
+    const productsById = new Map((availability.data ?? []).map((product) => [product.id, product]));
+    const availabilityReady = availability.isSuccess;
+    const currentCartItem = (item: CartItem): CartItem => {
+        if (!availabilityReady) return item;
+        const product = productsById.get(item.id);
+        if (!product) return { ...item, stock: 0 };
+        const factor = item.conversionFactor && item.conversionFactor > 0 ? item.conversionFactor : 1;
+        return { ...item, stock: Math.max(0, product.stock / factor) };
+    };
+    const availabilityIssue = (item: CartItem) => {
+        if (!availabilityReady) return null;
+        const live = currentCartItem(item);
+        const minimum = minimumCartQuantity(live);
+        const maximum = maximumCartQuantity(live);
+        if (maximum < minimum) return "unavailable" as const;
+        if (item.quantity > maximum + Number.EPSILON) return "quantity" as const;
+        return null;
+    };
+    const hasAvailabilityIssue = cart.items.some((item) => availabilityIssue(item) !== null);
 
     const subtotal = cart.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
@@ -159,6 +197,19 @@ export function CartPage() {
                                             {formatMoney(item.price)} {item.unitName ? `/ ${item.unitName}` : t("cart.each")}
                                         </p>
 
+                                        {availabilityIssue(item) ? (
+                                            <p className="mt-1.5 flex items-start gap-1.5 text-[11px] font-semibold leading-4 text-destructive sm:text-xs">
+                                                <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                                                <span>
+                                                    {availabilityIssue(item) === "unavailable"
+                                                        ? t("cart.itemUnavailable")
+                                                        : t("cart.quantityUnavailable", {
+                                                              count: maximumCartQuantity(currentCartItem(item)),
+                                                          })}
+                                                </span>
+                                            </p>
+                                        ) : null}
+
                                         <p className="mt-1.5 text-base font-black tracking-tight sm:hidden">
                                             {formatMoney(item.price * item.quantity)}
                                         </p>
@@ -171,7 +222,8 @@ export function CartPage() {
                                                     size="icon"
                                                     className="size-8 rounded-none"
                                                     disabled={
-                                                        item.quantity <= minimumCartQuantity(item)
+                                                        availabilityIssue(item) === "unavailable" ||
+                                                        item.quantity <= minimumCartQuantity(currentCartItem(item))
                                                     }
                                                     onClick={() =>
                                                         cart.updateQuantity(
@@ -185,7 +237,7 @@ export function CartPage() {
                                                 </Button>
 
                                                 <CartQuantityInput
-                                                    item={item}
+                                                    item={currentCartItem(item)}
                                                     onChange={(quantity) => cart.updateQuantity(item.lineKey, quantity)}
                                                 />
 
@@ -195,7 +247,8 @@ export function CartPage() {
                                                     size="icon"
                                                     className="size-8 rounded-none"
                                                     disabled={
-                                                        item.quantity >= maximumCartQuantity(item)
+                                                        availabilityIssue(item) !== null ||
+                                                        item.quantity >= maximumCartQuantity(currentCartItem(item))
                                                     }
                                                     onClick={() =>
                                                         cart.updateQuantity(
@@ -328,19 +381,30 @@ export function CartPage() {
                                 </div>
                             </div>
 
-                            <Button
-                                asChild
-                                className="mt-4 h-11 w-full rounded-lg font-bold shadow-md shadow-primary/15"
-                                size="lg"
-                            >
-                                <Link viewTransition to="/checkout">
-                                    {t("cart.checkout")}
-                                    <ArrowRight className="size-4 rtl:rotate-180" />
-                                </Link>
-                            </Button>
+                            {hasAvailabilityIssue ? (
+                                <Button
+                                    className="mt-4 h-11 w-full rounded-lg font-bold"
+                                    size="lg"
+                                    disabled
+                                >
+                                    <AlertTriangle className="size-4" />
+                                    {t("cart.resolveAvailability")}
+                                </Button>
+                            ) : (
+                                <Button
+                                    asChild
+                                    className="mt-4 h-11 w-full rounded-lg font-bold shadow-md shadow-primary/15"
+                                    size="lg"
+                                >
+                                    <Link viewTransition to="/checkout">
+                                        {t("cart.checkout")}
+                                        <ArrowRight className="size-4 rtl:rotate-180" />
+                                    </Link>
+                                </Button>
+                            )}
 
-                            <p className="mt-3 text-center text-xs leading-5 text-muted-foreground">
-                                {t("cart.checkoutDisclaimer")}
+                            <p className={hasAvailabilityIssue ? "mt-3 text-center text-xs leading-5 text-destructive" : "mt-3 text-center text-xs leading-5 text-muted-foreground"}>
+                                {hasAvailabilityIssue ? t("cart.stockChanged") : t("cart.checkoutDisclaimer")}
                             </p>
                         </div>
                     </aside>
@@ -365,12 +429,19 @@ export function CartPage() {
                         </p>
                     </div>
 
-                    <Button asChild className="ms-auto h-11 min-w-40 rounded-lg px-4 font-bold shadow-md shadow-primary/15">
-                        <Link viewTransition to="/checkout">
-                            {t("checkout.title")}
-                            <ArrowRight className="size-4 rtl:rotate-180" />
-                        </Link>
-                    </Button>
+                    {hasAvailabilityIssue ? (
+                        <Button disabled className="ms-auto h-11 min-w-40 rounded-lg px-4 font-bold">
+                            <AlertTriangle className="size-4" />
+                            {t("cart.resolveAvailability")}
+                        </Button>
+                    ) : (
+                        <Button asChild className="ms-auto h-11 min-w-40 rounded-lg px-4 font-bold shadow-md shadow-primary/15">
+                            <Link viewTransition to="/checkout">
+                                {t("checkout.title")}
+                                <ArrowRight className="size-4 rtl:rotate-180" />
+                            </Link>
+                        </Button>
+                    )}
                 </div>
             </div>
         </>

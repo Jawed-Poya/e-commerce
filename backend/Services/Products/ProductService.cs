@@ -92,23 +92,25 @@ public class ProductService : IProductService
         {
             products = filter.InStock.Value
                 ? products.Where(product => product.UsesDisplayStock
-                    ? (product.DisplayStockQuantity ?? 0) > 0
+                    ? (product.DisplayStockQuantity ?? 0) >= (product.OrderQuantityStep > 0 ? product.OrderQuantityStep : 1)
                     : product.Inventory != null &&
                       product.Inventory.Quantity - product.Inventory.ReservedQuantity -
                       (_context.InventoryLots
                           .Where(lot => lot.ProductId == product.Id &&
                               lot.ExpiresAt.HasValue && lot.ExpiresAt.Value < today &&
                               lot.Quantity - lot.ReservedQuantity > 0)
-                          .Sum(lot => (decimal?)(lot.Quantity - lot.ReservedQuantity)) ?? 0) > 0)
+                          .Sum(lot => (decimal?)(lot.Quantity - lot.ReservedQuantity)) ?? 0) >=
+                          (product.OrderQuantityStep > 0 ? product.OrderQuantityStep : 1))
                 : products.Where(product => product.UsesDisplayStock
-                    ? (product.DisplayStockQuantity ?? 0) <= 0
+                    ? (product.DisplayStockQuantity ?? 0) < (product.OrderQuantityStep > 0 ? product.OrderQuantityStep : 1)
                     : product.Inventory == null ||
                       product.Inventory.Quantity - product.Inventory.ReservedQuantity -
                       (_context.InventoryLots
                           .Where(lot => lot.ProductId == product.Id &&
                               lot.ExpiresAt.HasValue && lot.ExpiresAt.Value < today &&
                               lot.Quantity - lot.ReservedQuantity > 0)
-                          .Sum(lot => (decimal?)(lot.Quantity - lot.ReservedQuantity)) ?? 0) <= 0);
+                          .Sum(lot => (decimal?)(lot.Quantity - lot.ReservedQuantity)) ?? 0) <
+                          (product.OrderQuantityStep > 0 ? product.OrderQuantityStep : 1));
         }
 
         // Keep the expensive list projection (reviews, images, inventory lots and prices)

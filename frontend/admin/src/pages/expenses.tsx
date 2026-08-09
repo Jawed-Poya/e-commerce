@@ -74,7 +74,6 @@ export default function ExpensesPage() {
         setExportingPdf(true);
         try {
             await companyService.exportOperationalPdf("expenses");
-            toast.success("Expense PDF generated.");
         } catch (error) {
             toast.error(message(error));
         } finally {

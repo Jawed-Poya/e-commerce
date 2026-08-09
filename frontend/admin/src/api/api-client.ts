@@ -33,7 +33,7 @@ class ApiClient {
         return response.data;
     }
 
-    async download(url: string, params?: object): Promise<void> {
+    async download(url: string, params?: object): Promise<{ filename: string; size: number }> {
         const { blob, filename } = await this.getBlob(url, params);
         const href = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -43,6 +43,7 @@ class ApiClient {
         link.click();
         link.remove();
         window.setTimeout(() => URL.revokeObjectURL(href), 60_000);
+        return { filename, size: blob.size };
     }
 
     async createObjectUrl(url: string, params?: object): Promise<string> {
@@ -81,15 +82,17 @@ class ApiClient {
             }
             throw new Error(message);
         }
-        if (response.data.size === 0) {
-            throw new Error("The generated file was empty. Please try again.");
+        const blob = response.data instanceof Blob ? response.data : new Blob([response.data]);
+        if (blob.size === 0) {
+            throw new Error("The server returned an empty file. Please try again.");
         }
         const disposition = response.headers["content-disposition"] as string | undefined;
         const encoded = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
         const quoted = disposition?.match(/filename="?([^";]+)"?/i)?.[1];
+        const resolvedFilename = (encoded ? decodeURIComponent(encoded) : quoted)?.trim();
         return {
-            blob: response.data,
-            filename: encoded ? decodeURIComponent(encoded) : quoted || "download",
+            blob,
+            filename: resolvedFilename || "download",
         };
     }
 

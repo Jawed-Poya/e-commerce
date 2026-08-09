@@ -95,7 +95,6 @@ export default function StaffPage() {
         setExportingPdf(true);
         try {
             await companyService.exportOperationalPdf("payroll");
-            toast.success("Payroll PDF generated.");
         } catch (error) {
             toast.error(message(error));
         } finally {

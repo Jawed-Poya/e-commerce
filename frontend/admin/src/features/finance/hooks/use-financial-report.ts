@@ -89,7 +89,6 @@ export function useFinancialReport() {
                 currencyCode: filters.currencyCode || undefined,
                 search: filters.search.trim() || undefined,
             }),
-        onSuccess: () => toast.success(t("finance.salesPdfGenerated")),
         onError: (error) =>
             toast.error(getApiErrorMessage(error, t("finance.loadFailed"))),
     });

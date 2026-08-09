@@ -292,7 +292,6 @@ export default function PurchasesPage() {
         setExportingPdf(true);
         try {
             await companyService.exportOperationalPdf("purchases");
-            toast.success("Purchase PDF generated.");
         } catch (error) {
             toast.error(message(error));
         } finally {

@@ -335,7 +335,9 @@ export function GlobalSearch({
                                                     {product.name}
                                                 </span>
                                                 <span className="mt-1 block truncate text-[11px] text-muted-foreground">
-                                                    {[product.strength, product.categoryName].filter(Boolean).join(" · ")} · {product.stock} {t("product.availability")}
+                                                    {[product.strength, product.categoryName].filter(Boolean).join(" · ")} · {product.stock >= (product.orderQuantityStep > 0 ? product.orderQuantityStep : 1)
+                                                        ? `${product.stock} · ${t("product.inStock")}`
+                                                        : t("product.unavailable")}
                                                 </span>
                                             </span>
                                             <span className="shrink-0 text-sm font-black">

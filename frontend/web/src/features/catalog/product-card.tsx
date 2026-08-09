@@ -38,7 +38,8 @@ export function ProductCard({
         imageUrl(product.primaryImageUrl) || "/placeholder-product.svg";
     const hasPrice = product.price != null;
     const quantityStep = product.orderQuantityStep > 0 ? product.orderQuantityStep : 1;
-    const canAddToCart = hasPrice && product.stock >= quantityStep;
+    const hasOrderableStock = product.stock >= quantityStep;
+    const canAddToCart = hasPrice && hasOrderableStock;
     const hasDiscount =
         product.oldPrice != null &&
         product.price != null &&
@@ -68,8 +69,9 @@ export function ProductCard({
         });
     };
 
-    const stockLabel =
-        product.stock > 0 ? t("product.inStock") : t("product.unavailable");
+    const stockLabel = hasOrderableStock
+        ? t("product.inStock")
+        : t("product.unavailable");
     const displayPrice = hasPrice
         ? formatMoney(product.price!)
         : t("product.noPrice");
@@ -94,8 +96,16 @@ export function ProductCard({
                         alt={product.name}
                         loading="lazy"
                         decoding="async"
-                        className="size-full object-contain object-center p-2.5 transition duration-500 ease-out group-hover:scale-[1.025]"
+                        className={cn(
+                            "size-full object-contain object-center p-2.5 transition duration-500 ease-out group-hover:scale-[1.025]",
+                            !hasOrderableStock && "grayscale opacity-60",
+                        )}
                     />
+                    {!hasOrderableStock ? (
+                        <Badge className="absolute end-1.5 top-1.5 z-20 rounded-md border-0 bg-slate-950/85 px-1.5 py-0.5 text-[8px] font-black text-white shadow-sm backdrop-blur">
+                            {t("product.unavailable")}
+                        </Badge>
+                    ) : null}
                     {hasDiscount ? (
                         <Badge className="absolute start-1.5 top-1.5 z-20 rounded-md border-0 bg-brand-orange px-1.5 py-0.5 text-[9px] font-black text-white shadow-sm">
                             -{discount}%
@@ -144,12 +154,12 @@ export function ProductCard({
                         <span
                             className={cn(
                                 "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5",
-                                product.stock > 0
+                                hasOrderableStock
                                     ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                                     : "bg-destructive/10 text-destructive",
                             )}
                         >
-                            {product.stock > 0 ? (
+                            {hasOrderableStock ? (
                                 <Check className="size-2.5" />
                             ) : null}
                             {stockLabel}
@@ -216,7 +226,7 @@ export function ProductCard({
                                     )}
                                 />
                             </Button>
-                            {cartItem ? (
+                            {cartItem && canAddToCart ? (
                                 <CartQuantityControl
                                     item={cartItem}
                                     compact
@@ -266,9 +276,18 @@ export function ProductCard({
                         alt={product.name}
                         loading="lazy"
                         decoding="async"
-                        className="block size-full max-w-none object-cover object-center transition duration-500 ease-out group-hover:scale-[1.02]"
+                        className={cn(
+                            "block size-full max-w-none object-cover object-center transition duration-500 ease-out group-hover:scale-[1.02]",
+                            !hasOrderableStock && "grayscale opacity-60",
+                        )}
                     />
                 </div>
+
+                {!hasOrderableStock ? (
+                    <Badge className="absolute end-2.5 top-2.5 z-20 rounded-md border-0 bg-slate-950/85 px-2 py-1 text-[10px] font-black text-white shadow-sm backdrop-blur">
+                        {t("product.unavailable")}
+                    </Badge>
+                ) : null}
 
                 <div className="absolute start-2.5 top-2.5 z-20 flex max-w-[72%] flex-wrap gap-1.5">
                     {hasDiscount ? (
@@ -324,7 +343,7 @@ export function ProductCard({
                                     ? t("product.perUnit", {
                                           unit: product.unitName,
                                       })
-                                    : product.stock > 0
+                                    : hasOrderableStock
                                       ? t("product.availableCount", {
                                             count: product.stock,
                                         })
@@ -349,12 +368,12 @@ export function ProductCard({
                                         <span
                                             className={cn(
                                                 "inline-flex items-center gap-1 rounded-md px-1.5 py-1",
-                                                product.stock > 0
+                                                hasOrderableStock
                                                     ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                                                     : "bg-destructive/10 text-destructive",
                                             )}
                                         >
-                                            {product.stock > 0 ? (
+                                            {hasOrderableStock ? (
                                                 <Check className="size-2.5" />
                                             ) : null}
                                             {stockLabel}
@@ -408,7 +427,7 @@ export function ProductCard({
                                         />
                                     </Button>
 
-                                    {cartItem ? (
+                                    {cartItem && canAddToCart ? (
                                         <CartQuantityControl
                                             item={cartItem}
                                             compact
@@ -426,7 +445,7 @@ export function ProductCard({
                                         >
                                             <ShoppingBag className="size-3.5" />
                                             <span className="truncate">
-                                                {product.stock < quantityStep
+                                                {!hasOrderableStock
                                                     ? t("product.soldOut")
                                                     : hasPrice
                                                       ? t("product.addToCart")

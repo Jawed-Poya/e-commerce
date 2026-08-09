@@ -57,7 +57,7 @@ export function ProductPage() {
     enableBrowserNotifications,
   } = useStoreNotifications();
   const { t } = useI18n();
-  const productId = q.data?.id;
+  const productId = q.data?.isActive ? q.data.id : undefined;
 
   useEffect(() => {
     if (!productId) return;
@@ -74,9 +74,16 @@ export function ProductPage() {
 
   useEffect(() => {
     if (!q.data) return;
-    const preferred = q.data.unitConversions.find(unit => unit.isDefault && unit.isActive)
-      ?? q.data.unitConversions.find(unit => unit.isBaseUnit)
-      ?? q.data.unitConversions[0];
+    const activeUnits = q.data.unitConversions.filter((unit) => unit.isActive);
+    const isOrderable = (unit: (typeof activeUnits)[number]) => {
+      const step = unit.orderQuantityStep > 0 ? unit.orderQuantityStep : 1;
+      return unit.price != null && unit.availableQuantity >= step;
+    };
+    const preferred = activeUnits.find((unit) => unit.isDefault && isOrderable(unit))
+      ?? activeUnits.find(isOrderable)
+      ?? activeUnits.find((unit) => unit.isDefault)
+      ?? activeUnits.find((unit) => unit.isBaseUnit)
+      ?? activeUnits[0];
     setSelectedUnitId(preferred?.unitId ?? q.data.unitId ?? null);
   }, [q.data]);
 
@@ -110,7 +117,7 @@ export function ProductPage() {
     );
   }
 
-  if (!q.data) {
+  if (!q.data || !q.data.isActive) {
     return (
       <div className="mx-auto grid min-h-[65vh] max-w-xl place-items-center px-4 py-20 text-center">
         <div>
@@ -185,7 +192,8 @@ export function ProductPage() {
   const quantityStep = selectedUnit?.orderQuantityStep || p.orderQuantityStep || 1;
   const minimumQuantity = minimumCartQuantity({ stock, quantityStep });
   const maximumQuantity = maximumCartQuantity({ stock, quantityStep });
-  const canAddToCart = hasPrice && maximumQuantity >= minimumQuantity;
+  const hasOrderableStock = maximumQuantity >= minimumQuantity;
+  const canAddToCart = hasPrice && hasOrderableStock;
   const notificationLabel =
     notificationPermission === "granted"
       ? t("product.alertsEnabled")
@@ -261,12 +269,12 @@ export function ProductPage() {
                 <Badge
                   className={cn(
                     "rounded-full border px-3 py-1 text-[10px] font-bold shadow-md backdrop-blur",
-                    stock > 0
+                    hasOrderableStock
                       ? "border-emerald-500/20 bg-emerald-500/90 text-white"
                       : "border-white/20 bg-slate-950/80 text-white",
                   )}
                 >
-                  {stock > 0 ? t("product.inStock") : t("product.unavailable")}
+                  {hasOrderableStock ? t("product.inStock") : t("product.unavailable")}
                 </Badge>
               </div>
 
@@ -390,12 +398,12 @@ export function ProductPage() {
                 <p
                   className={cn(
                     "mt-1 text-sm font-bold",
-                    stock > 0
+                    hasOrderableStock
                       ? "text-emerald-600 dark:text-emerald-400"
                       : "text-destructive",
                   )}
                 >
-                  {stock > 0
+                  {hasOrderableStock
                     ? `${t("product.availableCount", { count: stock })}${selectedUnit?.unitName ? ` ${selectedUnit.unitName}` : ""}`
                     : t("product.soldOut")}
                 </p>
@@ -427,6 +435,16 @@ export function ProductPage() {
                       <span className="block text-sm font-black">{unit.unitName}</span>
                       <span className="mt-1 block text-[10px] text-muted-foreground">{unit.isBaseUnit ? t("product.baseInventoryUnit") : t("product.unitEquation", { unit: unit.unitName, factor: unit.conversionFactor, baseUnit: p.unitName ?? t("product.unit") })}</span>
                       <span className="mt-2 block text-xs font-bold text-primary">{unit.price != null ? formatMoney(unit.price) : t("product.noPrice")}</span>
+                      <span className={cn(
+                        "mt-2 inline-flex rounded-full px-2 py-0.5 text-[9px] font-black",
+                        unit.price != null && unit.availableQuantity >= (unit.orderQuantityStep > 0 ? unit.orderQuantityStep : 1)
+                          ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                          : "bg-destructive/10 text-destructive",
+                      )}>
+                        {unit.price != null && unit.availableQuantity >= (unit.orderQuantityStep > 0 ? unit.orderQuantityStep : 1)
+                          ? t("product.inStock")
+                          : t("product.unavailable")}
+                      </span>
                       {unit.orderQuantityStep > 1 ? (
                         <Badge variant="secondary" className="mt-2 h-5 border border-primary/15 bg-primary/[0.06] px-1.5 text-[9px] font-black text-primary">
                           {t("cart.quantityStep", { count: unit.orderQuantityStep })}
@@ -441,7 +459,7 @@ export function ProductPage() {
             <div
               className={cn(
                 "mt-5 flex items-start gap-3 rounded-2xl border p-4 sm:p-5",
-                stock > 0
+                hasOrderableStock
                   ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300"
                   : "border-destructive/20 bg-destructive/5 text-destructive",
               )}
@@ -449,7 +467,7 @@ export function ProductPage() {
               <span
                 className={cn(
                   "grid size-10 shrink-0 place-items-center rounded-xl",
-                  stock > 0 ? "bg-emerald-500/10" : "bg-destructive/10",
+                  hasOrderableStock ? "bg-emerald-500/10" : "bg-destructive/10",
                 )}
               >
                 <PackageCheck className="size-5" />
@@ -457,13 +475,13 @@ export function ProductPage() {
 
               <div>
                 <b className="block text-sm">
-                  {stock > 0
+                  {hasOrderableStock
                     ? t("product.readyToOrder")
                     : t("product.unavailable")}
                 </b>
 
                 <small className="mt-1 block leading-5 opacity-80">
-                  {stock > 0
+                  {hasOrderableStock
                     ? `${t("product.stockDescription", { count: stock })}${selectedUnit?.unitName ? ` ${selectedUnit.unitName}` : ""}`
                     : t("product.unavailableDescription")}
                 </small>
@@ -475,7 +493,7 @@ export function ProductPage() {
             </div>
 
             <div className="mt-6 hidden gap-3 sm:flex">
-              {cartItem ? (
+              {cartItem && canAddToCart ? (
                 <CartQuantityControl
                   item={cartItem}
                   className="min-w-0 flex-1"
@@ -488,7 +506,11 @@ export function ProductPage() {
                   onClick={addToCart}
                 >
                   <ShoppingBag className="size-4.5" />
-                  {t("product.addToCart")}
+                  {!hasOrderableStock
+                    ? t("product.soldOut")
+                    : hasPrice
+                      ? t("product.addToCart")
+                      : t("product.noPrice")}
                 </Button>
               )}
 
@@ -601,7 +623,7 @@ export function ProductPage() {
             <Heart className={cn("size-4.5", liked && "fill-current")} />
           </Button>
 
-          {cartItem ? (
+          {cartItem && canAddToCart ? (
             <CartQuantityControl
               item={cartItem}
               className="ms-auto"
@@ -614,7 +636,11 @@ export function ProductPage() {
               onClick={addToCart}
             >
               <ShoppingBag className="size-4" />
-              {t("product.addToCart")}
+              {!hasOrderableStock
+                ? t("product.soldOut")
+                : hasPrice
+                  ? t("product.addToCart")
+                  : t("product.noPrice")}
             </Button>
           )}
         </div>

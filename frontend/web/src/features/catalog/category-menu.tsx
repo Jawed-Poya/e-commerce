@@ -277,6 +277,8 @@ function ActiveCategory({ category }: { category: CategoryNode }) {
 
 function MegaMenuProduct({ product }: { product: Product }) {
     const { t } = useI18n();
+    const quantityStep = product.orderQuantityStep > 0 ? product.orderQuantityStep : 1;
+    const hasOrderableStock = product.stock >= quantityStep;
     const hasDiscount =
         product.oldPrice != null &&
         product.price != null &&
@@ -357,16 +359,16 @@ function MegaMenuProduct({ product }: { product: Product }) {
                                     <span
                                         className={cn(
                                             "inline-flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5",
-                                            product.stock > 0
+                                            hasOrderableStock
                                                 ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                                                 : "bg-destructive/10 text-destructive",
                                         )}
                                     >
-                                        {product.stock > 0 ? (
+                                        {hasOrderableStock ? (
                                             <Check className="size-2.5" />
                                         ) : null}
                                         <span className="truncate">
-                                            {product.stock > 0
+                                            {hasOrderableStock
                                                 ? t("product.inStock")
                                                 : t("product.unavailable")}
                                         </span>
