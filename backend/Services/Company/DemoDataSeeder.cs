@@ -7,6 +7,7 @@ using ECommerce.Entities.Common;
 using ECommerce.Entities.Operations;
 using ECommerce.Entities.Products;
 using ECommerce.Options;
+using ECommerce.Services.Orders;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -29,6 +30,7 @@ public interface IDemoDataSeeder
 public sealed class DemoDataSeeder(
     ApplicationDbContext context,
     IDatabaseMaintenanceService maintenance,
+    IOrderInventoryService orderInventory,
     IOptions<FileStorageOptions> storageOptions,
     IWebHostEnvironment environment,
     ILogger<DemoDataSeeder> logger) : IDemoDataSeeder
@@ -270,6 +272,18 @@ public sealed class DemoDataSeeder(
         context.AddRange(orders);
         context.AddRange(expenses);
         context.AddRange(staff);
+        await context.SaveChangesAsync(cancellationToken);
+
+        // Keep mutable demo orders consistent with the real checkout lifecycle.
+        // A Processing order must own a reservation so changing it to Delivered
+        // or Cancelled later can safely commit/release the exact lots.
+        foreach (var order in orders.Where(item =>
+                     item.Status is ECommerce.Entities.Orders.OrderStatus.Pending
+                         or ECommerce.Entities.Orders.OrderStatus.Confirmed
+                         or ECommerce.Entities.Orders.OrderStatus.Processing))
+        {
+            await orderInventory.ReserveAsync(order, userId: null, cancellationToken);
+        }
         await context.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(

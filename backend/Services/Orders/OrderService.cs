@@ -448,6 +448,18 @@ public sealed class OrderService(
             }
             else if (request.Status == OrderStatus.Delivered)
             {
+                // Older/demo processing orders may not have been reserved when
+                // they were created. Reserve idempotently before fulfillment so
+                // an existing reservation is kept as-is, while a missing one is
+                // repaired safely from currently sellable FEFO lots.
+                await orderInventory.ReserveAsync(
+                    order, userId, cancellationToken);
+
+                // Persist a newly-created reservation inside the same database
+                // transaction before committing it. This lets the commit step
+                // consume the exact lot movements that were just reserved.
+                await context.SaveChangesAsync(cancellationToken);
+
                 await orderInventory.CommitReservationsAsync(
                     order, userId, cancellationToken);
                 order.FulfillmentStatus = FulfillmentStatus.Fulfilled;

@@ -80,6 +80,9 @@ public sealed class OrderInventoryService(
         var existingKeys = await LoadExistingKeysAsync(
             lines.Select(line => BuildKey(order.Id, "release", line.ProductId)),
             cancellationToken);
+        var reservationKeys = await LoadExistingKeysAsync(
+            lines.Select(line => BuildKey(order.Id, "reserve", line.ProductId)),
+            cancellationToken);
         var inventories = await LoadInventoriesAsync(lines, cancellationToken);
         var reservations = await LoadReservationMovementsAsync(order.Id, cancellationToken);
         var changes = new List<InventoryAvailabilityChange>(lines.Count);
@@ -88,6 +91,14 @@ public sealed class OrderInventoryService(
         {
             var key = BuildKey(order.Id, "release", line.ProductId);
             if (existingKeys.Contains(key)) continue;
+
+            // Some legacy/demo orders were created before order reservations were
+            // recorded. Cancelling one of those orders must not release stock that
+            // belongs to another order. If this order never reserved the product,
+            // there is nothing to release.
+            var reserveKey = BuildKey(order.Id, "reserve", line.ProductId);
+            if (!reservationKeys.Contains(reserveKey))
+                continue;
 
             var inventory = GetInventory(inventories, line);
             if (inventory.ReservedQuantity < line.Quantity)
