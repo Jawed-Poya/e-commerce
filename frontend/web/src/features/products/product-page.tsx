@@ -56,7 +56,7 @@ export function ProductPage() {
     permission: notificationPermission,
     enableBrowserNotifications,
   } = useStoreNotifications();
-  const { t } = useI18n();
+  const { t, formatNumber } = useI18n();
   const productId = q.data?.isActive ? q.data.id : undefined;
 
   useEffect(() => {
