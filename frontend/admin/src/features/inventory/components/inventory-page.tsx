@@ -146,10 +146,10 @@ function InventoryOverview() {
                     </Button>)}
                 </div>
 
-                <div className="grid gap-3 md:hidden">
-                    {isLoading && <MobileMessage message={t("common.loading")} loading />}
-                    {isError && <MobileMessage message={t("inventory.loadError")} destructive />}
-                    {!isLoading && !isError && products.length === 0 && <MobileMessage message={t("inventory.empty")} />}
+                <div className="grid gap-3 sm:grid-cols-2 xl:hidden">
+                    {isLoading && <div className="sm:col-span-2"><MobileMessage message={t("common.loading")} loading /></div>}
+                    {isError && <div className="sm:col-span-2"><MobileMessage message={t("inventory.loadError")} destructive /></div>}
+                    {!isLoading && !isError && products.length === 0 && <div className="sm:col-span-2"><MobileMessage message={t("inventory.empty")} /></div>}
                     {products.map(item => <div key={item.productId} className="rounded-xl border bg-background p-4">
                         <div className="flex items-start gap-3">
                             {resolveProductImageUrl(item.primaryImageUrl) ? <img src={resolveProductImageUrl(item.primaryImageUrl)!} alt="" className="size-12 shrink-0 rounded-lg border bg-muted object-cover" /> : <div className="flex size-12 shrink-0 items-center justify-center rounded-lg border bg-muted"><Boxes className="size-4 text-muted-foreground" /></div>}
@@ -166,8 +166,8 @@ function InventoryOverview() {
                     </div>)}
                 </div>
 
-                <div className="responsive-table hidden border md:block">
-                    <Table>
+                <div className="hidden min-w-0 max-w-full overflow-hidden border xl:block">
+                    <Table className="min-w-[1180px]">
                         <TableHeader><TableRow>
                             <TableHead className="min-w-64">{t("products.product")}</TableHead>
                             <TableHead>{t("inventory.stockStatus")}</TableHead>
@@ -255,7 +255,7 @@ function InventoryTransactions() {
                 </article>)}
             </div>
 
-            <div className="responsive-table hidden min-w-0 overflow-x-auto rounded-xl border xl:block"><Table className="min-w-[1180px]">
+            <div className="hidden min-w-0 max-w-full overflow-hidden rounded-xl border xl:block"><Table className="min-w-[1180px]">
                 <TableHeader><TableRow><TableHead>{t("inventory.date")}</TableHead><TableHead className="min-w-56">{t("products.product")}</TableHead><TableHead>{t("inventory.movementType")}</TableHead><TableHead className="min-w-60">{t("inventory.lotBatch")}</TableHead><TableHead className="text-end">{t("inventory.change")}</TableHead><TableHead className="text-end">{t("inventory.beforeAfter")}</TableHead><TableHead className="min-w-52">{t("inventory.note")}</TableHead><TableHead /></TableRow></TableHeader>
                 <TableBody>
                     {isLoading && <LoadingRow colSpan={8} />}

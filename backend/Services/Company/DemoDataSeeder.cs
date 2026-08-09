@@ -54,8 +54,8 @@ public sealed class DemoDataSeeder(
 
         var branchId = branch.Id;
         var currency = settings.MainCurrencyCode;
-        var productImages = CopySeedImages("products");
-        var categoryImages = CopySeedImages("categories");
+        var productImages = ResolveDemoImages("products");
+        var categoryImages = ResolveDemoImages("categories");
 
         var generalCustomer = await GetOrCreateTypeAsync(GeneralTypeEnum.CustomerType, "General", branchId, 0, cancellationToken);
         var piece = await GetOrCreateTypeAsync(GeneralTypeEnum.ProductUnit, "Piece (Dana)", branchId, 0, cancellationToken);
@@ -552,22 +552,67 @@ public sealed class DemoDataSeeder(
         return type;
     }
 
-    private IReadOnlyDictionary<string, SeedImage> CopySeedImages(string collection)
+    private IReadOnlyDictionary<string, SeedImage> ResolveDemoImages(string collection)
     {
-        var sourceRoot = Path.Combine(environment.ContentRootPath, "SeedAssets", collection);
-        var destinationRoot = Path.Combine(_storage.ResolveRootPath(environment), "demo", collection);
-        Directory.CreateDirectory(destinationRoot);
-        var result = new Dictionary<string, SeedImage>(StringComparer.OrdinalIgnoreCase);
-        foreach (var sourcePath in Directory.EnumerateFiles(sourceRoot, "*.svg", SearchOption.TopDirectoryOnly))
+        var storageRoot = _storage.ResolveRootPath(environment);
+        var demoRoot = Path.Combine(storageRoot, "demo", collection);
+        EnsureBundledDemoImages(storageRoot, demoRoot, collection);
+
+        if (!Directory.Exists(demoRoot))
         {
-            var fileName = Path.GetFileName(sourcePath);
-            var destinationPath = Path.Combine(destinationRoot, fileName);
-            File.Copy(sourcePath, destinationPath, overwrite: true);
+            throw new InvalidOperationException(
+                $"Demo image folder '{demoRoot}' was not found. Publish the App_Data/demo assets with the API.");
+        }
+
+        var result = new Dictionary<string, SeedImage>(StringComparer.OrdinalIgnoreCase);
+        foreach (var filePath in Directory.EnumerateFiles(demoRoot, "*.svg", SearchOption.TopDirectoryOnly))
+        {
+            var fileName = Path.GetFileName(filePath);
             var databasePath = $"{_storage.ResolveRequestPath().Trim('/')}/demo/{collection}/{fileName}";
-            result[fileName] = new SeedImage(databasePath, $"/{databasePath}", new FileInfo(destinationPath).Length);
+            result[fileName] = new SeedImage(databasePath, $"/{databasePath}", new FileInfo(filePath).Length);
+        }
+
+        if (result.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Demo image folder '{demoRoot}' is empty. Publish the App_Data/demo assets with the API.");
         }
 
         return result;
+    }
+
+    private void EnsureBundledDemoImages(string storageRoot, string demoRoot, string collection)
+    {
+        var bundledRoot = Path.GetFullPath(
+            Path.Combine(AppContext.BaseDirectory, "App_Data", "demo", collection));
+        var targetRoot = Path.GetFullPath(demoRoot);
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        if (string.Equals(bundledRoot, targetRoot, comparison) || !Directory.Exists(bundledRoot))
+            return;
+
+        Directory.CreateDirectory(targetRoot);
+        var copied = 0;
+        foreach (var sourcePath in Directory.EnumerateFiles(bundledRoot, "*.svg", SearchOption.TopDirectoryOnly))
+        {
+            var destinationPath = Path.Combine(targetRoot, Path.GetFileName(sourcePath));
+            if (File.Exists(destinationPath))
+                continue;
+
+            File.Copy(sourcePath, destinationPath, overwrite: false);
+            copied++;
+        }
+
+        if (copied > 0)
+        {
+            logger.LogInformation(
+                "Copied {Count} bundled demo {Collection} image(s) into the configured App_Data root {StorageRoot}.",
+                copied,
+                collection,
+                storageRoot);
+        }
     }
 
     private static PurchaseItem PurchaseLine(

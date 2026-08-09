@@ -22,8 +22,10 @@ public sealed class DatabaseMaintenanceController(
 {
     [HttpGet("status")]
     [Authorize(Policy = AppPermissions.DatabaseMaintenanceAccessPolicy)]
-    public ActionResult<ApiResponse<DatabaseMaintenanceStatus>> GetStatus() =>
-        Ok(ApiResponse<DatabaseMaintenanceStatus>.Ok(maintenance.GetStatus()));
+    public async Task<ActionResult<ApiResponse<DatabaseMaintenanceStatus>>> GetStatus(
+        CancellationToken cancellationToken) =>
+        Ok(ApiResponse<DatabaseMaintenanceStatus>.Ok(
+            await maintenance.GetStatusAsync(cancellationToken)));
 
     [HttpGet("backups")]
     [Authorize(Policy = AppPermissions.DatabaseBackupReadPolicy)]
@@ -47,7 +49,7 @@ public sealed class DatabaseMaintenanceController(
         RestoreDatabaseRequest request,
         CancellationToken cancellationToken)
     {
-        var expected = $"RESTORE {maintenance.GetStatus().DatabaseName}";
+        var expected = $"RESTORE {(await maintenance.GetStatusAsync(cancellationToken)).DatabaseName}";
         if (!string.Equals(request.Confirmation?.Trim(), expected, StringComparison.Ordinal))
             return BadRequest(ApiResponse<object>.Fail($"Type '{expected}' to confirm the restore."));
 

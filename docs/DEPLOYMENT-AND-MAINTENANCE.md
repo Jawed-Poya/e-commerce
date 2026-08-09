@@ -6,7 +6,7 @@ Uploaded product, type, company-brand, and storefront images use one configurabl
 
 ```json
 "FileStorage": {
-  "RootPath": "App_Data/uploads",
+  "RootPath": "App_Data",
   "RequestPath": "/uploads",
   "MaximumImageSizeBytes": 5242880
 }
@@ -14,11 +14,11 @@ Uploaded product, type, company-brand, and storefront images use one configurabl
 
 `RootPath` can be absolute or relative to the published backend directory. For production, an absolute persistent path or mounted volume is recommended so a deployment cannot replace uploaded files.
 
-- Windows/IIS example: `D:\\EasyCartData\\uploads`. Grant the application-pool identity **Modify** permission on this directory.
-- Linux/systemd example: `/var/lib/easycart/uploads`. Make the directory writable by the service user, and mount it as persistent storage when using containers.
+- Windows/IIS example: `D:\\EasyCartData\\App_Data`. Grant the application-pool identity **Modify** permission on this directory.
+- Linux/systemd example: `/var/lib/easycart/App_Data`. Make the directory writable by the service user, and mount it as persistent storage when using containers.
 - Configure nested values with environment variables such as `FileStorage__RootPath` and `FileStorage__RequestPath`.
 
-The API creates missing subdirectories, validates image signatures, generates safe names, stores platform-neutral URL paths, and serves the configured directory at `RequestPath`. Existing files under `wwwroot/uploads` remain readable for compatibility; move them to the configured root during a planned deployment when standardizing an older installation.
+The API creates missing subdirectories, validates image signatures, generates safe names, stores platform-neutral URL paths, and serves the configured directory at `RequestPath`. Bundled demo artwork is published under `App_Data/demo`; when `RootPath` points to an external persistent `App_Data` directory, the demo seeder copies any missing bundled demo images into that configured root before seeding. Existing files under `wwwroot/uploads` remain readable for compatibility; move them to the configured root during a planned deployment when standardizing an older installation.
 
 Uploaded files are public static assets and are served only from `RequestPath` (for example, `/uploads/...`). They are intentionally not exposed below `/api`; this keeps API routing, authentication, caching, and static-file delivery separate.
 
@@ -27,13 +27,13 @@ Uploaded files are public static assets and are served only from `RequestPath` (
 Create the persistent directory with the same user and group used by the ASP.NET Core service:
 
 ```bash
-sudo install -d -m 0750 -o easycart -g easycart /var/lib/easycart/uploads
+sudo install -d -m 0750 -o easycart -g easycart /var/lib/easycart/App_Data
 ```
 
 Set the production environment value on the API service:
 
 ```ini
-Environment=FileStorage__RootPath=/var/lib/easycart/uploads
+Environment=FileStorage__RootPath=/var/lib/easycart/App_Data
 ```
 
 The frontend uses separate bases for API requests and uploaded assets:
@@ -71,17 +71,17 @@ After deployment, verify one uploaded file directly at `https://your-domain.exam
 
 ## SQL Server backup and restore
 
-Database backup and restore are disabled until a SQL Server host path is configured:
+Database backups use SQL Server's own default backup directory unless an absolute server-side path is configured; restores remain disabled until explicitly enabled:
 
 ```json
 "DatabaseMaintenance": {
-  "BackupDirectory": "D:\\SqlBackups\\EasyCart",
+  "BackupDirectory": "auto",
   "RestoreEnabled": false,
   "CommandTimeoutSeconds": 900
 }
 ```
 
-For SQL Server on Linux, a typical path is `/var/opt/mssql/backups/easycart`. `BackupDirectory` is interpreted by SQL Server, not the web server. The SQL Server service account must have read/write access. Keep `RestoreEnabled` false until backups have been created and independently tested. Backup creation uses full `COPY_ONLY` backups with checksums; restore first runs `RESTORE VERIFYONLY`, disconnects active sessions, restores the selected registered backup, and returns the database to multi-user mode.
+`BackupDirectory` is interpreted by SQL Server, not the web server. Use `"auto"` (recommended) to use SQL Server's `InstanceDefaultBackupPath`; this avoids relative paths such as `backups` becoming a missing `<SQL default>/backups` subdirectory. For a custom location, configure an absolute path that already exists on the SQL Server host (for Linux, for example `/var/opt/mssql/backups/easycart`) and grant the SQL Server service account read/write access. Keep `RestoreEnabled` false until backups have been created and independently tested. Backup creation uses full `COPY_ONLY` backups with checksums; restore first runs `RESTORE VERIFYONLY`, disconnects active sessions, restores the selected registered backup, and returns the database to multi-user mode.
 
 The admin application exposes these functions under **Administration → Database maintenance**. Give each trusted operator only the permissions their role needs:
 

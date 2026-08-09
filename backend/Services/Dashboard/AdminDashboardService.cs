@@ -8,53 +8,62 @@ using ECommerce.Services.Customers;
 using ECommerce.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace ECommerce.Services.Dashboard;
 
 public sealed class AdminDashboardService(
     ApplicationDbContext context,
     StoreRealtimeMetrics realtimeMetrics,
-    IOptions<WhatsAppOptions> whatsAppOptions) : IAdminDashboardService
+    IOptions<WhatsAppOptions> whatsAppOptions,
+    IMemoryCache cache) : IAdminDashboardService
 {
+    private const string DashboardCacheKey = "dashboard:admin:v2";
+    private static readonly TimeSpan DashboardCacheDuration = TimeSpan.FromSeconds(20);
     private readonly WhatsAppOptions _whatsAppOptions = whatsAppOptions.Value;
 
     public async Task<AdminDashboardResponse> GetAsync(CancellationToken cancellationToken = default)
     {
+        if (cache.TryGetValue<AdminDashboardResponse>(DashboardCacheKey, out var cached) && cached is not null)
+        {
+            return cached with
+            {
+                Kpis = cached.Kpis with { RealtimeConnections = realtimeMetrics.ActiveConnections }
+            };
+        }
+
         var now = DateTime.UtcNow;
         var today = InventoryAvailability.UtcToday;
         var from30Days = now.Date.AddDays(-29);
 
-        var productStats = await context.Products
+        // One round-trip for the headline counters. The old implementation issued
+        // separate queries for products, customers, order counts, revenue, currency
+        // and notifications, which becomes very noticeable when SQL Server is remote.
+        var headline = await context.Companies
             .AsNoTracking()
-            .GroupBy(_ => 1)
-            .Select(group => new
+            .Select(_ => new
             {
-                Total = group.Count(),
-                Active = group.Count(product => product.IsActive),
-                Views = group.Sum(product => product.ViewCount)
+                TotalProducts = context.Products.Count(),
+                ActiveProducts = context.Products.Count(product => product.IsActive),
+                TotalProductViews = context.Products.Sum(product => (long?)product.ViewCount) ?? 0,
+                TotalCustomers = context.Customers.Count(),
+                TotalOrders = context.Orders.Count(),
+                PendingOrders = context.Orders.Count(order => order.Status == OrderStatus.Pending),
+                PendingPayments = context.Orders.Count(order => order.PaymentStatus == PaymentStatus.Pending),
+                PaidRevenue = context.Orders
+                    .Where(order => order.PaymentStatus == PaymentStatus.Paid)
+                    .Sum(order => (decimal?)order.Total) ?? 0m,
+                RevenueLast30Days = context.Orders
+                    .Where(order => order.PaymentStatus == PaymentStatus.Paid && order.CreatedAt >= from30Days)
+                    .Sum(order => (decimal?)order.Total) ?? 0m,
+                Currency = context.Orders
+                    .OrderByDescending(order => order.Id)
+                    .Select(order => order.Currency)
+                    .FirstOrDefault() ?? "USD",
+                NotificationsLast24Hours = context.Notifications
+                    .Count(notification => !notification.IsDeleted && notification.CreatedAt >= now.AddHours(-24))
             })
-            .SingleOrDefaultAsync(cancellationToken);
-
-        var customerCount = await context.Customers.AsNoTracking().CountAsync(cancellationToken);
-        var orderCount = await context.Orders.AsNoTracking().CountAsync(cancellationToken);
-        var pendingOrders = await context.Orders.AsNoTracking()
-            .CountAsync(order => order.Status == OrderStatus.Pending, cancellationToken);
-        var pendingPayments = await context.Orders.AsNoTracking()
-            .CountAsync(order => order.PaymentStatus == PaymentStatus.Pending, cancellationToken);
-
-        var paidRevenue = await context.Orders.AsNoTracking()
-            .Where(order => order.PaymentStatus == PaymentStatus.Paid)
-            .SumAsync(order => (decimal?)order.Total, cancellationToken) ?? 0m;
-        var revenueLast30Days = await context.Orders.AsNoTracking()
-            .Where(order => order.PaymentStatus == PaymentStatus.Paid && order.CreatedAt >= from30Days)
-            .SumAsync(order => (decimal?)order.Total, cancellationToken) ?? 0m;
-        var currency = await context.Orders.AsNoTracking()
-            .OrderByDescending(order => order.Id)
-            .Select(order => order.Currency)
-            .FirstOrDefaultAsync(cancellationToken) ?? "USD";
-        var notificationsLast24Hours = await context.Notifications
-            .AsNoTracking()
-            .CountAsync(notification => !notification.IsDeleted && notification.CreatedAt >= now.AddHours(-24), cancellationToken);
+            .FirstAsync(cancellationToken);
 
         var inventoryAvailability = context.ProductInventories
             .AsNoTracking()
@@ -100,18 +109,18 @@ public sealed class AdminDashboardService(
         var salesRows = await context.Orders
             .AsNoTracking()
             .Where(order => order.CreatedAt >= from30Days)
-            .Select(order => new
+            .GroupBy(order => order.CreatedAt.Date)
+            .Select(group => new
             {
-                Date = order.CreatedAt.Date,
-                Revenue = order.PaymentStatus == PaymentStatus.Paid ? order.Total : 0m
+                Date = group.Key,
+                Orders = group.Count(),
+                Revenue = group.Sum(order => order.PaymentStatus == PaymentStatus.Paid ? order.Total : 0m)
             })
             .ToListAsync(cancellationToken);
 
-        var trendByDate = salesRows
-            .GroupBy(row => DateOnly.FromDateTime(row.Date))
-            .ToDictionary(
-                group => group.Key,
-                group => new { Orders = group.Count(), Revenue = group.Sum(row => row.Revenue) });
+        var trendByDate = salesRows.ToDictionary(
+            row => DateOnly.FromDateTime(row.Date),
+            row => new { row.Orders, row.Revenue });
 
         var salesTrend = Enumerable.Range(0, 30)
             .Select(offset => DateOnly.FromDateTime(from30Days.AddDays(offset)))
@@ -226,20 +235,20 @@ public sealed class AdminDashboardService(
                 order.CreatedAt);
         }).ToList();
 
-        return new AdminDashboardResponse(
+        var response = new AdminDashboardResponse(
             new DashboardKpis(
-                productStats?.Total ?? 0,
-                productStats?.Active ?? 0,
-                productStats?.Views ?? 0,
-                customerCount,
-                orderCount,
-                pendingOrders,
-                pendingPayments,
-                paidRevenue,
-                revenueLast30Days,
-                notificationsLast24Hours,
+                headline.TotalProducts,
+                headline.ActiveProducts,
+                headline.TotalProductViews,
+                headline.TotalCustomers,
+                headline.TotalOrders,
+                headline.PendingOrders,
+                headline.PendingPayments,
+                headline.PaidRevenue,
+                headline.RevenueLast30Days,
+                headline.NotificationsLast24Hours,
                 realtimeMetrics.ActiveConnections,
-                currency),
+                headline.Currency),
             inventory,
             Enum.GetValues<OrderStatus>()
                 .Select(status => new DashboardStatusCount(
@@ -252,5 +261,8 @@ public sealed class AdminDashboardService(
             lowStock,
             recentOrders,
             now);
+
+        cache.Set(DashboardCacheKey, response, DashboardCacheDuration);
+        return response;
     }
 }

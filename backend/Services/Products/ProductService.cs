@@ -111,7 +111,55 @@ public class ProductService : IProductService
                           .Sum(lot => (decimal?)(lot.Quantity - lot.ReservedQuantity)) ?? 0) <= 0);
         }
 
-        var query = products.Select(product => new ProductListProjection
+        // Keep the expensive list projection (reviews, images, inventory lots and prices)
+        // off the COUNT and pagination query. This matters a lot when the API and SQL
+        // Server are separated by a network because only the requested page pays for
+        // those correlated lookups.
+        var pageQuery = products.Select(product => new ProductPageProjection
+        {
+            Id = product.Id,
+            Name = product.Name,
+            Price = product.Prices
+                .Where(price => price.CustomerTypeId == effectiveTypeId)
+                .Select(price => (decimal?)(price.SalePrice.HasValue &&
+                    (!price.StartDate.HasValue || price.StartDate.Value <= today) &&
+                    (!price.EndDate.HasValue || price.EndDate.Value >= today)
+                        ? price.SalePrice.Value
+                        : price.RegularPrice))
+                .FirstOrDefault()
+                ?? product.Prices
+                    .Where(price => price.CustomerTypeId == defaultType.Id)
+                    .Select(price => (decimal?)(price.SalePrice.HasValue &&
+                        (!price.StartDate.HasValue || price.StartDate.Value <= today) &&
+                        (!price.EndDate.HasValue || price.EndDate.Value >= today)
+                            ? price.SalePrice.Value
+                            : price.RegularPrice))
+                    .FirstOrDefault()
+        });
+
+        if (filter.MinPrice.HasValue) pageQuery = pageQuery.Where(product => product.Price >= filter.MinPrice.Value);
+        if (filter.MaxPrice.HasValue) pageQuery = pageQuery.Where(product => product.Price <= filter.MaxPrice.Value);
+
+        pageQuery = filter.SortBy?.ToLowerInvariant() switch
+        {
+            "name" => filter.SortDescending ? pageQuery.OrderByDescending(product => product.Name) : pageQuery.OrderBy(product => product.Name),
+            "price" => filter.SortDescending ? pageQuery.OrderByDescending(product => product.Price) : pageQuery.OrderBy(product => product.Price),
+            "createdat" => filter.SortDescending ? pageQuery.OrderByDescending(product => product.Id) : pageQuery.OrderBy(product => product.Id),
+            _ => pageQuery.OrderByDescending(product => product.Id)
+        };
+
+        var page = Math.Max(1, filter.Page);
+        var pageSize = Math.Clamp(filter.PageSize, 1, 100);
+        var total = await pageQuery.CountAsync();
+        var pageIds = await pageQuery
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(product => product.Id)
+            .ToListAsync();
+
+        var query = products
+            .Where(product => pageIds.Contains(product.Id))
+            .Select(product => new ProductListProjection
         {
             Id = product.Id,
             Name = product.Name,
@@ -204,21 +252,14 @@ public class ProductService : IProductService
                 .ToList()
         });
 
-        if (filter.MinPrice.HasValue) query = query.Where(product => product.Price >= filter.MinPrice.Value);
-        if (filter.MaxPrice.HasValue) query = query.Where(product => product.Price <= filter.MaxPrice.Value);
-
-        query = filter.SortBy?.ToLowerInvariant() switch
-        {
-            "name" => filter.SortDescending ? query.OrderByDescending(product => product.Name) : query.OrderBy(product => product.Name),
-            "price" => filter.SortDescending ? query.OrderByDescending(product => product.Price) : query.OrderBy(product => product.Price),
-            "createdat" => filter.SortDescending ? query.OrderByDescending(product => product.Id) : query.OrderBy(product => product.Id),
-            _ => query.OrderByDescending(product => product.Id)
-        };
-
-        var page = Math.Max(1, filter.Page);
-        var pageSize = Math.Clamp(filter.PageSize, 1, 100);
-        var total = await query.CountAsync();
-        var rows = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+        List<ProductListProjection> loadedRows = pageIds.Count == 0
+            ? []
+            : await query.ToListAsync();
+        var rowsById = loadedRows.ToDictionary(product => product.Id);
+        var rows = pageIds
+            .Where(rowsById.ContainsKey)
+            .Select(id => rowsById[id])
+            .ToList();
 
         return new PagedResult<ProductListItemResponse>
         {
@@ -1048,19 +1089,16 @@ public class ProductService : IProductService
             })
             .ToListAsync(cancellationToken);
 
-        var categoryProducts = await _context
+        // Aggregate category counts in SQL instead of downloading one CategoryId
+        // for every active product. On a hosted database this removes a potentially
+        // large result set from the catalog's initial lookup request.
+        var categoryStats = await _context
             .Set<Product>()
             .AsNoTracking()
             .Where(x => x.IsActive && !x.IsDeleted)
-            .Select(x => x.CategoryId)
-            .ToListAsync(cancellationToken);
-
-        var categoryStats = categoryProducts
-            .GroupBy(categoryId => categoryId)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Count()
-            );
+            .GroupBy(x => x.CategoryId)
+            .Select(group => new { CategoryId = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(item => item.CategoryId, item => item.Count, cancellationToken);
 
         var categoryTypes = generalTypes
             .Where(x => x.Group == GeneralTypeEnum.ProductCategory)
@@ -1354,6 +1392,13 @@ public class ProductService : IProductService
         string CustomerTypeName,
         decimal Price,
         decimal? OldPrice);
+
+    private sealed class ProductPageProjection
+    {
+        public long Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public decimal? Price { get; init; }
+    }
 
     private sealed class ProductListProjection
     {

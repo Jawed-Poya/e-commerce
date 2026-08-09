@@ -3,7 +3,9 @@ node_modules/
 bin/
 obj/
 *.csproj.user
-backend/App_Data/
+backend/App_Data/*
+!backend/App_Data/demo/
+!backend/App_Data/demo/**
 backend/wwwroot/uploads/
 
 # Local AI agent configuration and instructions

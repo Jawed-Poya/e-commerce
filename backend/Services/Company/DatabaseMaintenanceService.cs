@@ -36,7 +36,7 @@ public sealed record ClearBusinessDataResult(
 
 public interface IDatabaseMaintenanceService
 {
-    DatabaseMaintenanceStatus GetStatus();
+    Task<DatabaseMaintenanceStatus> GetStatusAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<DatabaseBackupInfo>> GetBackupsAsync(CancellationToken cancellationToken = default);
     Task<DatabaseBackupInfo> CreateBackupAsync(CancellationToken cancellationToken = default);
     Task RestoreBackupAsync(string fileName, CancellationToken cancellationToken = default);
@@ -58,9 +58,10 @@ public sealed class DatabaseMaintenanceService(
     private readonly DatabaseMaintenanceOptions _options = maintenanceOptions.Value;
     private readonly FileStorageOptions _fileStorage = fileStorageOptions.Value;
 
-    public DatabaseMaintenanceStatus GetStatus()
+    public async Task<DatabaseMaintenanceStatus> GetStatusAsync(
+        CancellationToken cancellationToken = default)
     {
-        var directory = CleanDirectory(_options.BackupDirectory);
+        var directory = await ResolveBackupDirectoryAsync(cancellationToken);
         return new DatabaseMaintenanceStatus(
             DatabaseName(),
             directory is not null,
@@ -73,7 +74,7 @@ public sealed class DatabaseMaintenanceService(
     public async Task<IReadOnlyCollection<DatabaseBackupInfo>> GetBackupsAsync(
         CancellationToken cancellationToken = default)
     {
-        var directory = RequireBackupDirectory();
+        var directory = await RequireBackupDirectoryAsync(cancellationToken);
         await using var connection = CreateServerConnection("msdb");
         await connection.OpenAsync(cancellationToken);
         await using var command = connection.CreateCommand();
@@ -119,7 +120,7 @@ ORDER BY backup_set.backup_finish_date DESC;
     public async Task<DatabaseBackupInfo> CreateBackupAsync(
         CancellationToken cancellationToken = default)
     {
-        var directory = RequireBackupDirectory();
+        var directory = await RequireBackupDirectoryAsync(cancellationToken);
         var databaseName = DatabaseName();
         var safeDatabaseName = Regex.Replace(databaseName, @"[^a-zA-Z0-9_-]+", "-").Trim('-');
         if (string.IsNullOrWhiteSpace(safeDatabaseName)) safeDatabaseName = "database";
@@ -143,7 +144,7 @@ ORDER BY backup_set.backup_finish_date DESC;
         string fileName,
         CancellationToken cancellationToken = default)
     {
-        var directory = RequireBackupDirectory();
+        var directory = await RequireBackupDirectoryAsync(cancellationToken);
         if (!_options.RestoreEnabled)
             throw new InvalidOperationException(
                 "Database restore is disabled. Set DatabaseMaintenance:RestoreEnabled to true after verifying the backup directory and permissions.");
@@ -359,10 +360,53 @@ ALTER DATABASE {QuoteIdentifier(databaseName)} SET MULTI_USER;
         return new SqlConnection(builder.ConnectionString);
     }
 
-    private string RequireBackupDirectory() =>
-        CleanDirectory(_options.BackupDirectory)
+    private async Task<string> RequireBackupDirectoryAsync(CancellationToken cancellationToken) =>
+        await ResolveBackupDirectoryAsync(cancellationToken)
         ?? throw new InvalidOperationException(
-            "Database backup is not configured. Set DatabaseMaintenance:BackupDirectory to a directory on the SQL Server machine.");
+            "Database backup is not configured. Set DatabaseMaintenance:BackupDirectory to 'auto' or to an absolute directory on the SQL Server machine.");
+
+    private async Task<string?> ResolveBackupDirectoryAsync(CancellationToken cancellationToken)
+    {
+        var configured = CleanDirectory(_options.BackupDirectory);
+        if (configured is not null && !IsAutomaticBackupDirectory(configured) && IsServerAbsolutePath(configured))
+            return configured;
+
+        await using var connection = CreateServerConnection("master");
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandTimeout = Math.Min(CommandTimeout(), 60);
+        command.CommandText = "SELECT CAST(SERVERPROPERTY('InstanceDefaultBackupPath') AS nvarchar(4000));";
+        var serverDefault = CleanDirectory(Convert.ToString(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture));
+        if (serverDefault is null)
+        {
+            if (configured is not null && !IsAutomaticBackupDirectory(configured))
+            {
+                throw new InvalidOperationException(
+                    $"DatabaseMaintenance:BackupDirectory '{configured}' is relative and SQL Server did not report its default backup directory. Configure an absolute path that exists on the SQL Server host.");
+            }
+
+            return null;
+        }
+
+        if (configured is not null && !IsAutomaticBackupDirectory(configured) && !IsServerAbsolutePath(configured))
+        {
+            logger.LogWarning(
+                "DatabaseMaintenance:BackupDirectory '{ConfiguredDirectory}' is relative. SQL Server resolves relative backup paths under its default backup folder and does not create missing subdirectories. Using SQL Server default backup directory '{BackupDirectory}' instead.",
+                configured,
+                serverDefault);
+        }
+
+        return serverDefault;
+    }
+
+    private static bool IsAutomaticBackupDirectory(string value) =>
+        string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(value, "default", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsServerAbsolutePath(string value) =>
+        value.StartsWith("/", StringComparison.Ordinal) ||
+        value.StartsWith("\\", StringComparison.Ordinal) ||
+        Regex.IsMatch(value, @"^[a-zA-Z]:[\\/]", RegexOptions.CultureInvariant);
 
     private int CommandTimeout() => Math.Clamp(_options.CommandTimeoutSeconds, 30, 3600);
 

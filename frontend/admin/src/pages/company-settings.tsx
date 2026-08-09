@@ -248,23 +248,26 @@ export default function CompanySettingsPage() {
                             <Field label="Registration number"><Input value={profile.registrationNumber ?? ""} onChange={(event) => setProfile({ ...profile, registrationNumber: nullable(event.target.value) })} /></Field>
                             <Field label="Email"><Input type="email" value={profile.email ?? ""} onChange={(event) => setProfile({ ...profile, email: nullable(event.target.value) })} /></Field>
                             <Field label="Phone"><Input value={profile.phone ?? ""} onChange={(event) => setProfile({ ...profile, phone: nullable(event.target.value) })} /></Field>
-                            <section className="space-y-3 border bg-muted/20 p-3 sm:col-span-2 sm:p-4">
-                                <div className="flex items-start gap-3">
-                                    <div className="grid size-9 shrink-0 place-items-center bg-primary/10 text-primary">
-                                        <MonitorSmartphone className="size-5" />
+                            <section className="min-w-0 overflow-hidden border bg-muted/20 sm:col-span-2">
+                                <div className="flex flex-col gap-3 border-b bg-background/60 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
+                                    <div className="flex min-w-0 items-start gap-3">
+                                        <div className="grid size-10 shrink-0 place-items-center bg-primary/10 text-primary">
+                                            <MonitorSmartphone className="size-5" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="font-semibold">Brand identity assets</p>
+                                            <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
+                                                Upload the official company logo and favicon used across the storefront, admin experience, receipts, PDF documents, browser tabs, and installed app shortcuts.
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="font-semibold">Brand assets</p>
-                                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                                            Logo for storefront and documents; square icon for browser tabs and installed apps.
-                                        </p>
-                                    </div>
+                                    <Badge variant="outline" className="w-fit shrink-0">Logo + favicon</Badge>
                                 </div>
-                                <div className="grid gap-3 md:grid-cols-2">
+                                <div className="grid min-w-0 gap-3 p-3 sm:p-4 lg:grid-cols-2">
                                     <BrandAssetUploader
                                         assetType="logo"
                                         label="Company logo"
-                                        description="Recommended: transparent image, at least 512 × 256 pixels."
+                                        description="Primary company mark for storefront headers, admin branding, receipts, and generated documents. Use a transparent image when possible; recommended size 512 × 256 or larger."
                                         value={profile.logoUrl}
                                         disabled={!canManageProfile}
                                         companyName={profile.name}
@@ -273,7 +276,7 @@ export default function CompanySettingsPage() {
                                     <BrandAssetUploader
                                         assetType="favicon"
                                         label="Favicon and app icon"
-                                        description="Recommended: square image, at least 512 × 512 pixels."
+                                        description="Square browser and app icon used for tabs, bookmarks, shortcuts, and installed PWA surfaces. Recommended size 512 × 512 or larger."
                                         value={profile.faviconUrl}
                                         disabled={!canManageProfile}
                                         companyName={profile.name}
@@ -625,8 +628,8 @@ function BrandAssetUploader({
                     }}
                 />
 
-                <div className="flex min-w-0 items-center gap-3">
-                    <div className={`grid shrink-0 place-items-center overflow-hidden border bg-muted/30 p-2 ${assetType === "favicon" ? "size-16" : "h-16 w-24"}`}>
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className={`grid shrink-0 place-items-center overflow-hidden border bg-muted/30 p-2 ${assetType === "favicon" ? "size-16" : "h-16 w-full sm:w-28"}`}>
                         {preview ? (
                             <img src={preview} alt={`${companyName} ${label}`} className="size-full object-contain" />
                         ) : (
@@ -634,7 +637,7 @@ function BrandAssetUploader({
                         )}
                     </div>
                     <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0">
                                 <Label className="font-semibold">{label}</Label>
                                 <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{description}</p>
@@ -649,12 +652,12 @@ function BrandAssetUploader({
                         </div>
                     </div>
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-                    <Button type="button" size="sm" variant="outline" disabled={disabled || upload.isPending} onClick={() => inputRef.current?.click()}>
+                <div className="mt-3 flex flex-col gap-2 border-t pt-3 sm:flex-row sm:flex-wrap sm:items-center">
+                    <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" disabled={disabled || upload.isPending} onClick={() => inputRef.current?.click()}>
                         {upload.isPending ? <LoaderCircle className="animate-spin" /> : <UploadCloud />}
                         {upload.isPending ? tr("Uploading…") : tr(value ? "Replace" : "Upload")}
                     </Button>
-                    {value ? <Button type="button" size="sm" variant="ghost" disabled={disabled || upload.isPending} onClick={() => onChange(null)}><X />{tr("Remove")}</Button> : null}
+                    {value ? <Button type="button" size="sm" variant="ghost" className="w-full sm:w-auto" disabled={disabled || upload.isPending} onClick={() => onChange(null)}><X />{tr("Remove")}</Button> : null}
                     <span className="text-[10px] text-muted-foreground sm:ms-auto">PNG · JPG · WEBP · AVIF</span>
                 </div>
                 {value ? <p className="mt-2 text-[10px] font-medium text-primary">{tr("Save profile to publish this asset everywhere.")}</p> : null}

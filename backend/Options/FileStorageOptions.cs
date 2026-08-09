@@ -8,7 +8,7 @@ public sealed class FileStorageOptions
     /// Absolute path or a path relative to the published application directory.
     /// Keep uploaded files outside wwwroot so application deployments do not replace them.
     /// </summary>
-    public string RootPath { get; set; } = "App_Data/uploads";
+    public string RootPath { get; set; } = "App_Data";
 
     public string RequestPath { get; set; } = "/uploads";
 
@@ -17,7 +17,7 @@ public sealed class FileStorageOptions
     public string ResolveRootPath(IHostEnvironment environment)
     {
         var configured = string.IsNullOrWhiteSpace(RootPath)
-            ? "App_Data/uploads"
+            ? "App_Data"
             : Environment.ExpandEnvironmentVariables(RootPath.Trim());
 
         // A Linux systemd service can start with "/" as its working directory.
