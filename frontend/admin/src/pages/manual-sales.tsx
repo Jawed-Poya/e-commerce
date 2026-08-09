@@ -6,6 +6,9 @@ import {
     Layers3,
     LoaderCircle,
     Save,
+    TrendingDown,
+    TrendingUp,
+    TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -13,6 +16,7 @@ import { ListPagination } from "@/components/list-pagination";
 import { PageHeader } from "@/components/page-header";
 import { ServerSearchCombobox } from "@/components/server-search-combobox";
 import { SimpleCombobox } from "@/components/simple-combobox";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -127,6 +131,40 @@ export default function ManualSalesPage() {
     );
     const total = Math.max(0, subtotal - form.discount + form.tax);
     const remaining = Math.max(0, total - form.paidAmount);
+    const profitPreview = useMemo(() => {
+        const saleItems = getSubmittableDocumentLines(items);
+        if (!saleItems.length || saleItems.some((item) => !isDocumentLineComplete(item))) {
+            return null;
+        }
+
+        let costOfGoods = 0;
+        let missingCostCount = 0;
+
+        for (const item of saleItems) {
+            const currentUnitCost = item.product?.currentUnitCost;
+            if (currentUnitCost == null || currentUnitCost <= 0) {
+                missingCostCount += 1;
+                continue;
+            }
+
+            const baseQuantity =
+                item.quantity * Math.max(item.conversionFactor, 0.000001);
+            costOfGoods += baseQuantity * currentUnitCost;
+        }
+
+        const netSales = Math.max(0, subtotal - form.discount);
+        const grossProfit = netSales - costOfGoods;
+        const profitMargin =
+            netSales > 0 ? (grossProfit / netSales) * 100 : 0;
+
+        return {
+            costOfGoods,
+            netSales,
+            grossProfit,
+            profitMargin,
+            missingCostCount,
+        };
+    }, [form.discount, items, subtotal]);
 
     const reset = () => {
         setSelectedCustomer(null);
@@ -541,6 +579,13 @@ export default function ManualSalesPage() {
                         />
                         <Separator />
                         <MoneySummaryRow label="Sale total" value={total} emphasis />
+                        {profitPreview ? (
+                            <SaleProfitPreview
+                                preview={profitPreview}
+                                formatMoney={formatMoney}
+                                tr={tr}
+                            />
+                        ) : null}
                         <AmountInputRow
                             label="Opening payment"
                             value={form.paidAmount}
@@ -655,6 +700,82 @@ function SaleProfitResult({ sale, formatMoney }: { sale: ManualSale; formatMoney
         );
     }
     return <span className="text-sm font-medium text-muted-foreground">Break-even</span>;
+}
+
+function SaleProfitPreview({
+    preview,
+    formatMoney,
+    tr,
+}: {
+    preview: {
+        costOfGoods: number;
+        netSales: number;
+        grossProfit: number;
+        profitMargin: number;
+        missingCostCount: number;
+    };
+    formatMoney: (value: number) => string;
+    tr: (value: string) => string;
+}) {
+    if (preview.missingCostCount > 0) {
+        return (
+            <Alert className="rounded-xl border-amber-500/30 bg-amber-500/[0.06] text-amber-950 dark:text-amber-100">
+                <TriangleAlert className="text-amber-600 dark:text-amber-400" />
+                <AlertTitle>{tr("Profit estimate needs cost data")}</AlertTitle>
+                <AlertDescription>
+                    {preview.missingCostCount} {tr("selected product(s) have no current inventory cost. The final sale will still be recalculated by the server.")}
+                </AlertDescription>
+            </Alert>
+        );
+    }
+
+    const isProfit = preview.grossProfit > 0.005;
+    const isLoss = preview.grossProfit < -0.005;
+
+    if (!isProfit && !isLoss) {
+        return (
+            <Alert className="rounded-xl border-border bg-muted/35">
+                <CircleDollarSign className="text-muted-foreground" />
+                <AlertTitle>{tr("Expected break-even sale")}</AlertTitle>
+                <AlertDescription>
+                    {tr("No gross profit or loss is expected at the current price.")}
+                </AlertDescription>
+            </Alert>
+        );
+    }
+
+    return (
+        <Alert
+            variant={isLoss ? "destructive" : "default"}
+            className={
+                isLoss
+                    ? "rounded-xl border-destructive/35 bg-destructive/[0.05]"
+                    : "rounded-xl border-emerald-500/30 bg-emerald-500/[0.06] text-emerald-950 dark:text-emerald-100"
+            }
+        >
+            {isLoss ? (
+                <TrendingDown className="text-destructive" />
+            ) : (
+                <TrendingUp className="text-emerald-600 dark:text-emerald-400" />
+            )}
+            <AlertTitle>
+                {isLoss ? tr("Expected gross loss") : tr("Expected gross profit")}
+            </AlertTitle>
+            <AlertDescription className="space-y-1">
+                <p className="font-semibold text-current">
+                    {formatMoney(Math.abs(preview.grossProfit))} · {preview.profitMargin.toFixed(1)}% {tr("margin")}
+                </p>
+                <p>
+                    {tr("Net sales")} {formatMoney(preview.netSales)} · {tr("Cost of goods sold")} {formatMoney(preview.costOfGoods)}
+                </p>
+                {isLoss ? (
+                    <p className="font-medium text-current">
+                        {tr("This selling price is below the current inventory cost. Review the price before completing the sale.")}
+                    </p>
+                ) : null}
+            </AlertDescription>
+        </Alert>
+    );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

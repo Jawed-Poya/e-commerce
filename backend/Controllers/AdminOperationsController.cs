@@ -29,10 +29,16 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
     }
 
     [HttpGet("products")]
-    public async Task<IActionResult> Products([FromQuery] string? search, [FromQuery] int take = 20, CancellationToken ct = default)
+    public async Task<IActionResult> Products(
+        [FromQuery] string? search,
+        [FromQuery] int take = 20,
+        [FromQuery] bool includeCurrentUnitCost = false,
+        CancellationToken ct = default)
     {
         if (!HasAnyPermission(AppPermissions.OperationsView, AppPermissions.PurchasesView, AppPermissions.ManualSalesView)) return Forbid();
-        return Ok(ApiResponse<IReadOnlyList<OperationProductLookup>>.Ok(await service.GetProductLookupsAsync(search, take, ct)));
+        var canIncludeCost = includeCurrentUnitCost && HasAnyPermission(AppPermissions.ManualSalesView);
+        return Ok(ApiResponse<IReadOnlyList<OperationProductLookup>>.Ok(
+            await service.GetProductLookupsAsync(search, take, canIncludeCost, ct)));
     }
 
     [Authorize(Policy = AppPermissions.ManualSalesView)]

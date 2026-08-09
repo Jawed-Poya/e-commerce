@@ -24,6 +24,7 @@ public sealed record OperationProductLookup(
     bool UsesDisplayStock,
     long? BaseUnitId,
     string? BaseUnitName,
+    decimal? CurrentUnitCost,
     IReadOnlyList<OperationProductUnitLookup> Units);
 public sealed record OperationCustomerLookup(long Id, string Name, string Phone, string? WhatsAppUrl, string? Email, string? CustomerTypeName);
 public sealed record OperationSummary(decimal PurchasesThisMonth, decimal SalesThisMonth, decimal ExpensesThisMonth, decimal SalariesThisMonth, int LowStockProducts);

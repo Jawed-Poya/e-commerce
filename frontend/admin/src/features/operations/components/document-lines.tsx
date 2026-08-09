@@ -500,6 +500,7 @@ export function DocumentLines({
                                                 await operationsService.products(
                                                     search,
                                                     30,
+                                                    mode === "sale",
                                                 );
                                             return products.filter(
                                                 (product) =>

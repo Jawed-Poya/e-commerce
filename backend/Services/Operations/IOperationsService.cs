@@ -7,7 +7,7 @@ public interface IOperationsService
 {
     Task<OperationSummary> GetSummaryAsync(CancellationToken ct);
     Task<OperationPolicyResponse> GetPolicyAsync(bool canOverrideLineLimits, CancellationToken ct);
-    Task<IReadOnlyList<OperationProductLookup>> GetProductLookupsAsync(string? search, int take, CancellationToken ct);
+    Task<IReadOnlyList<OperationProductLookup>> GetProductLookupsAsync(string? search, int take, bool includeCurrentUnitCost, CancellationToken ct);
     Task<IReadOnlyList<OperationCustomerLookup>> GetCustomerLookupsAsync(string? search, int take, CancellationToken ct);
     Task<IReadOnlyList<SupplierResponse>> GetSuppliersAsync(string? search, int take, CancellationToken ct);
     Task<PagedResult<SupplierResponse>> GetSupplierPageAsync(string? search, int page, int pageSize, CancellationToken ct);

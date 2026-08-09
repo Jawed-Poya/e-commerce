@@ -60,7 +60,11 @@ public sealed class OperationsService(
             canOverrideLineLimits);
     }
 
-    public async Task<IReadOnlyList<OperationProductLookup>> GetProductLookupsAsync(string? search, int take, CancellationToken ct)
+    public async Task<IReadOnlyList<OperationProductLookup>> GetProductLookupsAsync(
+        string? search,
+        int take,
+        bool includeCurrentUnitCost,
+        CancellationToken ct)
     {
         var defaultTypeId = await defaultCustomerTypeResolver.GetIdAsync(ct);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -89,6 +93,9 @@ public sealed class OperationsService(
             context,
             products.Select(product => product.Id),
             ct);
+        var currentUnitCosts = includeCurrentUnitCost
+            ? await inventoryCosts.GetCurrentUnitCostsAsync(products.Select(product => product.Id), ct)
+            : null;
 
         return products.Select(product =>
         {
@@ -115,6 +122,9 @@ public sealed class OperationsService(
                 product.UsesDisplayStock,
                 product.UnitId,
                 product.Unit?.Name,
+                currentUnitCosts is null
+                    ? null
+                    : currentUnitCosts.GetValueOrDefault(product.Id),
                 units);
         }).ToList();
     }

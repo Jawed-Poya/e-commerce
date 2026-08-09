@@ -102,11 +102,15 @@ async function getSuppliers(search = "", take = 50) {
 export const operationsService = {
   summary: () => apiClient.get<OperationSummary>(`${base}/summary`),
   policy: getPolicy,
-  products: (search = "", take = 20) => cachedLookup(
+  products: (search = "", take = 20, includeCurrentUnitCost = false) => cachedLookup(
     "products",
     search,
     take,
-    async () => (await apiClient.get<OperationProduct[]>(`${base}/products`, { search: search || undefined, take })).data,
+    async () => (await apiClient.get<OperationProduct[]>(`${base}/products`, {
+      search: search || undefined,
+      take,
+      includeCurrentUnitCost: includeCurrentUnitCost || undefined,
+    })).data,
     (item, clean) => [item.name, item.strength, item.barcode, ...item.units.map((unit) => unit.barcode)].some((value) => normalize(value ?? "").includes(clean)),
   ),
   customers: (search = "", take = 20) => cachedLookup(
