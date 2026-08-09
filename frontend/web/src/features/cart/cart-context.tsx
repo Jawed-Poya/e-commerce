@@ -33,7 +33,7 @@ interface CartValue {
   wishlist: number[];
   count: number;
   addItem: (product: CartProduct) => void;
-  updateQuantity: (lineKey: string, quantity: number) => void;
+  updateQuantity: (lineKey: string, quantity: number, product?: Partial<CartProduct>) => void;
   removeItem: (lineKey: string) => void;
   clear: () => void;
   toggleWishlist: (id: number) => void;
@@ -171,13 +171,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
           return [...current, { ...product, lineKey, quantity: minimum }];
         }),
-      updateQuantity: (lineKey, quantity) =>
+      updateQuantity: (lineKey, quantity, product) =>
         setItems((current) =>
-          current.map((item) =>
-            item.lineKey === lineKey
-              ? { ...item, quantity: normalizeCartQuantity(item, quantity) }
-              : item,
-          ).filter((item) => item.quantity > 0),
+          current.map((item) => {
+            if (item.lineKey !== lineKey) return item;
+            const liveItem = product ? { ...item, ...product, lineKey } : item;
+            return {
+              ...liveItem,
+              quantity: normalizeCartQuantity(liveItem, quantity),
+            };
+          }).filter((item) => item.quantity > 0),
         ),
       removeItem: (lineKey) =>
         setItems((current) => current.filter((item) => item.lineKey !== lineKey)),

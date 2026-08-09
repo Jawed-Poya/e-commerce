@@ -43,13 +43,16 @@ function getUpdateErrorMessage(error: unknown, messages: { connection: string; e
         };
     };
     if (!apiError.response) {
-        return messages.connection;
+        if (apiError.code === "ERR_NETWORK" || apiError.code === "ECONNABORTED" || apiError.code === "ETIMEDOUT") {
+            return messages.connection;
+        }
+        return apiError.message?.trim() || messages.connection;
     }
     const data = apiError.response.data;
     const validationMessage = data?.errors && Object.values(data.errors).flat()[0];
-    if (validationMessage) return validationMessage;
+    if (validationMessage?.trim()) return validationMessage.trim();
     if (apiError.response.status === 415) return messages.endpoint;
-    return data?.message ?? data?.title ?? apiError.message ?? messages.failed;
+    return data?.message?.trim() || data?.title?.trim() || apiError.message?.trim() || messages.failed;
 }
 
 export default function ProductsPage() {
@@ -119,8 +122,6 @@ export default function ProductsPage() {
                         barcode: unit.barcode,
                         priceOverride: unit.priceOverride,
                         oldPriceOverride: unit.oldPriceOverride,
-                        orderQuantityStep: unit.orderQuantityStep || 1,
-                        quickOrderQuantities: unit.quickOrderQuantities ?? [],
                         isDefault: unit.isDefault,
                         isActive: unit.isActive,
                         sortOrder: unit.sortOrder,
@@ -249,7 +250,7 @@ export default function ProductsPage() {
                             disabled={saving}
                             compact
                         />
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div className="space-y-2"><Label>{t("form.minimum")}</Label><Input type="number" min={0} value={item.minimumValue ?? ""} onChange={e => change(item.id, { minimumValue: e.target.value ? Number(e.target.value) : null })} /></div><div className="space-y-2"><Label>{t("form.maximum")}</Label><Input type="number" min={0} value={item.maximumValue ?? ""} onChange={e => change(item.id, { maximumValue: e.target.value ? Number(e.target.value) : null })} /></div><div className="space-y-2"><Label>{t("productUnits.baseOrderStep")}</Label><Input type="number" min="0.001" step="any" value={item.orderQuantityStep} onChange={e => change(item.id, { orderQuantityStep: e.target.value === "" ? 0 : Number(e.target.value) })} /><p className="text-xs text-muted-foreground">{t("productUnits.baseOrderStepHelp")}</p></div><div className="space-y-2"><Label>{t("productUnits.quickQuantities")}</Label><QuickQuantityEditor value={item.quickOrderQuantities} step={item.orderQuantityStep} onChange={quickOrderQuantities => change(item.id, { quickOrderQuantities })} compact disabled={saving} /></div></div>
+                        <div className="grid min-w-0 gap-4 md:grid-cols-2 2xl:grid-cols-3"><div className="min-w-0 space-y-2"><Label>{t("form.minimum")}</Label><Input type="number" min={0} value={item.minimumValue ?? ""} onChange={e => change(item.id, { minimumValue: e.target.value ? Number(e.target.value) : null })} /></div><div className="min-w-0 space-y-2"><Label>{t("form.maximum")}</Label><Input type="number" min={0} value={item.maximumValue ?? ""} onChange={e => change(item.id, { maximumValue: e.target.value ? Number(e.target.value) : null })} /></div><div className="min-w-0 space-y-2"><Label>{t("productUnits.baseOrderStep")}</Label><Input type="number" min="0.001" step="any" value={item.orderQuantityStep} onChange={e => change(item.id, { orderQuantityStep: e.target.value === "" ? 0 : Number(e.target.value) })} /><p className="text-xs text-muted-foreground">{t("productUnits.baseOrderStepHelp")}</p></div><div className="min-w-0 space-y-2 md:col-span-2 2xl:col-span-3"><Label>{t("productUnits.quickQuantities")}</Label><QuickQuantityEditor value={item.quickOrderQuantities} step={item.orderQuantityStep} onChange={quickOrderQuantities => change(item.id, { quickOrderQuantities })} compact disabled={saving} /></div></div>
                         <div className="rounded-xl border bg-muted/20 p-4">
                             <ToggleCard title="Display stock" description="Show an orderable quantity without changing physical inventory." checked={item.usesDisplayStock} onChange={usesDisplayStock => change(item.id, { usesDisplayStock, displayStockQuantity: usesDisplayStock ? item.displayStockQuantity : null })} />
                             {item.usesDisplayStock ? <div className="mt-4 space-y-2 border-t pt-4"><Label>Customer-visible quantity</Label><Input type="number" min={0} step="any" value={item.displayStockQuantity ?? ""} onChange={event => change(item.id, { displayStockQuantity: event.target.value === "" ? null : Number(event.target.value) })} /></div> : null}

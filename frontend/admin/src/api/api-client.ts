@@ -63,8 +63,14 @@ class ApiClient {
             const candidate = error as { response?: { data?: unknown }; message?: string };
             if (candidate.response?.data instanceof Blob) {
                 try {
-                    const body = JSON.parse(await candidate.response.data.text()) as { message?: string };
-                    if (body.message) candidate.message = body.message;
+                    const body = JSON.parse(await candidate.response.data.text()) as {
+                        message?: string;
+                        title?: string;
+                        errors?: Record<string, string[]>;
+                    };
+                    const validationMessage = body.errors && Object.values(body.errors).flat().find((value) => value?.trim());
+                    const responseMessage = body.message?.trim() || body.title?.trim() || validationMessage?.trim();
+                    if (responseMessage) candidate.message = responseMessage;
                 } catch {
                     // Keep the original transport error when the response is not JSON.
                 }
@@ -72,11 +78,16 @@ class ApiClient {
             throw candidate;
         }
         const contentType = (response.headers["content-type"] as string | undefined)?.toLowerCase() ?? "";
-        if (contentType.includes("application/json")) {
+        if (contentType.includes("json")) {
             let message = "The server returned an unexpected response instead of a file.";
             try {
-                const body = JSON.parse(await response.data.text()) as { message?: string };
-                if (body.message?.trim()) message = body.message;
+                const body = JSON.parse(await response.data.text()) as {
+                    message?: string;
+                    title?: string;
+                    errors?: Record<string, string[]>;
+                };
+                const validationMessage = body.errors && Object.values(body.errors).flat().find((value) => value?.trim());
+                message = body.message?.trim() || body.title?.trim() || validationMessage?.trim() || message;
             } catch {
                 // Keep the safe download-specific message for malformed JSON.
             }

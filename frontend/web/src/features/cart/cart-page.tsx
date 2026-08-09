@@ -27,9 +27,11 @@ import {
     type CartItem,
 } from "./cart-context";
 import { useI18n } from "../../i18n/i18n-provider";
+import { useCompany } from "../company/company-context";
 
 export function CartPage() {
     const cart = useCart();
+    const { company } = useCompany();
     const { t, formatNumber } = useI18n();
     const configuration = useQuery({
         queryKey: ["checkout-configuration"],
@@ -60,7 +62,15 @@ export function CartPage() {
         const product = productsById.get(item.id);
         if (!product) return { ...item, stock: 0 };
         const factor = item.conversionFactor && item.conversionFactor > 0 ? item.conversionFactor : 1;
-        return { ...item, stock: Math.max(0, product.stock / factor) };
+        const quickOrderQuantities = product.quickOrderQuantities?.length
+            ? product.quickOrderQuantities
+            : company?.settings.defaultQuickOrderQuantities ?? [];
+        return {
+            ...item,
+            stock: Math.max(0, product.stock / factor),
+            quantityStep: product.orderQuantityStep > 0 ? product.orderQuantityStep : 1,
+            quickOrderQuantities,
+        };
     };
     const availabilityIssue = (item: CartItem) => {
         if (!availabilityReady) return null;
@@ -191,7 +201,7 @@ export function CartPage() {
                                         </Link>
                                         <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                             {item.unitName ? <span className="inline-flex w-fit rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-[10px] font-bold text-primary">{formatNumber(item.quantity)} {item.unitName}</span> : null}
-                                            {cartQuantityStep(item) > 1 ? <span className="inline-flex w-fit rounded-full border border-primary/10 bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">{t("cart.quantityStep", { count: formatNumber(cartQuantityStep(item)) })}</span> : null}
+                                            {cartQuantityStep(currentCartItem(item)) > 1 ? <span className="inline-flex w-fit rounded-full border border-primary/10 bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">{t("cart.quantityStep", { count: formatNumber(cartQuantityStep(currentCartItem(item))) })}</span> : null}
                                         </div>
 
                                         <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
@@ -230,7 +240,8 @@ export function CartPage() {
                                                     onClick={() =>
                                                         cart.updateQuantity(
                                                             item.lineKey,
-                                                            item.quantity - cartQuantityStep(item),
+                                                            item.quantity - cartQuantityStep(currentCartItem(item)),
+                                                            currentCartItem(item),
                                                         )
                                                     }
                                                     aria-label={`Decrease ${item.name} quantity`}
@@ -240,7 +251,7 @@ export function CartPage() {
 
                                                 <CartQuantityInput
                                                     item={currentCartItem(item)}
-                                                    onChange={(quantity) => cart.updateQuantity(item.lineKey, quantity)}
+                                                    onChange={(quantity) => cart.updateQuantity(item.lineKey, quantity, currentCartItem(item))}
                                                 />
 
                                                 <Button
@@ -255,7 +266,8 @@ export function CartPage() {
                                                     onClick={() =>
                                                         cart.updateQuantity(
                                                             item.lineKey,
-                                                            item.quantity + cartQuantityStep(item),
+                                                            item.quantity + cartQuantityStep(currentCartItem(item)),
+                                                            currentCartItem(item),
                                                         )
                                                     }
                                                     aria-label={`Increase ${item.name} quantity`}
@@ -270,7 +282,7 @@ export function CartPage() {
                                                             <button
                                                                 key={quantity}
                                                                 type="button"
-                                                                onClick={() => cart.updateQuantity(item.lineKey, quantity)}
+                                                                onClick={() => cart.updateQuantity(item.lineKey, quantity, currentCartItem(item))}
                                                                 className={`inline-flex h-6 min-w-8 items-center justify-center rounded-full border px-2 text-[10px] font-black tabular-nums transition ${Math.abs(item.quantity - quantity) < Number.EPSILON ? "border-primary bg-primary text-primary-foreground" : "border-primary/15 bg-primary/[0.045] text-primary hover:bg-primary/[0.09]"}`}
                                                                 aria-label={t("cart.setQuickQuantity", { count: formatNumber(quantity) })}
                                                             >

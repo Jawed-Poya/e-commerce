@@ -602,8 +602,6 @@ public class ProductService : IProductService
                 product.Barcode,
                 null,
                 null,
-                product.OrderQuantityStep <= 0 ? 1 : product.OrderQuantityStep,
-                ParseQuickOrderQuantities(product.QuickOrderQuantities),
                 true,
                 activeConversions.All(conversion => !conversion.IsDefault),
                 true,
@@ -627,8 +625,6 @@ public class ProductService : IProductService
                 conversion.Barcode,
                 conversion.PriceOverride,
                 conversion.OldPriceOverride,
-                conversion.OrderQuantityStep <= 0 ? 1 : conversion.OrderQuantityStep,
-                ParseQuickOrderQuantities(conversion.QuickOrderQuantities),
                 false,
                 conversion.IsDefault,
                 conversion.IsActive,
@@ -1313,8 +1309,6 @@ public class ProductService : IProductService
         Barcode = NormalizeOptional(conversion.Barcode),
         PriceOverride = conversion.PriceOverride,
         OldPriceOverride = conversion.OldPriceOverride,
-        OrderQuantityStep = conversion.OrderQuantityStep,
-        QuickOrderQuantities = SerializeQuickOrderQuantities(ValidateQuickOrderQuantities(conversion.QuickOrderQuantities, conversion.OrderQuantityStep, "UnitConversions.QuickOrderQuantities")),
         IsDefault = conversion.IsDefault,
         IsActive = conversion.IsActive,
         SortOrder = conversion.SortOrder
@@ -1354,8 +1348,6 @@ public class ProductService : IProductService
             existing.Barcode = NormalizeOptional(request.Barcode);
             existing.PriceOverride = request.PriceOverride;
             existing.OldPriceOverride = request.OldPriceOverride;
-            existing.OrderQuantityStep = request.OrderQuantityStep;
-            existing.QuickOrderQuantities = SerializeQuickOrderQuantities(ValidateQuickOrderQuantities(request.QuickOrderQuantities, request.OrderQuantityStep, "UnitConversions.QuickOrderQuantities"));
             existing.IsDefault = request.IsDefault;
             existing.IsActive = request.IsActive;
             existing.SortOrder = request.SortOrder;
@@ -1381,9 +1373,8 @@ public class ProductService : IProductService
             throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["The storefront default selling unit must be active."] });
         foreach (var item in conversions)
         {
-            if (item.UnitId <= 0 || item.ConversionFactor < 1 || item.OrderQuantityStep <= 0)
-                throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Every selling unit requires a valid unit, a conversion factor of at least one base unit, and an order quantity step greater than zero."] });
-            ValidateQuickOrderQuantities(item.QuickOrderQuantities, item.OrderQuantityStep, $"{key}[{item.UnitId}].QuickOrderQuantities");
+            if (item.UnitId <= 0 || item.ConversionFactor < 1)
+                throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Every selling unit requires a valid unit and a conversion factor of at least one base unit."] });
             if (item.PriceOverride < 0 || item.OldPriceOverride < 0 ||
                 (item.PriceOverride.HasValue && item.OldPriceOverride.HasValue && item.OldPriceOverride < item.PriceOverride))
                 throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Unit prices cannot be negative and old price cannot be lower than the selling price."] });

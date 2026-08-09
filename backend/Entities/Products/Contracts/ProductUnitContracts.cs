@@ -21,11 +21,6 @@ public sealed class ProductUnitConversionRequest
     [Range(typeof(decimal), "0", "999999999999999.99")]
     public decimal? OldPriceOverride { get; set; }
 
-    [Range(typeof(decimal), "0.001", "999999999999999.999", ErrorMessage = "Order quantity step must be greater than zero.")]
-    public decimal OrderQuantityStep { get; set; } = 1;
-
-    public List<decimal> QuickOrderQuantities { get; set; } = [];
-
     public bool IsDefault { get; set; }
     public bool IsActive { get; set; } = true;
     public int SortOrder { get; set; }
@@ -39,8 +34,6 @@ public sealed record ProductUnitConversionResponse(
     string? Barcode,
     decimal? PriceOverride,
     decimal? OldPriceOverride,
-    decimal OrderQuantityStep,
-    IReadOnlyList<decimal> QuickOrderQuantities,
     bool IsBaseUnit,
     bool IsDefault,
     bool IsActive,

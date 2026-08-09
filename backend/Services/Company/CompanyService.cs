@@ -11,6 +11,7 @@ namespace ECommerce.Services.Company;
 public sealed class CompanyService(ApplicationDbContext context) : ICompanyService
 {
     private static readonly int[] DefaultExpiryPeriods = [30, 14, 7, 3, 1, 0];
+    private static readonly decimal[] DefaultQuickOrderQuantities = [20m, 30m, 40m, 50m];
 
     public async Task<PublicCompanyProfileResponse> GetPublicProfileAsync(CancellationToken cancellationToken = default)
     {
@@ -75,6 +76,10 @@ public sealed class CompanyService(ApplicationDbContext context) : ICompanyServi
         settings.DariFontFamily = Required(request.DariFontFamily, "Dari font");
         settings.PashtoFontFamily = Required(request.PashtoFontFamily, "Pashto font");
         settings.BaseFontSize = request.BaseFontSize;
+        settings.DefaultQuickOrderQuantitiesJson = JsonSerializer.Serialize(
+            request.DefaultQuickOrderQuantities is null
+                ? ParseQuickOrderQuantities(settings.DefaultQuickOrderQuantitiesJson)
+                : NormalizeQuickOrderQuantities(request.DefaultQuickOrderQuantities, throwOnInvalid: true));
         settings.TrashRetentionDays = request.TrashRetentionDays;
         settings.NotificationRetentionDays = request.NotificationRetentionDays;
         settings.ExpiryAlertsEnabled = request.ExpiryAlertsEnabled;
@@ -232,6 +237,7 @@ public sealed class CompanyService(ApplicationDbContext context) : ICompanyServi
         settings.DariFontFamily,
         settings.PashtoFontFamily,
         settings.BaseFontSize,
+        ParseQuickOrderQuantities(settings.DefaultQuickOrderQuantitiesJson),
         settings.TrashRetentionDays,
         settings.NotificationRetentionDays,
         settings.ExpiryAlertsEnabled,
@@ -268,6 +274,48 @@ public sealed class CompanyService(ApplicationDbContext context) : ICompanyServi
         return normalized.Length == 0 ? DefaultExpiryPeriods : normalized;
     }
 
+    private static decimal[] ParseQuickOrderQuantities(string? json)
+    {
+        try
+        {
+            return NormalizeQuickOrderQuantities(
+                JsonSerializer.Deserialize<decimal[]>(json ?? string.Empty),
+                throwOnInvalid: false);
+        }
+        catch (JsonException)
+        {
+            return DefaultQuickOrderQuantities;
+        }
+    }
+
+    private static decimal[] NormalizeQuickOrderQuantities(
+        IEnumerable<decimal>? values,
+        bool throwOnInvalid)
+    {
+        if (values is null)
+            return DefaultQuickOrderQuantities;
+
+        var requested = values.ToArray();
+        if (requested.Length > 8)
+        {
+            if (throwOnInvalid)
+                throw new ArgumentException("Configure no more than 8 default quick quantities.");
+            return DefaultQuickOrderQuantities;
+        }
+
+        if (requested.Any(value => value <= 0))
+        {
+            if (throwOnInvalid)
+                throw new ArgumentException("Default quick quantities must be greater than zero.");
+            return DefaultQuickOrderQuantities;
+        }
+
+        return requested
+            .Distinct()
+            .OrderBy(value => value)
+            .ToArray();
+    }
+
     private static void ValidateBranch(UpsertCompanyBranchRequest request)
     {
         _ = Required(request.Name, "Branch name");
@@ -301,6 +349,8 @@ public sealed class CompanyService(ApplicationDbContext context) : ICompanyServi
         var expirySound = Required(request.ExpiryAlertSound, "Expiry alert sound").ToLowerInvariant();
         if (expirySound is not ("critical-pulse" or "urgent-alarm" or "warning-chime"))
             throw new ArgumentException("Expiry alert sound is not supported.");
+        if (request.DefaultQuickOrderQuantities is not null)
+            _ = NormalizeQuickOrderQuantities(request.DefaultQuickOrderQuantities, throwOnInvalid: true);
         return periods;
     }
 

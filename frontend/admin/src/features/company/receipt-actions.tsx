@@ -27,7 +27,6 @@ export function ReceiptActions({ source, id, compact = false }: ReceiptActionsPr
         setDownloading(true);
         try {
             await companyService.downloadReceipt(source, id, format, thermal);
-            toast.success(tr(thermal ? "Thermal receipt downloaded." : "Receipt downloaded."));
         } catch (error) {
             toast.error(tr(getErrorMessage(error)));
         } finally {
@@ -92,10 +91,8 @@ export function ReceiptActions({ source, id, compact = false }: ReceiptActionsPr
 }
 
 function getErrorMessage(error: unknown) {
-    return (
-        (error as { response?: { data?: { message?: string } }; message?: string })
-            ?.response?.data?.message ??
-        (error as Error)?.message ??
-        "Could not generate the receipt."
-    );
+    const responseMessage = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
+    if (typeof responseMessage === "string" && responseMessage.trim()) return responseMessage.trim();
+    if (error instanceof Error && error.message.trim()) return error.message.trim();
+    return "Could not generate the receipt.";
 }

@@ -77,7 +77,7 @@ export default function ProductDetailsPage() {
             </CardHeader>
             <CardContent>
                 {product.unitConversions.length ? (
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         {product.unitConversions.map(unit => (
                             <div key={`${unit.isBaseUnit ? "base" : unit.id}-${unit.unitId}`} className={`rounded-xl border p-4 ${unit.isDefault ? "border-primary/35 bg-primary/[0.04]" : "bg-muted/15"}`}>
                                 <div className="flex items-start justify-between gap-2">
@@ -87,8 +87,6 @@ export default function ProductDetailsPage() {
                                 <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
                                     <Detail label="Available" value={`${formatNumber(unit.availableQuantity)} ${unit.unitName}`} />
                                     <Detail label="Price" value={money(unit.price)} />
-                                    <Detail label="Cart step" value={formatNumber(unit.orderQuantityStep)} />
-                                    <Detail label="Quick quantities" value={unit.quickOrderQuantities.length ? unit.quickOrderQuantities.map(formatNumber).join(" · ") : "—"} />
                                 </div>
                                 {unit.barcode ? <p className="mt-3 truncate font-mono text-[11px] text-muted-foreground">{unit.barcode}</p> : null}
                             </div>

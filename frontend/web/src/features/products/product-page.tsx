@@ -75,10 +75,9 @@ export function ProductPage() {
   useEffect(() => {
     if (!q.data) return;
     const activeUnits = q.data.unitConversions.filter((unit) => unit.isActive);
-    const isOrderable = (unit: (typeof activeUnits)[number]) => {
-      const step = unit.orderQuantityStep > 0 ? unit.orderQuantityStep : 1;
-      return unit.price != null && unit.availableQuantity >= step;
-    };
+    const step = q.data.orderQuantityStep > 0 ? q.data.orderQuantityStep : 1;
+    const isOrderable = (unit: (typeof activeUnits)[number]) =>
+      unit.price != null && unit.availableQuantity >= step;
     const preferred = activeUnits.find((unit) => unit.isDefault && isOrderable(unit))
       ?? activeUnits.find(isOrderable)
       ?? activeUnits.find((unit) => unit.isDefault)
@@ -156,7 +155,6 @@ export function ProductPage() {
         barcode: p.barcode,
         priceOverride: null,
         oldPriceOverride: null,
-        orderQuantityStep: p.orderQuantityStep || 1,
         isBaseUnit: true,
         isDefault: true,
         isActive: true,
@@ -189,13 +187,32 @@ export function ProductPage() {
   const cartItem = cart.items.find(
     (item) => item.lineKey === selectedCartLineKey,
   );
-  const quantityStep = selectedUnit?.orderQuantityStep || p.orderQuantityStep || 1;
-  const quickOrderQuantities = selectedUnit?.quickOrderQuantities ?? p.quickOrderQuantities ?? [];
+  const quantityStep = p.orderQuantityStep > 0 ? p.orderQuantityStep : 1;
+  const quickOrderQuantities = p.quickOrderQuantities?.length
+    ? p.quickOrderQuantities
+    : company?.settings.defaultQuickOrderQuantities ?? [];
   const minimumQuantity = minimumCartQuantity({ stock, quantityStep });
   const maximumQuantity = maximumCartQuantity({ stock, quantityStep });
-  const availableQuickOrderQuantities = quickOrderQuantities.filter((quantity) => quantity <= maximumQuantity + Number.EPSILON);
+  const availableQuickOrderQuantities = quickOrderQuantities.filter(
+    (quantity) =>
+      quantity > 0 &&
+      quantity <= maximumQuantity + Number.EPSILON &&
+      Math.abs(quantity / quantityStep - Math.round(quantity / quantityStep)) < 1e-9,
+  );
   const hasOrderableStock = maximumQuantity >= minimumQuantity;
   const canAddToCart = hasPrice && hasOrderableStock;
+  const liveCartItem = cartItem
+    ? {
+        ...cartItem,
+        stock,
+        price: price ?? cartItem.price,
+        quantityStep,
+        quickOrderQuantities,
+        unitId: selectedUnit?.unitId ?? p.unitId,
+        unitName: selectedUnit?.unitName ?? p.unitName,
+        conversionFactor: factor,
+      }
+    : null;
   const notificationLabel =
     notificationPermission === "granted"
       ? t("product.alertsEnabled")
@@ -455,26 +472,14 @@ export function ProductPage() {
                       <span className="mt-2 block text-xs font-bold text-primary">{unit.price != null ? formatMoney(unit.price) : t("product.noPrice")}</span>
                       <span className={cn(
                         "mt-2 inline-flex rounded-full px-2 py-0.5 text-[9px] font-black",
-                        unit.price != null && unit.availableQuantity >= (unit.orderQuantityStep > 0 ? unit.orderQuantityStep : 1)
+                        unit.price != null && unit.availableQuantity >= quantityStep
                           ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                           : "bg-destructive/10 text-destructive",
                       )}>
-                        {unit.price != null && unit.availableQuantity >= (unit.orderQuantityStep > 0 ? unit.orderQuantityStep : 1)
+                        {unit.price != null && unit.availableQuantity >= quantityStep
                           ? t("product.inStock")
                           : t("product.unavailable")}
                       </span>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {unit.orderQuantityStep > 1 ? (
-                          <Badge variant="secondary" className="h-5 border border-primary/15 bg-primary/[0.06] px-1.5 text-[9px] font-black text-primary">
-                            {t("cart.quantityStep", { count: formatNumber(unit.orderQuantityStep) })}
-                          </Badge>
-                        ) : null}
-                        {(unit.quickOrderQuantities ?? []).filter((quantity) => quantity <= unit.availableQuantity + Number.EPSILON).slice(0, 3).map((quantity) => (
-                          <span key={quantity} className="inline-flex h-5 min-w-7 items-center justify-center rounded-full border border-primary/15 bg-background px-1.5 text-[9px] font-black tabular-nums text-primary">
-                            {formatNumber(quantity)}
-                          </span>
-                        ))}
-                      </div>
                     </button>
                   ))}
                 </div>
@@ -520,7 +525,7 @@ export function ProductPage() {
             <div className="mt-6 hidden gap-3 sm:flex">
               {cartItem && canAddToCart ? (
                 <CartQuantityControl
-                  item={cartItem}
+                  item={liveCartItem!}
                   className="min-w-0 flex-1"
                 />
               ) : (
@@ -650,7 +655,7 @@ export function ProductPage() {
 
           {cartItem && canAddToCart ? (
             <CartQuantityControl
-              item={cartItem}
+              item={liveCartItem!}
               className="ms-auto"
             />
           ) : (

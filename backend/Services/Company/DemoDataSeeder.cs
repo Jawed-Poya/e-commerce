@@ -329,6 +329,7 @@ public sealed class DemoDataSeeder(
         settings.AdminSecondaryColor = DefaultSecondaryColor;
         settings.StorefrontPrimaryColor = DefaultPrimaryColor;
         settings.StorefrontSecondaryColor = DefaultSecondaryColor;
+        settings.DefaultQuickOrderQuantitiesJson = "[20,30,40,50]";
         settings.UpdatedAt = DateTime.UtcNow;
     }
 

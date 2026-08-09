@@ -28,12 +28,6 @@ public sealed class ProductUnitConversion : BaseEntity
     /// <summary>Optional crossed-out price override for one selected unit.</summary>
     public decimal? OldPriceOverride { get; set; }
 
-    /// <summary>Quantity changed by one storefront + / - action when this selling unit is selected.</summary>
-    public decimal OrderQuantityStep { get; set; } = 1;
-
-    /// <summary>Optional quick quantity presets for this selling unit.</summary>
-    public string? QuickOrderQuantities { get; set; }
-
     public bool IsDefault { get; set; }
     public bool IsActive { get; set; } = true;
     public int SortOrder { get; set; }

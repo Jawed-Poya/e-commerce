@@ -135,8 +135,6 @@ function createProductsFormData(request: CreateBulkProductsRequest): FormData {
                 `${unitPrefix}.OldPriceOverride`,
                 unit.oldPriceOverride,
             );
-            formData.append(`${unitPrefix}.OrderQuantityStep`, String(unit.orderQuantityStep));
-            unit.quickOrderQuantities.forEach((quantity, quantityIndex) => formData.append(`${unitPrefix}.QuickOrderQuantities[${quantityIndex}]`, String(quantity)));
             formData.append(`${unitPrefix}.IsDefault`, String(unit.isDefault));
             formData.append(`${unitPrefix}.IsActive`, String(unit.isActive));
             formData.append(`${unitPrefix}.SortOrder`, String(unit.sortOrder));

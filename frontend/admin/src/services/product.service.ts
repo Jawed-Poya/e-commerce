@@ -67,8 +67,6 @@ export interface ProductUnitConversion {
     barcode: string | null;
     priceOverride: number | null;
     oldPriceOverride: number | null;
-    orderQuantityStep: number;
-    quickOrderQuantities: number[];
     isBaseUnit: boolean;
     isDefault: boolean;
     isActive: boolean;
@@ -80,7 +78,7 @@ export interface ProductUnitConversion {
 
 export type ProductUnitConversionInput = Pick<ProductUnitConversion,
     "id" | "unitId" | "conversionFactor" | "barcode" | "priceOverride" |
-    "oldPriceOverride" | "orderQuantityStep" | "quickOrderQuantities" | "isDefault" | "isActive" | "sortOrder">;
+    "oldPriceOverride" | "isDefault" | "isActive" | "sortOrder">;
 
 export interface ProductPrice {
     id: number;
@@ -203,8 +201,6 @@ export const productService = {
             append(formData, `${unitPrefix}.Barcode`, unit.barcode?.trim() || null);
             append(formData, `${unitPrefix}.PriceOverride`, unit.priceOverride);
             append(formData, `${unitPrefix}.OldPriceOverride`, unit.oldPriceOverride);
-            append(formData, `${unitPrefix}.OrderQuantityStep`, unit.orderQuantityStep);
-            unit.quickOrderQuantities.forEach((quantity, quantityIndex) => append(formData, `${unitPrefix}.QuickOrderQuantities[${quantityIndex}]`, quantity));
             append(formData, `${unitPrefix}.IsDefault`, unit.isDefault);
             append(formData, `${unitPrefix}.IsActive`, unit.isActive);
             append(formData, `${unitPrefix}.SortOrder`, unit.sortOrder);
@@ -254,8 +250,6 @@ export const productService = {
                 append(formData, `${unitPrefix}.Barcode`, unit.barcode?.trim() || null);
                 append(formData, `${unitPrefix}.PriceOverride`, unit.priceOverride);
                 append(formData, `${unitPrefix}.OldPriceOverride`, unit.oldPriceOverride);
-                append(formData, `${unitPrefix}.OrderQuantityStep`, unit.orderQuantityStep);
-                unit.quickOrderQuantities.forEach((quantity, quantityIndex) => append(formData, `${unitPrefix}.QuickOrderQuantities[${quantityIndex}]`, quantity));
                 append(formData, `${unitPrefix}.IsDefault`, unit.isDefault);
                 append(formData, `${unitPrefix}.IsActive`, unit.isActive);
                 append(formData, `${unitPrefix}.SortOrder`, unit.sortOrder);

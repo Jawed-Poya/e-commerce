@@ -887,10 +887,8 @@ function date(value: string) {
 }
 
 function message(error: unknown) {
-    return (
-        (error as { response?: { data?: { message?: string } }; message?: string })
-            .response?.data?.message ??
-        (error as Error).message ??
-        "The operation failed."
-    );
+    const responseMessage = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
+    if (typeof responseMessage === "string" && responseMessage.trim()) return responseMessage.trim();
+    if (error instanceof Error && error.message.trim()) return error.message.trim();
+    return "The operation failed.";
 }

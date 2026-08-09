@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { useI18n } from "@/i18n/i18n-provider";
 import { cn } from "@/lib/utils";
 import type { ProductUnitConversionInput } from "@/services/product.service";
-import { QuickQuantityEditor } from "./quick-quantity-editor";
 
 interface UnitOption {
     id: number;
@@ -43,8 +42,6 @@ export function createEmptyUnitConversion(
         barcode: null,
         priceOverride: null,
         oldPriceOverride: null,
-        orderQuantityStep: 1,
-        quickOrderQuantities: [],
         isDefault: index === 0,
         isActive: true,
         sortOrder: index,
@@ -71,12 +68,7 @@ export function validateUnitConversions(
                 !unit.unitId ||
                 unit.unitId === baseUnitId ||
                 !Number.isFinite(unit.conversionFactor) ||
-                unit.conversionFactor < 1 ||
-                !Number.isFinite(unit.orderQuantityStep) ||
-                unit.orderQuantityStep <= 0 ||
-                unit.quickOrderQuantities.some((quantity) =>
-                    quantity <= 0 || Math.abs(quantity / unit.orderQuantityStep - Math.round(quantity / unit.orderQuantityStep)) > 1e-9,
-                ),
+                unit.conversionFactor < 1,
         )
     ) {
         return "productUnits.invalidConversionError";
@@ -163,14 +155,14 @@ export function ProductUnitConversionsFields({
     return (
         <section
             className={cn(
-                "rounded-xl bg-muted/15 p-4 ring-1 ring-border/70 dark:bg-white/[0.025] dark:ring-white/[0.07]",
+                "min-w-0 rounded-xl bg-muted/15 p-4 ring-1 ring-border/70 dark:bg-white/[0.025] dark:ring-white/[0.07]",
                 compact ? "space-y-3" : "space-y-4",
             )}
         >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
+                <div className="min-w-0">
                     <h3 className="flex items-center gap-2 text-sm font-semibold">
-                        <Boxes className="size-4 text-primary" />
+                        <Boxes className="size-4 shrink-0 text-primary" />
                         {t("productUnits.title")}
                     </h3>
                     <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
@@ -182,6 +174,7 @@ export function ProductUnitConversionsFields({
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="w-full shrink-0 sm:w-auto"
                     disabled={disabled || !baseUnitId}
                     onClick={addUnit}
                 >
@@ -205,7 +198,7 @@ export function ProductUnitConversionsFields({
                     {t("productUnits.empty")}
                 </div>
             ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                     {value.map((unit, index) => {
                         const availableUnits = units.filter(
                             (option) =>
@@ -219,101 +212,25 @@ export function ProductUnitConversionsFields({
                         );
 
                         return (
-                            <div
+                            <article
                                 key={`${unit.id ?? "new"}-${index}`}
-                                className="grid gap-3 rounded-xl bg-background/75 p-3 ring-1 ring-border/70 dark:bg-white/[0.025] dark:ring-white/[0.07] md:grid-cols-2 xl:grid-cols-6"
+                                className="min-w-0 space-y-4 rounded-xl bg-background/80 p-4 ring-1 ring-border/70 dark:bg-white/[0.025] dark:ring-white/[0.07]"
                             >
-                                <Field label={t("productUnits.sellingUnit")}>
-                                    <SimpleCombobox<number>
-                                        value={unit.unitId || null}
-                                        onValueChange={(unitId) =>
-                                            updateUnit(index, {
-                                                unitId: unitId ?? 0,
-                                            })
-                                        }
-                                        options={availableUnits.map((option) => ({
-                                            value: option.id,
-                                            label: option.name,
-                                        }))}
-                                        placeholder={t("productUnits.selectUnit")}
-                                        disabled={disabled}
-                                    />
-                                </Field>
-
-                                <Field label={t("productUnits.factor")}>
-                                    <Input
-                                        type="number"
-                                        min="1"
-                                        step="any"
-                                        disabled={disabled}
-                                        value={unit.conversionFactor}
-                                        onChange={(event) =>
-                                            updateUnit(index, {
-                                                conversionFactor:
-                                                    event.target.value === ""
-                                                        ? 0
-                                                        : Number(
-                                                              event.target.value,
-                                                          ),
-                                            })
-                                        }
-                                    />
-                                </Field>
-
-                                <Field label={t("productUnits.orderStep")}>
-                                    <Input
-                                        type="number"
-                                        min="0.001"
-                                        step="any"
-                                        disabled={disabled}
-                                        value={unit.orderQuantityStep}
-                                        onChange={(event) =>
-                                            updateUnit(index, {
-                                                orderQuantityStep:
-                                                    event.target.value === ""
-                                                        ? 0
-                                                        : Number(event.target.value),
-                                            })
-                                        }
-                                    />
-                                    <p className="text-[10px] leading-4 text-muted-foreground">
-                                        {t("productUnits.orderStepHelp")}
-                                    </p>
-                                </Field>
-
-                                <Field label={t("productUnits.quickQuantities")}>
-                                    <QuickQuantityEditor
-                                        value={unit.quickOrderQuantities}
-                                        step={unit.orderQuantityStep}
-                                        disabled={disabled}
-                                        compact
-                                        onChange={(quickOrderQuantities) =>
-                                            updateUnit(index, { quickOrderQuantities })
-                                        }
-                                    />
-                                </Field>
-
-                                <Field label={t("productUnits.barcode")}>
-
-                                    <Input
-                                        disabled={disabled}
-                                        value={unit.barcode ?? ""}
-                                        onChange={(event) =>
-                                            updateUnit(index, {
-                                                barcode:
-                                                    event.target.value || null,
-                                            })
-                                        }
-                                        placeholder={t("productUnits.optional")}
-                                    />
-                                </Field>
-
-                                <div className="flex items-end justify-end">
+                                <div className="flex min-w-0 flex-col items-stretch gap-3 border-b border-border/60 pb-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.06]">
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-bold uppercase tracking-wide text-primary">
+                                            {t("productUnits.sellingUnit").replace(" *", "")} {index + 1}
+                                        </p>
+                                        <p className="mt-0.5 truncate text-sm font-semibold">
+                                            {units.find((option) => option.id === unit.unitId)?.name ?? t("productUnits.selectUnit")}
+                                        </p>
+                                    </div>
                                     <Button
                                         type="button"
                                         variant="ghost"
+                                        size="sm"
                                         disabled={disabled}
-                                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                        className="w-full shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-auto"
                                         onClick={() => removeUnit(index)}
                                     >
                                         <Trash2 className="me-2 size-4" />
@@ -321,85 +238,145 @@ export function ProductUnitConversionsFields({
                                     </Button>
                                 </div>
 
-                                <Field label={t("productUnits.priceOverride")}>
-                                    <Input
-                                        type="number"
-                                        min="0"
-                                        step="any"
-                                        disabled={disabled}
-                                        value={unit.priceOverride ?? ""}
-                                        onChange={(event) =>
-                                            updateUnit(index, {
-                                                priceOverride:
-                                                    event.target.value === ""
-                                                        ? null
-                                                        : Number(
-                                                              event.target.value,
-                                                          ),
-                                            })
-                                        }
-                                        placeholder={t(
-                                            "productUnits.autoPricePlaceholder",
-                                        )}
-                                    />
-                                </Field>
+                                <div
+                                    className={cn(
+                                        "grid min-w-0 gap-4",
+                                        compact
+                                            ? "grid-cols-1 xl:grid-cols-2"
+                                            : "grid-cols-1 md:grid-cols-2 2xl:grid-cols-3",
+                                    )}
+                                >
+                                    <Field label={t("productUnits.sellingUnit")}>
+                                        <SimpleCombobox<number>
+                                            value={unit.unitId || null}
+                                            onValueChange={(unitId) =>
+                                                updateUnit(index, {
+                                                    unitId: unitId ?? 0,
+                                                })
+                                            }
+                                            options={availableUnits.map((option) => ({
+                                                value: option.id,
+                                                label: option.name,
+                                            }))}
+                                            placeholder={t("productUnits.selectUnit")}
+                                            disabled={disabled}
+                                        />
+                                    </Field>
 
-                                <Field label={t("productUnits.oldPriceOverride")}>
-                                    <Input
-                                        type="number"
-                                        min="0"
-                                        step="any"
-                                        disabled={disabled}
-                                        value={unit.oldPriceOverride ?? ""}
-                                        onChange={(event) =>
-                                            updateUnit(index, {
-                                                oldPriceOverride:
-                                                    event.target.value === ""
-                                                        ? null
-                                                        : Number(
-                                                              event.target.value,
-                                                          ),
-                                            })
-                                        }
-                                        placeholder={t("productUnits.optional")}
-                                    />
-                                </Field>
+                                    <Field label={t("productUnits.factor")}>
+                                        <Input
+                                            className="w-full"
+                                            type="number"
+                                            min="1"
+                                            step="any"
+                                            disabled={disabled}
+                                            value={unit.conversionFactor}
+                                            onChange={(event) =>
+                                                updateUnit(index, {
+                                                    conversionFactor:
+                                                        event.target.value === ""
+                                                            ? 0
+                                                            : Number(event.target.value),
+                                                })
+                                            }
+                                        />
+                                    </Field>
 
-                                <label className="flex cursor-pointer items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 ring-1 ring-border/60 dark:bg-white/[0.025] dark:ring-white/[0.06]">
-                                    <Checkbox
-                                        checked={unit.isActive}
-                                        disabled={disabled}
-                                        onCheckedChange={(checked) =>
-                                            updateUnit(index, {
-                                                isActive: checked === true,
-                                                isDefault:
-                                                    checked === true
-                                                        ? unit.isDefault
-                                                        : false,
-                                            })
-                                        }
-                                    />
-                                    <span className="text-sm font-medium">
-                                        {t("productUnits.active")}
-                                    </span>
-                                </label>
+                                    <Field label={t("productUnits.barcode")}>
+                                        <Input
+                                            className="w-full"
+                                            disabled={disabled}
+                                            value={unit.barcode ?? ""}
+                                            onChange={(event) =>
+                                                updateUnit(index, {
+                                                    barcode: event.target.value || null,
+                                                })
+                                            }
+                                            placeholder={t("productUnits.optional")}
+                                        />
+                                    </Field>
 
-                                <label className="flex cursor-pointer items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 ring-1 ring-border/60 dark:bg-white/[0.025] dark:ring-white/[0.06]">
-                                    <Checkbox
-                                        checked={unit.isDefault}
-                                        disabled={disabled || !unit.isActive}
-                                        onCheckedChange={(checked) =>
-                                            setDefaultUnit(
-                                                index,
-                                                checked === true,
-                                            )
-                                        }
-                                    />
-                                    <span className="text-sm font-medium">
-                                        {t("productUnits.default")}
-                                    </span>
-                                </label>
-                            </div>
+                                    <Field label={t("productUnits.priceOverride")}>
+                                        <Input
+                                            className="w-full"
+                                            type="number"
+                                            min="0"
+                                            step="any"
+                                            disabled={disabled}
+                                            value={unit.priceOverride ?? ""}
+                                            onChange={(event) =>
+                                                updateUnit(index, {
+                                                    priceOverride:
+                                                        event.target.value === ""
+                                                            ? null
+                                                            : Number(event.target.value),
+                                                })
+                                            }
+                                            placeholder={t("productUnits.autoPricePlaceholder")}
+                                        />
+                                    </Field>
+
+                                    <Field label={t("productUnits.oldPriceOverride")}>
+                                        <Input
+                                            className="w-full"
+                                            type="number"
+                                            min="0"
+                                            step="any"
+                                            disabled={disabled}
+                                            value={unit.oldPriceOverride ?? ""}
+                                            onChange={(event) =>
+                                                updateUnit(index, {
+                                                    oldPriceOverride:
+                                                        event.target.value === ""
+                                                            ? null
+                                                            : Number(event.target.value),
+                                                })
+                                            }
+                                            placeholder={t("productUnits.optional")}
+                                        />
+                                    </Field>
+                                </div>
+
+                                <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                                    <label className="flex min-w-0 cursor-pointer items-start gap-3 rounded-lg bg-muted/30 px-3 py-3 ring-1 ring-border/60 dark:bg-white/[0.025] dark:ring-white/[0.06]">
+                                        <Checkbox
+                                            className="mt-0.5 shrink-0"
+                                            checked={unit.isActive}
+                                            disabled={disabled}
+                                            onCheckedChange={(checked) =>
+                                                updateUnit(index, {
+                                                    isActive: checked === true,
+                                                    isDefault:
+                                                        checked === true
+                                                            ? unit.isDefault
+                                                            : false,
+                                                })
+                                            }
+                                        />
+                                        <span className="min-w-0">
+                                            <span className="block text-sm font-medium">
+                                                {t("productUnits.active")}
+                                            </span>
+                                        </span>
+                                    </label>
+
+                                    <label className="flex min-w-0 cursor-pointer items-start gap-3 rounded-lg bg-muted/30 px-3 py-3 ring-1 ring-border/60 dark:bg-white/[0.025] dark:ring-white/[0.06]">
+                                        <Checkbox
+                                            className="mt-0.5 shrink-0"
+                                            checked={unit.isDefault}
+                                            disabled={disabled || !unit.isActive}
+                                            onCheckedChange={(checked) =>
+                                                setDefaultUnit(index, checked === true)
+                                            }
+                                        />
+                                        <span className="min-w-0">
+                                            <span className="block text-sm font-medium">
+                                                {t("productUnits.default")}
+                                            </span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </article>
                         );
                     })}
                 </div>
@@ -416,9 +393,9 @@ function Field({
     children: React.ReactNode;
 }) {
     return (
-        <div className="space-y-2">
-            <Label>{label}</Label>
-            {children}
+        <div className="min-w-0 space-y-2">
+            <Label className="block leading-5">{label}</Label>
+            <div className="min-w-0">{children}</div>
         </div>
     );
 }

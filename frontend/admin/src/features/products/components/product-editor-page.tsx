@@ -51,8 +51,6 @@ export function ProductEditorPage() {
       barcode: unit.barcode,
       priceOverride: unit.priceOverride,
       oldPriceOverride: unit.oldPriceOverride,
-      orderQuantityStep: unit.orderQuantityStep || 1,
-      quickOrderQuantities: unit.quickOrderQuantities ?? [],
       isDefault: unit.isDefault,
       isActive: unit.isActive,
       sortOrder: unit.sortOrder,
@@ -138,9 +136,11 @@ export function ProductEditorPage() {
           <Field label="Slug"><Input value={form.slug} onChange={e => setForm(x => ({ ...x, slug: e.target.value }))} placeholder="Generated automatically when empty" /></Field>
           <Field label="Minimum value"><Input type="number" min={0} value={form.minimumValue ?? ""} onChange={e => setForm(x => ({ ...x, minimumValue: e.target.value ? Number(e.target.value) : null }))} /></Field>
           <Field label="Maximum value"><Input type="number" min={0} value={form.maximumValue ?? ""} onChange={e => setForm(x => ({ ...x, maximumValue: e.target.value ? Number(e.target.value) : null }))} /></Field>
-          <Field label={t("productUnits.baseOrderStep")}><Input type="number" min="0.001" step="any" value={form.orderQuantityStep} onChange={e => setForm(x => ({ ...x, orderQuantityStep: e.target.value === "" ? 0 : Number(e.target.value) }))} /><p className="text-xs leading-5 text-muted-foreground">{t("productUnits.baseOrderStepHelp")}</p></Field>
-          <Field label={t("productUnits.quickQuantities")}><QuickQuantityEditor value={form.quickOrderQuantities} step={form.orderQuantityStep} onChange={quickOrderQuantities => setForm(x => ({ ...x, quickOrderQuantities }))} disabled={saving} /></Field>
           <Field label={t("inventory.reorderPoint")}><Input type="number" min={0} step="0.001" value={form.minimumStockQuantity} onChange={e => setForm(x => ({ ...x, minimumStockQuantity: e.target.value === "" ? 0 : Number(e.target.value) }))} /><p className="text-xs leading-5 text-muted-foreground">{t("inventory.reorderHelp")}</p></Field>
+          <section className="md:col-span-2 grid min-w-0 gap-4 rounded-xl border bg-muted/15 p-4 lg:grid-cols-[minmax(180px,280px)_minmax(0,1fr)]">
+            <Field label={t("productUnits.baseOrderStep")}><Input type="number" min="0.001" step="any" value={form.orderQuantityStep} onChange={e => setForm(x => ({ ...x, orderQuantityStep: e.target.value === "" ? 0 : Number(e.target.value) }))} /><p className="text-xs leading-5 text-muted-foreground">{t("productUnits.baseOrderStepHelp")}</p></Field>
+            <Field label={t("productUnits.quickQuantities")}><QuickQuantityEditor value={form.quickOrderQuantities} step={form.orderQuantityStep} onChange={quickOrderQuantities => setForm(x => ({ ...x, quickOrderQuantities }))} disabled={saving} /></Field>
+          </section>
           <div className="md:col-span-2 rounded-xl border border-primary/20 bg-primary/[0.035] p-4">
             <label className="flex cursor-pointer items-start justify-between gap-4">
               <span className="flex min-w-0 gap-3">
@@ -182,4 +182,4 @@ export function ProductEditorPage() {
   </div>;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-2"><Label>{label}</Label>{children}</div>; }
+function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="min-w-0 space-y-2"><Label className="block">{label}</Label><div className="min-w-0">{children}</div></div>; }

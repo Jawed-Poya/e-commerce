@@ -21,6 +21,7 @@ import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
 import { useI18n } from "@/i18n/i18n-provider";
 import { expiryAlertSounds, playExpiryAlertSound } from "@/features/notifications/expiry-alert-sounds";
+import { QuickQuantityEditor } from "@/features/products/components/quick-quantity-editor";
 
 const emptyBranch: UpsertCompanyBranch = {
     name: "",
@@ -392,7 +393,7 @@ export default function CompanySettingsPage() {
             </Card>
 
             <Card className="shadow-none">
-                <CardHeader className="border-b bg-muted/20"><CardTitle className="flex items-center gap-2"><Settings2 className="size-5 text-primary" /> Currency, appearance, and retention</CardTitle></CardHeader>
+                <CardHeader className="border-b bg-muted/20"><CardTitle className="flex items-center gap-2"><Settings2 className="size-5 text-primary" /> General settings</CardTitle><p className="mt-1 text-xs text-muted-foreground">Currency, appearance, storefront quantity shortcuts, retention, and system preferences.</p></CardHeader>
                 <CardContent className="p-5">
                     <form
                         className="space-y-6"
@@ -402,7 +403,7 @@ export default function CompanySettingsPage() {
                         }}
                     >
                         <fieldset disabled={!canManageSettings} className="space-y-6">
-                        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="grid min-w-0 gap-5 sm:grid-cols-2 2xl:grid-cols-4">
                             <Field label="Main currency"><Input maxLength={3} value={settings.mainCurrencyCode} onChange={(event) => setSettings({ ...settings, mainCurrencyCode: event.target.value.toUpperCase() })} /></Field>
                             <Field label="Currency symbol"><Input value={settings.currencySymbol} onChange={(event) => setSettings({ ...settings, currencySymbol: event.target.value })} /></Field>
                             <Field label="Symbol position"><SimpleCombobox value={settings.currencyPosition} onValueChange={(value) => value && setSettings({ ...settings, currencyPosition: value as "before" | "after" })} options={[{ value: "before", label: "Before amount" }, { value: "after", label: "After amount" }]} /></Field>
@@ -411,14 +412,14 @@ export default function CompanySettingsPage() {
 
                         <div className="rounded-xl border bg-muted/20 p-4"><p className="text-sm font-semibold">Money preview</p><p className="mt-2 text-2xl font-bold tabular-nums text-primary">{moneyPreview}</p></div>
 
-                        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="grid min-w-0 gap-5 sm:grid-cols-2 2xl:grid-cols-4">
                             <ColorField label="Admin primary" value={settings.adminPrimaryColor} onChange={(value) => setSettings({ ...settings, adminPrimaryColor: value })} />
                             <ColorField label="Admin secondary" value={settings.adminSecondaryColor} onChange={(value) => setSettings({ ...settings, adminSecondaryColor: value })} />
                             <ColorField label="Store primary" value={settings.storefrontPrimaryColor} onChange={(value) => setSettings({ ...settings, storefrontPrimaryColor: value })} />
                             <ColorField label="Store secondary" value={settings.storefrontSecondaryColor} onChange={(value) => setSettings({ ...settings, storefrontSecondaryColor: value })} />
                         </div>
 
-                        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="grid min-w-0 gap-5 sm:grid-cols-2 2xl:grid-cols-4">
                             <Field label="English font"><Input value={settings.englishFontFamily} onChange={(event) => setSettings({ ...settings, englishFontFamily: event.target.value })} /></Field>
                             <Field label="Dari font"><Input value={settings.dariFontFamily} onChange={(event) => setSettings({ ...settings, dariFontFamily: event.target.value })} /></Field>
                             <Field label="Pashto font"><Input value={settings.pashtoFontFamily} onChange={(event) => setSettings({ ...settings, pashtoFontFamily: event.target.value })} /></Field>
@@ -427,6 +428,25 @@ export default function CompanySettingsPage() {
                             <Field label="Notification retention days"><Input type="number" min={1} max={3650} value={settings.notificationRetentionDays} onChange={(event) => setSettings({ ...settings, notificationRetentionDays: Number(event.target.value) })} /></Field>
                             <div className="flex items-center justify-between gap-4 rounded-xl border p-4 sm:col-span-2"><div><p className="text-sm font-semibold">Allow permission assignment</p><p className="mt-1 text-xs text-muted-foreground">Administrators can assign permissions they already hold.</p></div><Switch checked={settings.allowUserClaimManagement} onCheckedChange={(checked) => setSettings({ ...settings, allowUserClaimManagement: checked })} /></div>
                         </div>
+
+                        <section className="min-w-0 rounded-2xl border bg-muted/15 p-4 sm:p-5">
+                            <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,520px)] lg:items-start">
+                                <div className="min-w-0">
+                                    <p className="text-sm font-bold">Default quick quantities</p>
+                                    <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
+                                        Storefront quantity shortcuts used when a product does not define its own values. Product-specific quick quantities always take priority; incompatible values are skipped for products with a different cart step.
+                                    </p>
+                                </div>
+                                <div className="min-w-0">
+                                    <QuickQuantityEditor
+                                        value={settings.defaultQuickOrderQuantities}
+                                        onChange={(defaultQuickOrderQuantities) =>
+                                            setSettings({ ...settings, defaultQuickOrderQuantities })
+                                        }
+                                    />
+                                </div>
+                            </div>
+                        </section>
 
                         <section className="overflow-hidden rounded-2xl border border-destructive/20 bg-destructive/[0.035]">
                             <div className="flex flex-col gap-3 border-b border-destructive/15 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">

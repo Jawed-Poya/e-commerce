@@ -44,7 +44,6 @@ export function CustomerLedgerCard({
         setExporting(format);
         try {
             await companyService.exportCustomerLedger(customerId, format, params);
-            toast.success(`Customer ledger ${format.toUpperCase()} downloaded.`);
         } catch (error) {
             toast.error(getErrorMessage(error));
         } finally {
@@ -177,10 +176,8 @@ function localDate(value: Date) {
 }
 
 function getErrorMessage(error: unknown) {
-    return (
-        (error as { response?: { data?: { message?: string } }; message?: string })
-            ?.response?.data?.message ??
-        (error as Error)?.message ??
-        "Could not load the customer ledger."
-    );
+    const responseMessage = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
+    if (typeof responseMessage === "string" && responseMessage.trim()) return responseMessage.trim();
+    if (error instanceof Error && error.message.trim()) return error.message.trim();
+    return "Could not load the customer ledger.";
 }

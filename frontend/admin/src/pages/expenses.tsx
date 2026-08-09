@@ -96,4 +96,4 @@ function Empty({ colSpan, text }: { colSpan: number; text: string }) { return <T
 function nullable(value: string) { const result = value.trim(); return result || null; }
 function money(value: number) { return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(value); }
 function date(value: string) { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`)); }
-function message(error: unknown) { return (error as { response?: { data?: { message?: string } }; message?: string }).response?.data?.message ?? (error as Error).message ?? "The operation failed."; }
+function message(error: unknown) { const responseMessage = (error as { response?: { data?: { message?: string } } }).response?.data?.message; if (typeof responseMessage === "string" && responseMessage.trim()) return responseMessage.trim(); if (error instanceof Error && error.message.trim()) return error.message.trim(); return "The operation failed."; }

@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 interface QuickQuantityEditorProps {
     value: number[];
-    step: number;
+    step?: number | null;
     onChange: (value: number[]) => void;
     disabled?: boolean;
     compact?: boolean;
@@ -18,7 +18,7 @@ export function quickQuantitiesMatchStep(values: number[], step: number) {
     return values.length <= 8 && values.every((value) => value > 0 && alignedToStep(value, step));
 }
 
-function alignedToStep(value: number, step: number) {
+function alignedToStep(value: number, step?: number | null) {
     if (!Number.isFinite(step) || step <= 0) return true;
     const ratio = value / step;
     return Math.abs(ratio - Math.round(ratio)) < 1e-9;
@@ -40,7 +40,7 @@ export function QuickQuantityEditor({
             setError("Enter a quantity greater than zero.");
             return;
         }
-        if (!alignedToStep(quantity, step)) {
+        if (step != null && !alignedToStep(quantity, step)) {
             setError(`Use a multiple of the cart step (${step || 1}).`);
             return;
         }
@@ -61,7 +61,7 @@ export function QuickQuantityEditor({
 
     return (
         <div className="space-y-2">
-            <div className="flex gap-2">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
                 <Input
                     type="number"
                     min="0.001"
@@ -69,7 +69,7 @@ export function QuickQuantityEditor({
                     value={draft}
                     disabled={disabled}
                     placeholder="20"
-                    className={cn(compact && "h-9")}
+                    className={cn("min-w-0 flex-1", compact && "h-9")}
                     onChange={(event) => {
                         setDraft(event.target.value);
                         setError(null);
@@ -84,6 +84,7 @@ export function QuickQuantityEditor({
                     type="button"
                     variant="outline"
                     size={compact ? "sm" : "default"}
+                    className="shrink-0 sm:w-auto"
                     disabled={disabled || !draft}
                     onClick={add}
                 >
@@ -116,7 +117,9 @@ export function QuickQuantityEditor({
             ) : null}
 
             <p className={cn("text-[10px] leading-4", error ? "text-destructive" : "text-muted-foreground")}>
-                {error ?? "Optional shortcuts customers can tap, for example 20, 30, 40. Each value must match the cart step."}
+                {error ?? (step == null
+                    ? "Default storefront shortcuts, for example 20, 30, 40. Products with their own presets override these values."
+                    : "Optional product override. Leave empty to use the default quick quantities from Company Settings. Each value must match the cart step.")}
             </p>
         </div>
     );

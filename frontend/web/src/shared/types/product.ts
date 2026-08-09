@@ -51,8 +51,6 @@ export type ProductUnitConversion = {
     barcode: string | null;
     priceOverride: number | null;
     oldPriceOverride: number | null;
-    orderQuantityStep: number;
-    quickOrderQuantities: number[];
     isBaseUnit: boolean;
     isDefault: boolean;
     isActive: boolean;

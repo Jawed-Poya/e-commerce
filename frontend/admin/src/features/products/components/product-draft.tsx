@@ -356,7 +356,7 @@ export function ProductDraftCard({
                         )}
                     />
 
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                    <div className="grid min-w-0 gap-4 md:grid-cols-2 2xl:grid-cols-3">
                         <div className="space-y-1.5">
                             <Label>{t("form.minimum")}</Label>
 
@@ -440,7 +440,7 @@ export function ProductDraftCard({
                             <FieldError message={productErrors?.orderQuantityStep?.message} />
                         </div>
 
-                        <div className="space-y-1.5">
+                        <div className="min-w-0 space-y-1.5 md:col-span-2 2xl:col-span-1">
                             <Label>{t("productUnits.quickQuantities")}</Label>
                             <Controller
                                 control={control}

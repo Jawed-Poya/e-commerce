@@ -20,6 +20,7 @@ export interface CompanySettings {
     dariFontFamily: string;
     pashtoFontFamily: string;
     baseFontSize: number;
+    defaultQuickOrderQuantities: number[];
     trashRetentionDays: number;
     notificationRetentionDays: number;
     allowUserClaimManagement: boolean;

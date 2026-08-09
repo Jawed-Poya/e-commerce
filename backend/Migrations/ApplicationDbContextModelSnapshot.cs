@@ -589,16 +589,6 @@ namespace ECommerce.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<decimal>("OrderQuantityStep")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(18, 3)
-                        .HasColumnType("decimal(18,3)")
-                        .HasDefaultValue(1m);
-
-                    b.Property<string>("QuickOrderQuantities")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
                     b.Property<decimal?>("PriceOverride")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -641,7 +631,6 @@ namespace ECommerce.Migrations
                         {
                             t.HasCheckConstraint("CK_ProductUnitConversion_Factor", "[ConversionFactor] >= 1");
                             t.HasCheckConstraint("CK_ProductUnitConversion_Prices", "[PriceOverride] IS NULL OR ([PriceOverride] >= 0 AND ([OldPriceOverride] IS NULL OR [OldPriceOverride] >= [PriceOverride]))");
-                            t.HasCheckConstraint("CK_ProductUnitConversion_OrderQuantityStep", "[OrderQuantityStep] > 0");
                             t.HasCheckConstraint("CK_ProductUnitConversion_DefaultActive", "[IsDefault] = 0 OR [IsActive] = 1");
                         });
                 });

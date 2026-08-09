@@ -17,6 +17,7 @@ import { productPath } from "../../shared/lib/product-path";
 import { cn } from "../../shared/lib/utils";
 import type { Product } from "../../shared/types/product";
 import { CartQuantityControl } from "../cart/cart-quantity-control";
+import { useCompany } from "../company/company-context";
 import { cartLineKey, useCart } from "../cart/cart-context";
 
 type ProductCardProps = {
@@ -29,6 +30,7 @@ export function ProductCard({
     density = "default",
 }: ProductCardProps) {
     const cart = useCart();
+    const { company } = useCompany();
     const { t } = useI18n();
     const compact = density === "compact";
     const liked = cart.wishlist.includes(product.id);
@@ -38,8 +40,25 @@ export function ProductCard({
         imageUrl(product.primaryImageUrl) || "/placeholder-product.svg";
     const hasPrice = product.price != null;
     const quantityStep = product.orderQuantityStep > 0 ? product.orderQuantityStep : 1;
+    const configuredQuickQuantities = product.quickOrderQuantities?.length
+        ? product.quickOrderQuantities
+        : company?.settings.defaultQuickOrderQuantities ?? [];
+    const quickOrderQuantities = configuredQuickQuantities.filter(
+        (quantity) =>
+            quantity > 0 &&
+            quantity <= product.stock + Number.EPSILON &&
+            Math.abs(quantity / quantityStep - Math.round(quantity / quantityStep)) < 1e-9,
+    );
     const hasOrderableStock = product.stock >= quantityStep;
     const canAddToCart = hasPrice && hasOrderableStock;
+    const liveCartItem = cartItem
+        ? {
+              ...cartItem,
+              stock: product.stock,
+              quantityStep,
+              quickOrderQuantities,
+          }
+        : null;
     const hasDiscount =
         product.oldPrice != null &&
         product.price != null &&
@@ -63,7 +82,7 @@ export function ProductCard({
             unitName: product.unitName,
             conversionFactor: 1,
             quantityStep,
-            quickOrderQuantities: product.quickOrderQuantities ?? [],
+            quickOrderQuantities,
             slug: product.slug,
             minimumValue: product.minimumValue,
             maximumValue: product.maximumValue,
@@ -178,7 +197,7 @@ export function ProductCard({
                                 {t("cart.quantityStep", { count: product.orderQuantityStep })}
                             </span>
                         ) : null}
-                        {(product.quickOrderQuantities ?? []).filter((quantity) => quantity <= product.stock + Number.EPSILON).slice(0, 3).map((quantity) => (
+                        {quickOrderQuantities.slice(0, 3).map((quantity) => (
                             <span key={quantity} className="inline-flex shrink-0 rounded-md border border-primary/10 bg-background px-1.5 py-0.5 font-black tabular-nums text-primary">
                                 {quantity}
                             </span>
@@ -234,7 +253,7 @@ export function ProductCard({
                             </Button>
                             {cartItem && canAddToCart ? (
                                 <CartQuantityControl
-                                    item={cartItem}
+                                    item={liveCartItem!}
                                     compact
                                     showStepBadge={false}
                                 />
@@ -397,7 +416,7 @@ export function ProductCard({
                                                 {t("cart.quantityStep", { count: product.orderQuantityStep })}
                                             </span>
                                         ) : null}
-                                        {(product.quickOrderQuantities ?? []).filter((quantity) => quantity <= product.stock + Number.EPSILON).slice(0, 3).map((quantity) => (
+                                        {quickOrderQuantities.slice(0, 3).map((quantity) => (
                                             <span key={quantity} className="inline-flex shrink-0 rounded-md border border-primary/10 bg-background px-1.5 py-1 font-black tabular-nums text-primary">
                                                 {quantity}
                                             </span>
@@ -440,7 +459,7 @@ export function ProductCard({
 
                                     {cartItem && canAddToCart ? (
                                         <CartQuantityControl
-                                            item={cartItem}
+                                            item={liveCartItem!}
                                             compact
                                             className="min-w-0 flex-1 justify-center"
                                             showStepBadge={false}

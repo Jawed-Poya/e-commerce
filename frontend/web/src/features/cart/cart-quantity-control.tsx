@@ -43,12 +43,12 @@ export function CartQuantityControl({
       return;
     }
 
-    cart.updateQuantity(item.lineKey, item.quantity - step);
+    cart.updateQuantity(item.lineKey, item.quantity - step, item);
   };
 
   const increase = () => {
     if (!canIncrease) return;
-    cart.updateQuantity(item.lineKey, item.quantity + step);
+    cart.updateQuantity(item.lineKey, item.quantity + step, item);
   };
 
   return (
@@ -121,7 +121,7 @@ export function CartQuantityControl({
               <button
                 key={quantity}
                 type="button"
-                onClick={() => cart.updateQuantity(item.lineKey, quantity)}
+                onClick={() => cart.updateQuantity(item.lineKey, quantity, item)}
                 aria-label={t("cart.setQuickQuantity", { count: formatNumber(quantity) })}
                 className={cn(
                   "inline-flex h-6 min-w-8 items-center justify-center rounded-full border px-2 text-[10px] font-black tabular-nums transition",

@@ -49,6 +49,7 @@ public sealed class CompanySetting
     [MaxLength(120)] public string DariFontFamily { get; set; } = "Vazirmatn";
     [MaxLength(120)] public string PashtoFontFamily { get; set; } = "Noto Sans Arabic";
     public int BaseFontSize { get; set; } = 16;
+    [MaxLength(500)] public string DefaultQuickOrderQuantitiesJson { get; set; } = "[20,30,40,50]";
     public int TrashRetentionDays { get; set; } = 30;
     public int NotificationRetentionDays { get; set; } = 30;
     public bool ExpiryAlertsEnabled { get; set; } = true;
