@@ -41,6 +41,7 @@ export interface ProductBulkItemFormValues {
     minimumValue: number | null;
     maximumValue: number | null;
     orderQuantityStep: number;
+    quickOrderQuantities: number[];
     minimumStockQuantity: number;
     usesDisplayStock: boolean;
     displayStockQuantity: number | null;

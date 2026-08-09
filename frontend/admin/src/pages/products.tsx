@@ -26,6 +26,7 @@ import { ProductPagination } from "@/features/products/components/product-pagina
 import { DeleteButton } from "@/components/delete-button";
 import { CustomerPricingFields, activePriceInputs, createCustomerPriceDrafts, validatePriceDrafts } from "@/features/products/components/customer-pricing-fields";
 import { ProductUnitConversionsFields, validateUnitConversions } from "@/features/products/components/product-unit-conversions-fields";
+import { QuickQuantityEditor, quickQuantitiesMatchStep } from "@/features/products/components/quick-quantity-editor";
 import {
     IMAGE_FILE_ACCEPT,
     isSupportedImageFile,
@@ -100,6 +101,7 @@ export default function ProductsPage() {
                 minimumValue: item.minimumValue,
                 maximumValue: item.maximumValue,
                 orderQuantityStep: item.orderQuantityStep || 1,
+                quickOrderQuantities: item.quickOrderQuantities ?? [],
                 minimumStockQuantity: item.inventory?.minimumQuantity ?? 0,
                 usesDisplayStock: item.usesDisplayStock,
                 displayStockQuantity: item.displayStockQuantity,
@@ -118,6 +120,7 @@ export default function ProductsPage() {
                         priceOverride: unit.priceOverride,
                         oldPriceOverride: unit.oldPriceOverride,
                         orderQuantityStep: unit.orderQuantityStep || 1,
+                        quickOrderQuantities: unit.quickOrderQuantities ?? [],
                         isDefault: unit.isDefault,
                         isActive: unit.isActive,
                         sortOrder: unit.sortOrder,
@@ -139,6 +142,7 @@ export default function ProductsPage() {
             const error = validatePriceDrafts(priceDrafts);
             if (error) return toast.error(`${draft.name}: ${error}`);
             if (!Number.isFinite(draft.orderQuantityStep) || draft.orderQuantityStep <= 0) return toast.error(`${draft.name}: cart quantity step must be greater than zero.`);
+            if (!quickQuantitiesMatchStep(draft.quickOrderQuantities, draft.orderQuantityStep)) return toast.error(`${draft.name}: quick quantities must match the cart quantity step.`);
             if (draft.minimumStockQuantity < 0) return toast.error(`${draft.name}: reorder point cannot be negative.`);
             if (draft.usesDisplayStock && draft.displayStockQuantity == null) return toast.error(`${draft.name}: enter the quantity customers should see.`);
             if (draft.displayStockQuantity != null && draft.displayStockQuantity < 0) return toast.error(`${draft.name}: display quantity cannot be negative.`);
@@ -245,7 +249,7 @@ export default function ProductsPage() {
                             disabled={saving}
                             compact
                         />
-                        <div className="grid gap-4 md:grid-cols-3"><div className="space-y-2"><Label>{t("form.minimum")}</Label><Input type="number" min={0} value={item.minimumValue ?? ""} onChange={e => change(item.id, { minimumValue: e.target.value ? Number(e.target.value) : null })} /></div><div className="space-y-2"><Label>{t("form.maximum")}</Label><Input type="number" min={0} value={item.maximumValue ?? ""} onChange={e => change(item.id, { maximumValue: e.target.value ? Number(e.target.value) : null })} /></div><div className="space-y-2"><Label>{t("productUnits.baseOrderStep")}</Label><Input type="number" min="0.001" step="any" value={item.orderQuantityStep} onChange={e => change(item.id, { orderQuantityStep: e.target.value === "" ? 0 : Number(e.target.value) })} /><p className="text-xs text-muted-foreground">{t("productUnits.baseOrderStepHelp")}</p></div></div>
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div className="space-y-2"><Label>{t("form.minimum")}</Label><Input type="number" min={0} value={item.minimumValue ?? ""} onChange={e => change(item.id, { minimumValue: e.target.value ? Number(e.target.value) : null })} /></div><div className="space-y-2"><Label>{t("form.maximum")}</Label><Input type="number" min={0} value={item.maximumValue ?? ""} onChange={e => change(item.id, { maximumValue: e.target.value ? Number(e.target.value) : null })} /></div><div className="space-y-2"><Label>{t("productUnits.baseOrderStep")}</Label><Input type="number" min="0.001" step="any" value={item.orderQuantityStep} onChange={e => change(item.id, { orderQuantityStep: e.target.value === "" ? 0 : Number(e.target.value) })} /><p className="text-xs text-muted-foreground">{t("productUnits.baseOrderStepHelp")}</p></div><div className="space-y-2"><Label>{t("productUnits.quickQuantities")}</Label><QuickQuantityEditor value={item.quickOrderQuantities} step={item.orderQuantityStep} onChange={quickOrderQuantities => change(item.id, { quickOrderQuantities })} compact disabled={saving} /></div></div>
                         <div className="rounded-xl border bg-muted/20 p-4">
                             <ToggleCard title="Display stock" description="Show an orderable quantity without changing physical inventory." checked={item.usesDisplayStock} onChange={usesDisplayStock => change(item.id, { usesDisplayStock, displayStockQuantity: usesDisplayStock ? item.displayStockQuantity : null })} />
                             {item.usesDisplayStock ? <div className="mt-4 space-y-2 border-t pt-4"><Label>Customer-visible quantity</Label><Input type="number" min={0} step="any" value={item.displayStockQuantity ?? ""} onChange={event => change(item.id, { displayStockQuantity: event.target.value === "" ? null : Number(event.target.value) })} /></div> : null}

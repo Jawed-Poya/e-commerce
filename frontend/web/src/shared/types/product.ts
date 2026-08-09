@@ -24,6 +24,7 @@ export type Product = {
     minimumValue: number | null;
     maximumValue: number | null;
     orderQuantityStep: number;
+    quickOrderQuantities: number[];
     usesDisplayStock: boolean;
     displayStockQuantity: number | null;
     inventoryStock: number;
@@ -51,6 +52,7 @@ export type ProductUnitConversion = {
     priceOverride: number | null;
     oldPriceOverride: number | null;
     orderQuantityStep: number;
+    quickOrderQuantities: number[];
     isBaseUnit: boolean;
     isDefault: boolean;
     isActive: boolean;

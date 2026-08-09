@@ -19,6 +19,7 @@ import { getCheckoutConfiguration } from "../checkout/checkout-api";
 import { getProducts } from "../catalog/catalog-api";
 import {
     cartQuantityStep,
+    cartQuickQuantities,
     maximumCartQuantity,
     minimumCartQuantity,
     normalizeCartQuantity,
@@ -215,7 +216,8 @@ export function CartPage() {
                                         </p>
 
                                         <div className="mt-auto flex items-end justify-between gap-3 pt-2.5">
-                                            <div className="inline-flex h-8 items-center overflow-hidden rounded-lg border bg-background shadow-sm">
+                                            <div className="space-y-1.5">
+                                                <div className="inline-flex h-8 items-center overflow-hidden rounded-lg border bg-background shadow-sm">
                                                 <Button
                                                     type="button"
                                                     variant="ghost"
@@ -260,6 +262,23 @@ export function CartPage() {
                                                 >
                                                     <Plus className="size-3.5" />
                                                 </Button>
+                                                </div>
+
+                                                {cartQuickQuantities(currentCartItem(item)).length > 0 ? (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {cartQuickQuantities(currentCartItem(item)).map((quantity) => (
+                                                            <button
+                                                                key={quantity}
+                                                                type="button"
+                                                                onClick={() => cart.updateQuantity(item.lineKey, quantity)}
+                                                                className={`inline-flex h-6 min-w-8 items-center justify-center rounded-full border px-2 text-[10px] font-black tabular-nums transition ${Math.abs(item.quantity - quantity) < Number.EPSILON ? "border-primary bg-primary text-primary-foreground" : "border-primary/15 bg-primary/[0.045] text-primary hover:bg-primary/[0.09]"}`}
+                                                                aria-label={t("cart.setQuickQuantity", { count: formatNumber(quantity) })}
+                                                            >
+                                                                {formatNumber(quantity)}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                ) : null}
                                             </div>
 
                                             <Button

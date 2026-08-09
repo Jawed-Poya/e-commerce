@@ -377,6 +377,7 @@ export const en: Messages = {
     "cart.decreaseQuantity": "Decrease quantity",
     "cart.currentQuantity": "Current quantity: {count}",
     "cart.quantityStep": "Step {count}",
+    "cart.setQuickQuantity": "Set quantity to {count}",
     "cart.itemUnavailable": "This product is currently unavailable.",
     "cart.quantityUnavailable": "Only {count} can be ordered with the current stock.",
     "cart.resolveAvailability": "Review cart",

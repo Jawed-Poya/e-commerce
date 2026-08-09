@@ -45,6 +45,9 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasPrecision(18, 3)
             .HasDefaultValue(1m);
 
+        builder.Property(x => x.QuickOrderQuantities)
+            .HasMaxLength(500);
+
         builder.ToTable(table =>
         {
             table.HasCheckConstraint(

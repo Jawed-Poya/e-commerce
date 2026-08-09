@@ -12,6 +12,7 @@ public sealed class ProductUnitConversionConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.PriceOverride).HasPrecision(18, 2);
         builder.Property(x => x.OldPriceOverride).HasPrecision(18, 2);
         builder.Property(x => x.OrderQuantityStep).HasPrecision(18, 3).HasDefaultValue(1m);
+        builder.Property(x => x.QuickOrderQuantities).HasMaxLength(500);
         builder.Property(x => x.Barcode).HasMaxLength(100);
         builder.Property(x => x.IsActive).HasDefaultValue(true);
 

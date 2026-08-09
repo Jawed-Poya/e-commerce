@@ -495,6 +495,10 @@ namespace ECommerce.Migrations
                         .HasColumnType("decimal(18,3)")
                         .HasDefaultValue(1m);
 
+                    b.Property<string>("QuickOrderQuantities")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -590,6 +594,10 @@ namespace ECommerce.Migrations
                         .HasPrecision(18, 3)
                         .HasColumnType("decimal(18,3)")
                         .HasDefaultValue(1m);
+
+                    b.Property<string>("QuickOrderQuantities")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<decimal?>("PriceOverride")
                         .HasPrecision(18, 2)

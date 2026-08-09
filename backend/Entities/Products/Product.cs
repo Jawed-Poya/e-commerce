@@ -30,6 +30,9 @@ public class Product : BaseEntity
     /// </summary>
     public decimal OrderQuantityStep { get; set; } = 1;
 
+    /// <summary>Optional customer-facing quick quantity presets, stored as canonical comma-separated decimals.</summary>
+    public string? QuickOrderQuantities { get; set; }
+
     /// <summary>
     /// Uses a storefront-only quantity that never reserves or reduces physical inventory.
     /// Useful for supplier-backed, made-to-order, or display catalog products.

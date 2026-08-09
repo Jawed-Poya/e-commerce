@@ -379,6 +379,7 @@ export const dr: Messages = {
     "cart.decreaseQuantity": "کاهش تعداد",
     "cart.currentQuantity": "تعداد فعلی: {count}",
     "cart.quantityStep": "گام {count}",
+    "cart.setQuickQuantity": "تعداد را به {count} تنظیم کنید",
     "cart.itemUnavailable": "این محصول فعلاً موجود نیست.",
     "cart.quantityUnavailable": "با موجودی فعلی فقط {count} قابل سفارش است.",
     "cart.resolveAvailability": "بررسی سبد",

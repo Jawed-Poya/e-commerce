@@ -18,6 +18,7 @@ export interface CartProduct {
   unitName?: string | null;
   conversionFactor?: number;
   quantityStep?: number;
+  quickOrderQuantities?: number[];
   minimumValue?: number | null;
   maximumValue?: number | null;
 }
@@ -77,6 +78,21 @@ export function maximumCartQuantity(product: QuantityLimitedProduct) {
   return roundCartQuantity(Math.floor((stock + Number.EPSILON) / step) * step);
 }
 
+export function cartQuickQuantities(product: CartProduct) {
+  const step = cartQuantityStep(product);
+  const maximum = maximumCartQuantity(product);
+  return [...new Set((product.quickOrderQuantities ?? [])
+    .map(Number)
+    .filter((quantity) =>
+      Number.isFinite(quantity) &&
+      quantity > 0 &&
+      quantity <= maximum + Number.EPSILON &&
+      Math.abs(quantity / step - Math.round(quantity / step)) < 1e-9,
+    )
+    .map(roundCartQuantity))]
+    .sort((a, b) => a - b);
+}
+
 export function normalizeCartQuantity(product: QuantityLimitedProduct, quantity: number) {
   const minimum = minimumCartQuantity(product);
   const maximum = maximumCartQuantity(product);
@@ -98,6 +114,7 @@ function normalizeStoredItem(item: CartItem | (CartProduct & { quantity: number 
     unitName: item.unitName ?? null,
     conversionFactor: item.conversionFactor && item.conversionFactor > 0 ? item.conversionFactor : 1,
     quantityStep: cartQuantityStep(item),
+    quickOrderQuantities: Array.isArray(item.quickOrderQuantities) ? item.quickOrderQuantities : [],
     lineKey: "lineKey" in item && item.lineKey ? item.lineKey : cartLineKey(item.id, unitId),
     quantity: normalizeCartQuantity(item, item.quantity),
   };

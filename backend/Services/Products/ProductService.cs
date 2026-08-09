@@ -178,6 +178,7 @@ public class ProductService : IProductService
             MinimumValue = product.MinimumValue,
             MaximumValue = product.MaximumValue,
             OrderQuantityStep = product.OrderQuantityStep,
+            QuickOrderQuantities = product.QuickOrderQuantities,
             UsesDisplayStock = product.UsesDisplayStock,
             DisplayStockQuantity = product.DisplayStockQuantity,
             IsFeatured = product.IsFeatured,
@@ -282,6 +283,7 @@ public class ProductService : IProductService
                 product.MinimumValue,
                 product.MaximumValue,
                 product.OrderQuantityStep,
+                ParseQuickOrderQuantities(product.QuickOrderQuantities),
                 product.UsesDisplayStock,
                 product.DisplayStockQuantity,
                 product.IsFeatured,
@@ -421,6 +423,7 @@ public class ProductService : IProductService
                 product.MinimumValue = item.MinimumValue;
                 product.MaximumValue = item.MaximumValue;
                 product.OrderQuantityStep = item.OrderQuantityStep;
+                product.QuickOrderQuantities = SerializeQuickOrderQuantities(ValidateQuickOrderQuantities(item.QuickOrderQuantities, item.OrderQuantityStep, $"Products[{item.Id}].QuickOrderQuantities"));
                 product.UsesDisplayStock = item.UsesDisplayStock;
                 product.DisplayStockQuantity = item.UsesDisplayStock
                     ? item.DisplayStockQuantity ?? 0
@@ -600,6 +603,7 @@ public class ProductService : IProductService
                 null,
                 null,
                 product.OrderQuantityStep <= 0 ? 1 : product.OrderQuantityStep,
+                ParseQuickOrderQuantities(product.QuickOrderQuantities),
                 true,
                 activeConversions.All(conversion => !conversion.IsDefault),
                 true,
@@ -624,6 +628,7 @@ public class ProductService : IProductService
                 conversion.PriceOverride,
                 conversion.OldPriceOverride,
                 conversion.OrderQuantityStep <= 0 ? 1 : conversion.OrderQuantityStep,
+                ParseQuickOrderQuantities(conversion.QuickOrderQuantities),
                 false,
                 conversion.IsDefault,
                 conversion.IsActive,
@@ -645,6 +650,7 @@ public class ProductService : IProductService
             MinimumValue = product.MinimumValue,
             MaximumValue = product.MaximumValue,
             OrderQuantityStep = product.OrderQuantityStep,
+            QuickOrderQuantities = ParseQuickOrderQuantities(product.QuickOrderQuantities),
             UsesDisplayStock = product.UsesDisplayStock,
             DisplayStockQuantity = product.DisplayStockQuantity,
             InventoryStock = physicalAvailableQuantity,
@@ -768,6 +774,7 @@ public class ProductService : IProductService
         entity.MinimumValue = model.MinimumValue;
         entity.MaximumValue = model.MaximumValue;
         entity.OrderQuantityStep = model.OrderQuantityStep <= 0 ? 1 : model.OrderQuantityStep;
+        entity.QuickOrderQuantities = model.QuickOrderQuantities;
         entity.UsesDisplayStock = model.UsesDisplayStock;
         entity.DisplayStockQuantity = model.UsesDisplayStock
             ? model.DisplayStockQuantity ?? 0
@@ -915,6 +922,7 @@ public class ProductService : IProductService
                     MaximumValue =
                         item.Request.MaximumValue,
                     OrderQuantityStep = item.Request.OrderQuantityStep,
+                    QuickOrderQuantities = SerializeQuickOrderQuantities(ValidateQuickOrderQuantities(item.Request.QuickOrderQuantities, item.Request.OrderQuantityStep, $"Products[{item.Index}].QuickOrderQuantities")),
                     UsesDisplayStock = item.Request.UsesDisplayStock,
                     DisplayStockQuantity = item.Request.UsesDisplayStock
                         ? item.Request.DisplayStockQuantity ?? 0
@@ -1306,6 +1314,7 @@ public class ProductService : IProductService
         PriceOverride = conversion.PriceOverride,
         OldPriceOverride = conversion.OldPriceOverride,
         OrderQuantityStep = conversion.OrderQuantityStep,
+        QuickOrderQuantities = SerializeQuickOrderQuantities(ValidateQuickOrderQuantities(conversion.QuickOrderQuantities, conversion.OrderQuantityStep, "UnitConversions.QuickOrderQuantities")),
         IsDefault = conversion.IsDefault,
         IsActive = conversion.IsActive,
         SortOrder = conversion.SortOrder
@@ -1346,6 +1355,7 @@ public class ProductService : IProductService
             existing.PriceOverride = request.PriceOverride;
             existing.OldPriceOverride = request.OldPriceOverride;
             existing.OrderQuantityStep = request.OrderQuantityStep;
+            existing.QuickOrderQuantities = SerializeQuickOrderQuantities(ValidateQuickOrderQuantities(request.QuickOrderQuantities, request.OrderQuantityStep, "UnitConversions.QuickOrderQuantities"));
             existing.IsDefault = request.IsDefault;
             existing.IsActive = request.IsActive;
             existing.SortOrder = request.SortOrder;
@@ -1373,10 +1383,56 @@ public class ProductService : IProductService
         {
             if (item.UnitId <= 0 || item.ConversionFactor < 1 || item.OrderQuantityStep <= 0)
                 throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Every selling unit requires a valid unit, a conversion factor of at least one base unit, and an order quantity step greater than zero."] });
+            ValidateQuickOrderQuantities(item.QuickOrderQuantities, item.OrderQuantityStep, $"{key}[{item.UnitId}].QuickOrderQuantities");
             if (item.PriceOverride < 0 || item.OldPriceOverride < 0 ||
                 (item.PriceOverride.HasValue && item.OldPriceOverride.HasValue && item.OldPriceOverride < item.PriceOverride))
                 throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Unit prices cannot be negative and old price cannot be lower than the selling price."] });
         }
+    }
+
+    private static IReadOnlyList<decimal> ValidateQuickOrderQuantities(
+        IEnumerable<decimal>? values,
+        decimal step,
+        string key)
+    {
+        var normalizedStep = step <= 0 ? 1 : step;
+        var normalized = (values ?? [])
+            .Distinct()
+            .OrderBy(value => value)
+            .ToArray();
+
+        if (normalized.Length > 8)
+            throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Use at most 8 quick quantity presets."] });
+
+        if (normalized.Any(value => value <= 0 || decimal.Remainder(value, normalizedStep) != 0))
+            throw new ProductValidationException(new Dictionary<string, string[]>
+            {
+                [key] = [$"Every quick quantity must be positive and a multiple of the cart step ({normalizedStep:0.###})."]
+            });
+
+        return normalized;
+    }
+
+    private static string? SerializeQuickOrderQuantities(IEnumerable<decimal>? values)
+    {
+        var normalized = (values ?? [])
+            .Distinct()
+            .OrderBy(value => value)
+            .ToArray();
+        return normalized.Length == 0
+            ? null
+            : string.Join(",", normalized.Select(value => value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
+    private static IReadOnlyList<decimal> ParseQuickOrderQuantities(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return [];
+        return value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(part => decimal.TryParse(part, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var quantity) ? quantity : 0)
+            .Where(quantity => quantity > 0)
+            .Distinct()
+            .OrderBy(quantity => quantity)
+            .ToArray();
     }
 
     private static ResolvedProductPrice? ResolvePrice(
@@ -1430,6 +1486,7 @@ public class ProductService : IProductService
         public int? MinimumValue { get; init; }
         public int? MaximumValue { get; init; }
         public decimal OrderQuantityStep { get; init; }
+        public string? QuickOrderQuantities { get; init; }
         public bool UsesDisplayStock { get; init; }
         public decimal? DisplayStockQuantity { get; init; }
         public bool IsFeatured { get; init; }
@@ -1525,6 +1582,16 @@ public class ProductService : IProductService
                     $"Products[{index}].OrderQuantityStep",
                     "Order quantity step must be greater than zero."
                 );
+            }
+
+            try
+            {
+                ValidateQuickOrderQuantities(product.QuickOrderQuantities, product.OrderQuantityStep, $"Products[{index}].QuickOrderQuantities");
+            }
+            catch (ProductValidationException exception)
+            {
+                foreach (var error in exception.Errors.SelectMany(pair => pair.Value))
+                    AddError(errors, $"Products[{index}].QuickOrderQuantities", error);
             }
 
             if (product.UsesDisplayStock && !product.DisplayStockQuantity.HasValue)

@@ -88,6 +88,7 @@ export default function ProductDetailsPage() {
                                     <Detail label="Available" value={`${formatNumber(unit.availableQuantity)} ${unit.unitName}`} />
                                     <Detail label="Price" value={money(unit.price)} />
                                     <Detail label="Cart step" value={formatNumber(unit.orderQuantityStep)} />
+                                    <Detail label="Quick quantities" value={unit.quickOrderQuantities.length ? unit.quickOrderQuantities.map(formatNumber).join(" · ") : "—"} />
                                 </div>
                                 {unit.barcode ? <p className="mt-3 truncate font-mono text-[11px] text-muted-foreground">{unit.barcode}</p> : null}
                             </div>

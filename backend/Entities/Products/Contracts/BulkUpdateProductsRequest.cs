@@ -50,6 +50,8 @@ public sealed class BulkUpdateProductItemRequest
     public int? MaximumValue { get; set; }
     [Range(typeof(decimal), "0.001", "999999999999999.999", ErrorMessage = "Order quantity step must be greater than zero.")]
     public decimal OrderQuantityStep { get; set; } = 1;
+
+    public List<decimal> QuickOrderQuantities { get; set; } = [];
     [Range(typeof(decimal), "0", "999999999999999.999", ErrorMessage = "Minimum stock quantity cannot be negative.")]
     public decimal MinimumStockQuantity { get; set; }
     public bool UsesDisplayStock { get; set; }

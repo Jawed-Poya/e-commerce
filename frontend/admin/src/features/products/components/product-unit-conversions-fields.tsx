@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useI18n } from "@/i18n/i18n-provider";
 import { cn } from "@/lib/utils";
 import type { ProductUnitConversionInput } from "@/services/product.service";
+import { QuickQuantityEditor } from "./quick-quantity-editor";
 
 interface UnitOption {
     id: number;
@@ -43,6 +44,7 @@ export function createEmptyUnitConversion(
         priceOverride: null,
         oldPriceOverride: null,
         orderQuantityStep: 1,
+        quickOrderQuantities: [],
         isDefault: index === 0,
         isActive: true,
         sortOrder: index,
@@ -71,7 +73,10 @@ export function validateUnitConversions(
                 !Number.isFinite(unit.conversionFactor) ||
                 unit.conversionFactor < 1 ||
                 !Number.isFinite(unit.orderQuantityStep) ||
-                unit.orderQuantityStep <= 0,
+                unit.orderQuantityStep <= 0 ||
+                unit.quickOrderQuantities.some((quantity) =>
+                    quantity <= 0 || Math.abs(quantity / unit.orderQuantityStep - Math.round(quantity / unit.orderQuantityStep)) > 1e-9,
+                ),
         )
     ) {
         return "productUnits.invalidConversionError";
@@ -216,7 +221,7 @@ export function ProductUnitConversionsFields({
                         return (
                             <div
                                 key={`${unit.id ?? "new"}-${index}`}
-                                className="grid gap-3 rounded-xl bg-background/75 p-3 ring-1 ring-border/70 dark:bg-white/[0.025] dark:ring-white/[0.07] md:grid-cols-2 xl:grid-cols-5"
+                                className="grid gap-3 rounded-xl bg-background/75 p-3 ring-1 ring-border/70 dark:bg-white/[0.025] dark:ring-white/[0.07] md:grid-cols-2 xl:grid-cols-6"
                             >
                                 <Field label={t("productUnits.sellingUnit")}>
                                     <SimpleCombobox<number>
@@ -274,6 +279,18 @@ export function ProductUnitConversionsFields({
                                     <p className="text-[10px] leading-4 text-muted-foreground">
                                         {t("productUnits.orderStepHelp")}
                                     </p>
+                                </Field>
+
+                                <Field label={t("productUnits.quickQuantities")}>
+                                    <QuickQuantityEditor
+                                        value={unit.quickOrderQuantities}
+                                        step={unit.orderQuantityStep}
+                                        disabled={disabled}
+                                        compact
+                                        onChange={(quickOrderQuantities) =>
+                                            updateUnit(index, { quickOrderQuantities })
+                                        }
+                                    />
                                 </Field>
 
                                 <Field label={t("productUnits.barcode")}>

@@ -84,6 +84,7 @@ function createProductsFormData(request: CreateBulkProductsRequest): FormData {
         );
 
         formData.append(`${prefix}.OrderQuantityStep`, String(product.orderQuantityStep));
+        product.quickOrderQuantities.forEach((quantity, quantityIndex) => formData.append(`${prefix}.QuickOrderQuantities[${quantityIndex}]`, String(quantity)));
 
         appendOptionalValue(
             formData,
@@ -135,6 +136,7 @@ function createProductsFormData(request: CreateBulkProductsRequest): FormData {
                 unit.oldPriceOverride,
             );
             formData.append(`${unitPrefix}.OrderQuantityStep`, String(unit.orderQuantityStep));
+            unit.quickOrderQuantities.forEach((quantity, quantityIndex) => formData.append(`${unitPrefix}.QuickOrderQuantities[${quantityIndex}]`, String(quantity)));
             formData.append(`${unitPrefix}.IsDefault`, String(unit.isDefault));
             formData.append(`${unitPrefix}.IsActive`, String(unit.isActive));
             formData.append(`${unitPrefix}.SortOrder`, String(unit.sortOrder));

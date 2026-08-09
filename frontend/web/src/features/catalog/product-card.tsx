@@ -63,6 +63,7 @@ export function ProductCard({
             unitName: product.unitName,
             conversionFactor: 1,
             quantityStep,
+            quickOrderQuantities: product.quickOrderQuantities ?? [],
             slug: product.slug,
             minimumValue: product.minimumValue,
             maximumValue: product.maximumValue,
@@ -177,6 +178,11 @@ export function ProductCard({
                                 {t("cart.quantityStep", { count: product.orderQuantityStep })}
                             </span>
                         ) : null}
+                        {(product.quickOrderQuantities ?? []).filter((quantity) => quantity <= product.stock + Number.EPSILON).slice(0, 3).map((quantity) => (
+                            <span key={quantity} className="inline-flex shrink-0 rounded-md border border-primary/10 bg-background px-1.5 py-0.5 font-black tabular-nums text-primary">
+                                {quantity}
+                            </span>
+                        ))}
                     </div>
 
                     <div className="mt-auto flex items-end justify-between gap-2 pt-2">
@@ -391,6 +397,11 @@ export function ProductCard({
                                                 {t("cart.quantityStep", { count: product.orderQuantityStep })}
                                             </span>
                                         ) : null}
+                                        {(product.quickOrderQuantities ?? []).filter((quantity) => quantity <= product.stock + Number.EPSILON).slice(0, 3).map((quantity) => (
+                                            <span key={quantity} className="inline-flex shrink-0 rounded-md border border-primary/10 bg-background px-1.5 py-1 font-black tabular-nums text-primary">
+                                                {quantity}
+                                            </span>
+                                        ))}
                                     </div>
 
                                     {product.strength ? (

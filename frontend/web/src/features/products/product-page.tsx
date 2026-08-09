@@ -190,8 +190,10 @@ export function ProductPage() {
     (item) => item.lineKey === selectedCartLineKey,
   );
   const quantityStep = selectedUnit?.orderQuantityStep || p.orderQuantityStep || 1;
+  const quickOrderQuantities = selectedUnit?.quickOrderQuantities ?? p.quickOrderQuantities ?? [];
   const minimumQuantity = minimumCartQuantity({ stock, quantityStep });
   const maximumQuantity = maximumCartQuantity({ stock, quantityStep });
+  const availableQuickOrderQuantities = quickOrderQuantities.filter((quantity) => quantity <= maximumQuantity + Number.EPSILON);
   const hasOrderableStock = maximumQuantity >= minimumQuantity;
   const canAddToCart = hasPrice && hasOrderableStock;
   const notificationLabel =
@@ -214,6 +216,7 @@ export function ProductPage() {
       unitName: selectedUnit?.unitName ?? p.unitName,
       conversionFactor: factor,
       quantityStep,
+      quickOrderQuantities,
       slug: p.slug,
       minimumValue: null,
       maximumValue: null,
@@ -410,6 +413,21 @@ export function ProductPage() {
               </div>
             </div>
 
+            {(quantityStep > 1 || availableQuickOrderQuantities.length > 0) ? (
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                {quantityStep > 1 ? (
+                  <Badge variant="secondary" className="h-7 border border-primary/15 bg-primary/[0.06] px-2.5 text-[10px] font-black text-primary">
+                    {t("cart.quantityStep", { count: formatNumber(quantityStep) })}
+                  </Badge>
+                ) : null}
+                {availableQuickOrderQuantities.map((quantity) => (
+                  <span key={quantity} className="inline-flex h-7 min-w-9 items-center justify-center rounded-full border border-primary/15 bg-background px-2.5 text-[10px] font-black tabular-nums text-primary shadow-sm">
+                    {formatNumber(quantity)}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
             {unitOptions.length > 1 ? (
               <div className="mt-5 rounded-2xl border border-border/80 bg-card p-4 dark:border-white/12 sm:p-5">
                 <div className="flex items-center justify-between gap-3">
@@ -445,11 +463,18 @@ export function ProductPage() {
                           ? t("product.inStock")
                           : t("product.unavailable")}
                       </span>
-                      {unit.orderQuantityStep > 1 ? (
-                        <Badge variant="secondary" className="mt-2 h-5 border border-primary/15 bg-primary/[0.06] px-1.5 text-[9px] font-black text-primary">
-                          {t("cart.quantityStep", { count: unit.orderQuantityStep })}
-                        </Badge>
-                      ) : null}
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {unit.orderQuantityStep > 1 ? (
+                          <Badge variant="secondary" className="h-5 border border-primary/15 bg-primary/[0.06] px-1.5 text-[9px] font-black text-primary">
+                            {t("cart.quantityStep", { count: formatNumber(unit.orderQuantityStep) })}
+                          </Badge>
+                        ) : null}
+                        {(unit.quickOrderQuantities ?? []).filter((quantity) => quantity <= unit.availableQuantity + Number.EPSILON).slice(0, 3).map((quantity) => (
+                          <span key={quantity} className="inline-flex h-5 min-w-7 items-center justify-center rounded-full border border-primary/15 bg-background px-1.5 text-[9px] font-black tabular-nums text-primary">
+                            {formatNumber(quantity)}
+                          </span>
+                        ))}
+                      </div>
                     </button>
                   ))}
                 </div>

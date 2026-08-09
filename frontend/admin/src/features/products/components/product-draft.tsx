@@ -25,6 +25,7 @@ import { useI18n } from "@/i18n/i18n-provider";
 import { flattenTree } from "@/lib/utils";
 import { CustomerPricingFields, createCustomerPriceDrafts } from "./customer-pricing-fields";
 import { ProductUnitConversionsFields } from "./product-unit-conversions-fields";
+import { QuickQuantityEditor } from "./quick-quantity-editor";
 import {
     IMAGE_FILE_ACCEPT,
     isSupportedImageFile,
@@ -179,6 +180,10 @@ export function ProductDraftCard({
         control,
         name: `products.${index}.unitId`,
     });
+    const baseOrderStep = useWatch({
+        control,
+        name: `products.${index}.orderQuantityStep`,
+    }) ?? 1;
 
     return (
         <Card className="overflow-hidden">
@@ -351,7 +356,7 @@ export function ProductDraftCard({
                         )}
                     />
 
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                         <div className="space-y-1.5">
                             <Label>{t("form.minimum")}</Label>
 
@@ -433,6 +438,24 @@ export function ProductDraftCard({
                                 )}
                             />
                             <FieldError message={productErrors?.orderQuantityStep?.message} />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label>{t("productUnits.quickQuantities")}</Label>
+                            <Controller
+                                control={control}
+                                name={`products.${index}.quickOrderQuantities`}
+                                render={({ field }) => (
+                                    <QuickQuantityEditor
+                                        value={field.value ?? []}
+                                        step={baseOrderStep}
+                                        onChange={field.onChange}
+                                        disabled={disabled}
+                                        compact
+                                    />
+                                )}
+                            />
+                            <FieldError message={productErrors?.quickOrderQuantities?.message} />
                         </div>
 
                         <div className="space-y-1.5">

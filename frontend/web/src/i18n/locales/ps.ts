@@ -379,6 +379,7 @@ export const ps: Messages = {
     "cart.decreaseQuantity": "شمېر کمول",
     "cart.currentQuantity": "اوسنی شمېر: {count}",
     "cart.quantityStep": "ګام {count}",
+    "cart.setQuickQuantity": "شمېر {count} ته وټاکئ",
     "cart.itemUnavailable": "دا محصول اوس شتون نه لري.",
     "cart.quantityUnavailable": "د اوسني موجودي له مخې یوازې {count} امر کېدای شي.",
     "cart.resolveAvailability": "ټوکرۍ وګورئ",

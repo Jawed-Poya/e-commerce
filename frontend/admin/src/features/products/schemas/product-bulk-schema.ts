@@ -71,6 +71,8 @@ export const ProductBulkItemSchema = z
             .number()
             .positive("Cart quantity step must be greater than zero."),
 
+        quickOrderQuantities: z.array(z.number().positive()).max(8),
+
         minimumStockQuantity: z
             .number()
             .nonnegative("Minimum stock quantity cannot be negative."),
@@ -103,6 +105,7 @@ export const ProductBulkItemSchema = z
                 priceOverride: z.number().nullable(),
                 oldPriceOverride: z.number().nullable(),
                 orderQuantityStep: z.number().positive(),
+                quickOrderQuantities: z.array(z.number().positive()).max(8),
                 isDefault: z.boolean(),
                 isActive: z.boolean(),
                 sortOrder: z.number().int().nonnegative(),
@@ -138,6 +141,30 @@ export const ProductBulkItemSchema = z
                 code: z.ZodIssueCode.custom,
                 path: ["displayStockQuantity"],
                 message: "Enter the quantity customers should see.",
+            });
+        }
+
+        const invalidBasePreset = product.quickOrderQuantities.some((value) =>
+            value <= 0 || Math.abs(value / product.orderQuantityStep - Math.round(value / product.orderQuantityStep)) > 1e-9,
+        );
+        if (invalidBasePreset) {
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["quickOrderQuantities"],
+                message: "Quick quantities must be multiples of the cart quantity step.",
+            });
+        }
+
+        const invalidUnitPreset = product.unitConversions.some((unit) =>
+            unit.quickOrderQuantities.some((value) =>
+                value <= 0 || Math.abs(value / unit.orderQuantityStep - Math.round(value / unit.orderQuantityStep)) > 1e-9,
+            ),
+        );
+        if (invalidUnitPreset) {
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["unitConversions"],
+                message: "Selling-unit quick quantities must be multiples of that unit's cart step.",
             });
         }
 

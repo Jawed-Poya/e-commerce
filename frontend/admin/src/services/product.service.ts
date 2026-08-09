@@ -21,6 +21,7 @@ export interface ProductListItem {
     minimumValue: number | null;
     maximumValue: number | null;
     orderQuantityStep: number;
+    quickOrderQuantities: number[];
     usesDisplayStock: boolean;
     displayStockQuantity: number | null;
     inventoryStock: number;
@@ -67,6 +68,7 @@ export interface ProductUnitConversion {
     priceOverride: number | null;
     oldPriceOverride: number | null;
     orderQuantityStep: number;
+    quickOrderQuantities: number[];
     isBaseUnit: boolean;
     isDefault: boolean;
     isActive: boolean;
@@ -78,7 +80,7 @@ export interface ProductUnitConversion {
 
 export type ProductUnitConversionInput = Pick<ProductUnitConversion,
     "id" | "unitId" | "conversionFactor" | "barcode" | "priceOverride" |
-    "oldPriceOverride" | "orderQuantityStep" | "isDefault" | "isActive" | "sortOrder">;
+    "oldPriceOverride" | "orderQuantityStep" | "quickOrderQuantities" | "isDefault" | "isActive" | "sortOrder">;
 
 export interface ProductPrice {
     id: number;
@@ -134,6 +136,7 @@ export interface CreateSingleProductInput {
     minimumValue?: number | null;
     maximumValue?: number | null;
     orderQuantityStep: number;
+    quickOrderQuantities: number[];
     minimumStockQuantity: number;
     usesDisplayStock: boolean;
     displayStockQuantity?: number | null;
@@ -151,7 +154,7 @@ export interface CreateSingleProductResult {
 export type BulkUpdateProduct = Pick<ProductListItem,
     "id" | "name" | "barcode" | "strength" | "categoryId" | "brandId" | "unitId" |
     "shortDescription" | "description" | "slug" | "minimumValue" |
-    "maximumValue" | "orderQuantityStep" | "usesDisplayStock" | "displayStockQuantity" | "isFeatured" | "isActive" | "primaryImageUrl" | "images"> & { minimumStockQuantity: number; image?: File; galleryImages?: File[]; removedImageIds?: number[]; prices: ProductPriceInput[]; unitConversions?: ProductUnitConversionInput[] };
+    "maximumValue" | "orderQuantityStep" | "quickOrderQuantities" | "usesDisplayStock" | "displayStockQuantity" | "isFeatured" | "isActive" | "primaryImageUrl" | "images"> & { minimumStockQuantity: number; image?: File; galleryImages?: File[]; removedImageIds?: number[]; prices: ProductPriceInput[]; unitConversions?: ProductUnitConversionInput[] };
 
 function append(formData: FormData, key: string, value: string | number | boolean | null | undefined) {
     if (value !== null && value !== undefined) formData.append(key, String(value));
@@ -178,6 +181,7 @@ export const productService = {
         append(formData, `${prefix}.MinimumValue`, product.minimumValue);
         append(formData, `${prefix}.MaximumValue`, product.maximumValue);
         append(formData, `${prefix}.OrderQuantityStep`, product.orderQuantityStep);
+        product.quickOrderQuantities.forEach((quantity, quantityIndex) => append(formData, `${prefix}.QuickOrderQuantities[${quantityIndex}]`, quantity));
         append(formData, `${prefix}.MinimumStockQuantity`, product.minimumStockQuantity);
         append(formData, `${prefix}.UsesDisplayStock`, product.usesDisplayStock);
         append(formData, `${prefix}.DisplayStockQuantity`, product.usesDisplayStock ? product.displayStockQuantity ?? 0 : null);
@@ -200,6 +204,7 @@ export const productService = {
             append(formData, `${unitPrefix}.PriceOverride`, unit.priceOverride);
             append(formData, `${unitPrefix}.OldPriceOverride`, unit.oldPriceOverride);
             append(formData, `${unitPrefix}.OrderQuantityStep`, unit.orderQuantityStep);
+            unit.quickOrderQuantities.forEach((quantity, quantityIndex) => append(formData, `${unitPrefix}.QuickOrderQuantities[${quantityIndex}]`, quantity));
             append(formData, `${unitPrefix}.IsDefault`, unit.isDefault);
             append(formData, `${unitPrefix}.IsActive`, unit.isActive);
             append(formData, `${unitPrefix}.SortOrder`, unit.sortOrder);
@@ -223,6 +228,7 @@ export const productService = {
             append(formData, `${prefix}.MinimumValue`, product.minimumValue);
             append(formData, `${prefix}.MaximumValue`, product.maximumValue);
             append(formData, `${prefix}.OrderQuantityStep`, product.orderQuantityStep);
+            product.quickOrderQuantities.forEach((quantity, quantityIndex) => append(formData, `${prefix}.QuickOrderQuantities[${quantityIndex}]`, quantity));
             append(formData, `${prefix}.MinimumStockQuantity`, product.minimumStockQuantity);
             append(formData, `${prefix}.UsesDisplayStock`, product.usesDisplayStock);
             append(formData, `${prefix}.DisplayStockQuantity`, product.usesDisplayStock ? product.displayStockQuantity ?? 0 : null);
@@ -249,6 +255,7 @@ export const productService = {
                 append(formData, `${unitPrefix}.PriceOverride`, unit.priceOverride);
                 append(formData, `${unitPrefix}.OldPriceOverride`, unit.oldPriceOverride);
                 append(formData, `${unitPrefix}.OrderQuantityStep`, unit.orderQuantityStep);
+                unit.quickOrderQuantities.forEach((quantity, quantityIndex) => append(formData, `${unitPrefix}.QuickOrderQuantities[${quantityIndex}]`, quantity));
                 append(formData, `${unitPrefix}.IsDefault`, unit.isDefault);
                 append(formData, `${unitPrefix}.IsActive`, unit.isActive);
                 append(formData, `${unitPrefix}.SortOrder`, unit.sortOrder);

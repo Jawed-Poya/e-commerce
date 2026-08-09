@@ -16,6 +16,7 @@ public sealed record ProductListItemResponse(
     int? MinimumValue,
     int? MaximumValue,
     decimal OrderQuantityStep,
+    IReadOnlyList<decimal> QuickOrderQuantities,
     bool UsesDisplayStock,
     decimal? DisplayStockQuantity,
     bool IsFeatured,
