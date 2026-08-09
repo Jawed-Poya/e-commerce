@@ -1,4 +1,5 @@
 using ECommerce.Entities;
+using ECommerce.Entities.Common;
 using ECommerce.Entities.Orders.Contracts;
 using ECommerce.Services.Orders;
 using ECommerce.Shared;
@@ -13,11 +14,13 @@ namespace ECommerce.Controllers;
 public sealed class AccountOrdersController(IOrderService orders) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<OrderListItemResponse>>>> Get(
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResponse<PagedResult<OrderListItemResponse>>>> Get(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken cancellationToken = default)
     {
-        var result = await orders.GetMyOrdersAsync(cancellationToken);
-        return Ok(ApiResponse<IReadOnlyCollection<OrderListItemResponse>>.Ok(result));
+        var result = await orders.GetMyOrdersAsync(page, pageSize, cancellationToken);
+        return Ok(ApiResponse<PagedResult<OrderListItemResponse>>.Ok(result));
     }
 
     [HttpGet("{orderNumber}")]

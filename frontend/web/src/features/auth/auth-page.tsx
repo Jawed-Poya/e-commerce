@@ -102,13 +102,13 @@ export function AuthPage() {
     const companyName = company?.name ?? "";
 
     return (
-        <main className="relative isolate overflow-hidden border-y border-border/70 bg-[radial-gradient(circle_at_top_left,color-mix(in_srgb,var(--primary)_10%,transparent),transparent_34%),linear-gradient(to_bottom,var(--background),color-mix(in_srgb,var(--muted)_55%,var(--background)))] px-4 py-6 dark:border-white/[0.08] sm:px-6 sm:py-9 lg:px-8 lg:py-12">
+        <main className="relative isolate overflow-hidden bg-[radial-gradient(circle_at_top_left,color-mix(in_srgb,var(--primary)_10%,transparent),transparent_34%),linear-gradient(to_bottom,var(--background),color-mix(in_srgb,var(--muted)_55%,var(--background)))] px-4 py-6 sm:px-6 sm:py-9 lg:px-8 lg:py-12">
             <div className="pointer-events-none absolute -start-32 top-16 -z-10 size-[28rem] rounded-full bg-primary/[0.08] blur-3xl" />
             <div className="pointer-events-none absolute -end-32 bottom-0 -z-10 size-[30rem] rounded-full bg-brand-orange/[0.07] blur-3xl" />
 
-            <div className="mx-auto grid w-full max-w-[1240px] overflow-hidden rounded-[28px] border border-border/75 bg-card shadow-[0_28px_80px_-52px_rgba(15,23,42,.55)] ring-1 ring-black/[0.025] dark:border-white/[0.08] dark:ring-white/[0.025] lg:grid-cols-[1.03fr_.97fr]">
+            <div className="mx-auto grid w-full max-w-[1240px] overflow-hidden rounded-[28px] bg-card shadow-[0_28px_80px_-52px_rgba(15,23,42,.55)] lg:grid-cols-[1.03fr_.97fr]">
                 <section className="relative hidden min-h-[650px] bg-muted/[0.32] p-5 lg:block xl:p-6">
-                    <div className="relative flex h-full min-h-[610px] flex-col overflow-hidden rounded-[22px] border border-white/[0.10] bg-[var(--brand-surface-strong)] shadow-[0_28px_70px_-42px_rgba(15,23,42,.8)]">
+                    <div className="relative flex h-full min-h-[610px] flex-col overflow-hidden rounded-[22px] bg-[var(--brand-surface-strong)] shadow-[0_28px_70px_-42px_rgba(15,23,42,.8)]">
                         <div className="absolute -end-24 -top-24 size-80 rounded-full bg-white/[0.10] blur-3xl" />
                         <div className="absolute -bottom-36 -start-24 size-[26rem] rounded-full bg-brand-orange/25 blur-3xl" />
                         <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_35%,rgba(255,255,255,0.075))]" />
@@ -117,7 +117,7 @@ export function AuthPage() {
                             <Link
                                 viewTransition
                                 to="/"
-                                className="flex min-w-0 items-center gap-2.5 rounded-xl border border-white/[0.14] bg-white/[0.08] p-2 pe-3.5 text-white backdrop-blur transition hover:bg-white/[0.13]"
+                                className="flex min-w-0 items-center gap-2.5 rounded-xl bg-white/[0.08] p-2 pe-3.5 text-white backdrop-blur transition hover:bg-white/[0.13]"
                             >
                                 <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-white text-primary shadow-lg">
                                     {logo ? (
@@ -135,16 +135,16 @@ export function AuthPage() {
                                 </span>
                             </Link>
 
-                            <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.14] bg-white/[0.08] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white backdrop-blur">
+                            <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.08] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white backdrop-blur">
                                 <ShieldCheck className="size-3.5 text-emerald-300" />
                                 {t("auth.secureAccess")}
                             </span>
                         </div>
 
                         <div className="relative z-10 flex min-h-[260px] flex-1 flex-col items-center justify-center px-8 py-6">
-                            <div className="relative grid size-48 place-items-center rounded-[42px] border border-white/[0.16] bg-white/[0.08] shadow-[0_32px_70px_-38px_rgba(0,0,0,.85)] backdrop-blur-sm xl:size-56">
-                                <div className="absolute -start-7 top-8 size-14 rounded-2xl border border-white/[0.13] bg-white/[0.08] backdrop-blur" />
-                                <div className="absolute -end-8 bottom-10 size-16 rounded-full border border-brand-orange/30 bg-brand-orange/20 backdrop-blur" />
+                            <div className="relative grid size-48 place-items-center rounded-[42px] bg-white/[0.08] shadow-[0_32px_70px_-38px_rgba(0,0,0,.85)] backdrop-blur-sm xl:size-56">
+                                <div className="absolute -start-7 top-8 size-14 rounded-2xl bg-white/[0.08] backdrop-blur" />
+                                <div className="absolute -end-8 bottom-10 size-16 rounded-full bg-brand-orange/20 backdrop-blur" />
                                 <span className="grid size-32 place-items-center overflow-hidden rounded-[30px] bg-white text-primary shadow-2xl xl:size-36">
                                     {logo ? (
                                         <img
@@ -184,7 +184,7 @@ export function AuthPage() {
                             )}
                         </div>
 
-                        <div className="relative z-30 border-t border-border/70 bg-background/[0.96] p-6 text-foreground shadow-[0_-18px_50px_-34px_rgba(15,23,42,.55)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/[0.92] dark:border-white/[0.08] xl:p-7">
+                        <div className="relative z-30 bg-background/[0.96] p-6 text-foreground shadow-[0_-18px_50px_-34px_rgba(15,23,42,.55)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/[0.92] xl:p-7">
                             <span className="inline-flex items-center gap-2 rounded-full bg-primary/[0.09] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-primary">
                                 <Sparkles className="size-3.5" />
                                 {t("auth.optionalAccount")}
@@ -561,7 +561,7 @@ function ContactChip({
     value: string;
 }) {
     return (
-        <span className="inline-flex min-w-0 items-center gap-2 rounded-full border border-white/12 bg-white/[0.08] px-3 py-1.5 text-[11px] font-semibold text-white/80 backdrop-blur">
+        <span className="inline-flex min-w-0 items-center gap-2 rounded-full bg-white/[0.08] px-3 py-1.5 text-[11px] font-semibold text-white/80 backdrop-blur">
             <span className="shrink-0 text-white [&_svg]:size-3.5">
                 {icon}
             </span>

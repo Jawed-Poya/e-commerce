@@ -600,17 +600,27 @@ public sealed class OrderService(
                 .ToList());
     }
 
-    public async Task<IReadOnlyCollection<OrderListItemResponse>> GetMyOrdersAsync(
+    public async Task<PagedResult<OrderListItemResponse>> GetMyOrdersAsync(
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default)
     {
         var customerId = await ResolveCurrentCustomerIdAsync(cancellationToken)
             ?? throw new UnauthorizedAccessException("A customer account is required.");
 
-        var rows = await context.Orders
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 5, 50);
+
+        var query = context.Orders
             .AsNoTracking()
-            .Where(order => order.CustomerId == customerId)
+            .Where(order => order.CustomerId == customerId);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var rows = await query
             .OrderByDescending(order => order.CreatedAt)
-            .Take(100)
+            .ThenByDescending(order => order.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(order => new
             {
                 order.Id,
@@ -629,7 +639,7 @@ public sealed class OrderService(
             })
             .ToListAsync(cancellationToken);
 
-        return rows.Select(row => new OrderListItemResponse(
+        var items = rows.Select(row => new OrderListItemResponse(
             row.Id,
             row.OrderNumber,
             BuildName(row.FirstName, row.LastName),
@@ -646,6 +656,14 @@ public sealed class OrderService(
             row.Currency,
             row.ItemCount,
             row.CreatedAt)).ToList();
+
+        return new PagedResult<OrderListItemResponse>
+        {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
     }
 
     public async Task<OrderDetailsResponse?> GetMyOrderAsync(

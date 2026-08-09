@@ -19,7 +19,6 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 
-import fallbackHeroImage from "../../assets/storefront-hero.png";
 import { useI18n } from "../../i18n/i18n-provider";
 import { imageUrl } from "../../shared/api/api-client";
 import { Button } from "../../shared/components/ui/button";
@@ -46,7 +45,7 @@ interface HeroSlide {
     primaryUrl: string;
     secondaryText: string;
     secondaryUrl: string;
-    image: string;
+    image: string | null;
     product?: Product;
 }
 
@@ -139,8 +138,7 @@ export function HomePage() {
                 secondaryUrl: content.data?.secondaryButtonUrl?.startsWith("/#")
                     ? "/#categories"
                     : content.data?.secondaryButtonUrl ?? "/#categories",
-                image:
-                    imageUrl(content.data?.heroImageUrl) ?? fallbackHeroImage,
+                image: imageUrl(content.data?.heroImageUrl),
             },
         ];
 
@@ -159,8 +157,7 @@ export function HomePage() {
                     primaryUrl: productPath(product),
                     secondaryText: t("common.viewAll"),
                     secondaryUrl: "/products?featured=true",
-                    image:
-                        imageUrl(product.primaryImageUrl) ?? fallbackHeroImage,
+                    image: imageUrl(product.primaryImageUrl),
                     product,
                 });
             });
@@ -209,7 +206,12 @@ export function HomePage() {
                     ) : (
                         <div
                             key={activeSlide.id}
-                            className="hero-copy-enter relative grid min-h-[570px] md:min-h-[470px] md:grid-cols-[minmax(0,.92fr)_minmax(360px,1.08fr)]"
+                            className={cn(
+                                "hero-copy-enter relative grid min-h-[570px] md:min-h-[470px]",
+                                activeSlide.image
+                                    ? "md:grid-cols-[minmax(0,.92fr)_minmax(360px,1.08fr)]"
+                                    : "md:grid-cols-1",
+                            )}
                         >
                             <div className="relative z-10 flex flex-col justify-center px-6 pb-28 pt-10 sm:px-10 md:px-12 md:pb-24 lg:px-16">
                                 <div className="inline-flex w-fit items-center gap-2 rounded-full bg-white/[0.055] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--brand-highlight)] ring-1 ring-white/[0.12] backdrop-blur">
@@ -289,26 +291,28 @@ export function HomePage() {
                                 </div>
                             </div>
 
-                            <div className="relative min-h-[300px] px-5 pb-6 sm:px-8 md:min-h-[470px] md:px-8 md:py-12 lg:px-12">
-                                <div className="pointer-events-none absolute inset-x-[14%] bottom-[10%] top-[17%] rounded-[38px] ring-1 ring-white/15 md:inset-x-[11%] md:bottom-[13%] md:top-[13%]" />
-                                <div className="pointer-events-none absolute inset-x-[20%] bottom-[16%] top-[11%] rounded-[34px] ring-1 ring-white/[0.08] md:inset-x-[17%] md:bottom-[9%] md:top-[19%]" />
+                            {activeSlide.image ? (
+                                <div className="relative min-h-[300px] px-5 pb-6 sm:px-8 md:min-h-[470px] md:px-8 md:py-12 lg:px-12">
+                                    <div className="pointer-events-none absolute inset-x-[14%] bottom-[10%] top-[17%] rounded-[38px] ring-1 ring-white/15 md:inset-x-[11%] md:bottom-[13%] md:top-[13%]" />
+                                    <div className="pointer-events-none absolute inset-x-[20%] bottom-[16%] top-[11%] rounded-[34px] ring-1 ring-white/[0.08] md:inset-x-[17%] md:bottom-[9%] md:top-[19%]" />
 
-                                <div className="hero-media-enter relative h-full min-h-[290px] overflow-hidden rounded-2xl bg-white/[0.06] shadow-[0_30px_65px_-35px_rgba(0,0,0,.9)] ring-1 ring-white/[0.12] md:min-h-0">
-                                    <img
-                                        src={activeSlide.image}
-                                        alt={activeSlide.title}
-                                        className={cn(
-                                            "size-full transition duration-700",
-                                            activeSlide.product
-                                                ? "bg-white/95 object-contain p-8 dark:bg-slate-950/80"
-                                                : "object-cover",
-                                        )}
-                                    />
-                                    {!activeSlide.product ? (
-                                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-white/5" />
-                                    ) : null}
+                                    <div className="hero-media-enter relative h-full min-h-[290px] overflow-hidden rounded-2xl bg-white/[0.06] shadow-[0_30px_65px_-35px_rgba(0,0,0,.9)] ring-1 ring-white/[0.12] md:min-h-0">
+                                        <img
+                                            src={activeSlide.image}
+                                            alt={activeSlide.title}
+                                            className={cn(
+                                                "size-full transition duration-700",
+                                                activeSlide.product
+                                                    ? "bg-white/95 object-contain p-8 dark:bg-slate-950/80"
+                                                    : "object-cover",
+                                            )}
+                                        />
+                                        {!activeSlide.product ? (
+                                            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-white/5" />
+                                        ) : null}
+                                    </div>
                                 </div>
-                            </div>
+                            ) : null}
                         </div>
                     )}
 

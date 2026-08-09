@@ -7,6 +7,7 @@ import type {
     CustomerLedger,
     PublicCompanyProfile,
     TrashItem,
+    PagedResult,
 } from "./company-types";
 
 export type UpdateCompanyProfile = Pick<
@@ -59,7 +60,7 @@ export const companyService = {
         params?: { startDate?: string; endDate?: string; branchId?: string | number; currencyCode?: string; search?: string },
     ) => apiClient.download(`/admin/documents/${document}/pdf`, params),
     trash: async (params?: Record<string, unknown>) =>
-        (await apiClient.get<TrashItem[]>("/admin/trash", params)).data,
+        (await apiClient.get<PagedResult<TrashItem>>("/admin/trash", params)).data,
     restoreTrash: async (id: number) => apiClient.post(`/admin/trash/${id}/restore`),
     purgeTrash: async (id: number) => apiClient.delete(`/admin/trash/${id}`),
 

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Link, Navigate } from "react-router-dom";
 
+import { ListPagination } from "../../shared/components/list-pagination";
 import { Button } from "../../shared/components/ui/button";
 import { formatMoney } from "../../shared/lib/money";
 import { useAuth } from "../auth/auth-context";
@@ -32,10 +33,12 @@ export function AccountPage() {
     const [verificationBusy, setVerificationBusy] = useState(false);
     const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
     const [verificationError, setVerificationError] = useState<string | null>(null);
+    const [orderPage, setOrderPage] = useState(1);
+    const orderPageSize = 10;
 
     const orders = useQuery({
-        queryKey: ["account-orders", auth.user?.customerId],
-        queryFn: getAccountOrders,
+        queryKey: ["account-orders", auth.user?.customerId, orderPage, orderPageSize],
+        queryFn: () => getAccountOrders(orderPage, orderPageSize),
         enabled: auth.isAuthenticated && Boolean(auth.user?.customerId),
     });
 
@@ -107,7 +110,7 @@ export function AccountPage() {
                 <div className="grid gap-3 p-6 sm:grid-cols-3 sm:p-8">
                     <ProfileCard icon={<BadgeCheck />} label={t("account.customerType")} value={user.customerTypeName ?? t("common.general")} description={t("account.typeDescription")} />
                     <ProfileCard icon={<UserRound />} label={t("common.phone")} value={user.phone ?? t("common.notSet")} description={t("account.phoneDescription")} />
-                    <ProfileCard icon={<ReceiptText />} label={t("account.orders")} value={String(orders.data?.length ?? 0)} description={t("account.ordersDescription")} />
+                    <ProfileCard icon={<ReceiptText />} label={t("account.orders")} value={String(orders.data?.totalCount ?? 0)} description={t("account.ordersDescription")} />
                 </div>
             </section>
 
@@ -186,7 +189,7 @@ export function AccountPage() {
                 <div className="mt-6 grid gap-3">
                     {orders.isLoading && <div className="rounded-xl border bg-card p-6 text-center text-muted-foreground">{t("account.loadingOrders")}</div>}
                     {orders.isError && <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 text-center text-destructive">{t("account.ordersError")}</div>}
-                    {orders.data?.map((order) => (
+                    {orders.data?.items.map((order) => (
                         <article key={order.id} className="grid gap-5 rounded-xl border bg-card p-4 transition hover:border-primary/30 hover:shadow-md sm:grid-cols-[1fr_auto] sm:items-center">
                             <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
@@ -206,7 +209,7 @@ export function AccountPage() {
                             </div>
                         </article>
                     ))}
-                    {!orders.isLoading && (!user.customerId || orders.data?.length === 0) && (
+                    {!orders.isLoading && (!user.customerId || orders.data?.totalCount === 0) && (
                         <div className="rounded-2xl border border-dashed bg-card p-7 text-center">
                             <PackageSearch className="mx-auto size-10 text-muted-foreground" />
                             <h3 className="mt-4 text-lg font-black">{t("account.noOrders")}</h3>
@@ -215,6 +218,15 @@ export function AccountPage() {
                         </div>
                     )}
                 </div>
+
+                {orders.data ? (
+                    <ListPagination
+                        page={orders.data.page}
+                        totalPages={orders.data.totalPages}
+                        disabled={orders.isFetching}
+                        onPageChange={setOrderPage}
+                    />
+                ) : null}
             </section>
         </main>
     );

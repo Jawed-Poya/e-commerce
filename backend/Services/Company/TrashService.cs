@@ -4,6 +4,7 @@ using API.Entities.Products;
 using API.Entities.Types;
 using ECommerce.Data;
 using ECommerce.Entities.Notifications;
+using ECommerce.Entities.Common;
 using ECommerce.Entities.Operations;
 using ECommerce.Entities.Products;
 using ECommerce.Entities.Storefront;
@@ -27,7 +28,7 @@ public sealed record TrashItemResponse(
 
 public interface ITrashService
 {
-    Task<IReadOnlyCollection<TrashItemResponse>> GetAsync(string? search, string? entityType, long? branchId, CancellationToken cancellationToken = default);
+    Task<PagedResult<TrashItemResponse>> GetAsync(string? search, string? entityType, long? branchId, int page, int pageSize, CancellationToken cancellationToken = default);
     Task RestoreAsync(long trashId, string? userId, CancellationToken cancellationToken = default);
     Task PurgeAsync(long trashId, CancellationToken cancellationToken = default);
     Task<int> PurgeExpiredAsync(CancellationToken cancellationToken = default);
@@ -38,39 +39,48 @@ public sealed class TrashService(
     IRecordDeletionPolicy deletionPolicy,
     ILogger<TrashService> logger) : ITrashService
 {
-    public async Task<IReadOnlyCollection<TrashItemResponse>> GetAsync(
+    public async Task<PagedResult<TrashItemResponse>> GetAsync(
         string? search,
         string? entityType,
         long? branchId,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default)
     {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 10, 100);
         var retention = await context.CompanySettings.AsNoTracking()
             .Select(item => (int?)item.TrashRetentionDays)
             .FirstOrDefaultAsync(cancellationToken) ?? 30;
         retention = NormalizeRetention(retention);
-        var branches = await context.Branches.AsNoTracking()
-            .ToDictionaryAsync(item => item.Id, item => item.Name, cancellationToken);
+
         var query = context.TrashRecords.AsNoTracking()
             .Where(item => item.RestoredAt == null && item.PurgedAt == null);
         if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(item => item.DisplayName.Contains(search) || item.EntityId.Contains(search));
-        if (!string.IsNullOrWhiteSpace(entityType))
-            query = query.Where(item => item.EntityType == entityType);
-        if (branchId.HasValue)
-            query = query.Where(item => item.BranchId == branchId.Value);
+        {
+            var cleanSearch = search.Trim();
+            query = query.Where(item => item.DisplayName.Contains(cleanSearch) || item.EntityId.Contains(cleanSearch));
+        }
+        if (!string.IsNullOrWhiteSpace(entityType)) query = query.Where(item => item.EntityType == entityType);
+        if (branchId.HasValue) query = query.Where(item => item.BranchId == branchId.Value);
 
-        var items = await query.OrderByDescending(item => item.CreatedAt).Take(1000).ToListAsync(cancellationToken);
-        return items.Select(item => new TrashItemResponse(
-            item.Id,
-            item.EntityType,
-            item.EntityId,
-            item.DisplayName,
-            item.CreatedAt,
-            item.DeletedByName,
-            item.BranchId,
-            item.BranchId.HasValue ? branches.GetValueOrDefault(item.BranchId.Value) : null,
-            item.CreatedAt.AddDays(retention),
-            item.SnapshotJson)).ToArray();
+        var totalCount = await query.CountAsync(cancellationToken);
+        var rows = await query.OrderByDescending(item => item.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+        var branchIds = rows.Where(item => item.BranchId.HasValue).Select(item => item.BranchId!.Value).Distinct().ToArray();
+        var branches = branchIds.Length == 0
+            ? new Dictionary<long, string>()
+            : await context.Branches.AsNoTracking().Where(item => branchIds.Contains(item.Id))
+                .ToDictionaryAsync(item => item.Id, item => item.Name, cancellationToken);
+
+        var items = rows.Select(item => new TrashItemResponse(
+            item.Id, item.EntityType, item.EntityId, item.DisplayName, item.CreatedAt, item.DeletedByName,
+            item.BranchId, item.BranchId.HasValue ? branches.GetValueOrDefault(item.BranchId.Value) : null,
+            item.CreatedAt.AddDays(retention), item.SnapshotJson)).ToArray();
+
+        return new PagedResult<TrashItemResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
     }
 
     public async Task RestoreAsync(long trashId, string? userId, CancellationToken cancellationToken = default)

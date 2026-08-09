@@ -38,7 +38,9 @@ public interface IOrderService
         string phone,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyCollection<OrderListItemResponse>> GetMyOrdersAsync(
+    Task<PagedResult<OrderListItemResponse>> GetMyOrdersAsync(
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default);
 
     Task<OrderDetailsResponse?> GetMyOrderAsync(

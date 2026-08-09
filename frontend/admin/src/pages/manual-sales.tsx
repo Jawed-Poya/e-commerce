@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
     CircleDollarSign,
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { ListPagination } from "@/components/list-pagination";
 import { PageHeader } from "@/components/page-header";
 import { ServerSearchCombobox } from "@/components/server-search-combobox";
 import { SimpleCombobox } from "@/components/simple-combobox";
@@ -78,10 +79,17 @@ export default function ManualSalesPage() {
     const canManage = hasPermission(user, Permissions.ManualSalesManage);
     const [search, setSearch] = useState("");
     const deferredSearch = useDeferredValue(search.trim());
-    const { data: sales, isLoading } = useOperationQuery(
-        operationKeys.sales(deferredSearch),
-        () => operationsService.sales(deferredSearch),
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
+    const { data: salePage, isLoading } = useOperationQuery(
+        operationKeys.sales(deferredSearch, page, pageSize),
+        () => operationsService.sales(deferredSearch, page, pageSize),
     );
+    const sales = salePage?.items;
+
+    useEffect(() => {
+        setPage(1);
+    }, [deferredSearch]);
     const { data: operationPolicy } = useOperationQuery(
         operationKeys.policy,
         operationsService.policy,
@@ -211,11 +219,19 @@ export default function ManualSalesPage() {
                 queryClient.invalidateQueries({ queryKey: operationKeys.summary }),
                 queryClient.invalidateQueries({ queryKey: ["inventory"] }),
             ]);
-            toast.success(
-                response.offlineQueued
-                    ? response.message
-                    : "Sale recorded and stock deducted.",
-            );
+            if (response.offlineQueued || !response.data) {
+                toast.success(response.message);
+            } else if (response.data.grossProfit > 0.005) {
+                toast.success(
+                    `Sale recorded · Gross profit ${formatMoney(response.data.grossProfit)} (${response.data.profitMargin.toFixed(1)}% margin).`,
+                );
+            } else if (response.data.grossProfit < -0.005) {
+                toast.warning(
+                    `Sale recorded with a gross loss of ${formatMoney(Math.abs(response.data.grossProfit))}. Review the selling price and cost.`,
+                );
+            } else {
+                toast.info("Sale recorded at break-even — no gross profit or loss.");
+            }
             setOpen(false);
             reset();
             if (!response.offlineQueued && response.data) {
@@ -264,12 +280,13 @@ export default function ManualSalesPage() {
                                 <TableHead className="text-end">Paid</TableHead>
                                 <TableHead className="text-end">Balance</TableHead>
                                 <TableHead>Status</TableHead>
+                                <TableHead>Gross result</TableHead>
                                 <TableHead />
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                <Loading colSpan={9} />
+                                <Loading colSpan={10} />
                             ) : sales?.length ? (
                                 sales.map((sale) => (
                                     <TableRow key={sale.id}>
@@ -304,6 +321,9 @@ export default function ManualSalesPage() {
                                             <PaymentBadge status={sale.paymentStatus} />
                                         </TableCell>
                                         <TableCell>
+                                            <SaleProfitResult sale={sale} formatMoney={formatMoney} />
+                                        </TableCell>
+                                        <TableCell>
                                             <div className="flex justify-end gap-2">
                                                 <WhatsAppLink
                                                     url={sale.whatsAppUrl}
@@ -333,13 +353,25 @@ export default function ManualSalesPage() {
                                 ))
                             ) : (
                                 <Empty
-                                    colSpan={9}
+                                    colSpan={10}
                                     text="No manual sales have been recorded."
                                 />
                             )}
                         </TableBody>
                     </Table>
                 </CardContent>
+                <ListPagination
+                    page={page}
+                    pageSize={pageSize}
+                    totalCount={salePage?.totalCount ?? 0}
+                    totalPages={salePage?.totalPages}
+                    disabled={isLoading}
+                    onPageChange={setPage}
+                    onPageSizeChange={(size) => {
+                        setPageSize(size);
+                        setPage(1);
+                    }}
+                />
             </Card>
 
             <Dialog open={open} onOpenChange={setOpen}>
@@ -603,6 +635,26 @@ export default function ManualSalesPage() {
             ) : null}
         </div>
     );
+}
+
+function SaleProfitResult({ sale, formatMoney }: { sale: ManualSale; formatMoney: (value: number) => string }) {
+    if (sale.grossProfit > 0.005) {
+        return (
+            <div className="min-w-28">
+                <p className="font-semibold text-emerald-600 dark:text-emerald-400">Profit {formatMoney(sale.grossProfit)}</p>
+                <p className="text-xs text-muted-foreground">{sale.profitMargin.toFixed(1)}% gross margin</p>
+            </div>
+        );
+    }
+    if (sale.grossProfit < -0.005) {
+        return (
+            <div className="min-w-28">
+                <p className="font-semibold text-destructive">Loss {formatMoney(Math.abs(sale.grossProfit))}</p>
+                <p className="text-xs text-muted-foreground">Review price vs. cost</p>
+            </div>
+        );
+    }
+    return <span className="text-sm font-medium text-muted-foreground">Break-even</span>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
     CreditCard,
@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/page-header";
+import { ListPagination } from "@/components/list-pagination";
 import { ServerSearchCombobox } from "@/components/server-search-combobox";
 import { SimpleCombobox } from "@/components/simple-combobox";
 import { Badge } from "@/components/ui/badge";
@@ -91,14 +92,21 @@ export default function PurchasesPage() {
     const canManage = hasPermission(user, Permissions.PurchasesManage);
     const [search, setSearch] = useState("");
     const deferredSearch = useDeferredValue(search.trim());
-    const { data: purchases, isLoading } = useOperationQuery(
-        operationKeys.purchases(deferredSearch),
-        () => operationsService.purchases(deferredSearch),
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
+    const [supplierPage, setSupplierPage] = useState(1);
+    const [supplierPageSize, setSupplierPageSize] = useState(20);
+    const { data: purchasePage, isLoading, isFetching } = useOperationQuery(
+        operationKeys.purchases(deferredSearch, page, pageSize),
+        () => operationsService.purchases(deferredSearch, page, pageSize),
     );
-    const { data: suppliers, isLoading: suppliersLoading } = useOperationQuery(
-        operationKeys.suppliers,
-        () => operationsService.suppliersResponse("", 100),
+    const purchases = purchasePage?.items;
+    const { data: supplierPageData, isLoading: suppliersLoading, isFetching: suppliersFetching } = useOperationQuery(
+        operationKeys.supplierPage("", supplierPage, supplierPageSize),
+        () => operationsService.supplierPage("", supplierPage, supplierPageSize),
     );
+    const suppliers = supplierPageData?.items;
+    useEffect(() => setPage(1), [deferredSearch]);
     const { data: operationPolicy } = useOperationQuery(
         operationKeys.policy,
         operationsService.policy,
@@ -421,8 +429,20 @@ export default function PurchasesPage() {
                         </Table>
                     </CardContent>
                 </Card>
+                {purchasePage ? (
+                    <ListPagination
+                        page={purchasePage.page}
+                        pageSize={purchasePage.pageSize}
+                        totalCount={purchasePage.totalCount}
+                        totalPages={purchasePage.totalPages}
+                        disabled={isFetching}
+                        onPageChange={setPage}
+                        onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+                    />
+                ) : null}
                 </div>
             ) : (
+                <div className="space-y-3">
                 <Card>
                     <CardContent className="p-0">
                         <Table>
@@ -488,6 +508,18 @@ export default function PurchasesPage() {
                         </Table>
                     </CardContent>
                 </Card>
+                {supplierPageData ? (
+                    <ListPagination
+                        page={supplierPageData.page}
+                        pageSize={supplierPageData.pageSize}
+                        totalCount={supplierPageData.totalCount}
+                        totalPages={supplierPageData.totalPages}
+                        disabled={suppliersFetching}
+                        onPageChange={setSupplierPage}
+                        onPageSizeChange={(size) => { setSupplierPageSize(size); setSupplierPage(1); }}
+                    />
+                ) : null}
+                </div>
             )}
 
             <Dialog open={purchaseOpen} onOpenChange={setPurchaseOpen}>

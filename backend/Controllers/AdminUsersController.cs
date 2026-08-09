@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using ECommerce.Entities;
+using ECommerce.Entities.Common;
 using ECommerce.Entities.Users.Contracts;
 using ECommerce.Services.Users;
 using ECommerce.Shared;
@@ -14,15 +15,22 @@ public sealed class AdminUsersController(IAdminUserService users) : ControllerBa
 {
     [Authorize(Policy = AppPermissions.UsersView)]
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AdminUserListItemResponse>>>> GetUsers(
+    public async Task<ActionResult<ApiResponse<PagedResult<AdminUserListItemResponse>>>> GetUsers(
         [FromQuery] string? search,
         [FromQuery] string? role,
         [FromQuery] bool? isActive,
-        CancellationToken cancellationToken)
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
     {
-        return Ok(ApiResponse<IReadOnlyCollection<AdminUserListItemResponse>>.Ok(
-            await users.GetUsersAsync(search, role, isActive, cancellationToken)));
+        return Ok(ApiResponse<PagedResult<AdminUserListItemResponse>>.Ok(
+            await users.GetUsersAsync(search, role, isActive, page, pageSize, cancellationToken)));
     }
+
+    [Authorize(Policy = AppPermissions.UsersView)]
+    [HttpGet("summary")]
+    public async Task<ActionResult<ApiResponse<AdminUserSummaryResponse>>> GetSummary(CancellationToken cancellationToken) =>
+        Ok(ApiResponse<AdminUserSummaryResponse>.Ok(await users.GetUserSummaryAsync(cancellationToken)));
 
     [Authorize(Policy = AppPermissions.UsersView)]
     [HttpGet("{id}")]

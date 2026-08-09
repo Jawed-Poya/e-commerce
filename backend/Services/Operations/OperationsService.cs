@@ -160,6 +160,28 @@ public sealed class OperationsService(
             .ToListAsync(ct);
     }
 
+    public async Task<PagedResult<SupplierResponse>> GetSupplierPageAsync(string? search, int page, int pageSize, CancellationToken ct)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 10, 100);
+        var query = context.Suppliers.AsNoTracking()
+            .Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value);
+        var clean = Clean(search);
+        if (clean is not null)
+            query = query.Where(x => x.Name.Contains(clean) || (x.Phone != null && x.Phone.Contains(clean)) || (x.ContactPerson != null && x.ContactPerson.Contains(clean)) || (x.Email != null && x.Email.Contains(clean)));
+
+        var totalCount = await query.CountAsync(ct);
+        var items = await query
+            .OrderByDescending(x => x.IsActive)
+            .ThenBy(x => x.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new SupplierResponse(x.Id, x.Name, x.ContactPerson, x.Phone, x.Email, x.Address, x.TaxNumber, x.IsActive))
+            .ToListAsync(ct);
+
+        return new PagedResult<SupplierResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
+    }
+
     public async Task<SupplierResponse> SaveSupplierAsync(long? id, CreateSupplierRequest request, CancellationToken ct)
     {
         RequireText(request.Name, "Supplier name");
@@ -185,8 +207,10 @@ public sealed class OperationsService(
         return MapSupplier(entity);
     }
 
-    public async Task<IReadOnlyList<PurchaseListItem>> GetPurchasesAsync(string? search, CancellationToken ct)
+    public async Task<PagedResult<PurchaseListItem>> GetPurchasesAsync(string? search, int page, int pageSize, CancellationToken ct)
     {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 10, 100);
         var query = context.Purchases.AsNoTracking()
             .Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value);
         var clean = Clean(search);
@@ -199,9 +223,16 @@ public sealed class OperationsService(
                     (item.Product.Barcode != null && item.Product.Barcode.Contains(clean)) ||
                     (item.LotNumber != null && item.LotNumber.Contains(clean))));
 
-        return await query.OrderByDescending(x => x.PurchaseDate).ThenByDescending(x => x.Id).Take(500)
+        var totalCount = await query.CountAsync(ct);
+        var items = await query
+            .OrderByDescending(x => x.PurchaseDate)
+            .ThenByDescending(x => x.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(x => new PurchaseListItem(x.Id, x.PurchaseNumber, x.ReferenceNumber, x.PurchaseDate, x.Supplier == null ? null : x.Supplier.Name, x.Items.Count, x.Total, x.PaidAmount, x.Total > x.PaidAmount ? x.Total - x.PaidAmount : 0, x.PaymentStatus, x.Status, x.CreatedAt))
             .ToListAsync(ct);
+
+        return new PagedResult<PurchaseListItem> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
     }
 
     public async Task<PurchaseDetailsResponse> GetPurchaseAsync(long id, CancellationToken ct)
@@ -411,8 +442,10 @@ public sealed class OperationsService(
         return MapPurchase(purchase, purchase.Supplier?.Name);
     }
 
-    public async Task<IReadOnlyList<InventorySaleListItem>> GetSalesAsync(string? search, CancellationToken ct)
+    public async Task<PagedResult<InventorySaleListItem>> GetSalesAsync(string? search, int page, int pageSize, CancellationToken ct)
     {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 10, 100);
         var query = context.InventorySales.AsNoTracking()
             .Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value);
         var clean = Clean(search);
@@ -428,44 +461,36 @@ public sealed class OperationsService(
                 x.Items.Any(item => item.Product.Name.Contains(clean) ||
                     (item.Product.Barcode != null && item.Product.Barcode.Contains(clean))));
 
-        var rows = await query.OrderByDescending(x => x.SaleDate).ThenByDescending(x => x.Id).Take(500)
+        var totalCount = await query.CountAsync(ct);
+        var rows = await query
+            .OrderByDescending(x => x.SaleDate)
+            .ThenByDescending(x => x.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(x => new
             {
-                x.Id,
-                x.SaleNumber,
-                x.ReferenceNumber,
-                x.SaleDate,
-                CustomerName = x.Customer != null
-                    ? (x.Customer.FirstName + " " + (x.Customer.LastName ?? "")).Trim()
-                    : (x.CustomerName ?? "Walk-in customer"),
+                x.Id, x.SaleNumber, x.ReferenceNumber, x.SaleDate,
+                CustomerName = x.Customer != null ? (x.Customer.FirstName + " " + (x.Customer.LastName ?? "")).Trim() : (x.CustomerName ?? "Walk-in customer"),
                 CustomerPhone = x.Customer != null ? x.Customer.Phone : x.CustomerPhone,
-                ItemCount = x.Items.Count,
-                x.Total,
-                x.PaidAmount,
+                ItemCount = x.Items.Count, x.Total, x.PaidAmount,
                 RemainingAmount = x.Total > x.PaidAmount ? x.Total - x.PaidAmount : 0,
-                x.PaymentStatus,
-                x.CreatedAt
+                x.PaymentStatus, x.CreatedAt,
+                NetSales = x.Subtotal > x.Discount ? x.Subtotal - x.Discount : 0,
+                CostOfGoods = x.Items.Sum(item => (decimal?)(item.Quantity * item.UnitCost)) ?? 0
             })
             .ToListAsync(ct);
 
-        return rows.Select(x => new InventorySaleListItem(
-            x.Id,
-            x.SaleNumber,
-            x.ReferenceNumber,
-            x.SaleDate,
-            x.CustomerName,
-            x.CustomerPhone,
-            WhatsAppLinkBuilder.BuildSale(
-                x.CustomerPhone,
-                x.CustomerName,
-                x.SaleNumber,
-                _whatsAppOptions),
-            x.ItemCount,
-            x.Total,
-            x.PaidAmount,
-            x.RemainingAmount,
-            x.PaymentStatus,
-            x.CreatedAt)).ToList();
+        var items = rows.Select(x =>
+        {
+            var grossProfit = x.NetSales - x.CostOfGoods;
+            var margin = x.NetSales > 0 ? decimal.Round(grossProfit / x.NetSales * 100m, 2) : 0;
+            return new InventorySaleListItem(
+                x.Id, x.SaleNumber, x.ReferenceNumber, x.SaleDate, x.CustomerName, x.CustomerPhone,
+                WhatsAppLinkBuilder.BuildSale(x.CustomerPhone, x.CustomerName, x.SaleNumber, _whatsAppOptions),
+                x.ItemCount, x.Total, x.PaidAmount, x.RemainingAmount, x.PaymentStatus, x.CostOfGoods, grossProfit, margin, x.CreatedAt);
+        }).ToList();
+
+        return new PagedResult<InventorySaleListItem> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
     }
 
     public async Task<IReadOnlyList<InventorySaleLotMovementResponse>> GetSaleLotsAsync(
@@ -681,6 +706,24 @@ public sealed class OperationsService(
         await context.StaffMembers.AsNoTracking().Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value).OrderByDescending(x => x.IsActive).ThenBy(x => x.FullName)
             .Select(x => new StaffResponse(x.Id, x.EmployeeNumber, x.FullName, x.Phone, x.Email, x.Position, x.Department, x.HireDate, x.BaseSalary, x.IsActive, x.Address, x.Notes)).ToListAsync(ct);
 
+    public async Task<PagedResult<StaffResponse>> GetStaffPageAsync(string? search, int page, int pageSize, CancellationToken ct)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 10, 100);
+        var query = context.StaffMembers.AsNoTracking()
+            .Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value);
+        var clean = Clean(search);
+        if (clean is not null)
+            query = query.Where(x => x.FullName.Contains(clean) || x.EmployeeNumber.Contains(clean) || (x.Phone != null && x.Phone.Contains(clean)) || (x.Department != null && x.Department.Contains(clean)) || (x.Position != null && x.Position.Contains(clean)));
+
+        var totalCount = await query.CountAsync(ct);
+        var items = await query.OrderByDescending(x => x.IsActive).ThenBy(x => x.FullName)
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(x => new StaffResponse(x.Id, x.EmployeeNumber, x.FullName, x.Phone, x.Email, x.Position, x.Department, x.HireDate, x.BaseSalary, x.IsActive, x.Address, x.Notes))
+            .ToListAsync(ct);
+        return new PagedResult<StaffResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
+    }
+
     public async Task<StaffResponse> SaveStaffAsync(long? id, StaffUpsertRequest request, CancellationToken ct)
     {
         RequireText(request.EmployeeNumber, "Employee number");
@@ -721,9 +764,18 @@ public sealed class OperationsService(
         await context.SaveChangesAsync(ct);
     }
 
-    public async Task<IReadOnlyList<SalaryPaymentResponse>> GetSalaryPaymentsAsync(CancellationToken ct) =>
-        await context.StaffSalaryPayments.AsNoTracking().Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value).OrderByDescending(x => x.PeriodYear).ThenByDescending(x => x.PeriodMonth).ThenByDescending(x => x.Id).Take(500)
-            .Select(x => new SalaryPaymentResponse(x.Id, x.StaffId, x.Staff.FullName, x.PeriodYear, x.PeriodMonth, x.BaseSalary, x.Bonus, x.Deduction, x.NetAmount, x.PaidAmount, x.NetAmount > x.PaidAmount ? x.NetAmount - x.PaidAmount : 0, x.PaymentStatus, x.PaidDate, x.PaymentMethod, x.ReferenceNumber, x.CreatedAt)).ToListAsync(ct);
+    public async Task<PagedResult<SalaryPaymentResponse>> GetSalaryPaymentsAsync(int page, int pageSize, CancellationToken ct)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 10, 100);
+        var query = context.StaffSalaryPayments.AsNoTracking().Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value);
+        var totalCount = await query.CountAsync(ct);
+        var items = await query.OrderByDescending(x => x.PeriodYear).ThenByDescending(x => x.PeriodMonth).ThenByDescending(x => x.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(x => new SalaryPaymentResponse(x.Id, x.StaffId, x.Staff.FullName, x.PeriodYear, x.PeriodMonth, x.BaseSalary, x.Bonus, x.Deduction, x.NetAmount, x.PaidAmount, x.NetAmount > x.PaidAmount ? x.NetAmount - x.PaidAmount : 0, x.PaymentStatus, x.PaidDate, x.PaymentMethod, x.ReferenceNumber, x.CreatedAt))
+            .ToListAsync(ct);
+        return new PagedResult<SalaryPaymentResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
+    }
 
     public async Task<SalaryPaymentResponse> CreateSalaryPaymentAsync(CreateSalaryPaymentRequest request, string? userId, CancellationToken ct)
     {
@@ -819,9 +871,18 @@ public sealed class OperationsService(
         return new ExpenseCategoryResponse(entity.Id, entity.Name, null, true);
     }
 
-    public async Task<IReadOnlyList<ExpenseResponse>> GetExpensesAsync(CancellationToken ct) =>
-        await context.Expenses.AsNoTracking().Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value).OrderByDescending(x => x.ExpenseDate).ThenByDescending(x => x.Id).Take(500)
-            .Select(x => new ExpenseResponse(x.Id, x.ExpenseDate, x.GeneralTypeCategoryId ?? x.CategoryId ?? 0, x.GeneralTypeCategory != null ? x.GeneralTypeCategory.Name : (x.Category != null ? x.Category.Name : "Uncategorized"), x.Amount, x.Vendor, x.PaymentMethod, x.ReferenceNumber, x.Description, x.CreatedAt)).ToListAsync(ct);
+    public async Task<PagedResult<ExpenseResponse>> GetExpensesAsync(int page, int pageSize, CancellationToken ct)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 10, 100);
+        var query = context.Expenses.AsNoTracking().Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value);
+        var totalCount = await query.CountAsync(ct);
+        var items = await query.OrderByDescending(x => x.ExpenseDate).ThenByDescending(x => x.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(x => new ExpenseResponse(x.Id, x.ExpenseDate, x.GeneralTypeCategoryId ?? x.CategoryId ?? 0, x.GeneralTypeCategory != null ? x.GeneralTypeCategory.Name : (x.Category != null ? x.Category.Name : "Uncategorized"), x.Amount, x.Vendor, x.PaymentMethod, x.ReferenceNumber, x.Description, x.CreatedAt))
+            .ToListAsync(ct);
+        return new PagedResult<ExpenseResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
+    }
 
     public async Task<ExpenseResponse> CreateExpenseAsync(CreateExpenseRequest request, string? userId, CancellationToken ct)
     {
@@ -1181,6 +1242,11 @@ public sealed class OperationsService(
             x.PaidAmount,
             Math.Max(0, x.Total - x.PaidAmount),
             x.PaymentStatus,
+            x.Items.Sum(item => item.Quantity * item.UnitCost),
+            (x.Subtotal - x.Discount) - x.Items.Sum(item => item.Quantity * item.UnitCost),
+            x.Subtotal - x.Discount > 0
+                ? decimal.Round(((x.Subtotal - x.Discount) - x.Items.Sum(item => item.Quantity * item.UnitCost)) / (x.Subtotal - x.Discount) * 100m, 2)
+                : 0,
             x.CreatedAt);
     }
     private static SalaryPaymentResponse MapSalary(StaffSalaryPayment x, string staffName) => new(x.Id, x.StaffId, staffName, x.PeriodYear, x.PeriodMonth, x.BaseSalary, x.Bonus, x.Deduction, x.NetAmount, x.PaidAmount, Math.Max(0, x.NetAmount - x.PaidAmount), x.PaymentStatus, x.PaidDate, x.PaymentMethod, x.ReferenceNumber, x.CreatedAt);

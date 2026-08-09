@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using ECommerce.Data;
+using ECommerce.Entities.Common;
 using ECommerce.Entities.Users;
 using ECommerce.Entities.Users.Contracts;
 using ECommerce.Shared;
@@ -16,12 +17,16 @@ public sealed class AdminUserService(
     ICompanyPermissionService companyPermissions,
     IHttpContextAccessor httpContextAccessor) : IAdminUserService
 {
-    public async Task<IReadOnlyCollection<AdminUserListItemResponse>> GetUsersAsync(
+    public async Task<PagedResult<AdminUserListItemResponse>> GetUsersAsync(
         string? search,
         string? role,
         bool? isActive,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default)
     {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 10, 100);
         var query = context.Users.AsNoTracking().AsQueryable();
         var cleanSearch = Clean(search);
         if (cleanSearch is not null)
@@ -32,24 +37,29 @@ public sealed class AdminUserService(
                 (user.PhoneNumber != null && user.PhoneNumber.Contains(cleanSearch)));
         }
 
-        if (isActive.HasValue)
-            query = query.Where(user => user.IsActive == isActive.Value);
+        if (isActive.HasValue) query = query.Where(user => user.IsActive == isActive.Value);
 
         if (!string.IsNullOrWhiteSpace(role))
         {
             var requestedRole = role.Trim();
-            var internalRole = requestedRole;
-            var normalizedRole = roleManager.KeyNormalizer?.NormalizeName(internalRole)
-                ?? internalRole.ToUpperInvariant();
+            var normalizedRole = roleManager.KeyNormalizer?.NormalizeName(requestedRole) ?? requestedRole.ToUpperInvariant();
             query = query.Where(user => context.UserRoles.Any(userRole =>
                 userRole.UserId == user.Id &&
                 context.Roles.Any(item => item.Id == userRole.RoleId && item.NormalizedName == normalizedRole)));
         }
 
+        var totalCount = await query.CountAsync(cancellationToken);
         var users = await query
             .OrderByDescending(user => user.CreatedAt)
-            .Take(500)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
+
+        var branchIds = users.Where(user => user.BranchId.HasValue).Select(user => user.BranchId!.Value).Distinct().ToArray();
+        var branchNames = branchIds.Length == 0
+            ? new Dictionary<long, string>()
+            : await context.Branches.AsNoTracking().Where(branch => branchIds.Contains(branch.Id))
+                .ToDictionaryAsync(branch => branch.Id, branch => branch.Name, cancellationToken);
 
         var result = new List<AdminUserListItemResponse>(users.Count);
         foreach (var user in users)
@@ -58,20 +68,25 @@ public sealed class AdminUserService(
             var roles = internalRoles.Select(DisplayRoleName).OrderBy(value => value).ToArray();
             var permissions = await GetEffectivePermissionsAsync(user, internalRoles);
             result.Add(new AdminUserListItemResponse(
-                user.Id,
-                user.FullName,
-                user.Email,
-                user.PhoneNumber,
-                user.IsActive,
-                roles,
-                permissions.Count,
-                user.BranchId,
-                await GetBranchNameAsync(user.BranchId, cancellationToken),
-                user.LastLoginAt,
-                user.CreatedAt));
+                user.Id, user.FullName, user.Email, user.PhoneNumber, user.IsActive, roles, permissions.Count,
+                user.BranchId, user.BranchId.HasValue ? branchNames.GetValueOrDefault(user.BranchId.Value) : null,
+                user.LastLoginAt, user.CreatedAt));
         }
 
-        return result;
+        return new PagedResult<AdminUserListItemResponse>
+        {
+            Items = result,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
+    }
+
+    public async Task<AdminUserSummaryResponse> GetUserSummaryAsync(CancellationToken cancellationToken = default)
+    {
+        var total = await context.Users.AsNoTracking().CountAsync(cancellationToken);
+        var active = await context.Users.AsNoTracking().CountAsync(user => user.IsActive, cancellationToken);
+        return new AdminUserSummaryResponse(total, active, total - active);
     }
 
     public async Task<AdminUserDetailsResponse?> GetUserAsync(

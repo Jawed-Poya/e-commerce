@@ -15,6 +15,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
 import { ConfirmActionDialog } from "@/components/confirm-action-dialog";
+import { ListPagination } from "@/components/list-pagination";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,11 +34,14 @@ const filters = [
 export default function ReviewsPage() {
     const queryClient = useQueryClient();
     const [approved, setApproved] = useState<boolean | undefined>(false);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
 
     const reviews = useQuery({
-        queryKey: ["admin-reviews", approved],
-        queryFn: () => reviewService.list(approved),
+        queryKey: ["admin-reviews", approved, page, pageSize],
+        queryFn: () => reviewService.list(approved, page, pageSize),
     });
+    const reviewItems = reviews.data?.items ?? [];
 
     const approval = useMutation({
         mutationFn: ({ id, value }: { id: number; value: boolean }) =>
@@ -72,7 +76,7 @@ export default function ReviewsPage() {
                                 size="sm"
                                 variant={approved === filter.value ? "default" : "ghost"}
                                 className="rounded-lg"
-                                onClick={() => setApproved(filter.value)}
+                                onClick={() => { setApproved(filter.value); setPage(1); }}
                             >
                                 {filter.label}
                             </Button>
@@ -109,7 +113,7 @@ export default function ReviewsPage() {
                 </Card>
             )}
 
-            {!reviews.isLoading && !reviews.isError && !reviews.data?.length && (
+            {!reviews.isLoading && !reviews.isError && !reviewItems.length && (
                 <Card>
                     <CardContent className="px-6 py-16 text-center">
                         <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-muted text-muted-foreground">
@@ -124,7 +128,7 @@ export default function ReviewsPage() {
             )}
 
             <div className="grid gap-4 xl:grid-cols-2">
-                {reviews.data?.map((review) => (
+                {reviewItems.map((review) => (
                     <ReviewCard
                         key={review.id}
                         review={review}
@@ -137,6 +141,20 @@ export default function ReviewsPage() {
                     />
                 ))}
             </div>
+
+            {!reviews.isError ? (
+                <Card className="overflow-hidden">
+                    <ListPagination
+                        page={page}
+                        pageSize={pageSize}
+                        totalCount={reviews.data?.totalCount ?? 0}
+                        totalPages={reviews.data?.totalPages}
+                        disabled={reviews.isFetching}
+                        onPageChange={setPage}
+                        onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+                    />
+                </Card>
+            ) : null}
         </div>
     );
 }

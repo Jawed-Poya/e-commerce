@@ -10,9 +10,10 @@ import {
     UserCheck,
     UserRoundX,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { ListPagination } from "@/components/list-pagination";
 import { PageHeader } from "@/components/page-header";
 import { SimpleCombobox } from "@/components/simple-combobox";
 import { ConfirmActionDialog } from "@/components/confirm-action-dialog";
@@ -69,8 +70,11 @@ export default function UsersPage() {
     const { user: currentUser } = useAdminAuth();
     const canManage = hasPermission(currentUser, Permissions.UsersManage);
     const [search, setSearch] = useState("");
+    const deferredSearch = useDeferredValue(search.trim());
     const [role, setRole] = useState("");
     const [status, setStatus] = useState<"" | "active" | "inactive">("");
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState<AdminUserDetails | null>(null);
     const [form, setForm] = useState<CreateUserRequest>(emptyForm);
@@ -78,10 +82,10 @@ export default function UsersPage() {
     const [newPassword, setNewPassword] = useState("");
 
     const users = useQuery({
-        queryKey: ["admin-users", search, role, status],
+        queryKey: ["admin-users", deferredSearch, role, status, page, pageSize],
         queryFn: () =>
             userService.getUsers({
-                search: search || undefined,
+                search: deferredSearch || undefined,
                 role: role || undefined,
                 isActive:
                     status === "active"
@@ -89,8 +93,19 @@ export default function UsersPage() {
                         : status === "inactive"
                           ? false
                           : undefined,
+                page,
+                pageSize,
             }),
     });
+    const userSummary = useQuery({
+        queryKey: ["admin-user-summary"],
+        queryFn: userService.getSummary,
+    });
+    const userItems = users.data?.items ?? [];
+
+    useEffect(() => {
+        setPage(1);
+    }, [deferredSearch, role, status]);
     const roles = useQuery({
         queryKey: ["admin-roles"],
         queryFn: userService.getRoles,
@@ -123,6 +138,7 @@ export default function UsersPage() {
             toast.success(editing ? "User updated." : "User created.");
             setOpen(false);
             await queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+            await queryClient.invalidateQueries({ queryKey: ["admin-user-summary"] });
             await queryClient.invalidateQueries({ queryKey: ["admin-roles"] });
         },
         onError: (error) => toast.error(errorMessage(error)),
@@ -144,6 +160,7 @@ export default function UsersPage() {
         onSuccess: async () => {
             toast.success("User deactivated.");
             await queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+            await queryClient.invalidateQueries({ queryKey: ["admin-user-summary"] });
         },
         onError: (error) => toast.error(errorMessage(error)),
     });
@@ -191,17 +208,17 @@ export default function UsersPage() {
             <div className="grid gap-4 sm:grid-cols-3">
                 <SummaryCard
                     label="Total users"
-                    value={users.data?.length ?? 0}
+                    value={userSummary.data?.total ?? 0}
                     icon={<Shield />}
                 />
                 <SummaryCard
                     label="Active"
-                    value={users.data?.filter((user) => user.isActive).length ?? 0}
+                    value={userSummary.data?.active ?? 0}
                     icon={<UserCheck />}
                 />
                 <SummaryCard
                     label="Disabled"
-                    value={users.data?.filter((user) => !user.isActive).length ?? 0}
+                    value={userSummary.data?.disabled ?? 0}
                     icon={<UserRoundX />}
                 />
             </div>
@@ -219,7 +236,7 @@ export default function UsersPage() {
                     </div>
                     <SimpleCombobox
                         value={role}
-                        onValueChange={(value) => setRole(value ?? "")}
+                        onValueChange={(value) => { setRole(value ?? ""); setPage(1); }}
                         options={[
                             { value: "", label: "All roles" },
                             ...(roles.data ?? []).map((item) => ({ value: item.name, label: item.name })),
@@ -228,7 +245,7 @@ export default function UsersPage() {
                     />
                     <SimpleCombobox<"" | "active" | "inactive">
                         value={status}
-                        onValueChange={(value) => setStatus(value ?? "")}
+                        onValueChange={(value) => { setStatus(value ?? ""); setPage(1); }}
                         options={[
                             { value: "", label: "All statuses" },
                             { value: "active", label: "Active" },
@@ -273,7 +290,7 @@ export default function UsersPage() {
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {users.data?.map((user) => (
+                            {userItems.map((user) => (
                                 <TableRow key={user.id}>
                                     <TableCell>
                                         <div className="flex items-center gap-3">
@@ -385,7 +402,7 @@ export default function UsersPage() {
                                     </TableCell>
                                 </TableRow>
                             ))}
-                            {!users.isLoading && !users.data?.length && (
+                            {!users.isLoading && !userItems.length && (
                                 <TableRow>
                                     <TableCell
                                         colSpan={6}
@@ -398,6 +415,15 @@ export default function UsersPage() {
                         </TableBody>
                     </Table>
                 </CardContent>
+                <ListPagination
+                    page={page}
+                    pageSize={pageSize}
+                    totalCount={users.data?.totalCount ?? 0}
+                    totalPages={users.data?.totalPages}
+                    disabled={users.isFetching}
+                    onPageChange={setPage}
+                    onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+                />
             </Card>
 
             <UserDialog

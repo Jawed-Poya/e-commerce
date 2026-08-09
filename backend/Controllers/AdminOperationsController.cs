@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using ECommerce.Entities;
+using ECommerce.Entities.Common;
 using ECommerce.Entities.Operations.Contracts;
 using ECommerce.Services.Operations;
 using ECommerce.Shared;
@@ -44,6 +45,11 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
     public async Task<IActionResult> Suppliers([FromQuery] string? search, [FromQuery] int take = 50, CancellationToken ct = default) =>
         Ok(ApiResponse<IReadOnlyList<SupplierResponse>>.Ok(await service.GetSuppliersAsync(search, take, ct)));
 
+    [Authorize(Policy = AppPermissions.PurchasesView)]
+    [HttpGet("suppliers/page")]
+    public async Task<IActionResult> SupplierPage([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default) =>
+        Ok(ApiResponse<PagedResult<SupplierResponse>>.Ok(await service.GetSupplierPageAsync(search, page, pageSize, ct)));
+
     [Authorize(Policy = AppPermissions.PurchasesManage)]
     [HttpPost("suppliers")]
     public Task<IActionResult> CreateSupplier(CreateSupplierRequest request, CancellationToken ct) => Handle(async () => ApiResponse<SupplierResponse>.Ok(await service.SaveSupplierAsync(null, request, ct), "Supplier created."));
@@ -54,7 +60,8 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
 
     [Authorize(Policy = AppPermissions.PurchasesView)]
     [HttpGet("purchases")]
-    public async Task<IActionResult> Purchases([FromQuery] string? search, CancellationToken ct) => Ok(ApiResponse<IReadOnlyList<PurchaseListItem>>.Ok(await service.GetPurchasesAsync(search, ct)));
+    public async Task<IActionResult> Purchases([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default) =>
+        Ok(ApiResponse<PagedResult<PurchaseListItem>>.Ok(await service.GetPurchasesAsync(search, page, pageSize, ct)));
 
     [Authorize(Policy = AppPermissions.PurchasesView)]
     [HttpGet("purchases/{id:long}")]
@@ -75,7 +82,8 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
 
     [Authorize(Policy = AppPermissions.ManualSalesView)]
     [HttpGet("sales")]
-    public async Task<IActionResult> Sales([FromQuery] string? search, CancellationToken ct) => Ok(ApiResponse<IReadOnlyList<InventorySaleListItem>>.Ok(await service.GetSalesAsync(search, ct)));
+    public async Task<IActionResult> Sales([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default) =>
+        Ok(ApiResponse<PagedResult<InventorySaleListItem>>.Ok(await service.GetSalesAsync(search, page, pageSize, ct)));
 
     [Authorize(Policy = AppPermissions.ManualSalesView)]
     [HttpGet("sales/{id:long}/lots")]
@@ -99,6 +107,11 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
     [HttpGet("staff")]
     public async Task<IActionResult> Staff(CancellationToken ct) => Ok(ApiResponse<IReadOnlyList<StaffResponse>>.Ok(await service.GetStaffAsync(ct)));
 
+    [Authorize(Policy = AppPermissions.StaffView)]
+    [HttpGet("staff/page")]
+    public async Task<IActionResult> StaffPage([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default) =>
+        Ok(ApiResponse<PagedResult<StaffResponse>>.Ok(await service.GetStaffPageAsync(search, page, pageSize, ct)));
+
     [Authorize(Policy = AppPermissions.StaffManage)]
     [HttpPost("staff")]
     public Task<IActionResult> CreateStaff(StaffUpsertRequest request, CancellationToken ct) => Handle(async () => ApiResponse<StaffResponse>.Ok(await service.SaveStaffAsync(null, request, ct), "Staff member created."));
@@ -113,7 +126,8 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
 
     [Authorize(Policy = AppPermissions.PayrollView)]
     [HttpGet("salaries")]
-    public async Task<IActionResult> Salaries(CancellationToken ct) => Ok(ApiResponse<IReadOnlyList<SalaryPaymentResponse>>.Ok(await service.GetSalaryPaymentsAsync(ct)));
+    public async Task<IActionResult> Salaries([FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default) =>
+        Ok(ApiResponse<PagedResult<SalaryPaymentResponse>>.Ok(await service.GetSalaryPaymentsAsync(page, pageSize, ct)));
 
     [Authorize(Policy = AppPermissions.PayrollManage)]
     [HttpPost("salaries")]
@@ -141,7 +155,8 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
 
     [Authorize(Policy = AppPermissions.ExpensesView)]
     [HttpGet("expenses")]
-    public async Task<IActionResult> Expenses(CancellationToken ct) => Ok(ApiResponse<IReadOnlyList<ExpenseResponse>>.Ok(await service.GetExpensesAsync(ct)));
+    public async Task<IActionResult> Expenses([FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default) =>
+        Ok(ApiResponse<PagedResult<ExpenseResponse>>.Ok(await service.GetExpensesAsync(page, pageSize, ct)));
 
     [Authorize(Policy = AppPermissions.ExpensesManage)]
     [HttpPost("expenses")]

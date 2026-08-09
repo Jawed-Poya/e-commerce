@@ -1,5 +1,7 @@
 namespace ECommerce.Entities.Users.Contracts;
 
+public sealed record AdminUserSummaryResponse(int Total, int Active, int Disabled);
+
 public sealed record AdminUserListItemResponse(
     string Id,
     string FullName,

@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { ArrowRight, Heart, LoaderCircle, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { ListPagination } from "../../shared/components/list-pagination";
 import { Button } from "../../shared/components/ui/button";
 import { ProductCard } from "../catalog/product-card";
 import { getProducts } from "../catalog/catalog-api";
@@ -12,14 +14,20 @@ export function WishlistPage() {
   const cart = useCart();
   const { t } = useI18n();
   const productIds = cart.wishlist;
+  const [page, setPage] = useState(1);
+  const pageSize = 12;
+
+  useEffect(() => {
+    setPage(1);
+  }, [productIds.length]);
 
   const products = useQuery({
-    queryKey: ["wishlist-products", productIds],
+    queryKey: ["wishlist-products", productIds, page, pageSize],
     queryFn: () =>
       getProducts({
         ids: productIds,
-        page: 1,
-        pageSize: Math.min(Math.max(productIds.length, 1), 100),
+        page,
+        pageSize,
         isActive: true,
       }),
     enabled: productIds.length > 0,
@@ -96,11 +104,19 @@ export function WishlistPage() {
         </div>
       )}
       {products.data && (
-        <div className="mt-8 grid auto-rows-fr gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
-          {products.data.items.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        <>
+          <div className="mt-8 grid auto-rows-fr gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+            {products.data.items.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+          <ListPagination
+            page={products.data.page}
+            totalPages={products.data.totalPages}
+            disabled={products.isFetching}
+            onPageChange={setPage}
+          />
+        </>
       )}
     </main>
   );

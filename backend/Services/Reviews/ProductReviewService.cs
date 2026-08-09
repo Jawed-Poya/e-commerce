@@ -2,6 +2,7 @@ using API.Entities.Orders;
 using ECommerce.Data;
 using ECommerce.Entities.Orders;
 using ECommerce.Entities.Products;
+using ECommerce.Entities.Common;
 using ECommerce.Entities.Products.Reviews;
 using ECommerce.Services.Customers;
 using ECommerce.Services.Notifications;
@@ -136,29 +137,28 @@ public sealed class ProductReviewService(
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyCollection<AdminProductReviewResponse>> GetForAdminAsync(
+    public async Task<PagedResult<AdminProductReviewResponse>> GetForAdminAsync(
         bool? approved,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default)
     {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 10, 100);
         var query = context.ProductReviews.AsNoTracking().AsQueryable();
         if (approved.HasValue) query = query.Where(review => review.IsApproved == approved.Value);
-        return await query
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
             .OrderBy(review => review.IsApproved)
             .ThenByDescending(review => review.CreatedAt)
-            .Take(500)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(review => new AdminProductReviewResponse(
-                review.Id,
-                review.ProductId,
-                review.Product.Name,
-                review.CustomerId,
+                review.Id, review.ProductId, review.Product.Name, review.CustomerId,
                 review.Customer.FirstName + (review.Customer.LastName == null ? "" : " " + review.Customer.LastName),
-                review.Rating,
-                review.Comment,
-                review.IsApproved,
-                review.IsVerifiedPurchase,
-                review.CreatedAt,
-                review.UpdatedAt))
+                review.Rating, review.Comment, review.IsApproved, review.IsVerifiedPurchase, review.CreatedAt, review.UpdatedAt))
             .ToListAsync(cancellationToken);
+        return new PagedResult<AdminProductReviewResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
     }
 
     public async Task<AdminProductReviewResponse> SetApprovalAsync(

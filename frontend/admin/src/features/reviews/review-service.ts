@@ -1,11 +1,11 @@
 import apiClient from "@/api/api-client";
-import type { AdminProductReview } from "./review-types";
+import type { AdminProductReview, PagedResult } from "./review-types";
 
 export const reviewService = {
-    async list(approved?: boolean) {
-        const response = await apiClient.get<AdminProductReview[]>(
+    async list(approved: boolean | undefined, page = 1, pageSize = 20) {
+        const response = await apiClient.get<PagedResult<AdminProductReview>>(
             "/admin/reviews",
-            approved === undefined ? undefined : { approved },
+            { approved, page, pageSize },
         );
         return response.data;
     },

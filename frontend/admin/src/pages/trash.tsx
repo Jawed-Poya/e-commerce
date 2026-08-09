@@ -1,4 +1,4 @@
-import { useMemo, useState, type ComponentType } from "react";
+import { useDeferredValue, useState, type ComponentType } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     Boxes,
@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmActionDialog } from "@/components/confirm-action-dialog";
+import { ListPagination } from "@/components/list-pagination";
 import { PageHeader } from "@/components/page-header";
 import { SimpleCombobox } from "@/components/simple-combobox";
 import { Badge } from "@/components/ui/badge";
@@ -40,31 +41,32 @@ export default function TrashPage() {
     const client = useQueryClient();
     const { t, language } = useI18n();
     const [search, setSearch] = useState("");
+    const deferredSearch = useDeferredValue(search.trim());
     const [type, setType] = useState("");
     const [branchId, setBranchId] = useState("");
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [selected, setSelected] = useState<TrashItem | null>(null);
     const query = useQuery({
-        queryKey: ["company-trash", search, type, branchId],
+        queryKey: ["company-trash", deferredSearch, type, branchId, page, pageSize],
         queryFn: () =>
             companyService.trash({
-                search: search || undefined,
+                search: deferredSearch || undefined,
                 entityType: type || undefined,
                 branchId: branchId ? Number(branchId) : undefined,
+                page,
+                pageSize,
             }),
     });
-    const types = useMemo(
-        () => [...new Set(query.data?.map((item) => item.entityType) ?? [])].sort(),
-        [query.data],
-    );
-    const branches = useMemo(
-        () =>
-            [...new Map(
-                (query.data ?? [])
-                    .filter((item) => item.branchId && item.branchName)
-                    .map((item) => [item.branchId!, item.branchName!]),
-            ).entries()].sort((left, right) => left[1].localeCompare(right[1])),
-        [query.data],
-    );
+    const profile = useQuery({
+        queryKey: ["company", "profile"],
+        queryFn: companyService.profile,
+    });
+    const types = [
+        "Product", "Customer", "Order", "GeneralType", "Supplier", "Purchase",
+        "InventorySale", "Staff", "StaffSalaryPayment", "Expense", "Warehouse",
+    ];
+    const branches = profile.data?.branches ?? [];
     const refresh = () =>
         client.invalidateQueries({ queryKey: ["company-trash"] });
     const restore = useMutation({
@@ -101,13 +103,13 @@ export default function TrashPage() {
                         <Input
                             className="ps-9"
                             value={search}
-                            onChange={(event) => setSearch(event.target.value)}
+                            onChange={(event) => { setSearch(event.target.value); setPage(1); }}
                             placeholder={t("trash.search")}
                         />
                     </div>
                     <SimpleCombobox
                         value={type}
-                        onValueChange={(value) => setType(value ?? "")}
+                        onValueChange={(value) => { setType(value ?? ""); setPage(1); }}
                         options={[
                             { value: "", label: t("trash.allTypes") },
                             ...types.map((value) => ({
@@ -118,12 +120,12 @@ export default function TrashPage() {
                     />
                     <SimpleCombobox
                         value={branchId}
-                        onValueChange={(value) => setBranchId(value ?? "")}
+                        onValueChange={(value) => { setBranchId(value ?? ""); setPage(1); }}
                         options={[
                             { value: "", label: t("reports.allBranches") },
-                            ...branches.map(([id, name]) => ({
-                                value: String(id),
-                                label: name,
+                            ...branches.map((branch) => ({
+                                value: String(branch.id),
+                                label: branch.name,
                             })),
                         ]}
                     />
@@ -137,9 +139,9 @@ export default function TrashPage() {
                 <div className="grid min-h-56 place-items-center">
                     <LoaderCircle className="animate-spin" />
                 </div>
-            ) : query.data?.length ? (
+            ) : query.data?.items.length ? (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {query.data.map((item) => (
+                    {query.data.items.map((item) => (
                         <TrashCard
                             key={item.id}
                             item={item}
@@ -165,6 +167,18 @@ export default function TrashPage() {
                     </CardContent>
                 </Card>
             )}
+
+            <Card className="overflow-hidden">
+                <ListPagination
+                    page={page}
+                    pageSize={pageSize}
+                    totalCount={query.data?.totalCount ?? 0}
+                    totalPages={query.data?.totalPages}
+                    disabled={query.isFetching}
+                    onPageChange={setPage}
+                    onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+                />
+            </Card>
 
             <TrashDetailsDialog
                 item={selected}

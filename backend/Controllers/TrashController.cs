@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using ECommerce.Entities;
+using ECommerce.Entities.Common;
 using ECommerce.Services.Company;
 using ECommerce.Shared;
 using Microsoft.AspNetCore.Authorization;
@@ -13,12 +14,14 @@ namespace ECommerce.Controllers;
 public sealed class TrashController(ITrashService trash) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<TrashItemResponse>>>> Get(
+    public async Task<ActionResult<ApiResponse<PagedResult<TrashItemResponse>>>> Get(
         [FromQuery] string? search,
         [FromQuery] string? entityType,
         [FromQuery] long? branchId,
-        CancellationToken cancellationToken) =>
-        Ok(ApiResponse<IReadOnlyCollection<TrashItemResponse>>.Ok(await trash.GetAsync(search, entityType, branchId, cancellationToken)));
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default) =>
+        Ok(ApiResponse<PagedResult<TrashItemResponse>>.Ok(await trash.GetAsync(search, entityType, branchId, page, pageSize, cancellationToken)));
 
     [HttpPost("{id:long}/restore")]
     public async Task<ActionResult<ApiResponse<object>>> Restore(long id, CancellationToken cancellationToken)

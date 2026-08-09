@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, Plus, Search } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useDeferredValue, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
+import { ListPagination } from "@/components/list-pagination";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,12 +24,14 @@ const emptyForm = { firstName: "", lastName: "", phone: "", email: "", address: 
 
 export default function CustomersPage() {
     const [search, setSearch] = useState("");
+    const deferredSearch = useDeferredValue(search.trim());
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState(emptyForm);
     const queryClient = useQueryClient();
     const { data: lookups } = useProductLookupsQuery();
-    const query = useQuery({ queryKey: ["customers", search, page], queryFn: () => customerService.getCustomers({ search: search || undefined, page, pageSize: 20 }) });
+    const query = useQuery({ queryKey: ["customers", deferredSearch, page, pageSize], queryFn: () => customerService.getCustomers({ search: deferredSearch || undefined, page, pageSize }) });
     const create = useMutation({ mutationFn: (request: UpsertCustomerRequest) => customerService.createCustomer(request), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["customers"] }); setOpen(false); setForm(emptyForm); toast.success("Customer created."); }, onError: error => toast.error(getErrorMessage(error)) });
 
     const submit = (event: FormEvent) => {
@@ -53,8 +56,7 @@ export default function CustomersPage() {
             {query.isLoading && <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">Loading customers...</TableCell></TableRow>}
             {data?.items.map(customer => <TableRow key={customer.id}><TableCell><div className="font-semibold">{customer.name}</div><div className="text-muted-foreground">{customer.email ?? "No email"}</div></TableCell><TableCell><a className="hover:text-primary hover:underline" href={`tel:${customer.phone}`}>{customer.phone}</a></TableCell><TableCell>{customer.customerTypeName ?? "Default"}</TableCell><TableCell>{customer.orderCount}</TableCell><TableCell>{formatMoney(customer.totalSpent, "USD")}</TableCell><TableCell>{customer.lastOrderAt ? new Date(customer.lastOrderAt).toLocaleString() : "—"}</TableCell><TableCell><div className="flex justify-end gap-2"><WhatsAppLink url={customer.whatsAppUrl} customerName={customer.name} compact /><Link className="inline-flex h-7 items-center gap-1 border px-2 hover:bg-muted" to={`/customers/${customer.id}`}><Eye className="size-3.5" />View</Link></div></TableCell></TableRow>)}
             {!query.isLoading && data?.items.length === 0 && <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No customers found.</TableCell></TableRow>}
-        </TableBody></Table></CardContent></Card>
-        {data && data.totalPages > 1 && <div className="flex items-center justify-between text-xs"><span>Page {data.page} of {data.totalPages}</span><div className="flex gap-2"><Button variant="outline" disabled={!data.hasPreviousPage} onClick={() => setPage(x => x - 1)}>Previous</Button><Button variant="outline" disabled={!data.hasNextPage} onClick={() => setPage(x => x + 1)}>Next</Button></div></div>}
+        </TableBody></Table></CardContent><ListPagination page={page} pageSize={pageSize} totalCount={data?.totalCount ?? 0} totalPages={data?.totalPages} disabled={query.isFetching} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} /></Card>
 
         <Dialog open={open} onOpenChange={setOpen}><DialogContent className="sm:max-w-lg"><form onSubmit={submit}><DialogHeader><DialogTitle>Add customer</DialogTitle><DialogDescription>Create a customer without placing an order.</DialogDescription></DialogHeader><div className="my-5 grid gap-4 sm:grid-cols-2"><Field label="First name" value={form.firstName} onChange={value => setForm(x => ({ ...x, firstName: value }))} required /><Field label="Last name" value={form.lastName} onChange={value => setForm(x => ({ ...x, lastName: value }))} /><Field label="Phone" value={form.phone} onChange={value => setForm(x => ({ ...x, phone: value }))} required /><Field label="Email" value={form.email} onChange={value => setForm(x => ({ ...x, email: value }))} /><div className="space-y-2"><Label>Customer type</Label><Combobox items={lookups?.customerTypes ?? []} value={(lookups?.customerTypes ?? []).find(type => String(type.id) === (form.customerTypeId || String(lookups?.defaultCustomerTypeId ?? ""))) ?? null} onValueChange={value => setForm(x => ({ ...x, customerTypeId: value ? String((value as { id: number }).id) : "" }))} itemToStringLabel={item => item ? (item as { name: string }).name : ""}><ComboboxInput className="w-full" placeholder="Search customer type…" showClear={false} /><ComboboxContent><ComboboxList>{lookups?.customerTypes.map(type => <ComboboxItem key={type.id} value={type}>{type.name}{type.id === lookups.defaultCustomerTypeId ? " (Default / guests)" : ""}</ComboboxItem>)}</ComboboxList><ComboboxEmpty>No customer type found.</ComboboxEmpty></ComboboxContent></Combobox></div><div className="sm:col-span-2 space-y-2"><Label>Address</Label><Textarea value={form.address} onChange={e => setForm(x => ({ ...x, address: e.target.value }))} /></div></div><DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={create.isPending || !form.firstName.trim() || !form.phone.trim()}>{create.isPending ? "Saving..." : "Create customer"}</Button></DialogFooter></form></DialogContent></Dialog>
     </div>;

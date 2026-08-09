@@ -14,5 +14,15 @@ export interface AccountOrder {
     createdAt: string;
 }
 
-export const getAccountOrders = () =>
-    apiGet<AccountOrder[]>("/account/orders");
+export interface PagedAccountOrders {
+    items: AccountOrder[];
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+    hasPreviousPage: boolean;
+    hasNextPage: boolean;
+}
+
+export const getAccountOrders = (page = 1, pageSize = 10) =>
+    apiGet<PagedAccountOrders>("/account/orders", { page, pageSize });

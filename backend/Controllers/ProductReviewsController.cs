@@ -1,4 +1,5 @@
 using ECommerce.Entities;
+using ECommerce.Entities.Common;
 using ECommerce.Entities.Products.Reviews;
 using ECommerce.Services.Reviews;
 using ECommerce.Shared;
@@ -72,12 +73,14 @@ public sealed class ProductReviewsController(IProductReviewService reviews) : Co
 
     [Authorize(Policy = AppPermissions.ReviewsView)]
     [HttpGet("api/admin/reviews")]
-    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AdminProductReviewResponse>>>> GetAdmin(
+    public async Task<ActionResult<ApiResponse<PagedResult<AdminProductReviewResponse>>>> GetAdmin(
         [FromQuery] bool? approved,
-        CancellationToken cancellationToken)
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
     {
-        return Ok(ApiResponse<IReadOnlyCollection<AdminProductReviewResponse>>.Ok(
-            await reviews.GetForAdminAsync(approved, cancellationToken)));
+        return Ok(ApiResponse<PagedResult<AdminProductReviewResponse>>.Ok(
+            await reviews.GetForAdminAsync(approved, page, pageSize, cancellationToken)));
     }
 
     [Authorize(Policy = AppPermissions.ReviewsManage)]

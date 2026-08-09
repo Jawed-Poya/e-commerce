@@ -2,6 +2,8 @@ import apiClient from "@/api/api-client";
 import type {
     AdminUserDetails,
     AdminUserListItem,
+    AdminUserSummary,
+    PagedResult,
     CreateUserRequest,
     PermissionGroup,
     RoleListItem,
@@ -14,11 +16,17 @@ export const userService = {
         search?: string;
         role?: string;
         isActive?: boolean;
+        page?: number;
+        pageSize?: number;
     }) {
-        const response = await apiClient.get<AdminUserListItem[]>(
+        const response = await apiClient.get<PagedResult<AdminUserListItem>>(
             "/admin/users",
             params,
         );
+        return response.data;
+    },
+    async getSummary() {
+        const response = await apiClient.get<AdminUserSummary>("/admin/users/summary");
         return response.data;
     },
     async getUser(id: string) {

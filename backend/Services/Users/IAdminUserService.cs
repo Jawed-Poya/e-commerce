@@ -1,14 +1,19 @@
+using ECommerce.Entities.Common;
 using ECommerce.Entities.Users.Contracts;
 
 namespace ECommerce.Services.Users;
 
 public interface IAdminUserService
 {
-    Task<IReadOnlyCollection<AdminUserListItemResponse>> GetUsersAsync(
+    Task<PagedResult<AdminUserListItemResponse>> GetUsersAsync(
         string? search,
         string? role,
         bool? isActive,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default);
+
+    Task<AdminUserSummaryResponse> GetUserSummaryAsync(CancellationToken cancellationToken = default);
 
     Task<AdminUserDetailsResponse?> GetUserAsync(
         string id,

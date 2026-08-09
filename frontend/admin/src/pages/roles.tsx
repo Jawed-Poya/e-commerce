@@ -3,6 +3,7 @@ import { LoaderCircle, Pencil, Plus, ShieldCheck, Trash2, Users } from "lucide-r
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ListPagination } from "@/components/list-pagination";
 import { PageHeader } from "@/components/page-header";
 import { ConfirmActionDialog } from "@/components/confirm-action-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,8 @@ export default function RolesPage() {
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState<RoleListItem | null>(null);
     const [form, setForm] = useState<UpsertRoleRequest>(emptyForm);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
 
     const roles = useQuery({
         queryKey: ["admin-roles"],
@@ -97,6 +100,9 @@ export default function RolesPage() {
         }));
     };
 
+    const roleItems = roles.data ?? [];
+    const pagedRoles = roleItems.slice((page - 1) * pageSize, page * pageSize);
+
     return (
         <div className="space-y-5">
             <PageHeader
@@ -122,7 +128,7 @@ export default function RolesPage() {
             </Card>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {roles.data?.map((role) => (
+                {pagedRoles.map((role) => (
                     <Card key={role.id} className="overflow-hidden">
                         <CardHeader className="border-b">
                             <div className="flex items-start justify-between gap-3">
@@ -206,6 +212,10 @@ export default function RolesPage() {
                     </Card>
                 ))}
             </div>
+
+            <Card className="overflow-hidden">
+                <ListPagination page={page} pageSize={pageSize} totalCount={roleItems.length} disabled={roles.isFetching} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} pageSizes={[5, 10, 20]} />
+            </Card>
 
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">

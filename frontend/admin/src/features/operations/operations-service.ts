@@ -8,7 +8,7 @@ import {
   readReferenceItems,
   writeCachedValue,
 } from "@/features/offline/offline-reference-cache";
-import type { DocumentPayment, Expense, ExpenseCategory, ManualSale, ManualSaleLotMovement, OperationCustomer, OperationPolicy, OperationProduct, OperationSummary, Purchase, PurchaseDetails, SalaryPayment, Staff, Supplier } from "./operations-types";
+import type { DocumentPayment, Expense, ExpenseCategory, ManualSale, ManualSaleLotMovement, OperationCustomer, OperationPolicy, OperationProduct, OperationSummary, PagedResult, Purchase, PurchaseDetails, SalaryPayment, Staff, Supplier } from "./operations-types";
 
 const base = "/admin/operations";
 
@@ -39,23 +39,38 @@ async function cachedLookup<T extends { id: number }>(
 }
 
 
-async function cachedDocumentList<T extends { id: number }>(
+async function cachedDocumentPage<T extends { id: number }>(
   name: string,
   search: string,
-  request: () => Promise<ApiResponse<T[]>>,
+  page: number,
+  pageSize: number,
+  request: () => Promise<ApiResponse<PagedResult<T>>>,
   matches: (item: T, clean: string) => boolean,
 ) {
   try {
     const response = await request();
-    await mergeReferenceItems(cacheKey(name), response.data);
+    await mergeReferenceItems(cacheKey(name), response.data.items);
     return response;
   } catch (error) {
     if (!isOfflineNetworkError(error)) throw error;
     const clean = normalize(search);
-    const cached = await readReferenceItems<T>(cacheKey(name));
+    const filtered = (await readReferenceItems<T>(cacheKey(name))).filter(
+      (item) => !clean || matches(item, clean),
+    );
+    const safePage = Math.max(1, page);
+    const safePageSize = Math.max(1, pageSize);
+    const offset = (safePage - 1) * safePageSize;
     return {
       success: true,
-      data: cached.filter((item) => !clean || matches(item, clean)),
+      data: {
+        items: filtered.slice(offset, offset + safePageSize),
+        page: safePage,
+        pageSize: safePageSize,
+        totalCount: filtered.length,
+        totalPages: Math.ceil(filtered.length / safePageSize),
+        hasPreviousPage: safePage > 1,
+        hasNextPage: offset + safePageSize < filtered.length,
+      },
       message: "Offline cached records",
     };
   }
@@ -103,21 +118,27 @@ export const operationsService = {
   ),
   suppliers: getSuppliers,
   suppliersResponse: async (search = "", take = 50) => ({ success: true, data: await getSuppliers(search, take), message: "" }),
+  supplierPage: (search = "", page = 1, pageSize = 20) =>
+    apiClient.get<PagedResult<Supplier>>(`${base}/suppliers/page`, { search: search || undefined, page, pageSize }),
   saveSupplier: (id: number | null, body: Omit<Supplier, "id">) => id ? apiClient.put<Supplier>(`${base}/suppliers/${id}`, body) : apiClient.post<Supplier>(`${base}/suppliers`, body),
-  purchases: (search = "") => cachedDocumentList(
+  purchases: (search = "", page = 1, pageSize = 20) => cachedDocumentPage(
     "purchases",
     search,
-    () => apiClient.get<Purchase[]>(`${base}/purchases`, { search: search || undefined }),
+    page,
+    pageSize,
+    () => apiClient.get<PagedResult<Purchase>>(`${base}/purchases`, { search: search || undefined, page, pageSize }),
     (item, clean) => [item.purchaseNumber, item.referenceNumber, item.supplierName].some((value) => normalize(value ?? "").includes(clean)),
   ),
   purchase: (id: number) => apiClient.get<PurchaseDetails>(`${base}/purchases/${id}`),
   createPurchase: (body: Record<string, unknown>) => postQueueable<Purchase>(`${base}/purchases`, body, "Purchase"),
   purchasePayments: (id: number) => apiClient.get<DocumentPayment[]>(`${base}/purchases/${id}/payments`),
   addPurchasePayment: (id: number, body: unknown) => apiClient.post<Purchase>(`${base}/purchases/${id}/payments`, body),
-  sales: (search = "") => cachedDocumentList(
+  sales: (search = "", page = 1, pageSize = 20) => cachedDocumentPage(
     "sales",
     search,
-    () => apiClient.get<ManualSale[]>(`${base}/sales`, { search: search || undefined }),
+    page,
+    pageSize,
+    () => apiClient.get<PagedResult<ManualSale>>(`${base}/sales`, { search: search || undefined, page, pageSize }),
     (item, clean) => [item.saleNumber, item.referenceNumber, item.customerName].some((value) => normalize(value ?? "").includes(clean)),
   ),
   createSale: (body: Record<string, unknown>) => postQueueable<ManualSale>(`${base}/sales`, body, "Manual sale"),
@@ -125,15 +146,16 @@ export const operationsService = {
   salePayments: (id: number) => apiClient.get<DocumentPayment[]>(`${base}/sales/${id}/payments`),
   addSalePayment: (id: number, body: unknown) => apiClient.post<ManualSale>(`${base}/sales/${id}/payments`, body),
   staff: () => apiClient.get<Staff[]>(`${base}/staff`),
+  staffPage: (search = "", page = 1, pageSize = 20) => apiClient.get<PagedResult<Staff>>(`${base}/staff/page`, { search: search || undefined, page, pageSize }),
   saveStaff: (id: number | null, body: Omit<Staff, "id">) => id ? apiClient.put<Staff>(`${base}/staff/${id}`, body) : apiClient.post<Staff>(`${base}/staff`, body),
   deleteStaff: (id: number) => apiClient.delete<void>(`${base}/staff/${id}`),
-  salaries: () => apiClient.get<SalaryPayment[]>(`${base}/salaries`),
+  salaries: (page = 1, pageSize = 20) => apiClient.get<PagedResult<SalaryPayment>>(`${base}/salaries`, { page, pageSize }),
   createSalary: (body: unknown) => apiClient.post<SalaryPayment>(`${base}/salaries`, body),
   salaryPayments: (id: number) => apiClient.get<DocumentPayment[]>(`${base}/salaries/${id}/payments`),
   addSalaryPayment: (id: number, body: unknown) => apiClient.post<SalaryPayment>(`${base}/salaries/${id}/payments`, body),
   expenseCategories: () => apiClient.get<ExpenseCategory[]>(`${base}/expense-categories`),
   saveExpenseCategory: (id: number | null, body: Omit<ExpenseCategory, "id">) => id ? apiClient.put<ExpenseCategory>(`${base}/expense-categories/${id}`, body) : apiClient.post<ExpenseCategory>(`${base}/expense-categories`, body),
-  expenses: () => apiClient.get<Expense[]>(`${base}/expenses`),
+  expenses: (page = 1, pageSize = 20) => apiClient.get<PagedResult<Expense>>(`${base}/expenses`, { page, pageSize }),
   createExpense: (body: unknown) => apiClient.post<Expense>(`${base}/expenses`, body),
 };
 
@@ -144,7 +166,7 @@ export async function warmOfflineOperationReferences() {
     operationsService.products("", 500),
     operationsService.suppliers("", 500),
     operationsService.customers("", 500),
-    operationsService.purchases(""),
-    operationsService.sales(""),
+    operationsService.purchases("", 1, 100),
+    operationsService.sales("", 1, 100),
   ]);
 }
