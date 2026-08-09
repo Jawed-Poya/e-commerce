@@ -1,14 +1,11 @@
 import {
     AlertTriangle,
     ArrowRight,
-    Minus,
-    Plus,
     ShoppingBag,
     Trash2,
     Truck,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useEffect, useState, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { imageUrl } from "../../shared/api/api-client";
@@ -18,16 +15,14 @@ import { productPath } from "../../shared/lib/product-path";
 import { getCheckoutConfiguration } from "../checkout/checkout-api";
 import { getProducts } from "../catalog/catalog-api";
 import {
-    cartQuantityStep,
-    cartQuickQuantities,
     maximumCartQuantity,
     minimumCartQuantity,
-    normalizeCartQuantity,
     useCart,
     type CartItem,
 } from "./cart-context";
 import { useI18n } from "../../i18n/i18n-provider";
 import { useCompany } from "../company/company-context";
+import { CartQuantityControl } from "./cart-quantity-control";
 
 export function CartPage() {
     const cart = useCart();
@@ -201,7 +196,6 @@ export function CartPage() {
                                         </Link>
                                         <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                             {item.unitName ? <span className="inline-flex w-fit rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-[10px] font-bold text-primary">{formatNumber(item.quantity)} {item.unitName}</span> : null}
-                                            {cartQuantityStep(currentCartItem(item)) > 1 ? <span className="inline-flex w-fit rounded-full border border-primary/10 bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">{t("cart.quantityStep", { count: formatNumber(cartQuantityStep(currentCartItem(item))) })}</span> : null}
                                         </div>
 
                                         <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
@@ -226,72 +220,12 @@ export function CartPage() {
                                         </p>
 
                                         <div className="mt-auto flex items-end justify-between gap-3 pt-2.5">
-                                            <div className="space-y-1.5">
-                                                <div className="inline-flex h-8 items-center overflow-hidden rounded-lg border bg-background shadow-sm">
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="size-8 rounded-none"
-                                                    disabled={
-                                                        availabilityIssue(item) === "unavailable" ||
-                                                        item.quantity <= minimumCartQuantity(currentCartItem(item))
-                                                    }
-                                                    onClick={() =>
-                                                        cart.updateQuantity(
-                                                            item.lineKey,
-                                                            item.quantity - cartQuantityStep(currentCartItem(item)),
-                                                            currentCartItem(item),
-                                                        )
-                                                    }
-                                                    aria-label={`Decrease ${item.name} quantity`}
-                                                >
-                                                    <Minus className="size-3.5" />
-                                                </Button>
-
-                                                <CartQuantityInput
-                                                    item={currentCartItem(item)}
-                                                    onChange={(quantity) => cart.updateQuantity(item.lineKey, quantity, currentCartItem(item))}
-                                                />
-
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="size-8 rounded-none"
-                                                    disabled={
-                                                        availabilityIssue(item) !== null ||
-                                                        item.quantity >= maximumCartQuantity(currentCartItem(item))
-                                                    }
-                                                    onClick={() =>
-                                                        cart.updateQuantity(
-                                                            item.lineKey,
-                                                            item.quantity + cartQuantityStep(currentCartItem(item)),
-                                                            currentCartItem(item),
-                                                        )
-                                                    }
-                                                    aria-label={`Increase ${item.name} quantity`}
-                                                >
-                                                    <Plus className="size-3.5" />
-                                                </Button>
-                                                </div>
-
-                                                {cartQuickQuantities(currentCartItem(item)).length > 0 ? (
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {cartQuickQuantities(currentCartItem(item)).map((quantity) => (
-                                                            <button
-                                                                key={quantity}
-                                                                type="button"
-                                                                onClick={() => cart.updateQuantity(item.lineKey, quantity, currentCartItem(item))}
-                                                                className={`inline-flex h-6 min-w-8 items-center justify-center rounded-full border px-2 text-[10px] font-black tabular-nums transition ${Math.abs(item.quantity - quantity) < Number.EPSILON ? "border-primary bg-primary text-primary-foreground" : "border-primary/15 bg-primary/[0.045] text-primary hover:bg-primary/[0.09]"}`}
-                                                                aria-label={t("cart.setQuickQuantity", { count: formatNumber(quantity) })}
-                                                            >
-                                                                {formatNumber(quantity)}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                ) : null}
-                                            </div>
+                                            <CartQuantityControl
+                                                item={currentCartItem(item)}
+                                                compact
+                                                showQuickQuantities
+                                                className="max-w-[13rem]"
+                                            />
 
                                             <Button
                                                 type="button"
@@ -476,60 +410,5 @@ export function CartPage() {
                 </div>
             </div>
         </>
-    );
-}
-
-
-function CartQuantityInput({ item, onChange }: { item: CartItem; onChange: (quantity: number) => void }) {
-    const { t } = useI18n();
-    const [draft, setDraft] = useState(String(item.quantity));
-
-    useEffect(() => {
-        setDraft(String(item.quantity));
-    }, [item.quantity]);
-
-    const commit = () => {
-        const parsed = Number(draft.replace(",", "."));
-        if (!Number.isFinite(parsed)) {
-            setDraft(String(item.quantity));
-            return;
-        }
-
-        const normalized = normalizeCartQuantity(item, parsed);
-        onChange(normalized);
-        setDraft(String(normalized));
-    };
-
-    const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-        if (event.key === "Enter") {
-            event.preventDefault();
-            event.currentTarget.blur();
-        }
-
-        if (event.key === "Escape") {
-            setDraft(String(item.quantity));
-            event.currentTarget.blur();
-        }
-    };
-
-    const maximum = maximumCartQuantity(item);
-    const visibleCharacters = Math.min(14, Math.max(5, String(maximum).length + 2, draft.length + 1));
-
-    return (
-        <input
-            type="number"
-            inputMode="decimal"
-            min={minimumCartQuantity(item)}
-            max={maximumCartQuantity(item)}
-            step="any"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onBlur={commit}
-            onKeyDown={handleKeyDown}
-            aria-label={t("cart.quantityInput", { name: item.name })}
-            title={`${minimumCartQuantity(item)} – ${maximum}`}
-            style={{ width: `${visibleCharacters}ch` }}
-            className="h-8 min-w-[4.25rem] max-w-[9rem] border-x border-border/80 bg-transparent px-2 text-center text-xs font-bold tabular-nums outline-none transition focus:bg-primary/5 focus:ring-2 focus:ring-inset focus:ring-primary/25 dark:border-white/10"
-        />
     );
 }

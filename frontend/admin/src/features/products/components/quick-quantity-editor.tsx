@@ -84,7 +84,7 @@ export function QuickQuantityEditor({
                     type="button"
                     variant="outline"
                     size={compact ? "sm" : "default"}
-                    className="shrink-0 sm:w-auto"
+                    className="w-full shrink-0 sm:w-auto"
                     disabled={disabled || !draft}
                     onClick={add}
                 >

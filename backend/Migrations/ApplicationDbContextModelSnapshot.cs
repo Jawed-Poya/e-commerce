@@ -585,14 +585,6 @@ namespace ECommerce.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
-                    b.Property<decimal?>("OldPriceOverride")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal?>("PriceOverride")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<long>("ProductId")
                         .HasColumnType("bigint");
 
@@ -630,7 +622,6 @@ namespace ECommerce.Migrations
                     b.ToTable("ProductUnitConversions", t =>
                         {
                             t.HasCheckConstraint("CK_ProductUnitConversion_Factor", "[ConversionFactor] >= 1");
-                            t.HasCheckConstraint("CK_ProductUnitConversion_Prices", "[PriceOverride] IS NULL OR ([PriceOverride] >= 0 AND ([OldPriceOverride] IS NULL OR [OldPriceOverride] >= [PriceOverride]))");
                             t.HasCheckConstraint("CK_ProductUnitConversion_DefaultActive", "[IsDefault] = 0 OR [IsActive] = 1");
                         });
                 });

@@ -64,14 +64,17 @@ public sealed class FinancialReportsController(
     }
 
     [HttpGet("export/excel")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<IActionResult> ExportExcel([FromQuery] FinancialReportRequest request) =>
         ExportFinancialReportAsync(request, "excel");
 
     [HttpGet("export/pdf")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<IActionResult> ExportPdf([FromQuery] FinancialReportRequest request) =>
         ExportFinancialReportAsync(request, "pdf");
 
     [HttpGet("customers/{customerId:long}/ledger/export/excel")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<IActionResult> ExportCustomerLedgerExcel(
         long customerId,
         [FromQuery] DateTime? startDate,
@@ -80,6 +83,7 @@ public sealed class FinancialReportsController(
         ExportCustomerLedgerAsync(customerId, startDate, endDate, currencyCode, "excel");
 
     [HttpGet("customers/{customerId:long}/ledger/export/pdf")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<IActionResult> ExportCustomerLedgerPdf(
         long customerId,
         [FromQuery] DateTime? startDate,

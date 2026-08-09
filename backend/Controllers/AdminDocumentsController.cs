@@ -10,6 +10,7 @@ namespace ECommerce.Controllers;
 [ApiController]
 [Route("api/admin/documents")]
 [Authorize]
+[ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class AdminDocumentsController(IFinancialDocumentService documents) : ControllerBase
 {
     [Authorize(Policy = AppPermissions.ProductsView)]

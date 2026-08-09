@@ -9,7 +9,7 @@ export function PageHeader({ title, description, actions, className }: { title: 
                 <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{title}</h1>
                 <p className="max-w-3xl text-xs leading-5 text-muted-foreground sm:text-sm">{description}</p>
             </div>
-            {actions && <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto">{actions}</div>}
+            {actions && <div className="flex w-full min-w-0 shrink-0 flex-wrap items-center gap-2 [&>*]:max-w-full sm:w-auto">{actions}</div>}
         </header>
     );
 }

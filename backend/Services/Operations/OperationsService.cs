@@ -969,7 +969,7 @@ public sealed class OperationsService(
                 unit.Unit.Name,
                 unit.ConversionFactor,
                 unit.Barcode,
-                unit.PriceOverride ?? (basePrice.HasValue ? basePrice.Value * unit.ConversionFactor : null),
+                basePrice.HasValue ? basePrice.Value * unit.ConversionFactor : null,
                 decimal.Round(availableBaseQuantity / unit.ConversionFactor, 3),
                 false,
                 unit.IsDefault)));

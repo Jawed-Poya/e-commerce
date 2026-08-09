@@ -153,8 +153,6 @@ export function ProductPage() {
         unitName: p.unitName ?? t("product.unit"),
         conversionFactor: 1,
         barcode: p.barcode,
-        priceOverride: null,
-        oldPriceOverride: null,
         isBaseUnit: true,
         isDefault: true,
         isActive: true,
@@ -193,12 +191,6 @@ export function ProductPage() {
     : company?.settings.defaultQuickOrderQuantities ?? [];
   const minimumQuantity = minimumCartQuantity({ stock, quantityStep });
   const maximumQuantity = maximumCartQuantity({ stock, quantityStep });
-  const availableQuickOrderQuantities = quickOrderQuantities.filter(
-    (quantity) =>
-      quantity > 0 &&
-      quantity <= maximumQuantity + Number.EPSILON &&
-      Math.abs(quantity / quantityStep - Math.round(quantity / quantityStep)) < 1e-9,
-  );
   const hasOrderableStock = maximumQuantity >= minimumQuantity;
   const canAddToCart = hasPrice && hasOrderableStock;
   const liveCartItem = cartItem
@@ -430,20 +422,6 @@ export function ProductPage() {
               </div>
             </div>
 
-            {(quantityStep > 1 || availableQuickOrderQuantities.length > 0) ? (
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                {quantityStep > 1 ? (
-                  <Badge variant="secondary" className="h-7 border border-primary/15 bg-primary/[0.06] px-2.5 text-[10px] font-black text-primary">
-                    {t("cart.quantityStep", { count: formatNumber(quantityStep) })}
-                  </Badge>
-                ) : null}
-                {availableQuickOrderQuantities.map((quantity) => (
-                  <span key={quantity} className="inline-flex h-7 min-w-9 items-center justify-center rounded-full border border-primary/15 bg-background px-2.5 text-[10px] font-black tabular-nums text-primary shadow-sm">
-                    {formatNumber(quantity)}
-                  </span>
-                ))}
-              </div>
-            ) : null}
 
             {unitOptions.length > 1 ? (
               <div className="mt-5 rounded-2xl border border-border/80 bg-card p-4 dark:border-white/12 sm:p-5">
@@ -656,7 +634,10 @@ export function ProductPage() {
           {cartItem && canAddToCart ? (
             <CartQuantityControl
               item={liveCartItem!}
-              className="ms-auto"
+              compact
+              showStepBadge={false}
+              showQuickQuantities
+              className="ms-auto max-w-[13rem]"
             />
           ) : (
             <Button

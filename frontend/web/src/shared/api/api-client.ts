@@ -101,17 +101,30 @@ function requestHeaders(includeJson = false) {
 }
 
 async function readResponse<T>(response: Response): Promise<T> {
-    const payload = (await response.json().catch(() => null)) as
-        | ApiEnvelope<T>
-        | T
-        | null;
+    const text = await response.text();
+    let payload: unknown = null;
+    if (text.trim()) {
+        try {
+            payload = JSON.parse(text);
+        } catch {
+            payload = text;
+        }
+    }
 
-    if (!response.ok) {
-        const envelope =
-            payload && typeof payload === "object" && "message" in payload
-                ? (payload as ApiEnvelope<T>)
-                : null;
+    const objectPayload = payload && typeof payload === "object"
+        ? payload as Record<string, unknown>
+        : null;
+    const errors = objectPayload?.errors && typeof objectPayload.errors === "object"
+        ? objectPayload.errors as Record<string, string[]>
+        : undefined;
+    const validationMessage = errors
+        ? Object.values(errors).flat().find((value) => typeof value === "string" && value.trim())?.trim()
+        : undefined;
+    const message = [objectPayload?.message, objectPayload?.detail, objectPayload?.title]
+        .find((value) => typeof value === "string" && value.trim()) as string | undefined;
+    const resolvedMessage = message?.trim() || validationMessage;
 
+    if (!response.ok || objectPayload?.success === false) {
         if (response.status === 401) {
             localStorage.removeItem(customerTokenKey);
             localStorage.removeItem("easycart-customer-session");
@@ -119,17 +132,27 @@ async function readResponse<T>(response: Response): Promise<T> {
         }
 
         throw new ApiError(
-            envelope?.message ?? "The request could not be completed.",
+            resolvedMessage || statusMessage(response.status),
             response.status,
-            envelope?.errors,
+            errors,
         );
     }
 
-    return (
-        payload && typeof payload === "object" && "data" in payload
-            ? (payload as ApiEnvelope<T>).data
-            : payload
-    ) as T;
+    if (objectPayload && "data" in objectPayload) {
+        return objectPayload.data as T;
+    }
+
+    return payload as T;
+}
+
+function statusMessage(status: number) {
+    if (status === 400) return "Check the entered information and try again.";
+    if (status === 401) return "Your session has expired. Sign in again.";
+    if (status === 403) return "You do not have permission to perform this action.";
+    if (status === 404) return "The requested resource was not found.";
+    if (status === 409) return "The request conflicts with the current data. Refresh and try again.";
+    if (status >= 500) return "The server could not complete the request. Please try again.";
+    return "The request could not be completed.";
 }
 
 export async function apiGet<T>(

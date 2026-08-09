@@ -253,7 +253,7 @@ export default function PurchasesPage() {
             ]);
             toast.success(
                 response.offlineQueued
-                    ? response.message
+                    ? response.message?.trim() || "Purchase saved and will sync when the connection returns."
                     : "Purchase received and inventory updated.",
             );
             setPurchaseOpen(false);
@@ -532,7 +532,7 @@ export default function PurchasesPage() {
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="grid gap-4 md:grid-cols-3">
+                    <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         <Field label="Supplier">
                             <ServerSearchCombobox<Supplier>
                                 value={selectedSupplier}

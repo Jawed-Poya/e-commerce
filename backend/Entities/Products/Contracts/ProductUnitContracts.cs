@@ -15,11 +15,6 @@ public sealed class ProductUnitConversionRequest
     [StringLength(100)]
     public string? Barcode { get; set; }
 
-    [Range(typeof(decimal), "0", "999999999999999.99")]
-    public decimal? PriceOverride { get; set; }
-
-    [Range(typeof(decimal), "0", "999999999999999.99")]
-    public decimal? OldPriceOverride { get; set; }
 
     public bool IsDefault { get; set; }
     public bool IsActive { get; set; } = true;
@@ -32,8 +27,6 @@ public sealed record ProductUnitConversionResponse(
     string UnitName,
     decimal ConversionFactor,
     string? Barcode,
-    decimal? PriceOverride,
-    decimal? OldPriceOverride,
     bool IsBaseUnit,
     bool IsDefault,
     bool IsActive,

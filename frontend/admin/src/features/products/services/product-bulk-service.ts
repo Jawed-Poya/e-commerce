@@ -125,16 +125,6 @@ function createProductsFormData(request: CreateBulkProductsRequest): FormData {
                 String(unit.conversionFactor),
             );
             appendOptionalValue(formData, `${unitPrefix}.Barcode`, unit.barcode);
-            appendOptionalValue(
-                formData,
-                `${unitPrefix}.PriceOverride`,
-                unit.priceOverride,
-            );
-            appendOptionalValue(
-                formData,
-                `${unitPrefix}.OldPriceOverride`,
-                unit.oldPriceOverride,
-            );
             formData.append(`${unitPrefix}.IsDefault`, String(unit.isDefault));
             formData.append(`${unitPrefix}.IsActive`, String(unit.isActive));
             formData.append(`${unitPrefix}.SortOrder`, String(unit.sortOrder));

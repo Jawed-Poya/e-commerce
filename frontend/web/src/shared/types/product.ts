@@ -49,8 +49,6 @@ export type ProductUnitConversion = {
     unitName: string;
     conversionFactor: number;
     barcode: string | null;
-    priceOverride: number | null;
-    oldPriceOverride: number | null;
     isBaseUnit: boolean;
     isDefault: boolean;
     isActive: boolean;

@@ -140,8 +140,7 @@ public sealed class OrderService(
                     defaultCustomerTypeId,
                     today)
                     ?? throw new InvalidOperationException($"No active price is configured for '{product.Name}'.");
-                var sellingUnitPrice = selectedUnit.PriceOverride
-                    ?? decimal.Round(baseUnitPrice * selectedUnit.ConversionFactor, 2);
+                var sellingUnitPrice = decimal.Round(baseUnitPrice * selectedUnit.ConversionFactor, 2);
                 var normalizedBasePrice = decimal.Round(sellingUnitPrice / selectedUnit.ConversionFactor, 6);
 
                 orderItems.Add(new OrderItem
@@ -958,11 +957,11 @@ public sealed class OrderService(
         {
             if (requestedUnitId.HasValue)
                 throw new InvalidOperationException($"A base unit is not configured for '{product.Name}'.");
-            return new SelectedProductUnit(null, "Unit", 1, product.Barcode, null);
+            return new SelectedProductUnit(null, "Unit", 1, product.Barcode);
         }
 
         if (!requestedUnitId.HasValue || requestedUnitId.Value == product.UnitId.Value)
-            return new SelectedProductUnit(product.UnitId, product.Unit.Name, 1, product.Barcode, null);
+            return new SelectedProductUnit(product.UnitId, product.Unit.Name, 1, product.Barcode);
 
         var conversion = product.UnitConversions.FirstOrDefault(item =>
             item.UnitId == requestedUnitId.Value && item.IsActive);
@@ -973,16 +972,14 @@ public sealed class OrderService(
             conversion.UnitId,
             conversion.Unit.Name,
             conversion.ConversionFactor,
-            conversion.Barcode,
-            conversion.PriceOverride);
+            conversion.Barcode);
     }
 
     private sealed record SelectedProductUnit(
         long? UnitId,
         string UnitName,
         decimal ConversionFactor,
-        string? Barcode,
-        decimal? PriceOverride);
+        string? Barcode);
 
     private static void ValidateOrderQuantityStep(
         string productName,

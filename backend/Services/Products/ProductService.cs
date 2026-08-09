@@ -600,8 +600,6 @@ public class ProductService : IProductService
                 product.Unit.Name,
                 1,
                 product.Barcode,
-                null,
-                null,
                 true,
                 activeConversions.All(conversion => !conversion.IsDefault),
                 true,
@@ -614,17 +612,14 @@ public class ProductService : IProductService
         unitConversions.AddRange(activeConversions.Select(conversion =>
         {
             var factor = conversion.ConversionFactor <= 0 ? 1 : conversion.ConversionFactor;
-            var convertedPrice = conversion.PriceOverride ?? (resolved is null ? null : decimal.Round(resolved.Price * factor, 2));
-            var convertedOldPrice = conversion.OldPriceOverride
-                ?? (resolved?.OldPrice is null ? null : decimal.Round(resolved.OldPrice.Value * factor, 2));
+            var convertedPrice = resolved is null ? null : decimal.Round(resolved.Price * factor, 2);
+            var convertedOldPrice = resolved?.OldPrice is null ? null : decimal.Round(resolved.OldPrice.Value * factor, 2);
             return new ProductUnitConversionResponse(
                 conversion.Id,
                 conversion.UnitId,
                 conversion.Unit.Name,
                 factor,
                 conversion.Barcode,
-                conversion.PriceOverride,
-                conversion.OldPriceOverride,
                 false,
                 conversion.IsDefault,
                 conversion.IsActive,
@@ -1307,8 +1302,6 @@ public class ProductService : IProductService
         UnitId = conversion.UnitId,
         ConversionFactor = conversion.ConversionFactor,
         Barcode = NormalizeOptional(conversion.Barcode),
-        PriceOverride = conversion.PriceOverride,
-        OldPriceOverride = conversion.OldPriceOverride,
         IsDefault = conversion.IsDefault,
         IsActive = conversion.IsActive,
         SortOrder = conversion.SortOrder
@@ -1346,8 +1339,6 @@ public class ProductService : IProductService
 
             existing.ConversionFactor = request.ConversionFactor;
             existing.Barcode = NormalizeOptional(request.Barcode);
-            existing.PriceOverride = request.PriceOverride;
-            existing.OldPriceOverride = request.OldPriceOverride;
             existing.IsDefault = request.IsDefault;
             existing.IsActive = request.IsActive;
             existing.SortOrder = request.SortOrder;
@@ -1375,9 +1366,6 @@ public class ProductService : IProductService
         {
             if (item.UnitId <= 0 || item.ConversionFactor < 1)
                 throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Every selling unit requires a valid unit and a conversion factor of at least one base unit."] });
-            if (item.PriceOverride < 0 || item.OldPriceOverride < 0 ||
-                (item.PriceOverride.HasValue && item.OldPriceOverride.HasValue && item.OldPriceOverride < item.PriceOverride))
-                throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Unit prices cannot be negative and old price cannot be lower than the selling price."] });
         }
     }
 

@@ -1,4 +1,6 @@
-import axiosInstance from "./axios";
+import { dispatchAdminUnauthorized, getAdminToken } from "@/features/auth/auth-storage";
+import { getResponseMessage } from "@/lib/api-error";
+import axiosInstance, { apiBaseUrl } from "./axios";
 
 export interface ApiResponse<T> {
     data: T;
@@ -6,31 +8,33 @@ export interface ApiResponse<T> {
     success: boolean;
 }
 
+function normalizeApiResponse<T>(response: ApiResponse<T>): ApiResponse<T> {
+    if (!response || typeof response !== "object") {
+        throw new Error("The server returned an invalid API response.");
+    }
+    const message = typeof response.message === "string" ? response.message.trim() : "";
+    return { ...response, message: message || undefined };
+}
+
 class ApiClient {
     async get<T>(url: string, params?: object): Promise<ApiResponse<T>> {
-        const response = await axiosInstance.get<ApiResponse<T>>(url, {
-            params,
-        });
-
-        return response.data;
+        const response = await axiosInstance.get<ApiResponse<T>>(url, { params });
+        return normalizeApiResponse(response.data);
     }
 
     async post<T>(url: string, body?: unknown): Promise<ApiResponse<T>> {
         const response = await axiosInstance.post<ApiResponse<T>>(url, body);
-
-        return response.data;
+        return normalizeApiResponse(response.data);
     }
 
     async put<T>(url: string, body?: unknown): Promise<ApiResponse<T>> {
         const response = await axiosInstance.put<ApiResponse<T>>(url, body);
-
-        return response.data;
+        return normalizeApiResponse(response.data);
     }
 
     async patch<T>(url: string, body?: unknown): Promise<ApiResponse<T>> {
         const response = await axiosInstance.patch<ApiResponse<T>>(url, body);
-
-        return response.data;
+        return normalizeApiResponse(response.data);
     }
 
     async download(url: string, params?: object): Promise<{ filename: string; size: number }> {
@@ -39,6 +43,7 @@ class ApiClient {
         const link = document.createElement("a");
         link.href = href;
         link.download = filename;
+        link.rel = "noopener";
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -52,66 +57,126 @@ class ApiClient {
     }
 
     private async getBlob(url: string, params?: object) {
-        let response;
-        try {
-            response = await axiosInstance.get<Blob>(url, {
-                params,
-                responseType: "blob",
-                timeout: 600_000,
+        // Keep binary downloads outside the JSON Axios interceptor path. Native fetch is
+        // more reliable for large PDF/image bodies behind IIS/Nginx/reverse proxies and
+        // avoids a successful response being interpreted as an empty Axios Blob.
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+            const requestUrl = createDownloadUrl(url, params, attempt);
+            const headers = new Headers({
+                Accept: "application/pdf, image/png, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/octet-stream, */*",
+                "Cache-Control": "no-cache, no-store",
+                Pragma: "no-cache",
             });
-        } catch (error) {
-            const candidate = error as { response?: { data?: unknown }; message?: string };
-            if (candidate.response?.data instanceof Blob) {
-                try {
-                    const body = JSON.parse(await candidate.response.data.text()) as {
-                        message?: string;
-                        title?: string;
-                        errors?: Record<string, string[]>;
-                    };
-                    const validationMessage = body.errors && Object.values(body.errors).flat().find((value) => value?.trim());
-                    const responseMessage = body.message?.trim() || body.title?.trim() || validationMessage?.trim();
-                    if (responseMessage) candidate.message = responseMessage;
-                } catch {
-                    // Keep the original transport error when the response is not JSON.
-                }
-            }
-            throw candidate;
-        }
-        const contentType = (response.headers["content-type"] as string | undefined)?.toLowerCase() ?? "";
-        if (contentType.includes("json")) {
-            let message = "The server returned an unexpected response instead of a file.";
+            const token = getAdminToken();
+            if (token) headers.set("Authorization", `Bearer ${token}`);
+
+            let response: Response;
             try {
-                const body = JSON.parse(await response.data.text()) as {
-                    message?: string;
-                    title?: string;
-                    errors?: Record<string, string[]>;
-                };
-                const validationMessage = body.errors && Object.values(body.errors).flat().find((value) => value?.trim());
-                message = body.message?.trim() || body.title?.trim() || validationMessage?.trim() || message;
-            } catch {
-                // Keep the safe download-specific message for malformed JSON.
+                response = await fetch(requestUrl, {
+                    method: "GET",
+                    headers,
+                    cache: "no-store",
+                    credentials: "same-origin",
+                });
+            } catch (error) {
+                if (attempt === 0) continue;
+                throw error instanceof Error && error.message.trim()
+                    ? error
+                    : new Error("Could not connect to the document service.");
             }
-            throw new Error(message);
+
+            const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
+            const bytes = await response.arrayBuffer();
+
+            if (response.status === 401 && token && getAdminToken() === token) {
+                dispatchAdminUnauthorized(token);
+            }
+
+            if (!response.ok || contentType.includes("json") || contentType.includes("problem+json")) {
+                const message = parseBufferMessage(bytes);
+                throw new Error(
+                    message ??
+                        (response.ok
+                            ? "The server returned an unexpected response instead of a document."
+                            : responseStatusMessage(response.status)),
+                );
+            }
+
+            if (bytes.byteLength > 0) {
+                const blob = new Blob([bytes], {
+                    type: contentType.split(";")[0] || "application/octet-stream",
+                });
+                return {
+                    blob,
+                    filename: resolveFilename(response.headers.get("content-disposition") ?? undefined, contentType),
+                };
+            }
+
+            // Retry once with a cache-busting query value. This handles proxies that can
+            // occasionally return a 200 response before forwarding the generated body.
+            if (attempt === 0) continue;
         }
-        const blob = response.data instanceof Blob ? response.data : new Blob([response.data]);
-        if (blob.size === 0) {
-            throw new Error("The server returned an empty file. Please try again.");
-        }
-        const disposition = response.headers["content-disposition"] as string | undefined;
-        const encoded = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
-        const quoted = disposition?.match(/filename="?([^";]+)"?/i)?.[1];
-        const resolvedFilename = (encoded ? decodeURIComponent(encoded) : quoted)?.trim();
-        return {
-            blob,
-            filename: resolvedFilename || "download",
-        };
+
+        throw new Error("The document download did not complete. Please try again.");
     }
 
     async delete<T>(url: string): Promise<ApiResponse<T>> {
         const response = await axiosInstance.delete<ApiResponse<T>>(url);
-
-        return response.data;
+        return normalizeApiResponse(response.data);
     }
+}
+
+function createDownloadUrl(path: string, params: object | undefined, attempt: number) {
+    const base = new URL(`${apiBaseUrl.replace(/\/+$/, "")}/`, window.location.origin);
+    const url = new URL(path.replace(/^\/+/, ""), base);
+    const entries = Object.entries((params ?? {}) as Record<string, unknown>);
+    for (const [key, value] of entries) {
+        if (value === undefined || value === null || value === "") continue;
+        if (Array.isArray(value)) {
+            value.forEach((item) => url.searchParams.append(key, String(item)));
+        } else {
+            url.searchParams.set(key, String(value));
+        }
+    }
+    if (attempt > 0) url.searchParams.set("_download", `${Date.now()}-${attempt}`);
+    return url.toString();
+}
+
+function parseBufferMessage(buffer: ArrayBuffer) {
+    if (!buffer.byteLength) return null;
+    try {
+        const text = new TextDecoder().decode(buffer).trim();
+        if (!text) return null;
+        const body = JSON.parse(text) as unknown;
+        return getResponseMessage(body);
+    } catch {
+        return null;
+    }
+}
+
+function responseStatusMessage(status: number) {
+    if (status === 400) return "The document request is invalid.";
+    if (status === 401) return "Your session has expired. Sign in again.";
+    if (status === 403) return "You do not have permission to download this document.";
+    if (status === 404) return "The requested document endpoint was not found.";
+    if (status >= 500) return "The server could not generate the document.";
+    return "The document could not be downloaded.";
+}
+
+function resolveFilename(disposition?: string, contentType = "") {
+    const encoded = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+    const quoted = disposition?.match(/filename="?([^";]+)"?/i)?.[1];
+    let resolved: string | undefined;
+    try {
+        resolved = (encoded ? decodeURIComponent(encoded) : quoted)?.trim();
+    } catch {
+        resolved = quoted?.trim();
+    }
+    if (resolved) return resolved;
+    if (contentType.includes("application/pdf")) return "document.pdf";
+    if (contentType.includes("image/png")) return "document.png";
+    if (contentType.includes("spreadsheetml")) return "report.xlsx";
+    return "download";
 }
 
 export default new ApiClient();

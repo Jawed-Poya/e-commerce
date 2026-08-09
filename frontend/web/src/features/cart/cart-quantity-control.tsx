@@ -1,4 +1,5 @@
 import { Minus, Plus } from "lucide-react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 
 import { useI18n } from "../../i18n/i18n-provider";
 import { Badge } from "../../shared/components/ui/badge";
@@ -9,6 +10,7 @@ import {
   cartQuickQuantities,
   maximumCartQuantity,
   minimumCartQuantity,
+  normalizeCartQuantity,
   useCart,
   type CartItem,
 } from "./cart-context";
@@ -26,7 +28,7 @@ export function CartQuantityControl({
   compact = false,
   className,
   showStepBadge = true,
-  showQuickQuantities,
+  showQuickQuantities = true,
 }: CartQuantityControlProps) {
   const cart = useCart();
   const { t, formatNumber } = useI18n();
@@ -35,14 +37,12 @@ export function CartQuantityControl({
   const maximum = maximumCartQuantity(item);
   const canIncrease = item.quantity + step <= maximum + Number.EPSILON;
   const presets = cartQuickQuantities(item);
-  const shouldShowQuickQuantities = showQuickQuantities ?? !compact;
 
   const decrease = () => {
     if (item.quantity <= minimum + Number.EPSILON) {
       cart.removeItem(item.lineKey);
       return;
     }
-
     cart.updateQuantity(item.lineKey, item.quantity - step, item);
   };
 
@@ -56,7 +56,7 @@ export function CartQuantityControl({
       <div className="flex min-w-0 items-center gap-1.5">
         <div
           className={cn(
-            "inline-flex items-center overflow-hidden rounded-lg border border-primary/20 bg-background shadow-sm",
+            "inline-flex min-w-0 items-center overflow-hidden rounded-lg border border-primary/20 bg-background shadow-sm",
             compact ? "h-8" : "h-11",
           )}
         >
@@ -74,15 +74,11 @@ export function CartQuantityControl({
             <Minus className={compact ? "size-3.5" : "size-4"} />
           </Button>
 
-          <span
-            className={cn(
-              "grid min-w-10 place-items-center border-x border-primary/15 bg-primary/[0.055] px-2 font-black tabular-nums text-foreground",
-              compact ? "h-8 text-[11px]" : "h-11 min-w-12 text-sm",
-            )}
-            aria-label={t("cart.currentQuantity", { count: item.quantity })}
-          >
-            {formatNumber(item.quantity)}
-          </span>
+          <QuantityInput
+            item={item}
+            compact={compact}
+            onChange={(quantity) => cart.updateQuantity(item.lineKey, quantity, item)}
+          />
 
           <Button
             type="button"
@@ -113,8 +109,8 @@ export function CartQuantityControl({
         ) : null}
       </div>
 
-      {shouldShowQuickQuantities && presets.length > 0 ? (
-        <div className="flex max-w-full flex-wrap items-center gap-1">
+      {showQuickQuantities && presets.length > 0 ? (
+        <div className="flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {presets.map((quantity) => {
             const selected = Math.abs(item.quantity - quantity) < Number.EPSILON;
             return (
@@ -124,7 +120,7 @@ export function CartQuantityControl({
                 onClick={() => cart.updateQuantity(item.lineKey, quantity, item)}
                 aria-label={t("cart.setQuickQuantity", { count: formatNumber(quantity) })}
                 className={cn(
-                  "inline-flex h-6 min-w-8 items-center justify-center rounded-full border px-2 text-[10px] font-black tabular-nums transition",
+                  "inline-flex h-6 min-w-8 shrink-0 items-center justify-center rounded-full border px-2 text-[10px] font-black tabular-nums transition",
                   selected
                     ? "border-primary bg-primary text-primary-foreground shadow-sm"
                     : "border-primary/15 bg-primary/[0.045] text-primary hover:border-primary/30 hover:bg-primary/[0.09]",
@@ -137,5 +133,63 @@ export function CartQuantityControl({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function QuantityInput({
+  item,
+  compact,
+  onChange,
+}: {
+  item: CartItem;
+  compact: boolean;
+  onChange: (quantity: number) => void;
+}) {
+  const { t } = useI18n();
+  const [draft, setDraft] = useState(String(item.quantity));
+
+  useEffect(() => {
+    setDraft(String(item.quantity));
+  }, [item.quantity]);
+
+  const commit = () => {
+    const parsed = Number(draft.replace(",", "."));
+    if (!Number.isFinite(parsed)) {
+      setDraft(String(item.quantity));
+      return;
+    }
+
+    const normalized = normalizeCartQuantity(item, parsed);
+    onChange(normalized);
+    setDraft(String(normalized));
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      event.currentTarget.blur();
+    } else if (event.key === "Escape") {
+      setDraft(String(item.quantity));
+      event.currentTarget.blur();
+    }
+  };
+
+  return (
+    <input
+      type="number"
+      inputMode="decimal"
+      min={minimumCartQuantity(item)}
+      max={maximumCartQuantity(item)}
+      step="any"
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={handleKeyDown}
+      aria-label={t("cart.quantityInput", { name: item.name })}
+      className={cn(
+        "min-w-0 border-x border-primary/15 bg-primary/[0.035] text-center font-black tabular-nums text-foreground outline-none transition [appearance:textfield] focus:bg-primary/[0.08] focus:ring-2 focus:ring-inset focus:ring-primary/25 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+        compact ? "h-8 w-14 px-1 text-[11px]" : "h-11 w-20 px-2 text-sm",
+      )}
+    />
   );
 }

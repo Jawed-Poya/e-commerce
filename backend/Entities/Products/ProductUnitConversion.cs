@@ -22,11 +22,6 @@ public sealed class ProductUnitConversion : BaseEntity
     /// <summary>Optional barcode for this packaging/unit.</summary>
     public string? Barcode { get; set; }
 
-    /// <summary>Optional storefront price override for one selected unit.</summary>
-    public decimal? PriceOverride { get; set; }
-
-    /// <summary>Optional crossed-out price override for one selected unit.</summary>
-    public decimal? OldPriceOverride { get; set; }
 
     public bool IsDefault { get; set; }
     public bool IsActive { get; set; } = true;

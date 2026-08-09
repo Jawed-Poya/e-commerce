@@ -28,9 +28,7 @@ export type UnitConversionValidationKey =
     | "productUnits.duplicateError"
     | "productUnits.invalidConversionError"
     | "productUnits.defaultError"
-    | "productUnits.defaultActiveError"
-    | "productUnits.priceNegativeError"
-    | "productUnits.oldPriceError";
+    | "productUnits.defaultActiveError";
 
 export function createEmptyUnitConversion(
     index: number,
@@ -40,8 +38,6 @@ export function createEmptyUnitConversion(
         unitId: 0,
         conversionFactor: 1,
         barcode: null,
-        priceOverride: null,
-        oldPriceOverride: null,
         isDefault: index === 0,
         isActive: true,
         sortOrder: index,
@@ -82,26 +78,6 @@ export function validateUnitConversions(
         return "productUnits.defaultActiveError";
     }
 
-    if (
-        conversions.some(
-            (unit) =>
-                (unit.priceOverride != null && unit.priceOverride < 0) ||
-                (unit.oldPriceOverride != null && unit.oldPriceOverride < 0),
-        )
-    ) {
-        return "productUnits.priceNegativeError";
-    }
-
-    if (
-        conversions.some(
-            (unit) =>
-                unit.priceOverride != null &&
-                unit.oldPriceOverride != null &&
-                unit.oldPriceOverride < unit.priceOverride,
-        )
-    ) {
-        return "productUnits.oldPriceError";
-    }
 
     return null;
 }
@@ -241,9 +217,7 @@ export function ProductUnitConversionsFields({
                                 <div
                                     className={cn(
                                         "grid min-w-0 gap-4",
-                                        compact
-                                            ? "grid-cols-1 xl:grid-cols-2"
-                                            : "grid-cols-1 md:grid-cols-2 2xl:grid-cols-3",
+                                        "grid-cols-1 lg:grid-cols-2",
                                     )}
                                 >
                                     <Field label={t("productUnits.sellingUnit")}>
@@ -296,45 +270,6 @@ export function ProductUnitConversionsFields({
                                         />
                                     </Field>
 
-                                    <Field label={t("productUnits.priceOverride")}>
-                                        <Input
-                                            className="w-full"
-                                            type="number"
-                                            min="0"
-                                            step="any"
-                                            disabled={disabled}
-                                            value={unit.priceOverride ?? ""}
-                                            onChange={(event) =>
-                                                updateUnit(index, {
-                                                    priceOverride:
-                                                        event.target.value === ""
-                                                            ? null
-                                                            : Number(event.target.value),
-                                                })
-                                            }
-                                            placeholder={t("productUnits.autoPricePlaceholder")}
-                                        />
-                                    </Field>
-
-                                    <Field label={t("productUnits.oldPriceOverride")}>
-                                        <Input
-                                            className="w-full"
-                                            type="number"
-                                            min="0"
-                                            step="any"
-                                            disabled={disabled}
-                                            value={unit.oldPriceOverride ?? ""}
-                                            onChange={(event) =>
-                                                updateUnit(index, {
-                                                    oldPriceOverride:
-                                                        event.target.value === ""
-                                                            ? null
-                                                            : Number(event.target.value),
-                                                })
-                                            }
-                                            placeholder={t("productUnits.optional")}
-                                        />
-                                    </Field>
                                 </div>
 
                                 <div className="grid min-w-0 gap-3 sm:grid-cols-2">

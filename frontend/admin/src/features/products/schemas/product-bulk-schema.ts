@@ -102,8 +102,6 @@ export const ProductBulkItemSchema = z
                 unitId: z.number().int().nonnegative(),
                 conversionFactor: z.number(),
                 barcode: z.string().max(100).nullable(),
-                priceOverride: z.number().nullable(),
-                oldPriceOverride: z.number().nullable(),
                 isDefault: z.boolean(),
                 isActive: z.boolean(),
                 sortOrder: z.number().int().nonnegative(),

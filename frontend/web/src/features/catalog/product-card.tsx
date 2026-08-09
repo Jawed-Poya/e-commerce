@@ -192,19 +192,9 @@ export function ProductCard({
                                 </span>
                             </span>
                         ) : null}
-                        {product.orderQuantityStep > 1 ? (
-                            <span className="inline-flex shrink-0 rounded-md bg-primary/[0.08] px-1.5 py-0.5 text-primary">
-                                {t("cart.quantityStep", { count: product.orderQuantityStep })}
-                            </span>
-                        ) : null}
-                        {quickOrderQuantities.slice(0, 3).map((quantity) => (
-                            <span key={quantity} className="inline-flex shrink-0 rounded-md border border-primary/10 bg-background px-1.5 py-0.5 font-black tabular-nums text-primary">
-                                {quantity}
-                            </span>
-                        ))}
                     </div>
 
-                    <div className="mt-auto flex items-end justify-between gap-2 pt-2">
+                    <div className="mt-auto min-w-0 pt-2">
                         <div className="min-w-0">
                             <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
                                 <span className="text-sm font-black tracking-[-0.035em] text-primary">
@@ -227,14 +217,14 @@ export function ProductCard({
                             </p>
                         </div>
 
-                        <div className="flex shrink-0 items-center gap-1">
+                        <div className="mt-2 flex min-w-0 items-start gap-1.5">
                             <Button
                                 type="button"
                                 variant="outline"
                                 size="icon"
                                 onClick={() => cart.toggleWishlist(product.id)}
                                 className={cn(
-                                    "size-8 rounded-lg shadow-none",
+                                    "size-8 shrink-0 rounded-lg shadow-none",
                                     liked &&
                                         "border-brand-orange/30 bg-brand-orange text-white hover:bg-brand-orange/90 hover:text-white",
                                 )}
@@ -255,13 +245,15 @@ export function ProductCard({
                                 <CartQuantityControl
                                     item={liveCartItem!}
                                     compact
+                                    className="min-w-0 flex-1"
                                     showStepBadge={false}
+                                    showQuickQuantities
                                 />
                             ) : (
                                 <Button
                                     type="button"
                                     size="icon"
-                                    className="size-8 rounded-lg shadow-none"
+                                    className="ms-auto size-8 shrink-0 rounded-lg shadow-none"
                                     disabled={!canAddToCart}
                                     onClick={addToCart}
                                     aria-label={t("product.addToCart")}
@@ -411,16 +403,6 @@ export function ProductCard({
                                                 </span>
                                             </span>
                                         ) : null}
-                                        {product.orderQuantityStep > 1 ? (
-                                            <span className="inline-flex shrink-0 rounded-md bg-primary/[0.08] px-1.5 py-1 text-primary">
-                                                {t("cart.quantityStep", { count: product.orderQuantityStep })}
-                                            </span>
-                                        ) : null}
-                                        {quickOrderQuantities.slice(0, 3).map((quantity) => (
-                                            <span key={quantity} className="inline-flex shrink-0 rounded-md border border-primary/10 bg-background px-1.5 py-1 font-black tabular-nums text-primary">
-                                                {quantity}
-                                            </span>
-                                        ))}
                                     </div>
 
                                     {product.strength ? (
@@ -463,6 +445,7 @@ export function ProductCard({
                                             compact
                                             className="min-w-0 flex-1 justify-center"
                                             showStepBadge={false}
+                                            showQuickQuantities
                                         />
                                     ) : (
                                         <Button

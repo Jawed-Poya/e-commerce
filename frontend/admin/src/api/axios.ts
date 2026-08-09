@@ -8,6 +8,7 @@ import {
     getAdminToken,
 } from "@/features/auth/auth-storage";
 import { literalTranslations } from "@/i18n/literal-translations";
+import { getResponseMessage } from "@/lib/api-error";
 
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 const configuredAssetBaseUrl = import.meta.env.VITE_ASSET_BASE_URL?.trim();
@@ -119,6 +120,29 @@ function isSessionValidationRequest(
     return normalizedRequestPath(config) === "auth/me";
 }
 
+function statusFallback(status?: number) {
+    if (status === 400) return "Check the entered information and try again.";
+    if (status === 401) return "Your session has expired. Sign in again.";
+    if (status === 403) return "You do not have permission to perform this action.";
+    if (status === 404) return "The requested resource was not found.";
+    if (status === 409) return "The request conflicts with the current data. Refresh and try again.";
+    if (status && status >= 500) return "The server could not complete the request. Please try again.";
+    return "The request could not be completed.";
+}
+
+function normalizeResponseMessage(data: unknown, status?: number, isError = false) {
+    if (!data || typeof data !== "object" || data instanceof Blob) return;
+    const record = data as Record<string, unknown>;
+    const message = getResponseMessage(record);
+    if (message) {
+        record.message = message;
+    } else if (isError) {
+        record.message = statusFallback(status);
+    } else if ("message" in record) {
+        delete record.message;
+    }
+}
+
 function localizeApiMessage(data: unknown, useFallback: boolean) {
     if (!data || typeof data !== "object" || !("message" in data)) return;
 
@@ -164,10 +188,12 @@ axiosInstance.interceptors.request.use(
 
 axiosInstance.interceptors.response.use(
     (response) => {
+        normalizeResponseMessage(response.data, response.status, false);
         localizeApiMessage(response.data, false);
         return response;
     },
     (error: AxiosError) => {
+        normalizeResponseMessage(error.response?.data, error.response?.status, true);
         localizeApiMessage(error.response?.data, true);
         const config = error.config as AdminRequestConfig | undefined;
         const failedToken = config?.adminAccessToken;

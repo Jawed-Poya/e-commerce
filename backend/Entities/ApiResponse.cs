@@ -14,7 +14,7 @@ public sealed record ApiResponse<T>(
     {
         return new ApiResponse<T>(
             true,
-            message,
+            Normalize(message, "Operation completed successfully."),
             data
         );
     }
@@ -26,9 +26,12 @@ public sealed record ApiResponse<T>(
     {
         return new ApiResponse<T>(
             false,
-            message,
+            Normalize(message, "The request could not be completed."),
             default,
             errors
         );
     }
+
+    private static string Normalize(string? message, string fallback) =>
+        string.IsNullOrWhiteSpace(message) ? fallback : message.Trim();
 }

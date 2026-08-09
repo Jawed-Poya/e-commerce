@@ -65,8 +65,6 @@ export interface ProductUnitConversion {
     unitName: string;
     conversionFactor: number;
     barcode: string | null;
-    priceOverride: number | null;
-    oldPriceOverride: number | null;
     isBaseUnit: boolean;
     isDefault: boolean;
     isActive: boolean;
@@ -77,8 +75,8 @@ export interface ProductUnitConversion {
 }
 
 export type ProductUnitConversionInput = Pick<ProductUnitConversion,
-    "id" | "unitId" | "conversionFactor" | "barcode" | "priceOverride" |
-    "oldPriceOverride" | "isDefault" | "isActive" | "sortOrder">;
+    "id" | "unitId" | "conversionFactor" | "barcode" |
+    "isDefault" | "isActive" | "sortOrder">;
 
 export interface ProductPrice {
     id: number;
@@ -199,8 +197,6 @@ export const productService = {
             append(formData, `${unitPrefix}.UnitId`, unit.unitId);
             append(formData, `${unitPrefix}.ConversionFactor`, unit.conversionFactor);
             append(formData, `${unitPrefix}.Barcode`, unit.barcode?.trim() || null);
-            append(formData, `${unitPrefix}.PriceOverride`, unit.priceOverride);
-            append(formData, `${unitPrefix}.OldPriceOverride`, unit.oldPriceOverride);
             append(formData, `${unitPrefix}.IsDefault`, unit.isDefault);
             append(formData, `${unitPrefix}.IsActive`, unit.isActive);
             append(formData, `${unitPrefix}.SortOrder`, unit.sortOrder);
@@ -248,8 +244,6 @@ export const productService = {
                 append(formData, `${unitPrefix}.UnitId`, unit.unitId);
                 append(formData, `${unitPrefix}.ConversionFactor`, unit.conversionFactor);
                 append(formData, `${unitPrefix}.Barcode`, unit.barcode?.trim() || null);
-                append(formData, `${unitPrefix}.PriceOverride`, unit.priceOverride);
-                append(formData, `${unitPrefix}.OldPriceOverride`, unit.oldPriceOverride);
                 append(formData, `${unitPrefix}.IsDefault`, unit.isDefault);
                 append(formData, `${unitPrefix}.IsActive`, unit.isActive);
                 append(formData, `${unitPrefix}.SortOrder`, unit.sortOrder);

@@ -31,18 +31,24 @@ public sealed class ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExce
 
     public static int GetStatusCode(Exception exception) => MapException(exception).Status;
 
-    private static (int Status, string Message, LogLevel Level) MapException(Exception exception) =>
-        exception switch
+    private static (int Status, string Message, LogLevel Level) MapException(Exception exception)
+    {
+        var mapped = exception switch
         {
-            UnauthorizedAccessException => (StatusCodes.Status403Forbidden, exception.Message.Length > 0 ? exception.Message : "You do not have permission to perform this action.", LogLevel.Warning),
-            KeyNotFoundException => (StatusCodes.Status404NotFound, exception.Message, LogLevel.Information),
-            ArgumentException => (StatusCodes.Status400BadRequest, exception.Message, LogLevel.Information),
+            UnauthorizedAccessException => (StatusCodes.Status403Forbidden, Message(exception, "You do not have permission to perform this action."), LogLevel.Warning),
+            KeyNotFoundException => (StatusCodes.Status404NotFound, Message(exception, "The requested resource was not found."), LogLevel.Information),
+            ArgumentException => (StatusCodes.Status400BadRequest, Message(exception, "Check the entered information and try again."), LogLevel.Information),
             DbUpdateException dbException when SqlServerExceptionClassifier.IsUniqueConstraintViolation(dbException) =>
                 (StatusCodes.Status409Conflict, "This action was already completed or the value must be unique. Refresh and try again.", LogLevel.Warning),
             DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "The record changed while you were editing it. Refresh and try again.", LogLevel.Warning),
             DbUpdateException => (StatusCodes.Status409Conflict, "The data could not be saved because it conflicts with the current database state.", LogLevel.Warning),
             OperationCanceledException => (StatusCodes.Status408RequestTimeout, "The request took too long and was cancelled. Please try again.", LogLevel.Warning),
-            InvalidOperationException => (StatusCodes.Status409Conflict, exception.Message, LogLevel.Warning),
+            InvalidOperationException => (StatusCodes.Status409Conflict, Message(exception, "The operation conflicts with the current data. Refresh and try again."), LogLevel.Warning),
             _ => (StatusCodes.Status500InternalServerError, "An unexpected server error occurred.", LogLevel.Error)
         };
+        return mapped;
+    }
+
+    private static string Message(Exception exception, string fallback) =>
+        string.IsNullOrWhiteSpace(exception.Message) ? fallback : exception.Message.Trim();
 }
