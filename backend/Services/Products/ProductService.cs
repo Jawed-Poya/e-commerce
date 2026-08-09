@@ -612,8 +612,13 @@ public class ProductService : IProductService
         unitConversions.AddRange(activeConversions.Select(conversion =>
         {
             var factor = conversion.ConversionFactor <= 0 ? 1 : conversion.ConversionFactor;
-            var convertedPrice = resolved is null ? null : decimal.Round(resolved.Price * factor, 2);
-            var convertedOldPrice = resolved?.OldPrice is null ? null : decimal.Round(resolved.OldPrice.Value * factor, 2);
+            decimal? convertedPrice = resolved is null
+                ? null
+                : decimal.Round(resolved.Price * factor, 2);
+
+            decimal? convertedOldPrice = resolved?.OldPrice is null
+                ? null
+                : decimal.Round(resolved.OldPrice.Value * factor, 2);
             return new ProductUnitConversionResponse(
                 conversion.Id,
                 conversion.UnitId,
