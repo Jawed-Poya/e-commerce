@@ -16,6 +16,7 @@ export const userService = {
         search?: string;
         role?: string;
         isActive?: boolean;
+        branchId?: number;
         page?: number;
         pageSize?: number;
     }) {

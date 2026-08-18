@@ -9,6 +9,7 @@ public interface IAdminUserService
         string? search,
         string? role,
         bool? isActive,
+        long? branchId,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default);

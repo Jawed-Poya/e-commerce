@@ -19,12 +19,13 @@ public sealed class AdminUsersController(IAdminUserService users) : ControllerBa
         [FromQuery] string? search,
         [FromQuery] string? role,
         [FromQuery] bool? isActive,
+        [FromQuery] long? branchId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
         return Ok(ApiResponse<PagedResult<AdminUserListItemResponse>>.Ok(
-            await users.GetUsersAsync(search, role, isActive, page, pageSize, cancellationToken)));
+            await users.GetUsersAsync(search, role, isActive, branchId, page, pageSize, cancellationToken)));
     }
 
     [Authorize(Policy = AppPermissions.UsersView)]

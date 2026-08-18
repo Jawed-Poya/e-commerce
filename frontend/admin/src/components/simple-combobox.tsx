@@ -6,6 +6,7 @@ import {
     ComboboxItem,
     ComboboxList,
 } from "@/components/ui/combobox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 export interface SimpleComboboxOption<T extends string | number = string> {
@@ -42,16 +43,31 @@ export function SimpleCombobox<T extends string | number>({
         >
             <ComboboxInput className={cn("w-full", className)} placeholder={placeholder} showClear={value !== null && value !== undefined && value !== ""} />
             <ComboboxContent>
-                <ComboboxList>
-                    {options.map((option) => (
-                        <ComboboxItem key={String(option.value)} value={option}>
-                            <div className="min-w-0">
-                                <p className="truncate font-medium">{option.label}</p>
-                                {option.description ? <p className="truncate text-[11px] text-muted-foreground">{option.description}</p> : null}
-                            </div>
-                        </ComboboxItem>
-                    ))}
-                </ComboboxList>
+                {options.length > 7 ? (
+                    <ScrollArea type="always" className="h-72">
+                        <ComboboxList className="max-h-none overflow-visible pe-2">
+                            {options.map((option) => (
+                                <ComboboxItem key={String(option.value)} value={option}>
+                                    <div className="min-w-0">
+                                        <p className="truncate font-medium">{option.label}</p>
+                                        {option.description ? <p className="truncate text-[11px] text-muted-foreground">{option.description}</p> : null}
+                                    </div>
+                                </ComboboxItem>
+                            ))}
+                        </ComboboxList>
+                    </ScrollArea>
+                ) : (
+                    <ComboboxList>
+                        {options.map((option) => (
+                            <ComboboxItem key={String(option.value)} value={option}>
+                                <div className="min-w-0">
+                                    <p className="truncate font-medium">{option.label}</p>
+                                    {option.description ? <p className="truncate text-[11px] text-muted-foreground">{option.description}</p> : null}
+                                </div>
+                            </ComboboxItem>
+                        ))}
+                    </ComboboxList>
+                )}
                 <ComboboxEmpty>{emptyText}</ComboboxEmpty>
             </ComboboxContent>
         </Combobox>

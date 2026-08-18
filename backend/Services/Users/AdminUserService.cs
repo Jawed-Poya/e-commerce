@@ -21,6 +21,7 @@ public sealed class AdminUserService(
         string? search,
         string? role,
         bool? isActive,
+        long? branchId,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
@@ -38,6 +39,7 @@ public sealed class AdminUserService(
         }
 
         if (isActive.HasValue) query = query.Where(user => user.IsActive == isActive.Value);
+        if (branchId.HasValue) query = query.Where(user => user.BranchId == branchId.Value);
 
         if (!string.IsNullOrWhiteSpace(role))
         {
