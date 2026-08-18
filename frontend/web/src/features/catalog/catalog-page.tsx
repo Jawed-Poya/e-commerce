@@ -386,7 +386,7 @@ export function CatalogPage() {
             ) : null}
 
             <div className="grid items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
-                <aside className="sticky top-28 hidden max-h-[calc(100vh-8rem)] overflow-hidden rounded-xl bg-card shadow-[0_16px_38px_-34px_rgba(15,23,42,.48)] ring-1 ring-black/[0.05] lg:flex lg:flex-col dark:bg-white/[0.025] dark:ring-white/[0.05]">
+                <aside className="sticky top-28 hidden h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] overflow-hidden rounded-xl bg-card shadow-[0_16px_38px_-34px_rgba(15,23,42,.48)] ring-1 ring-black/[0.05] lg:flex lg:flex-col dark:bg-white/[0.025] dark:ring-white/[0.05]">
                     <div className="bg-muted/35 p-4 dark:bg-white/[0.025]">
                         <p className="text-xs font-black uppercase tracking-[0.14em] text-primary">
                             {t("catalog.filterProducts")}
@@ -395,7 +395,7 @@ export function CatalogPage() {
                             {t("catalog.filterDescription")}
                         </p>
                     </div>
-                    <ScrollArea className="min-h-0 flex-1">
+                    <ScrollArea type="auto" className="min-h-0 flex-1">
                         <div className="p-4 pe-5">{filterPanel}</div>
                     </ScrollArea>
                 </aside>
@@ -468,7 +468,7 @@ export function CatalogPage() {
                                             </Dialog.Close>
                                         </div>
 
-                                        <ScrollArea className="min-h-0 flex-1">
+                                        <ScrollArea type="auto" className="min-h-0 flex-1">
                                             <div className="p-4 pe-5">{filterPanel}</div>
                                         </ScrollArea>
 
