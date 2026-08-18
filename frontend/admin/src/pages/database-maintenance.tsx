@@ -28,6 +28,7 @@ import { hasPermission, Permissions } from "@/features/auth/permissions";
 import { companyService } from "@/features/company/company-service";
 import { maintenanceService } from "@/features/maintenance/maintenance-service";
 import { useI18n } from "@/i18n/i18n-provider";
+import { formatDecimal, toFiniteNumber } from "@/lib/numbers";
 
 type ConfirmationAction =
     | { kind: "restore"; phrase: string; backupFileName: string }
@@ -196,10 +197,11 @@ function actionCopy(kind: ConfirmationAction["kind"], tr: (value: string) => str
 }
 
 function formatBytes(value: number) {
-    if (!value) return "—";
-    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-    if (value < 1024 * 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
-    return `${(value / 1024 / 1024 / 1024).toFixed(2)} GB`;
+    const safeValue = Math.max(0, toFiniteNumber(value));
+    if (!safeValue) return "—";
+    if (safeValue < 1024 * 1024) return `${formatDecimal(safeValue / 1024, 1)} KB`;
+    if (safeValue < 1024 * 1024 * 1024) return `${formatDecimal(safeValue / 1024 / 1024, 1)} MB`;
+    return `${formatDecimal(safeValue / 1024 / 1024 / 1024, 2)} GB`;
 }
 
 function message(error: unknown) {

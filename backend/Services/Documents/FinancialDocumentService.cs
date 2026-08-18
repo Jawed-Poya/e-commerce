@@ -727,7 +727,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
                      item.BranchId == null))
                 .Select(item => new
                 {
-                    item.Id, item.OrderNumber, item.CreatedAt, item.Currency, item.Subtotal, item.DiscountTotal,
+                    item.Id, item.OrderNumber, item.CreatedAt, item.Currency, item.CustomerId, item.Subtotal, item.DiscountTotal,
                     item.TaxTotal, item.ShippingTotal, item.Total, item.PaymentStatus, item.Notes,
                     Branch = context.Branches.Where(branch => branch.Id == item.BranchId).Select(branch => branch.Name).FirstOrDefault(),
                     CustomerName = (item.Customer.FirstName + " " + (item.Customer.LastName ?? "")).Trim(),
@@ -740,10 +740,11 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
                 ?? throw new KeyNotFoundException("Order was not found.");
 
             var paid = order.Paid > 0 ? order.Paid : order.PaymentStatus == PaymentStatus.Paid ? order.Total : 0;
+            var previousBalance = await GetCustomerBalanceBeforeAsync(order.CustomerId, order.CreatedAt, order.Currency, "orders", order.Id, cancellationToken);
             return new ReceiptResponse("orders", order.Id, order.OrderNumber, order.CreatedAt, company.Name, company.LegalName,
                 company.Phone, company.Email, company.Address, company.LogoUrl, order.Branch, order.CustomerName,
                 order.Phone, order.Address, order.Currency, order.Subtotal, order.DiscountTotal, order.TaxTotal,
-                order.ShippingTotal, order.Total, paid, Math.Max(0, order.Total - paid), order.PaymentStatus.ToString(),
+                order.ShippingTotal, order.Total, paid, Math.Max(0, order.Total - paid), previousBalance, order.PaymentStatus.ToString(),
                 order.PaymentMethod, order.Notes, order.Items);
         }
 
@@ -756,7 +757,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
                      item.BranchId == null))
                 .Select(item => new
                 {
-                    item.Id, item.SaleNumber, item.SaleDate, item.CurrencyCode, item.Subtotal, item.Discount, item.Tax,
+                    item.Id, item.SaleNumber, item.SaleDate, item.CreatedAt, item.CustomerId, item.CurrencyCode, item.Subtotal, item.Discount, item.Tax,
                     item.Total, item.PaidAmount, item.PaymentStatus, item.PaymentMethod, item.Notes,
                     Branch = context.Branches.Where(branch => branch.Id == item.BranchId).Select(branch => branch.Name).FirstOrDefault(),
                     CustomerName = item.Customer != null
@@ -768,11 +769,14 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
                 }).SingleOrDefaultAsync(cancellationToken)
                 ?? throw new KeyNotFoundException("Manual sale was not found.");
 
+            var previousBalance = sale.CustomerId.HasValue
+                ? await GetCustomerBalanceBeforeAsync(sale.CustomerId.Value, sale.CreatedAt, sale.CurrencyCode, "manual-sales", sale.Id, cancellationToken)
+                : 0;
             return new ReceiptResponse("manual-sales", sale.Id, sale.SaleNumber, sale.SaleDate.ToDateTime(TimeOnly.MinValue),
                 company.Name, company.LegalName, company.Phone, company.Email, company.Address, company.LogoUrl,
                 sale.Branch, sale.CustomerName, sale.CustomerPhone, sale.CustomerAddress, sale.CurrencyCode,
                 sale.Subtotal, sale.Discount, sale.Tax, 0, sale.Total, sale.PaidAmount,
-                Math.Max(0, sale.Total - sale.PaidAmount), sale.PaymentStatus.ToString(), sale.PaymentMethod,
+                Math.Max(0, sale.Total - sale.PaidAmount), previousBalance, sale.PaymentStatus.ToString(), sale.PaymentMethod,
                 sale.Notes, sale.Items);
         }
 
@@ -786,6 +790,32 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
             "sale" or "sales" or "manual-sale" or "manual-sales" => "manual-sales",
             _ => throw new ArgumentException("Receipt source must be 'orders' or 'manual-sales'.")
         };
+
+    private async Task<decimal> GetCustomerBalanceBeforeAsync(
+        long customerId,
+        DateTime before,
+        string currency,
+        string source,
+        long currentId,
+        CancellationToken cancellationToken)
+    {
+        var orders = await context.Orders.AsNoTracking()
+            .Where(item => item.CustomerId == customerId && item.Currency == currency &&
+                item.Status != OrderStatus.Cancelled && item.Status != OrderStatus.Returned &&
+                item.CreatedAt < before && (source != "orders" || item.Id != currentId))
+            .Select(item => new
+            {
+                item.Total,
+                Paid = item.Payments.Where(payment => payment.Status == PaymentStatus.Paid || payment.Status == PaymentStatus.PartiallyRefunded)
+                    .Sum(payment => (decimal?)payment.Amount) ?? (item.PaymentStatus == PaymentStatus.Paid ? item.Total : 0)
+            })
+            .ToListAsync(cancellationToken);
+        var manual = await context.InventorySales.AsNoTracking()
+            .Where(item => item.CustomerId == customerId && item.CurrencyCode == currency &&
+                item.CreatedAt < before && (source != "manual-sales" || item.Id != currentId))
+            .SumAsync(item => (decimal?)(item.Total > item.PaidAmount ? item.Total - item.PaidAmount : 0), cancellationToken) ?? 0;
+        return orders.Sum(item => Math.Max(0, item.Total - item.Paid)) + manual;
+    }
 
     private long? ResolveBranchId(long? requestedBranchId)
     {
@@ -1021,6 +1051,11 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
             });
             TotalRow(total, "Paid", receipt.PaidAmount, receipt.CurrencyCode, compact);
             TotalRow(total, "Balance", receipt.BalanceAmount, receipt.CurrencyCode, compact);
+            if (receipt.PreviousBalance > 0)
+            {
+                TotalRow(total, "Previous balance", receipt.PreviousBalance, receipt.CurrencyCode, compact);
+                TotalRow(total, "Customer account due", receipt.PreviousBalance + receipt.BalanceAmount, receipt.CurrencyCode, compact);
+            }
         });
     }
 

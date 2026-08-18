@@ -33,6 +33,12 @@ public sealed class CreateBulkProductItemRequest
     [StringLength(100)]
     public string? Strength { get; set; }
 
+    [StringLength(200)]
+    public string? GenericName { get; set; }
+
+    [StringLength(500)]
+    public string? Formula { get; set; }
+
     [StringLength(500)]
     public string? ShortDescription { get; set; }
 

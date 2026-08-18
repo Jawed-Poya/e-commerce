@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, ChevronDown, Globe2, ListFilter, LoaderCircle, Search, ShieldCheck } from "lucide-react";
+import { Activity, BarChart3, ChevronDown, Clock3, Globe2, ListFilter, LoaderCircle, Search, ShieldCheck, UserCheck, Users } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { useI18n } from "@/i18n/i18n-provider";
+import { toFiniteNumber } from "@/lib/numbers";
 import { auditService } from "./audit-service";
 import {
     AuditActions,
@@ -53,6 +55,14 @@ export default function AuditPage() {
         queryKey: ["audit", "visits", deferredSearch, page],
         queryFn: async () => (await auditService.visits(deferredSearch, page, PageSize)).data,
         enabled: view === "visits",
+    });
+    const analytics = useQuery({
+        queryKey: ["audit", "visit-analytics"],
+        queryFn: async () => (await auditService.visitAnalytics()).data,
+        enabled: view === "visits",
+        refetchInterval: 5_000,
+        refetchIntervalInBackground: false,
+        refetchOnWindowFocus: true,
     });
 
     const activeQuery = view === "activities" ? activities : visits;
@@ -133,6 +143,10 @@ export default function AuditPage() {
                 </div>
             </div>
 
+            {view === "visits" && analytics.data ? (
+                <VisitorCrm analytics={analytics.data} />
+            ) : null}
+
             <Card className="overflow-hidden shadow-none">
                 <CardContent className="p-0">
                     {activeQuery.isLoading ? (
@@ -168,6 +182,89 @@ export default function AuditPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+function VisitorCrm({ analytics }: { analytics: import("./audit-types").VisitAnalytics }) {
+    const { locale, tr } = useI18n();
+    const guests = Math.max(0, toFiniteNumber(analytics.onlineVisitors) - toFiniteNumber(analytics.authenticatedOnlineVisitors));
+    return (
+        <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm">
+                <span className="flex items-center gap-2 font-medium text-emerald-700 dark:text-emerald-300"><span className="size-2 animate-pulse rounded-full bg-emerald-500" />{tr("Live customer presence")}</span>
+                <span className="text-xs text-muted-foreground">{tr("Updated")} {formatDate(analytics.generatedAt, locale)} · {tr("refreshes every 5 seconds")}</span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <MetricCard icon={Users} label={tr("Online visitors")} value={analytics.onlineVisitors} detail={`${guests} ${tr("guests")}`} />
+                <MetricCard icon={UserCheck} label={tr("Known customers online")} value={analytics.authenticatedOnlineVisitors} detail={tr("Linked to customer profiles")} />
+                <MetricCard icon={Activity} label={tr("Visits in 24 hours")} value={analytics.visitsLast24Hours} detail={`${analytics.uniqueVisitorsLast24Hours} ${tr("unique visitors")}`} />
+                <MetricCard icon={BarChart3} label={tr("Product demand signals")} value={analytics.topProducts.length + analytics.topSearches.length} detail={tr("Page views and searches, not heartbeats")} />
+            </div>
+            <div className="grid gap-4 xl:grid-cols-3">
+                <InsightList
+                    title={tr("Most visited products")}
+                    empty={tr("No product-page visits yet.")}
+                    items={analytics.topProducts.map((item) => ({ label: item.label, detail: item.path, value: item.visits }))}
+                />
+                <InsightList
+                    title={tr("Most searched items")}
+                    empty={tr("No storefront searches yet.")}
+                    items={analytics.topSearches.map((item) => ({ label: item.term, detail: tr("Search term"), value: item.searches }))}
+                />
+                <Card className="shadow-none">
+                    <CardContent className="p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                            <p className="font-semibold">{tr("Currently browsing")}</p>
+                            <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700">{tr("Live")}</Badge>
+                        </div>
+                        <div className="max-h-64 space-y-2 overflow-y-auto pe-1">
+                            {analytics.activeVisitors.length ? analytics.activeVisitors.map((visitor) => (
+                                <div key={visitor.sessionId} className="rounded-lg border p-3">
+                                    <div className="flex items-start justify-between gap-2">
+                                        {visitor.customerId ? <Link className="truncate text-sm font-semibold text-primary hover:underline" to={`/customers/${visitor.customerId}`}>{visitor.customerName ?? tr("Known customer")}</Link> : <p className="truncate text-sm font-medium">{tr("Guest visitor")}</p>}
+                                        <span className="size-2 shrink-0 rounded-full bg-emerald-500" />
+                                    </div>
+                                    <p className="mt-1 truncate text-xs font-medium" title={visitor.pageTitle ?? visitor.currentPath}>{visitor.pageTitle || friendlyPath(visitor.currentPath)}</p>
+                                    <p className="truncate text-[11px] text-muted-foreground" title={visitor.currentPath}>{visitor.currentPath}</p>
+                                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground"><span>{[visitor.deviceType, visitor.browser].filter(Boolean).join(" · ") || tr("Unknown device")}</span><span className="flex items-center gap-1"><Clock3 className="size-3" />{duration(visitor.firstSeenAt, visitor.lastSeenAt)}</span></div>
+                                </div>
+                            )) : <p className="py-8 text-center text-sm text-muted-foreground">{tr("No visitors are active right now.")}</p>}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
+    );
+}
+
+function MetricCard({ icon: Icon, label, value, detail }: { icon: typeof Activity; label: string; value: number; detail: string }) {
+    return (
+        <Card className="shadow-none">
+            <CardContent className="flex items-center gap-3 p-4">
+                <div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary"><Icon className="size-5" /></div>
+                <div className="min-w-0"><p className="text-2xl font-bold">{toFiniteNumber(value).toLocaleString()}</p><p className="text-sm font-medium">{label}</p><p className="truncate text-xs text-muted-foreground">{detail}</p></div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function InsightList({ title, empty, items }: { title: string; empty: string; items: { label: string; detail: string; value: number }[] }) {
+    const { tr } = useI18n();
+    const maximum = Math.max(1, ...items.map((item) => item.value));
+    return (
+        <Card className="shadow-none">
+            <CardContent className="p-4">
+                <p className="mb-3 font-semibold">{title}</p>
+                <div className="max-h-64 space-y-3 overflow-y-auto pe-1">
+                    {items.length ? items.map((item) => (
+                        <div key={`${item.label}-${item.detail}`}>
+                            <div className="flex items-start justify-between gap-3 text-sm"><div className="min-w-0"><p className="truncate font-medium" title={item.label}>{item.label}</p><p className="truncate text-xs text-muted-foreground" title={item.detail}>{item.detail}</p></div><span className="font-semibold">{item.value} {tr("visits")}</span></div>
+                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(6, (item.value / maximum) * 100)}%` }} /></div>
+                        </div>
+                    )) : <p className="py-8 text-center text-sm text-muted-foreground">{empty}</p>}
+                </div>
+            </CardContent>
+        </Card>
     );
 }
 
@@ -295,8 +392,13 @@ function Empty({ colSpan }: { colSpan: number }) {
 }
 
 function formatDate(value: string, locale: string) {
-    return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
+
+function duration(start: string, end: string) { const milliseconds = Math.max(0, new Date(end).getTime() - new Date(start).getTime()); if (!Number.isFinite(milliseconds)) return "—"; const minutes = Math.max(1, Math.round(milliseconds / 60_000)); return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${minutes % 60}m`; }
+function friendlyPath(path: string) { if (path === "/") return "Home page"; if (path.startsWith("/products/")) return `Product ${path.split("?")[0].split("/").filter(Boolean).at(-1) ?? "page"}`; if (path.startsWith("/products")) return "Shop catalog"; if (path.startsWith("/cart")) return "Shopping cart"; if (path.startsWith("/checkout")) return "Checkout"; if (path.startsWith("/account")) return "Customer account"; return path; }
 
 function formatAuditChanges(value: string) {
     try {

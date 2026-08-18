@@ -22,9 +22,17 @@ internal static class WhatsAppLinkBuilder
         string? phone,
         string customerName,
         string saleNumber,
+        decimal total,
+        decimal paid,
+        decimal balance,
+        string currency,
         WhatsAppOptions options) =>
         BuildCore(phone, customerName, options.SaleMessageTemplate, options,
-            ("{SaleNumber}", saleNumber));
+            ("{SaleNumber}", saleNumber),
+            ("{Total}", total.ToString("0.##")),
+            ("{Paid}", paid.ToString("0.##")),
+            ("{Balance}", balance.ToString("0.##")),
+            ("{Currency}", currency));
 
     private static string? BuildCore(
         string? phone,

@@ -57,6 +57,8 @@ public class ProductService : IProductService
         var defaultType = await _defaultCustomerType.GetAsync();
         var requestedTypeId = await _currentCustomer.GetCustomerTypeIdAsync();
         var effectiveTypeId = requestedTypeId ?? defaultType.Id;
+        var generalDiscountPercent = _currentCustomer.IsAdmin ? 0 : await GetGeneralSalesDiscountAsync();
+        var priceFactor = 1 - generalDiscountPercent / 100m;
 
         IQueryable<Product> products = _context.Products
             .AsNoTracking()
@@ -68,6 +70,8 @@ public class ProductService : IProductService
             products = products.Where(product =>
                 product.Name.Contains(search) ||
                 (product.Strength != null && product.Strength.Contains(search)) ||
+                (product.GenericName != null && product.GenericName.Contains(search)) ||
+                (product.Formula != null && product.Formula.Contains(search)) ||
                 (product.Barcode != null && product.Barcode.Contains(search)) ||
                 product.UnitConversions.Any(unit => unit.IsActive && unit.Barcode != null && unit.Barcode.Contains(search)));
         }
@@ -139,8 +143,8 @@ public class ProductService : IProductService
                     .FirstOrDefault()
         });
 
-        if (filter.MinPrice.HasValue) pageQuery = pageQuery.Where(product => product.Price >= filter.MinPrice.Value);
-        if (filter.MaxPrice.HasValue) pageQuery = pageQuery.Where(product => product.Price <= filter.MaxPrice.Value);
+        if (filter.MinPrice.HasValue) pageQuery = pageQuery.Where(product => product.Price * priceFactor >= filter.MinPrice.Value);
+        if (filter.MaxPrice.HasValue) pageQuery = pageQuery.Where(product => product.Price * priceFactor <= filter.MaxPrice.Value);
 
         pageQuery = filter.SortBy?.ToLowerInvariant() switch
         {
@@ -167,6 +171,8 @@ public class ProductService : IProductService
             Name = product.Name,
             Barcode = product.Barcode,
             Strength = product.Strength,
+            GenericName = product.GenericName,
+            Formula = product.Formula,
             ShortDescription = product.ShortDescription,
             Description = product.Description,
             Slug = product.Slug,
@@ -272,6 +278,8 @@ public class ProductService : IProductService
                 product.Name,
                 product.Barcode,
                 product.Strength,
+                product.GenericName,
+                product.Formula,
                 product.ShortDescription,
                 product.Description,
                 product.Slug,
@@ -290,8 +298,8 @@ public class ProductService : IProductService
                 product.IsActive,
                 Math.Max(0, product.Stock),
                 Math.Max(0, product.InventoryStock),
-                product.Price,
-                product.OldPrice,
+                ApplyGeneralDiscount(product.Price, generalDiscountPercent),
+                generalDiscountPercent > 0 && product.Price.HasValue ? product.OldPrice ?? product.Price : product.OldPrice,
                 product.PriceCustomerTypeName,
                 effectiveTypeId == defaultType.Id || !product.HasRequestedPrice,
                 product.ViewCount,
@@ -414,6 +422,8 @@ public class ProductService : IProductService
                 product.Name = item.Name.Trim();
                 product.Barcode = NormalizeOptional(item.Barcode);
                 product.Strength = NormalizeOptional(item.Strength);
+                product.GenericName = NormalizeOptional(item.GenericName);
+                product.Formula = NormalizeOptional(item.Formula);
                 product.ShortDescription = NormalizeOptional(item.ShortDescription);
                 product.Description = NormalizeOptional(item.Description);
                 product.Slug = NormalizeOptional(item.Slug);
@@ -563,6 +573,9 @@ public class ProductService : IProductService
         var requestedTypeId = await _currentCustomer.GetCustomerTypeIdAsync(cancellationToken);
         var effectiveTypeId = requestedTypeId ?? defaultType.Id;
         var resolved = ResolvePrice(product.Prices, effectiveTypeId, defaultType.Id, today);
+        var generalDiscountPercent = _currentCustomer.IsAdmin ? 0 : await GetGeneralSalesDiscountAsync(cancellationToken);
+        var displayPrice = ApplyGeneralDiscount(resolved?.Price, generalDiscountPercent);
+        var displayOldPrice = generalDiscountPercent > 0 && resolved is not null ? resolved.OldPrice ?? resolved.Price : resolved?.OldPrice;
         var expiredAvailableQuantity = product.Inventory is null
             ? 0
             : await _context.InventoryLots
@@ -605,8 +618,8 @@ public class ProductService : IProductService
                 true,
                 -1,
                 availableBaseQuantity,
-                resolved?.Price,
-                resolved?.OldPrice));
+                displayPrice,
+                displayOldPrice));
         }
 
         unitConversions.AddRange(activeConversions.Select(conversion =>
@@ -614,11 +627,11 @@ public class ProductService : IProductService
             var factor = conversion.ConversionFactor <= 0 ? 1 : conversion.ConversionFactor;
             decimal? convertedPrice = resolved is null
                 ? null
-                : decimal.Round(resolved.Price * factor, 2);
+                : decimal.Round((displayPrice ?? resolved.Price) * factor, 2);
 
-            decimal? convertedOldPrice = resolved?.OldPrice is null
+            decimal? convertedOldPrice = displayOldPrice is null
                 ? null
-                : decimal.Round(resolved.OldPrice.Value * factor, 2);
+                : decimal.Round(displayOldPrice.Value * factor, 2);
             return new ProductUnitConversionResponse(
                 conversion.Id,
                 conversion.UnitId,
@@ -640,6 +653,8 @@ public class ProductService : IProductService
             Name = product.Name,
             Barcode = product.Barcode,
             Strength = product.Strength,
+            GenericName = product.GenericName,
+            Formula = product.Formula,
             Description = product.Description,
             ShortDescription = product.ShortDescription,
             Slug = product.Slug,
@@ -668,8 +683,8 @@ public class ProductService : IProductService
                 .Where(review => review.ProductId == product.Id && review.IsApproved && !review.IsDeleted)
                 .Select(review => (double?)review.Rating)
                 .AverageAsync(cancellationToken) ?? 0,
-            Price = resolved?.Price,
-            OldPrice = resolved?.OldPrice,
+            Price = displayPrice,
+            OldPrice = displayOldPrice,
             PriceCustomerTypeId = resolved?.CustomerTypeId,
             PriceCustomerTypeName = resolved?.CustomerTypeName,
             IsDefaultPrice = resolved is not null && resolved.CustomerTypeId == defaultType.Id,
@@ -756,6 +771,8 @@ public class ProductService : IProductService
         entity.Name = model.Name;
         entity.Barcode = model.Barcode;
         entity.Strength = model.Strength;
+        entity.GenericName = model.GenericName;
+        entity.Formula = model.Formula;
         entity.Slug = model.Slug;
         entity.ShortDescription = model.ShortDescription;
         entity.Description = model.Description;
@@ -909,6 +926,8 @@ public class ProductService : IProductService
                     Name = item.Name,
                     Barcode = item.Barcode,
                     Strength = NormalizeOptional(item.Request.Strength),
+                    GenericName = NormalizeOptional(item.Request.GenericName),
+                    Formula = NormalizeOptional(item.Request.Formula),
                     ShortDescription =
                         item.ShortDescription,
                     Description = item.Description,
@@ -1440,6 +1459,16 @@ public class ProductService : IProductService
             saleActive ? selected.RegularPrice : null);
     }
 
+    private async Task<decimal> GetGeneralSalesDiscountAsync(CancellationToken cancellationToken = default) =>
+        Math.Clamp(await _context.CompanySettings.AsNoTracking()
+            .Select(setting => (decimal?)setting.GeneralSalesDiscountPercent)
+            .SingleOrDefaultAsync(cancellationToken) ?? 0, 0, 100);
+
+    private static decimal? ApplyGeneralDiscount(decimal? price, decimal percent) =>
+        price.HasValue
+            ? decimal.Round(price.Value * (1 - Math.Clamp(percent, 0, 100) / 100m), 2, MidpointRounding.AwayFromZero)
+            : null;
+
     private sealed record ResolvedProductPrice(
         long CustomerTypeId,
         string CustomerTypeName,
@@ -1459,6 +1488,8 @@ public class ProductService : IProductService
         public string Name { get; init; } = string.Empty;
         public string? Barcode { get; init; }
         public string? Strength { get; init; }
+        public string? GenericName { get; init; }
+        public string? Formula { get; init; }
         public string? ShortDescription { get; init; }
         public string? Description { get; init; }
         public string? Slug { get; init; }

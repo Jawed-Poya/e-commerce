@@ -219,7 +219,7 @@ export function CheckoutPage() {
     };
 
     return (
-        <main className="mx-auto w-full max-w-[1320px] px-4 py-6 sm:px-6 lg:px-8 lg:py-9">
+        <main className="mx-auto w-full max-w-[1320px] px-4 pb-40 pt-6 sm:px-6 md:pb-28 lg:px-8 lg:py-9">
             <div className="mb-6 flex items-center justify-between gap-4">
                 <div>
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
@@ -475,7 +475,7 @@ export function CheckoutPage() {
                     </CheckoutSection>
                 </div>
 
-                <aside className="sticky top-28 overflow-hidden rounded-2xl border bg-card shadow-[0_14px_38px_rgba(15,23,42,0.07)]">
+                <aside className="overflow-hidden rounded-2xl border bg-card shadow-[0_14px_38px_rgba(15,23,42,0.07)] lg:sticky lg:top-28">
                     <div className="border-b bg-muted/25 p-4">
                         <div className="flex items-center gap-3">
                             <span className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
@@ -559,7 +559,7 @@ export function CheckoutPage() {
                         <Button
                             type="submit"
                             size="lg"
-                            className="mt-4 h-11 w-full rounded-lg font-bold"
+                            className="mt-4 hidden h-11 w-full rounded-lg font-bold lg:flex"
                             disabled={submitting || configQuery.isError}
                         >
                             {submitting ? (
@@ -580,6 +580,34 @@ export function CheckoutPage() {
                         </div>
                     </div>
                 </aside>
+
+                <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t bg-background/95 px-4 py-2.5 shadow-[0_-12px_35px_rgba(15,23,42,0.1)] backdrop-blur-xl md:bottom-0 lg:hidden">
+                    <div className="mx-auto flex max-w-xl items-center gap-4">
+                        <div className="min-w-0 flex-1">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                {t("checkout.estimatedTotal")}
+                            </p>
+                            <p className="truncate text-lg font-black tracking-tight">
+                                {formatMoney(estimatedTotal, config?.currency)}
+                            </p>
+                        </div>
+                        <Button
+                            type="submit"
+                            size="lg"
+                            className="h-11 min-w-40 rounded-xl font-black shadow-md shadow-primary/15"
+                            disabled={submitting || configQuery.isError}
+                        >
+                            {submitting ? (
+                                <LoaderCircle className="animate-spin" />
+                            ) : (
+                                <LockKeyhole />
+                            )}
+                            {submitting
+                                ? t("checkout.creating")
+                                : t("checkout.placeOrder")}
+                        </Button>
+                    </div>
+                </div>
             </form>
         </main>
     );

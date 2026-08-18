@@ -19,6 +19,7 @@ import {
 import { useInventoryLots } from "@/features/inventory/hooks/use-inventory";
 import type { InventoryListItem } from "@/features/inventory/types/inventory-types";
 import { cn } from "@/lib/utils";
+import { toFiniteNumber } from "@/lib/numbers";
 
 interface InventoryLotsDialogProps {
     item: InventoryListItem | null;
@@ -28,8 +29,8 @@ interface InventoryLotsDialogProps {
 
 export function InventoryLotsDialog({ item, open, onOpenChange }: InventoryLotsDialogProps) {
     const { data: lots = [], isLoading, isError } = useInventoryLots(open ? item?.productId ?? null : null);
-    const lotQuantity = lots.reduce((sum, lot) => sum + lot.quantity, 0);
-    const unallocatedQuantity = item ? item.quantity - lotQuantity : 0;
+    const lotQuantity = lots.reduce((sum, lot) => sum + toFiniteNumber(lot.quantity), 0);
+    const unallocatedQuantity = item ? toFiniteNumber(item.quantity) - lotQuantity : 0;
     const hasUnallocatedQuantity = Math.abs(unallocatedQuantity) >= 0.0005;
 
     return (
@@ -128,7 +129,7 @@ function NumberCell({ value, muted = false, strong = false }: { value: number | 
 }
 
 function formatNumber(value: number) {
-    return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
+    return toFiniteNumber(value).toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
 function formatDate(value: string) {

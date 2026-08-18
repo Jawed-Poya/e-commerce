@@ -30,6 +30,8 @@ public sealed class Purchase : BaseEntity
     public DocumentPaymentStatus PaymentStatus { get; set; }
     public decimal Subtotal { get; set; }
     public decimal Discount { get; set; }
+    public decimal DiscountPercent { get; set; }
+    public decimal SecondaryDiscountPercent { get; set; }
     public decimal Tax { get; set; }
     public decimal OtherCost { get; set; }
     public decimal Total { get; set; }
@@ -58,6 +60,9 @@ public sealed class PurchaseItem : BaseEntity
     public decimal UnitConversionFactor { get; set; } = 1;
     public decimal EnteredUnitCost { get; set; }
     public decimal LineTotal { get; set; }
+    public decimal BonusQuantity { get; set; }
+    public decimal DiscountPercent { get; set; }
+    public decimal SecondaryDiscountPercent { get; set; }
     public string? LotNumber { get; set; }
     public DateOnly? ExpireDate { get; set; }
 }
@@ -86,6 +91,8 @@ public sealed class InventorySale : BaseEntity
     public string PaymentMethod { get; set; } = "Cash";
     public decimal Subtotal { get; set; }
     public decimal Discount { get; set; }
+    public decimal DiscountPercent { get; set; }
+    public decimal SecondaryDiscountPercent { get; set; }
     public decimal Tax { get; set; }
     public decimal Total { get; set; }
     public decimal PaidAmount { get; set; }
@@ -93,6 +100,9 @@ public sealed class InventorySale : BaseEntity
     public string? ReferenceNumber { get; set; }
     public string? ClientRequestId { get; set; }
     public string? Notes { get; set; }
+    public DateOnly? DebtDueDate { get; set; }
+    public decimal CustomerCreditApplied { get; set; }
+    public decimal CustomerCreditCreated { get; set; }
     public string? CreatedByUserId { get; set; }
     public ICollection<InventorySaleItem> Items { get; set; } = [];
     public ICollection<InventorySalePayment> Payments { get; set; } = [];
@@ -114,6 +124,9 @@ public sealed class InventorySaleItem : BaseEntity
     public decimal UnitConversionFactor { get; set; } = 1;
     public decimal EnteredUnitPrice { get; set; }
     public decimal LineTotal { get; set; }
+    public decimal BonusQuantity { get; set; }
+    public decimal DiscountPercent { get; set; }
+    public decimal SecondaryDiscountPercent { get; set; }
     public decimal CostTotal => Quantity * UnitCost;
 }
 
@@ -202,4 +215,27 @@ public sealed class Expense : BaseEntity
     public string? ReferenceNumber { get; set; }
     public string Description { get; set; } = null!;
     public string? CreatedByUserId { get; set; }
+}
+
+public sealed class JournalVoucher : BaseEntity
+{
+    public string VoucherNumber { get; set; } = null!;
+    public DateOnly VoucherDate { get; set; }
+    public string CurrencyCode { get; set; } = "USD";
+    public string Memo { get; set; } = null!;
+    public decimal TotalDebit { get; set; }
+    public decimal TotalCredit { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public ICollection<JournalVoucherLine> Lines { get; set; } = [];
+}
+
+public sealed class JournalVoucherLine : BaseEntity
+{
+    public long JournalVoucherId { get; set; }
+    public JournalVoucher JournalVoucher { get; set; } = null!;
+    public string AccountCode { get; set; } = null!;
+    public string AccountName { get; set; } = null!;
+    public string? Description { get; set; }
+    public decimal Debit { get; set; }
+    public decimal Credit { get; set; }
 }

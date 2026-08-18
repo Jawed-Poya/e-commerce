@@ -4,10 +4,39 @@ import type {
     FinancialReport,
     FinancialReportFilters,
 } from "./finance-types";
+import { toFiniteNumber } from "@/lib/numbers";
+
+const reportNumberFields = [
+    "onlineRevenue", "manualSalesRevenue", "totalRevenue", "costOfGoodsSold", "grossProfit",
+    "grossMarginPercent", "expenses", "payrollObligation", "netProfit", "netMarginPercent",
+    "cashReceived", "purchases", "payrollPaid", "cashPaid", "netCashFlow", "operatingBalance",
+    "outstandingReceivables", "outstandingSupplierPayables", "outstandingPayroll", "onlineOrders",
+    "manualSales", "purchaseCount", "returnedOrderCount", "returnedOrderAmount", "customerCount",
+    "productCount", "lowStockProducts", "averageOrderValue", "totalResults", "page", "pageSize",
+] as const satisfies readonly (keyof FinancialReport)[];
+
+function normalizeReport(report: FinancialReport): FinancialReport {
+    const normalized = { ...report };
+    for (const key of reportNumberFields) {
+        // Runtime API values can be nullable or numeric strings even though the
+        // generated TypeScript contract correctly describes the target shape.
+        (normalized as unknown as Record<string, unknown>)[key] = toFiniteNumber(report[key]);
+    }
+    normalized.page = Math.max(1, normalized.page);
+    normalized.pageSize = Math.max(1, normalized.pageSize || 25);
+    normalized.availableCurrencies = Array.isArray(report.availableCurrencies) ? report.availableCurrencies : [];
+    normalized.trend = (report.trend ?? []).map(point => ({ ...point, revenue: toFiniteNumber(point.revenue), cost: toFiniteNumber(point.cost), net: toFiniteNumber(point.net) }));
+    normalized.profitTrend = (report.profitTrend ?? []).map(point => ({ ...point, revenue: toFiniteNumber(point.revenue), cost: toFiniteNumber(point.cost), net: toFiniteNumber(point.net) }));
+    normalized.topProducts = (report.topProducts ?? []).map(product => ({ ...product, quantity: toFiniteNumber(product.quantity), revenue: toFiniteNumber(product.revenue), cost: toFiniteNumber(product.cost), profit: toFiniteNumber(product.profit), marginPercent: toFiniteNumber(product.marginPercent) }));
+    normalized.topCustomers = (report.topCustomers ?? []).map(item => ({ ...item, transactionCount: toFiniteNumber(item.transactionCount), amount: toFiniteNumber(item.amount), balance: toFiniteNumber(item.balance) }));
+    normalized.topSuppliers = (report.topSuppliers ?? []).map(item => ({ ...item, transactionCount: toFiniteNumber(item.transactionCount), amount: toFiniteNumber(item.amount), balance: toFiniteNumber(item.balance) }));
+    normalized.results = (report.results ?? []).map(item => ({ ...item, amount: toFiniteNumber(item.amount), paidAmount: toFiniteNumber(item.paidAmount), balanceAmount: toFiniteNumber(item.balanceAmount) }));
+    return normalized;
+}
 
 export const financeService = {
     report: async (filters: FinancialReportFilters) =>
-        (await apiClient.get<FinancialReport>("/admin/reports", filters)).data,
+        normalizeReport((await apiClient.get<FinancialReport>("/admin/reports", filters)).data),
     worth: async (params: {
         asOfDate?: string;
         periodStartDate?: string;

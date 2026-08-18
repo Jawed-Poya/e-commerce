@@ -22,6 +22,16 @@ public sealed record CompanySettingsResponse(
     string ExpiryAlertSound,
     int MaximumPurchaseLines,
     int MaximumManualSaleLines,
+    decimal GeneralSalesDiscountPercent,
+    decimal MaximumCustomerDebt,
+    int DefaultDebtDueDays,
+    bool AllowNegativeStockSales,
+    string PurchaseNumberPrefix,
+    long NextPurchaseNumber,
+    int PurchaseNumberIncrement,
+    string SaleNumberPrefix,
+    long NextSaleNumber,
+    int SaleNumberIncrement,
     bool AllowUserClaimManagement);
 
 public sealed record CompanyBranchResponse(
@@ -88,7 +98,17 @@ public sealed record UpdateCompanySettingsRequest(
     bool ExpiryAlertsEnabled = true,
     IReadOnlyCollection<int>? ExpiryAlertPeriods = null,
     bool ExpiryAlertSoundEnabled = true,
-    string ExpiryAlertSound = "critical-pulse");
+    string ExpiryAlertSound = "critical-pulse",
+    decimal GeneralSalesDiscountPercent = 0,
+    decimal MaximumCustomerDebt = 300000,
+    int DefaultDebtDueDays = 30,
+    bool AllowNegativeStockSales = false,
+    string PurchaseNumberPrefix = "PUR",
+    long NextPurchaseNumber = 1,
+    int PurchaseNumberIncrement = 1,
+    string SaleNumberPrefix = "SAL",
+    long NextSaleNumber = 1,
+    int SaleNumberIncrement = 1);
 
 public sealed record UpdateOperationLimitsRequest(
     int MaximumPurchaseLines,

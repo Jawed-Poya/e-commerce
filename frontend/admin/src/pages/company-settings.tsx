@@ -412,6 +412,27 @@ export default function CompanySettingsPage() {
 
                         <div className="rounded-xl border bg-muted/20 p-4"><p className="text-sm font-semibold">Money preview</p><p className="mt-2 text-2xl font-bold tabular-nums text-primary">{moneyPreview}</p></div>
 
+                        <section className="rounded-2xl border border-primary/15 bg-primary/[0.025] p-4 sm:p-5">
+                            <div>
+                                <p className="text-sm font-bold">Sales, credit, and invoice controls</p>
+                                <p className="mt-1 text-xs leading-5 text-muted-foreground">Apply a company-wide discount, enforce customer debt policy, control negative stock, and choose the next automatic document numbers.</p>
+                            </div>
+                            <div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+                                <Field label="General sales discount %"><Input type="number" min={0} max={100} step="0.01" value={settings.generalSalesDiscountPercent} onChange={(event) => setSettings({ ...settings, generalSalesDiscountPercent: Number(event.target.value) })} /></Field>
+                                <Field label="Maximum customer debt"><Input type="number" min={0} step="0.01" value={settings.maximumCustomerDebt} onChange={(event) => setSettings({ ...settings, maximumCustomerDebt: Number(event.target.value) })} /></Field>
+                                <Field label="Default debt due days"><Input type="number" min={0} max={3650} value={settings.defaultDebtDueDays} onChange={(event) => setSettings({ ...settings, defaultDebtDueDays: Number(event.target.value) })} /></Field>
+                                <Toggle label="Allow negative stock" description="Permit manual sales below zero; later purchases offset the balance." checked={settings.allowNegativeStockSales} onCheckedChange={(checked) => setSettings({ ...settings, allowNegativeStockSales: checked })} />
+                            </div>
+                            <div className="mt-5 grid gap-5 rounded-xl border bg-background p-4 sm:grid-cols-3 xl:grid-cols-6">
+                                <Field label="Purchase prefix"><Input maxLength={12} value={settings.purchaseNumberPrefix} onChange={(event) => setSettings({ ...settings, purchaseNumberPrefix: event.target.value.toUpperCase() })} /></Field>
+                                <Field label="Next purchase #"><Input type="number" min={1} value={settings.nextPurchaseNumber} onChange={(event) => setSettings({ ...settings, nextPurchaseNumber: Number(event.target.value) })} /></Field>
+                                <Field label="Purchase increment"><Input type="number" min={1} value={settings.purchaseNumberIncrement} onChange={(event) => setSettings({ ...settings, purchaseNumberIncrement: Number(event.target.value) })} /></Field>
+                                <Field label="Sale prefix"><Input maxLength={12} value={settings.saleNumberPrefix} onChange={(event) => setSettings({ ...settings, saleNumberPrefix: event.target.value.toUpperCase() })} /></Field>
+                                <Field label="Next sale #"><Input type="number" min={1} value={settings.nextSaleNumber} onChange={(event) => setSettings({ ...settings, nextSaleNumber: Number(event.target.value) })} /></Field>
+                                <Field label="Sale increment"><Input type="number" min={1} value={settings.saleNumberIncrement} onChange={(event) => setSettings({ ...settings, saleNumberIncrement: Number(event.target.value) })} /></Field>
+                            </div>
+                        </section>
+
                         <div className="grid min-w-0 gap-5 sm:grid-cols-2 2xl:grid-cols-4">
                             <ColorField label="Admin primary" value={settings.adminPrimaryColor} onChange={(value) => setSettings({ ...settings, adminPrimaryColor: value })} />
                             <ColorField label="Admin secondary" value={settings.adminSecondaryColor} onChange={(value) => setSettings({ ...settings, adminSecondaryColor: value })} />

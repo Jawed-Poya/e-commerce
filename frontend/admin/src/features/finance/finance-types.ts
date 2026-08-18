@@ -10,6 +10,17 @@ export interface TopProduct {
     productName: string;
     quantity: number;
     revenue: number;
+    cost: number;
+    profit: number;
+    marginPercent: number;
+}
+
+export interface BusinessPartyMetric {
+    id: number | null;
+    name: string;
+    transactionCount: number;
+    amount: number;
+    balance: number;
 }
 
 export interface FinancialReportLine {
@@ -55,6 +66,8 @@ export interface FinancialReport {
     onlineOrders: number;
     manualSales: number;
     purchaseCount: number;
+    returnedOrderCount: number;
+    returnedOrderAmount: number;
     customerCount: number;
     productCount: number;
     lowStockProducts: number;
@@ -62,6 +75,8 @@ export interface FinancialReport {
     trend: FinancialTrendPoint[];
     profitTrend: FinancialTrendPoint[];
     topProducts: TopProduct[];
+    topCustomers: BusinessPartyMetric[];
+    topSuppliers: BusinessPartyMetric[];
     results: FinancialReportLine[];
     totalResults: number;
     page: number;

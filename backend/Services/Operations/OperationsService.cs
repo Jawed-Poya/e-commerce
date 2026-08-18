@@ -51,13 +51,25 @@ public sealed class OperationsService(
         CancellationToken ct)
     {
         var settings = await context.CompanySettings.AsNoTracking()
-            .Select(item => new { item.MaximumPurchaseLines, item.MaximumManualSaleLines })
+            .Select(item => new
+            {
+                item.MaximumPurchaseLines,
+                item.MaximumManualSaleLines,
+                item.GeneralSalesDiscountPercent,
+                item.MaximumCustomerDebt,
+                item.DefaultDebtDueDays,
+                item.AllowNegativeStockSales
+            })
             .SingleOrDefaultAsync(ct);
 
         return new OperationPolicyResponse(
             Math.Clamp(settings?.MaximumPurchaseLines ?? 50, 1, 500),
             Math.Clamp(settings?.MaximumManualSaleLines ?? 50, 1, 500),
-            canOverrideLineLimits);
+            canOverrideLineLimits,
+            settings?.GeneralSalesDiscountPercent ?? 0,
+            settings?.MaximumCustomerDebt ?? 300000,
+            settings?.DefaultDebtDueDays ?? 30,
+            settings?.AllowNegativeStockSales ?? false);
     }
 
     public async Task<IReadOnlyList<OperationProductLookup>> GetProductLookupsAsync(
@@ -82,6 +94,8 @@ public sealed class OperationsService(
             query = query.Where(product =>
                 product.Name.Contains(clean) ||
                 (product.Strength != null && product.Strength.Contains(clean)) ||
+                (product.GenericName != null && product.GenericName.Contains(clean)) ||
+                (product.Formula != null && product.Formula.Contains(clean)) ||
                 (product.Barcode != null && product.Barcode.Contains(clean)) ||
                 product.UnitConversions.Any(unit => unit.IsActive && unit.Barcode != null && unit.Barcode.Contains(clean)));
 
@@ -114,6 +128,8 @@ public sealed class OperationsService(
                 product.Id,
                 product.Name,
                 product.Strength,
+                product.GenericName,
+                product.Formula,
                 product.Barcode,
                 availableBaseQuantity,
                 basePrice,
@@ -131,6 +147,10 @@ public sealed class OperationsService(
 
     public async Task<IReadOnlyList<OperationCustomerLookup>> GetCustomerLookupsAsync(string? search, int take, CancellationToken ct)
     {
+        var companyDebtLimit = await context.CompanySettings.AsNoTracking()
+            .Select(x => x.MaximumCustomerDebt)
+            .SingleOrDefaultAsync(ct);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var query = context.Customers.AsNoTracking()
             .Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value);
         var clean = Clean(search);
@@ -144,7 +164,15 @@ public sealed class OperationsService(
                 Name = (x.FirstName + " " + (x.LastName ?? "")).Trim(),
                 x.Phone,
                 x.Email,
-                CustomerTypeName = x.CustomerType == null ? null : x.CustomerType.Name
+                CustomerTypeName = x.CustomerType == null ? null : x.CustomerType.Name,
+                x.AccountCredit,
+                CreditLimit = x.CreditLimit ?? companyDebtLimit,
+                OutstandingDebt = context.InventorySales
+                    .Where(sale => sale.CustomerId == x.Id && sale.Total > sale.PaidAmount)
+                    .Sum(sale => (decimal?)(sale.Total - sale.PaidAmount)) ?? 0,
+                HasOverdueDebt = context.InventorySales.Any(sale =>
+                    sale.CustomerId == x.Id && sale.Total > sale.PaidAmount &&
+                    sale.DebtDueDate.HasValue && sale.DebtDueDate.Value < today)
             })
             .ToListAsync(ct);
 
@@ -154,7 +182,11 @@ public sealed class OperationsService(
             x.Phone,
             WhatsAppLinkBuilder.Build(x.Phone, x.Name, _whatsAppOptions),
             x.Email,
-            x.CustomerTypeName)).ToList();
+            x.CustomerTypeName,
+            x.AccountCredit,
+            x.OutstandingDebt,
+            x.CreditLimit,
+            x.HasOverdueDebt)).ToList();
     }
 
     public async Task<IReadOnlyList<SupplierResponse>> GetSuppliersAsync(string? search, int take, CancellationToken ct)
@@ -166,7 +198,8 @@ public sealed class OperationsService(
             query = query.Where(x => x.Name.Contains(clean) || (x.Phone != null && x.Phone.Contains(clean)) || (x.ContactPerson != null && x.ContactPerson.Contains(clean)));
 
         return await query.OrderByDescending(x => x.IsActive).ThenBy(x => x.Name).Take(Math.Clamp(take, 1, 500))
-            .Select(x => new SupplierResponse(x.Id, x.Name, x.ContactPerson, x.Phone, x.Email, x.Address, x.TaxNumber, x.IsActive))
+            .Select(x => new SupplierResponse(x.Id, x.Name, x.ContactPerson, x.Phone, x.Email, x.Address, x.TaxNumber, x.IsActive,
+                x.Purchases.Where(purchase => purchase.Status != PurchaseStatus.Cancelled && purchase.Total > purchase.PaidAmount).Sum(purchase => (decimal?)(purchase.Total - purchase.PaidAmount)) ?? 0))
             .ToListAsync(ct);
     }
 
@@ -186,7 +219,8 @@ public sealed class OperationsService(
             .ThenBy(x => x.Name)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(x => new SupplierResponse(x.Id, x.Name, x.ContactPerson, x.Phone, x.Email, x.Address, x.TaxNumber, x.IsActive))
+            .Select(x => new SupplierResponse(x.Id, x.Name, x.ContactPerson, x.Phone, x.Email, x.Address, x.TaxNumber, x.IsActive,
+                x.Purchases.Where(purchase => purchase.Status != PurchaseStatus.Cancelled && purchase.Total > purchase.PaidAmount).Sum(purchase => (decimal?)(purchase.Total - purchase.PaidAmount)) ?? 0))
             .ToListAsync(ct);
 
         return new PagedResult<SupplierResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
@@ -215,6 +249,41 @@ public sealed class OperationsService(
         entity.IsActive = request.IsActive;
         await context.SaveChangesAsync(ct);
         return MapSupplier(entity);
+    }
+
+    public async Task<SupplierLedgerResponse> GetSupplierLedgerAsync(long id, CancellationToken ct)
+    {
+        var supplier = await context.Suppliers.AsNoTracking()
+            .Where(x => x.Id == id && (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value))
+            .Select(x => new { x.Id, x.Name })
+            .SingleOrDefaultAsync(ct)
+            ?? throw new KeyNotFoundException("Supplier not found.");
+        var purchases = await context.Purchases.AsNoTracking()
+            .Where(x => x.SupplierId == id && x.Status != PurchaseStatus.Cancelled)
+            .Select(x => new { x.Id, x.PurchaseNumber, x.PurchaseDate, x.Total })
+            .ToListAsync(ct);
+        var payments = await context.PurchasePayments.AsNoTracking()
+            .Where(x => x.Purchase.SupplierId == id && x.Purchase.Status != PurchaseStatus.Cancelled)
+            .Select(x => new { x.Id, x.PurchaseId, x.Purchase.PurchaseNumber, x.PaymentDate, x.Amount, x.PaymentMethod })
+            .ToListAsync(ct);
+
+        var rawEntries = purchases.Select(x => new { Date = x.PurchaseDate, Sort = 0, Type = "Purchase", Reference = x.PurchaseNumber, Description = "Inventory purchase", Debit = x.Total, Credit = 0m, SourceId = x.Id })
+            .Concat(payments.Select(x => new { Date = x.PaymentDate, Sort = 1, Type = "Payment", Reference = x.PurchaseNumber, Description = $"{x.PaymentMethod} payment", Debit = 0m, Credit = x.Amount, SourceId = x.PurchaseId }))
+            .OrderBy(x => x.Date).ThenBy(x => x.Sort).ThenBy(x => x.SourceId)
+            .ToList();
+        var balance = 0m;
+        var entries = rawEntries.Select(x =>
+        {
+            balance += x.Debit - x.Credit;
+            return new SupplierLedgerEntryResponse(x.Date, x.Type, x.Reference, x.Description, x.Debit, x.Credit, balance, x.SourceId);
+        }).ToList();
+        return new SupplierLedgerResponse(
+            supplier.Id,
+            supplier.Name,
+            purchases.Sum(x => x.Total),
+            payments.Sum(x => x.Amount),
+            balance,
+            entries);
     }
 
     public async Task<PagedResult<PurchaseListItem>> GetPurchasesAsync(string? search, int page, int pageSize, CancellationToken ct)
@@ -326,8 +395,10 @@ public sealed class OperationsService(
                 throw new ArgumentException(
                     $"Cannot receive expired stock for '{product.Name}'. Use supplier return or quarantine documentation instead.");
             var selectedUnit = ResolveOperationUnit(product, item.UnitId);
-            var baseQuantity = decimal.Round(item.Quantity * selectedUnit.ConversionFactor, 3, MidpointRounding.AwayFromZero);
-            var baseUnitCost = decimal.Round(item.UnitCost / selectedUnit.ConversionFactor, 4, MidpointRounding.AwayFromZero);
+            var receivedQuantity = item.Quantity + item.BonusQuantity;
+            var baseQuantity = decimal.Round(receivedQuantity * selectedUnit.ConversionFactor, 3, MidpointRounding.AwayFromZero);
+            var lineTotal = StackedNet(item.Quantity * item.UnitCost, item.DiscountPercent, item.SecondaryDiscountPercent);
+            var baseUnitCost = decimal.Round(lineTotal / baseQuantity, 4, MidpointRounding.AwayFromZero);
             if (baseQuantity <= 0)
                 throw new ArgumentException($"The quantity for '{product.Name}' is too small for base-unit precision.");
             return new NormalizedPurchaseLine(item, product, selectedUnit, baseQuantity, baseUnitCost);
@@ -345,18 +416,27 @@ public sealed class OperationsService(
         }
 
         var subtotal = normalizedItems.Sum(line => line.Request.Quantity * line.Request.UnitCost);
-        var total = Math.Max(0, subtotal - request.Discount + request.Tax + request.OtherCost);
+        var linesNet = normalizedItems.Sum(line => StackedNet(
+            line.Request.Quantity * line.Request.UnitCost,
+            line.Request.DiscountPercent,
+            line.Request.SecondaryDiscountPercent));
+        var documentNet = StackedNet(linesNet, request.DiscountPercent, request.SecondaryDiscountPercent);
+        var effectiveDiscount = Math.Min(subtotal, subtotal - documentNet + request.Discount);
+        var total = Math.Max(0, subtotal - effectiveDiscount + request.Tax + request.OtherCost);
         ValidateInitialPayment(request.PaidAmount, total);
         var purchaseDate = request.PurchaseDate == default ? DateOnly.FromDateTime(DateTime.UtcNow) : request.PurchaseDate;
         var currencyCode = await GetCurrencyCodeAsync(ct);
+        await using var tx = await context.Database.BeginTransactionAsync(ct);
         var purchase = new Purchase
         {
-            PurchaseNumber = DocumentNumber("PUR"),
+            PurchaseNumber = await NextDocumentNumberAsync(isPurchase: true, ct),
             SupplierId = request.SupplierId,
             PurchaseDate = purchaseDate,
             Status = PurchaseStatus.Received,
             Subtotal = subtotal,
-            Discount = request.Discount,
+            Discount = effectiveDiscount,
+            DiscountPercent = request.DiscountPercent,
+            SecondaryDiscountPercent = request.SecondaryDiscountPercent,
             Tax = request.Tax,
             OtherCost = request.OtherCost,
             Total = total,
@@ -380,7 +460,13 @@ public sealed class OperationsService(
                 SelectedUnitName = line.Unit.UnitName,
                 UnitConversionFactor = line.Unit.ConversionFactor,
                 EnteredUnitCost = line.Request.UnitCost,
-                LineTotal = line.Request.Quantity * line.Request.UnitCost,
+                LineTotal = StackedNet(
+                    line.Request.Quantity * line.Request.UnitCost,
+                    line.Request.DiscountPercent,
+                    line.Request.SecondaryDiscountPercent),
+                BonusQuantity = line.Request.BonusQuantity,
+                DiscountPercent = line.Request.DiscountPercent,
+                SecondaryDiscountPercent = line.Request.SecondaryDiscountPercent,
                 LotNumber = Clean(line.Request.LotNumber),
                 ExpireDate = line.Request.ExpireDate
             });
@@ -388,7 +474,6 @@ public sealed class OperationsService(
         if (request.PaidAmount > 0)
             purchase.Payments.Add(NewPurchasePayment(request.PaidAmount, purchaseDate, request.PaymentMethod, request.PaymentReferenceNumber, "Initial purchase payment", userId));
 
-        await using var tx = await context.Database.BeginTransactionAsync(ct);
         context.Purchases.Add(purchase);
         await context.SaveChangesAsync(ct);
         var warehouse = await context.Warehouses
@@ -400,15 +485,27 @@ public sealed class OperationsService(
 
         foreach (var line in normalizedItems)
         {
-            var lot = await AddOrMergeInventoryLotAsync(
-                line.Request.ProductId,
-                warehouse.Id,
-                Clean(line.Request.LotNumber) ?? purchase.PurchaseNumber,
-                line.Request.ExpireDate,
-                line.BaseQuantity,
-                line.BaseUnitCost,
-                ct);
-            lot.Warehouse = warehouse;
+            var inventory = context.ProductInventories.Local.FirstOrDefault(item => item.ProductId == line.Request.ProductId)
+                ?? await context.ProductInventories.SingleOrDefaultAsync(item => item.ProductId == line.Request.ProductId, ct);
+            var negativeDeficit = Math.Max(0, -(inventory?.Quantity ?? 0));
+            // Stock sold before it was purchased already exists as a negative
+            // inventory balance. The matching part of this receipt settles that
+            // deficit and must not also become a sellable lot.
+            var lotQuantity = Math.Max(0, line.BaseQuantity - negativeDeficit);
+            var allocations = new List<InventoryLotAllocation>();
+            if (lotQuantity > 0)
+            {
+                var lot = await AddOrMergeInventoryLotAsync(
+                    line.Request.ProductId,
+                    warehouse.Id,
+                    Clean(line.Request.LotNumber) ?? purchase.PurchaseNumber,
+                    line.Request.ExpireDate,
+                    lotQuantity,
+                    line.BaseUnitCost,
+                    ct);
+                lot.Warehouse = warehouse;
+                allocations.Add(new InventoryLotAllocation(lot, lotQuantity));
+            }
             await ApplyStockMovement(
                 line.Request.ProductId,
                 line.BaseQuantity,
@@ -417,8 +514,9 @@ public sealed class OperationsService(
                 purchase.Id,
                 purchase.PurchaseNumber,
                 userId,
-                line.Request.ExpireDate,
-                [new InventoryLotAllocation(lot, line.BaseQuantity)],
+                lotQuantity > 0 ? line.Request.ExpireDate : null,
+                allocations,
+                false,
                 ct);
         }
         await context.SaveChangesAsync(ct);
@@ -484,7 +582,7 @@ public sealed class OperationsService(
                 CustomerPhone = x.Customer != null ? x.Customer.Phone : x.CustomerPhone,
                 ItemCount = x.Items.Count, x.Total, x.PaidAmount,
                 RemainingAmount = x.Total > x.PaidAmount ? x.Total - x.PaidAmount : 0,
-                x.PaymentStatus, x.CreatedAt,
+                x.PaymentStatus, x.CreatedAt, x.CurrencyCode,
                 NetSales = x.Subtotal > x.Discount ? x.Subtotal - x.Discount : 0,
                 CostOfGoods = x.Items.Sum(item => (decimal?)(item.Quantity * item.UnitCost)) ?? 0
             })
@@ -496,7 +594,7 @@ public sealed class OperationsService(
             var margin = x.NetSales > 0 ? decimal.Round(grossProfit / x.NetSales * 100m, 2) : 0;
             return new InventorySaleListItem(
                 x.Id, x.SaleNumber, x.ReferenceNumber, x.SaleDate, x.CustomerName, x.CustomerPhone,
-                WhatsAppLinkBuilder.BuildSale(x.CustomerPhone, x.CustomerName, x.SaleNumber, _whatsAppOptions),
+                WhatsAppLinkBuilder.BuildSale(x.CustomerPhone, x.CustomerName, x.SaleNumber, x.Total, x.PaidAmount, x.RemainingAmount, x.CurrencyCode, _whatsAppOptions),
                 x.ItemCount, x.Total, x.PaidAmount, x.RemainingAmount, x.PaymentStatus, x.CostOfGoods, grossProfit, margin, x.CreatedAt);
         }).ToList();
 
@@ -557,14 +655,29 @@ public sealed class OperationsService(
 
         await EnsureLineLimitAsync(request.Items.Count, isPurchase: false, canOverrideLineLimits, ct);
         if (request.Items.Count == 0) throw new ArgumentException("At least one sale item is required.");
-        if (request.Items.Any(x => x.ProductId <= 0 || x.Quantity <= 0 || x.UnitPrice < 0)) throw new ArgumentException("Every sale item requires a product, positive quantity, and non-negative price.");
+        if (request.Items.Any(x => x.ProductId <= 0 || x.Quantity <= 0 || x.BonusQuantity < 0 || x.UnitPrice < 0)) throw new ArgumentException("Every sale item requires a product, positive quantity, non-negative bonus, and non-negative price.");
         if (request.Discount < 0 || request.Tax < 0) throw new ArgumentException("Discount and tax cannot be negative.");
+        ValidatePercentage(request.DiscountPercent, "Sale discount");
+        ValidatePercentage(request.SecondaryDiscountPercent, "Secondary sale discount");
+        foreach (var item in request.Items)
+        {
+            ValidatePercentage(item.DiscountPercent, "Line discount");
+            ValidatePercentage(item.SecondaryDiscountPercent, "Secondary line discount");
+        }
         EnsureNoDuplicateProducts(request.Items.Select(item => item.ProductId), "sale");
 
         var items = request.Items.ToList();
         var productIds = items.Select(item => item.ProductId).Distinct().ToArray();
         var products = await LoadProductsForUnitsAsync(productIds, ct);
         EnsureAllProductsExist(productIds, products);
+        var salesSettings = await context.CompanySettings.AsNoTracking()
+            .Select(x => new SalesPolicySettings(
+                x.GeneralSalesDiscountPercent,
+                x.MaximumCustomerDebt,
+                x.DefaultDebtDueDays,
+                x.AllowNegativeStockSales))
+            .SingleOrDefaultAsync(ct)
+            ?? new SalesPolicySettings(0, 300000, 30, false);
         var expiredAvailableByProduct = await InventoryAvailability.LoadExpiredAvailableByProductAsync(
             context,
             productIds,
@@ -574,7 +687,7 @@ public sealed class OperationsService(
         {
             var product = products[item.ProductId];
             var selectedUnit = ResolveOperationUnit(product, item.UnitId);
-            var baseQuantity = decimal.Round(item.Quantity * selectedUnit.ConversionFactor, 3, MidpointRounding.AwayFromZero);
+            var baseQuantity = decimal.Round((item.Quantity + item.BonusQuantity) * selectedUnit.ConversionFactor, 3, MidpointRounding.AwayFromZero);
             var baseUnitPrice = decimal.Round(item.UnitPrice / selectedUnit.ConversionFactor, 4, MidpointRounding.AwayFromZero);
             if (baseQuantity <= 0)
                 throw new ArgumentException($"The quantity for '{product.Name}' is too small for base-unit precision.");
@@ -586,8 +699,9 @@ public sealed class OperationsService(
                         product.Inventory.Quantity,
                         product.Inventory.ReservedQuantity,
                         expiredAvailableByProduct.GetValueOrDefault(product.Id));
-            ValidateSaleQuantity(product, baseQuantity, selectedUnit, availableBaseQuantity);
-            return new NormalizedSaleLine(item, product, selectedUnit, baseQuantity, baseUnitPrice);
+            if (!salesSettings.AllowNegativeStockSales)
+                ValidateSaleQuantity(product, baseQuantity, selectedUnit, availableBaseQuantity);
+            return new NormalizedSaleLine(item, product, selectedUnit, baseQuantity, baseUnitPrice, availableBaseQuantity);
         }).ToList();
 
         // Display-stock products do not mutate inventory, but an existing base-unit
@@ -596,41 +710,82 @@ public sealed class OperationsService(
 
         string? registeredCustomerName = null;
         string? registeredCustomerPhone = null;
+        API.Entities.Customers.Customer? registeredCustomer = null;
         if (request.CustomerId.HasValue)
         {
-            var customer = await context.Customers
+            registeredCustomer = await context.Customers
                 .Where(x => x.Id == request.CustomerId &&
                     (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value))
-                .Select(x => new { Name = (x.FirstName + " " + (x.LastName ?? "")).Trim(), x.Phone })
                 .SingleOrDefaultAsync(ct);
-            if (customer is null) throw new ArgumentException("Customer not found.");
-            registeredCustomerName = customer.Name;
-            registeredCustomerPhone = customer.Phone;
+            if (registeredCustomer is null) throw new ArgumentException("Customer not found.");
+            registeredCustomerName = (registeredCustomer.FirstName + " " + (registeredCustomer.LastName ?? "")).Trim();
+            registeredCustomerPhone = registeredCustomer.Phone;
         }
 
         var subtotal = normalizedItems.Sum(line => line.Request.Quantity * line.Request.UnitPrice);
-        var total = Math.Max(0, subtotal - request.Discount + request.Tax);
-        ValidateInitialPayment(request.PaidAmount, total);
+        var linesNet = normalizedItems.Sum(line => StackedNet(
+            line.Request.Quantity * line.Request.UnitPrice,
+            line.Request.DiscountPercent,
+            line.Request.SecondaryDiscountPercent));
+        var primaryDiscountPercent = request.DiscountPercent > 0
+            ? request.DiscountPercent
+            : salesSettings.GeneralSalesDiscountPercent;
+        var documentNet = StackedNet(linesNet, primaryDiscountPercent, request.SecondaryDiscountPercent);
+        var effectiveDiscount = Math.Min(subtotal, subtotal - documentNet + request.Discount);
+        var total = Math.Max(0, subtotal - effectiveDiscount + request.Tax);
+        if (request.PaidAmount < 0)
+            throw new ArgumentException("Paid amount cannot be negative.");
+        if (registeredCustomer is null && request.PaidAmount > total)
+            throw new ArgumentException("Only a registered customer can keep an overpayment as account credit.");
         var saleDate = request.SaleDate == default ? DateOnly.FromDateTime(DateTime.UtcNow) : request.SaleDate;
+        var customerCreditApplied = registeredCustomer is not null && request.UseCustomerCredit
+            ? Math.Min(registeredCustomer.AccountCredit, Math.Max(0, total - request.PaidAmount))
+            : 0;
+        var customerCreditCreated = registeredCustomer is not null
+            ? Math.Max(0, request.PaidAmount - total)
+            : 0;
+        var effectivePaidAmount = request.PaidAmount + customerCreditApplied;
+        var remainingDebt = Math.Max(0, total - effectivePaidAmount);
+        if (registeredCustomer is not null)
+        {
+            var existingDebt = await context.InventorySales.AsNoTracking()
+                .Where(x => x.CustomerId == registeredCustomer.Id && x.Total > x.PaidAmount)
+                .SumAsync(x => (decimal?)(x.Total - x.PaidAmount), ct) ?? 0;
+            var debtLimit = registeredCustomer.CreditLimit ?? salesSettings.MaximumCustomerDebt;
+            if (existingDebt + remainingDebt > debtLimit)
+                throw new InvalidOperationException(
+                    $"This sale would raise the customer's debt to {existingDebt + remainingDebt:0.00}, above the allowed limit of {debtLimit:0.00}.");
+            registeredCustomer.AccountCredit = Math.Max(
+                0,
+                registeredCustomer.AccountCredit - customerCreditApplied + customerCreditCreated);
+        }
         var currencyCode = await GetCurrencyCodeAsync(ct);
+        await using var tx = await context.Database.BeginTransactionAsync(ct);
         var sale = new InventorySale
         {
-            SaleNumber = DocumentNumber("SAL"),
+            SaleNumber = await NextDocumentNumberAsync(isPurchase: false, ct),
             CustomerId = request.CustomerId,
             CustomerName = registeredCustomerName ?? Clean(request.CustomerName),
             CustomerPhone = registeredCustomerPhone ?? Clean(request.CustomerPhone),
             SaleDate = saleDate,
             PaymentMethod = PaymentMethod(request.PaymentMethod),
             Subtotal = subtotal,
-            Discount = request.Discount,
+            Discount = effectiveDiscount,
+            DiscountPercent = primaryDiscountPercent,
+            SecondaryDiscountPercent = request.SecondaryDiscountPercent,
             Tax = request.Tax,
             Total = total,
-            PaidAmount = request.PaidAmount,
+            PaidAmount = effectivePaidAmount,
             CurrencyCode = currencyCode,
-            PaymentStatus = PaymentStatus(request.PaidAmount, total),
+            PaymentStatus = PaymentStatus(effectivePaidAmount, total),
             ReferenceNumber = Clean(request.ReferenceNumber),
             ClientRequestId = clientRequestId,
             Notes = Clean(request.Notes),
+            DebtDueDate = remainingDebt > 0
+                ? request.DebtDueDate ?? saleDate.AddDays(registeredCustomer?.DebtDueDays ?? salesSettings.DefaultDebtDueDays)
+                : null,
+            CustomerCreditApplied = customerCreditApplied,
+            CustomerCreditCreated = customerCreditCreated,
             CreatedByUserId = userId
         };
 
@@ -646,13 +801,20 @@ public sealed class OperationsService(
                 SelectedUnitName = line.Unit.UnitName,
                 UnitConversionFactor = line.Unit.ConversionFactor,
                 EnteredUnitPrice = line.Request.UnitPrice,
-                LineTotal = line.Request.Quantity * line.Request.UnitPrice
+                LineTotal = StackedNet(
+                    line.Request.Quantity * line.Request.UnitPrice,
+                    line.Request.DiscountPercent,
+                    line.Request.SecondaryDiscountPercent),
+                BonusQuantity = line.Request.BonusQuantity,
+                DiscountPercent = line.Request.DiscountPercent,
+                SecondaryDiscountPercent = line.Request.SecondaryDiscountPercent
             });
 
         if (request.PaidAmount > 0)
             sale.Payments.Add(NewSalePayment(request.PaidAmount, saleDate, request.PaymentMethod, request.PaymentReferenceNumber, "Initial sale payment", userId));
+        if (customerCreditApplied > 0)
+            sale.Payments.Add(NewSalePayment(customerCreditApplied, saleDate, "Account credit", null, "Applied customer account credit", userId));
 
-        await using var tx = await context.Database.BeginTransactionAsync(ct);
         context.InventorySales.Add(sale);
         await context.SaveChangesAsync(ct);
         foreach (var line in normalizedItems)
@@ -660,10 +822,12 @@ public sealed class OperationsService(
             if (line.Product.UsesDisplayStock)
                 continue;
 
-            var allocations = await lotAllocator.ConsumeFefoAsync(
-                line.Request.ProductId,
-                line.BaseQuantity,
-                ct);
+            var allocationQuantity = salesSettings.AllowNegativeStockSales
+                ? Math.Min(line.BaseQuantity, Math.Max(0, line.AvailableBaseQuantity))
+                : line.BaseQuantity;
+            IReadOnlyList<InventoryLotAllocation> allocations = allocationQuantity > 0
+                ? await lotAllocator.ConsumeFefoAsync(line.Request.ProductId, allocationQuantity, ct)
+                : [];
             await ApplyStockMovement(
                 line.Request.ProductId,
                 -line.BaseQuantity,
@@ -674,6 +838,7 @@ public sealed class OperationsService(
                 userId,
                 null,
                 allocations,
+                salesSettings.AllowNegativeStockSales,
                 ct);
         }
         await context.SaveChangesAsync(ct);
@@ -701,9 +866,16 @@ public sealed class OperationsService(
             .SingleOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Sale not found.");
         var remaining = Math.Max(0, sale.Total - sale.PaidAmount);
-        if (request.Amount > remaining) throw new ArgumentException($"Payment cannot exceed the remaining balance of {remaining:0.00}.");
+        var creditCreated = Math.Max(0, request.Amount - remaining);
+        if (creditCreated > 0 && sale.Customer is null)
+            throw new ArgumentException($"Payment cannot exceed the remaining balance of {remaining:0.00} for a walk-in customer.");
         sale.Payments.Add(NewSalePayment(request.Amount, PaymentDate(request.PaymentDate), request.PaymentMethod, request.ReferenceNumber, request.Notes, userId));
         sale.PaidAmount += request.Amount;
+        if (sale.Customer is not null && creditCreated > 0)
+        {
+            sale.Customer.AccountCredit += creditCreated;
+            sale.CustomerCreditCreated += creditCreated;
+        }
         sale.PaymentStatus = PaymentStatus(sale.PaidAmount, sale.Total);
         sale.PaymentMethod = PaymentMethod(request.PaymentMethod);
         await context.SaveChangesAsync(ct);
@@ -714,7 +886,7 @@ public sealed class OperationsService(
 
     public async Task<IReadOnlyList<StaffResponse>> GetStaffAsync(CancellationToken ct) =>
         await context.StaffMembers.AsNoTracking().Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value).OrderByDescending(x => x.IsActive).ThenBy(x => x.FullName)
-            .Select(x => new StaffResponse(x.Id, x.EmployeeNumber, x.FullName, x.Phone, x.Email, x.Position, x.Department, x.HireDate, x.BaseSalary, x.IsActive, x.Address, x.Notes)).ToListAsync(ct);
+            .Select(x => new StaffResponse(x.Id, x.EmployeeNumber, x.FullName, x.Phone, x.Email, x.Position, x.Department, x.HireDate, x.BaseSalary, x.IsActive, x.Address, x.Notes, x.Email != null && context.Users.Any(user => user.Email == x.Email))).ToListAsync(ct);
 
     public async Task<PagedResult<StaffResponse>> GetStaffPageAsync(string? search, int page, int pageSize, CancellationToken ct)
     {
@@ -729,7 +901,7 @@ public sealed class OperationsService(
         var totalCount = await query.CountAsync(ct);
         var items = await query.OrderByDescending(x => x.IsActive).ThenBy(x => x.FullName)
             .Skip((page - 1) * pageSize).Take(pageSize)
-            .Select(x => new StaffResponse(x.Id, x.EmployeeNumber, x.FullName, x.Phone, x.Email, x.Position, x.Department, x.HireDate, x.BaseSalary, x.IsActive, x.Address, x.Notes))
+            .Select(x => new StaffResponse(x.Id, x.EmployeeNumber, x.FullName, x.Phone, x.Email, x.Position, x.Department, x.HireDate, x.BaseSalary, x.IsActive, x.Address, x.Notes, x.Email != null && context.Users.Any(user => user.Email == x.Email)))
             .ToListAsync(ct);
         return new PagedResult<StaffResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
     }
@@ -762,7 +934,7 @@ public sealed class OperationsService(
         entity.Address = Clean(request.Address);
         entity.Notes = Clean(request.Notes);
         await context.SaveChangesAsync(ct);
-        return MapStaff(entity);
+        return MapStaff(entity, entity.Email is not null && await context.Users.AnyAsync(user => user.Email == entity.Email, ct));
     }
 
     public async Task DeleteStaffAsync(long id, CancellationToken ct)
@@ -917,6 +1089,72 @@ public sealed class OperationsService(
         return new ExpenseResponse(entity.Id, entity.ExpenseDate, category.Id, category.Name, entity.Amount, entity.Vendor, entity.PaymentMethod, entity.ReferenceNumber, entity.Description, entity.CreatedAt);
     }
 
+    public async Task<PagedResult<JournalVoucherResponse>> GetJournalVouchersAsync(int page, int pageSize, CancellationToken ct)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 10, 100);
+        var query = context.JournalVouchers.AsNoTracking()
+            .Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value);
+        var totalCount = await query.CountAsync(ct);
+        var items = await query.OrderByDescending(x => x.VoucherDate).ThenByDescending(x => x.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(x => new JournalVoucherResponse(
+                x.Id, x.VoucherNumber, x.VoucherDate, x.CurrencyCode, x.Memo, x.TotalDebit, x.TotalCredit, x.CreatedAt,
+                x.Lines.OrderBy(line => line.Id).Select(line => new JournalVoucherLineResponse(line.Id, line.AccountCode, line.AccountName, line.Description, line.Debit, line.Credit)).ToList()))
+            .ToListAsync(ct);
+        return new PagedResult<JournalVoucherResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
+    }
+
+    public async Task<JournalVoucherResponse> CreateJournalVoucherAsync(CreateJournalVoucherRequest request, string? userId, CancellationToken ct)
+    {
+        RequireText(request.Memo, "Voucher memo");
+        if (request.Lines.Count is < 2 or > 200)
+            throw new ArgumentException("A journal voucher requires between 2 and 200 account lines.");
+
+        foreach (var (line, index) in request.Lines.Select((line, index) => (line, index)))
+        {
+            RequireText(line.AccountCode, $"Account code on line {index + 1}");
+            RequireText(line.AccountName, $"Account name on line {index + 1}");
+            if (line.Debit < 0 || line.Credit < 0 || (line.Debit > 0) == (line.Credit > 0))
+                throw new ArgumentException($"Line {index + 1} must contain either a positive debit or a positive credit, not both.");
+        }
+
+        var debit = decimal.Round(request.Lines.Sum(line => line.Debit), 2, MidpointRounding.AwayFromZero);
+        var credit = decimal.Round(request.Lines.Sum(line => line.Credit), 2, MidpointRounding.AwayFromZero);
+        if (debit <= 0 || Math.Abs(debit - credit) > 0.009m)
+            throw new ArgumentException($"The voucher is not balanced. Debit is {debit:N2} and credit is {credit:N2}.");
+
+        var requestedNumber = Clean(request.ReferenceNumber);
+        var voucherNumber = requestedNumber ?? DocumentNumber("JV");
+        if (await context.JournalVouchers.AnyAsync(item => item.VoucherNumber == voucherNumber, ct))
+            throw new ArgumentException("This voucher number already exists.");
+
+        var entity = new JournalVoucher
+        {
+            VoucherNumber = voucherNumber,
+            VoucherDate = request.VoucherDate == default ? DateOnly.FromDateTime(DateTime.UtcNow) : request.VoucherDate,
+            CurrencyCode = await GetCurrencyCodeAsync(ct),
+            Memo = request.Memo.Trim(),
+            TotalDebit = debit,
+            TotalCredit = credit,
+            CreatedByUserId = userId,
+            Lines = request.Lines.Select(line => new JournalVoucherLine
+            {
+                AccountCode = line.AccountCode.Trim(),
+                AccountName = line.AccountName.Trim(),
+                Description = Clean(line.Description),
+                Debit = decimal.Round(line.Debit, 2, MidpointRounding.AwayFromZero),
+                Credit = decimal.Round(line.Credit, 2, MidpointRounding.AwayFromZero)
+            }).ToList()
+        };
+        context.JournalVouchers.Add(entity);
+        await context.SaveChangesAsync(ct);
+        return new JournalVoucherResponse(
+            entity.Id, entity.VoucherNumber, entity.VoucherDate, entity.CurrencyCode, entity.Memo,
+            entity.TotalDebit, entity.TotalCredit, entity.CreatedAt,
+            entity.Lines.Select(line => new JournalVoucherLineResponse(line.Id, line.AccountCode, line.AccountName, line.Description, line.Debit, line.Credit)).ToList());
+    }
+
 
     private async Task<Dictionary<long, Product>> LoadProductsForUnitsAsync(long[] productIds, CancellationToken ct) =>
         await context.Products
@@ -1005,13 +1243,36 @@ public sealed class OperationsService(
 
     private sealed record SelectedOperationUnit(long? UnitId, string UnitName, decimal ConversionFactor);
     private sealed record NormalizedPurchaseLine(PurchaseItemRequest Request, Product Product, SelectedOperationUnit Unit, decimal BaseQuantity, decimal BaseUnitCost);
-    private sealed record NormalizedSaleLine(InventorySaleItemRequest Request, Product Product, SelectedOperationUnit Unit, decimal BaseQuantity, decimal BaseUnitPrice);
+    private sealed record NormalizedSaleLine(InventorySaleItemRequest Request, Product Product, SelectedOperationUnit Unit, decimal BaseQuantity, decimal BaseUnitPrice, decimal AvailableBaseQuantity);
+    private sealed record SalesPolicySettings(decimal GeneralSalesDiscountPercent, decimal MaximumCustomerDebt, int DefaultDebtDueDays, bool AllowNegativeStockSales);
 
 
     private async Task<string> GetCurrencyCodeAsync(CancellationToken ct) =>
         await context.CompanySettings.AsNoTracking()
             .Select(item => item.MainCurrencyCode)
             .FirstOrDefaultAsync(ct) ?? "USD";
+
+    private async Task<string> NextDocumentNumberAsync(bool isPurchase, CancellationToken ct)
+    {
+        var settings = await context.CompanySettings
+            .FromSqlRaw("SELECT * FROM [CompanySettings] WITH (UPDLOCK, ROWLOCK)")
+            .SingleOrDefaultAsync(ct);
+        if (settings is null)
+            return DocumentNumber(isPurchase ? "PUR" : "SAL");
+
+        var prefix = isPurchase ? settings.PurchaseNumberPrefix : settings.SaleNumberPrefix;
+        var number = isPurchase ? settings.NextPurchaseNumber : settings.NextSaleNumber;
+        var increment = isPurchase ? settings.PurchaseNumberIncrement : settings.SaleNumberIncrement;
+        number = Math.Max(1, number);
+        increment = Math.Max(1, increment);
+
+        if (isPurchase)
+            settings.NextPurchaseNumber = checked(number + increment);
+        else
+            settings.NextSaleNumber = checked(number + increment);
+        settings.UpdatedAt = DateTime.UtcNow;
+        return $"{prefix.Trim().ToUpperInvariant()}-{number:D8}";
+    }
 
     private async Task<InventoryLot> AddOrMergeInventoryLotAsync(
         long productId,
@@ -1083,18 +1344,19 @@ public sealed class OperationsService(
         string? userId,
         DateOnly? expireDate,
         IReadOnlyList<InventoryLotAllocation> allocations,
+        bool allowNegative,
         CancellationToken ct)
     {
         var inventory = await context.ProductInventories.SingleOrDefaultAsync(x => x.ProductId == productId, ct);
         if (inventory is null)
         {
-            if (delta < 0) throw new InvalidOperationException("This product has no stock available.");
+            if (delta < 0 && !allowNegative) throw new InvalidOperationException("This product has no stock available.");
             inventory = new ProductInventory { ProductId = productId, Quantity = 0, ReservedQuantity = 0, MinimumQuantity = 0 };
             context.ProductInventories.Add(inventory);
         }
         var beforeQuantity = inventory.Quantity;
         var beforeReserved = inventory.ReservedQuantity;
-        if (delta < 0 && inventory.Quantity - inventory.ReservedQuantity < -delta) throw new InvalidOperationException("Insufficient available stock for one or more sale items.");
+        if (!allowNegative && delta < 0 && inventory.Quantity - inventory.ReservedQuantity < -delta) throw new InvalidOperationException("Insufficient available stock for one or more sale items.");
         inventory.Quantity += delta;
         if (expireDate.HasValue && (!inventory.ExpireDate.HasValue || expireDate.Value < inventory.ExpireDate.Value)) inventory.ExpireDate = expireDate;
         var inventoryTransaction = new InventoryTransaction
@@ -1204,8 +1466,29 @@ public sealed class OperationsService(
     private static void ValidatePurchase(CreatePurchaseRequest request)
     {
         if (request.Items.Count == 0) throw new ArgumentException("At least one purchase item is required.");
-        if (request.Items.Any(x => x.ProductId <= 0 || x.Quantity <= 0 || x.UnitCost < 0)) throw new ArgumentException("Every purchase item requires a product, positive quantity, and non-negative cost.");
+        if (request.Items.Any(x => x.ProductId <= 0 || x.Quantity <= 0 || x.BonusQuantity < 0 || x.UnitCost < 0)) throw new ArgumentException("Every purchase item requires a product, positive quantity, non-negative bonus, and non-negative cost.");
         if (request.Discount < 0 || request.Tax < 0 || request.OtherCost < 0) throw new ArgumentException("Discount, tax, and other costs cannot be negative.");
+        ValidatePercentage(request.DiscountPercent, "Purchase discount");
+        ValidatePercentage(request.SecondaryDiscountPercent, "Secondary purchase discount");
+        foreach (var item in request.Items)
+        {
+            ValidatePercentage(item.DiscountPercent, "Line discount");
+            ValidatePercentage(item.SecondaryDiscountPercent, "Secondary line discount");
+        }
+    }
+
+    private static void ValidatePercentage(decimal value, string name)
+    {
+        if (value is < 0 or > 100)
+            throw new ArgumentException($"{name} must be between 0 and 100 percent.");
+    }
+
+    private static decimal StackedNet(decimal amount, decimal firstPercent, decimal secondPercent)
+    {
+        ValidatePercentage(firstPercent, "Discount");
+        ValidatePercentage(secondPercent, "Secondary discount");
+        var afterFirst = amount * (1 - firstPercent / 100m);
+        return decimal.Round(afterFirst * (1 - secondPercent / 100m), 2, MidpointRounding.AwayFromZero);
     }
 
     private static void ValidateInitialPayment(decimal paid, decimal total)
@@ -1246,6 +1529,10 @@ public sealed class OperationsService(
                 customerPhone,
                 cleanName,
                 x.SaleNumber,
+                x.Total,
+                x.PaidAmount,
+                Math.Max(0, x.Total - x.PaidAmount),
+                x.CurrencyCode,
                 _whatsAppOptions),
             x.Items.Count,
             x.Total,
@@ -1260,8 +1547,8 @@ public sealed class OperationsService(
             x.CreatedAt);
     }
     private static SalaryPaymentResponse MapSalary(StaffSalaryPayment x, string staffName) => new(x.Id, x.StaffId, staffName, x.PeriodYear, x.PeriodMonth, x.BaseSalary, x.Bonus, x.Deduction, x.NetAmount, x.PaidAmount, Math.Max(0, x.NetAmount - x.PaidAmount), x.PaymentStatus, x.PaidDate, x.PaymentMethod, x.ReferenceNumber, x.CreatedAt);
-    private static StaffResponse MapStaff(Staff x) => new(x.Id, x.EmployeeNumber, x.FullName, x.Phone, x.Email, x.Position, x.Department, x.HireDate, x.BaseSalary, x.IsActive, x.Address, x.Notes);
-    private static SupplierResponse MapSupplier(Supplier x) => new(x.Id, x.Name, x.ContactPerson, x.Phone, x.Email, x.Address, x.TaxNumber, x.IsActive);
+    private static StaffResponse MapStaff(Staff x, bool isSystemUser) => new(x.Id, x.EmployeeNumber, x.FullName, x.Phone, x.Email, x.Position, x.Department, x.HireDate, x.BaseSalary, x.IsActive, x.Address, x.Notes, isSystemUser);
+    private static SupplierResponse MapSupplier(Supplier x) => new(x.Id, x.Name, x.ContactPerson, x.Phone, x.Email, x.Address, x.TaxNumber, x.IsActive, 0);
 
     private static DocumentPaymentStatus PaymentStatus(decimal paid, decimal total) =>
         total <= 0 || paid >= total

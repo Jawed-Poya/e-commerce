@@ -23,6 +23,12 @@ public sealed class BulkUpdateProductItemRequest
     [StringLength(100)]
     public string? Strength { get; set; }
 
+    [StringLength(200)]
+    public string? GenericName { get; set; }
+
+    [StringLength(500)]
+    public string? Formula { get; set; }
+
     public IFormFile? Image { get; set; }
 
     [MaxLength(10, ErrorMessage = "A maximum of 10 gallery images can be added at once.")]

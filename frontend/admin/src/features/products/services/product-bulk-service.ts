@@ -5,6 +5,7 @@ import type {
     ProductLookups,
 } from "../types/product-bulk-types";
 import apiClient from "@/api/api-client";
+import { prepareProductImage } from "@/lib/image-files";
 
 function appendOptionalValue(
     formData: FormData,
@@ -25,10 +26,10 @@ function appendOptionalValue(
     formData.append(key, normalizedValue);
 }
 
-function createProductsFormData(request: CreateBulkProductsRequest): FormData {
+async function createProductsFormData(request: CreateBulkProductsRequest): Promise<FormData> {
     const formData = new FormData();
 
-    request.products.forEach((product, index) => {
+    for (const [index, product] of request.products.entries()) {
         const prefix = `Products[${index}]`;
 
         if (!(product.image instanceof File)) {
@@ -43,8 +44,12 @@ function createProductsFormData(request: CreateBulkProductsRequest): FormData {
             );
         }
 
-        formData.append(`${prefix}.Image`, product.image, product.image.name);
-        product.galleryImages.forEach((image) =>
+        const primaryImage = await prepareProductImage(product.image);
+        const galleryImages = await Promise.all(
+            product.galleryImages.map(prepareProductImage),
+        );
+        formData.append(`${prefix}.Image`, primaryImage, primaryImage.name);
+        galleryImages.forEach((image) =>
             formData.append(`${prefix}.GalleryImages`, image, image.name),
         );
 
@@ -58,6 +63,8 @@ function createProductsFormData(request: CreateBulkProductsRequest): FormData {
 
         appendOptionalValue(formData, `${prefix}.Barcode`, product.barcode);
         appendOptionalValue(formData, `${prefix}.Strength`, product.strength);
+        appendOptionalValue(formData, `${prefix}.GenericName`, product.genericName);
+        appendOptionalValue(formData, `${prefix}.Formula`, product.formula);
 
         appendOptionalValue(
             formData,
@@ -129,7 +136,7 @@ function createProductsFormData(request: CreateBulkProductsRequest): FormData {
             formData.append(`${unitPrefix}.IsActive`, String(unit.isActive));
             formData.append(`${unitPrefix}.SortOrder`, String(unit.sortOrder));
         });
-    });
+    }
 
     return formData;
 }
@@ -145,7 +152,7 @@ export const ProductService = {
     async CreateBulk(
         request: CreateBulkProductsRequest,
     ): Promise<ApiResponse<CreatedProduct[]>> {
-        const formData = createProductsFormData(request);
+        const formData = await createProductsFormData(request);
 
         const response = await apiClient.post<ApiResponse<CreatedProduct[]>>(
             "/products/bulk",

@@ -36,6 +36,7 @@ import type {
 } from "@/features/operations/operations-types";
 import { useI18n } from "@/i18n/i18n-provider";
 import { cn } from "@/lib/utils";
+import { toFiniteNumber } from "@/lib/numbers";
 
 interface DocumentLinesProps {
     items: DocumentItem[];
@@ -45,6 +46,7 @@ interface DocumentLinesProps {
     canOverrideLineLimit: boolean;
     overrideLineLimit: boolean;
     onOverrideLineLimitChange: (enabled: boolean) => void;
+    allowNegativeStock?: boolean;
 }
 
 const emptyItem = createEmptyDocumentItem;
@@ -79,7 +81,7 @@ function currentUnit(item: DocumentItem) {
     );
 }
 
-function selectedBounds(item: DocumentItem, mode: "purchase" | "sale") {
+function selectedBounds(item: DocumentItem, mode: "purchase" | "sale", allowNegativeStock = false) {
     if (mode === "purchase") {
         return {
             minimum: 0.001,
@@ -91,7 +93,9 @@ function selectedBounds(item: DocumentItem, mode: "purchase" | "sale") {
     const unit = currentUnit(item);
     return {
         minimum: 0.001,
-        maximum:
+        maximum: allowNegativeStock
+            ? Number.POSITIVE_INFINITY
+            :
             unit?.availableQuantity ??
             product?.availableQuantity ??
             Number.MAX_SAFE_INTEGER,
@@ -102,14 +106,15 @@ function quantityError(
     item: DocumentItem,
     mode: "purchase" | "sale",
     translate: (value: string) => string,
+    allowNegativeStock = false,
 ) {
     const product = item.product;
     const unit = currentUnit(item);
     if (!product || !unit || item.quantity <= 0) return null;
 
-    const bounds = selectedBounds(item, mode);
+    const bounds = selectedBounds(item, mode, allowNegativeStock);
     if (item.quantity < bounds.minimum) {
-        return `${translate("Minimum quantity")}: ${bounds.minimum.toLocaleString(undefined, { maximumFractionDigits: 3 })} ${unit.unitName}.`;
+        return `${translate("Minimum quantity")}: ${toFiniteNumber(bounds.minimum).toLocaleString(undefined, { maximumFractionDigits: 3 })} ${unit.unitName}.`;
     }
 
     if (item.quantity > bounds.maximum) {
@@ -117,7 +122,7 @@ function quantityError(
             mode === "sale" && bounds.maximum === unit.availableQuantity
                 ? translate("Available quantity")
                 : translate("Maximum quantity");
-        return `${label}: ${bounds.maximum.toLocaleString(undefined, { maximumFractionDigits: 3 })} ${unit.unitName}.`;
+        return `${label}: ${toFiniteNumber(bounds.maximum).toLocaleString(undefined, { maximumFractionDigits: 3 })} ${unit.unitName}.`;
     }
 
     return null;
@@ -131,6 +136,7 @@ export function DocumentLines({
     canOverrideLineLimit,
     overrideLineLimit,
     onOverrideLineLimitChange,
+    allowNegativeStock = false,
 }: DocumentLinesProps) {
     const { formatMoney } = useCompany();
     const { tr } = useI18n();
@@ -151,7 +157,7 @@ export function DocumentLines({
         const ready = items.filter(
             (item) =>
                 isDocumentLineComplete(item) &&
-                !quantityError(item, mode, tr),
+                !quantityError(item, mode, tr, allowNegativeStock),
         ).length;
         const empty = items.filter(isDocumentLineEmpty).length;
         return {
@@ -159,11 +165,11 @@ export function DocumentLines({
             empty,
             incomplete: Math.max(0, items.length - ready - empty),
             total: items.reduce(
-                (sum, item) => sum + item.quantity * item.amount,
+                (sum, item) => sum + stackedLineTotal(item),
                 0,
             ),
         };
-    }, [items, mode, tr]);
+    }, [allowNegativeStock, items, mode, tr]);
 
     useEffect(() => {
         const index = pendingScrollIndexRef.current;
@@ -351,8 +357,8 @@ export function DocumentLines({
 
             <div ref={linesContainerRef} className="space-y-4">
                 {items.map((item, index) => {
-                    const lineTotal = item.quantity * item.amount;
-                    const validation = quantityError(item, mode, tr);
+                    const lineTotal = stackedLineTotal(item);
+                    const validation = quantityError(item, mode, tr, allowNegativeStock);
                     const baseState = getDocumentLineState(item);
                     const lineState = validation ? "incomplete" : baseState;
                     const unit = currentUnit(item);
@@ -361,7 +367,7 @@ export function DocumentLines({
                         : item.product
                           ? [fallbackUnit(item.product)]
                           : [];
-                    const bounds = selectedBounds(item, mode);
+                    const bounds = selectedBounds(item, mode, allowNegativeStock);
 
                     return (
                         <Card
@@ -435,6 +441,8 @@ export function DocumentLines({
                                                         tr("base units")}
                                                 </span>
                                             ) : null}
+                                            {item.product.genericName ? <span>{tr("Generic")}: {item.product.genericName}</span> : null}
+                                            {item.product.formula ? <span>{tr("Formula")}: {item.product.formula}</span> : null}
                                         </div>
                                     ) : (
                                         <p className="mt-1 text-xs text-muted-foreground">
@@ -513,7 +521,7 @@ export function DocumentLines({
                                                         )),
                                             );
                                         }}
-                                        getLabel={(product) => product.strength ? `${product.name} — ${product.strength}` : product.name}
+                                        getLabel={(product) => [product.name, product.strength, product.genericName].filter(Boolean).join(" — ")}
                                         getDescription={(product) => {
                                             const defaultSellingUnit =
                                                 defaultUnit(product);
@@ -617,6 +625,38 @@ export function DocumentLines({
                                         ) : null}
                                     </LineField>
 
+                                    <LineField label={tr("Bonus quantity")}>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            step="0.001"
+                                            value={item.bonusQuantity}
+                                            onChange={(event) => update(index, { bonusQuantity: Number(event.target.value) })}
+                                        />
+                                    </LineField>
+
+                                    <LineField label={tr("Discount %")}>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            step="0.01"
+                                            value={item.discountPercent}
+                                            onChange={(event) => update(index, { discountPercent: Number(event.target.value) })}
+                                        />
+                                    </LineField>
+
+                                    <LineField label={tr("Second discount %")}>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            step="0.01"
+                                            value={item.secondaryDiscountPercent}
+                                            onChange={(event) => update(index, { secondaryDiscountPercent: Number(event.target.value) })}
+                                        />
+                                    </LineField>
+
                                     <LineField
                                         label={`${mode === "purchase" ? tr("Unit cost") : tr("Unit price")} · ${unit?.unitName ?? tr("Unit")}`}
                                     >
@@ -691,6 +731,12 @@ export function DocumentLines({
             </div>
         </section>
     );
+}
+
+function stackedLineTotal(item: DocumentItem) {
+    const gross = item.quantity * item.amount;
+    const first = gross * (1 - Math.min(100, Math.max(0, item.discountPercent)) / 100);
+    return first * (1 - Math.min(100, Math.max(0, item.secondaryDiscountPercent)) / 100);
 }
 
 function LineStateBadge({

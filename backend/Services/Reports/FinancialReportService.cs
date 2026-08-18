@@ -87,19 +87,23 @@ public sealed class FinancialReportService(
             payrollQuery = payrollQuery.Where(item => item.BranchId == request.BranchId.Value);
         }
 
-        var onlineRevenue = await ordersQuery.SumAsync(item => (decimal?)item.Total, cancellationToken) ?? 0;
+        var onlineRevenue = await ordersQuery.Where(item => item.Status != OrderStatus.Returned)
+            .SumAsync(item => (decimal?)item.Total, cancellationToken) ?? 0;
         var manualRevenue = await salesQuery.SumAsync(item => (decimal?)item.Total, cancellationToken) ?? 0;
         var purchaseTotal = await purchasesQuery.SumAsync(item => (decimal?)item.Total, cancellationToken) ?? 0;
         var expenseTotal = await expensesQuery.SumAsync(item => (decimal?)item.Amount, cancellationToken) ?? 0;
         var payrollObligation = await payrollQuery.SumAsync(item => (decimal?)item.NetAmount, cancellationToken) ?? 0;
         var payrollPaidForDocuments = await payrollQuery.SumAsync(item => (decimal?)item.PaidAmount, cancellationToken) ?? 0;
-        var orderCount = await ordersQuery.CountAsync(cancellationToken);
+        var orderCount = await ordersQuery.CountAsync(item => item.Status != OrderStatus.Returned, cancellationToken);
+        var returnedOrderCount = await ordersQuery.CountAsync(item => item.Status == OrderStatus.Returned, cancellationToken);
+        var returnedOrderAmount = await ordersQuery.Where(item => item.Status == OrderStatus.Returned)
+            .SumAsync(item => (decimal?)item.Total, cancellationToken) ?? 0;
         var saleCount = await salesQuery.CountAsync(cancellationToken);
         var purchaseCount = await purchasesQuery.CountAsync(cancellationToken);
 
         var onlineCost = await context.OrderItems.AsNoTracking()
             .Where(item => item.Order.CreatedAt >= start && item.Order.CreatedAt <= end &&
-                item.Order.Status != OrderStatus.Cancelled && item.Order.Currency == selectedCurrency &&
+                item.Order.Status != OrderStatus.Cancelled && item.Order.Status != OrderStatus.Returned && item.Order.Currency == selectedCurrency &&
                 (!request.BranchId.HasValue || item.Order.BranchId == request.BranchId.Value))
             .SumAsync(item => (decimal?)(item.Quantity * item.UnitCost), cancellationToken) ?? 0;
         var manualCost = await context.InventorySaleItems.AsNoTracking()
@@ -241,6 +245,8 @@ public sealed class FinancialReportService(
             request.BranchId,
             selectedCurrency,
             cancellationToken);
+        var topCustomers = await GetTopCustomersAsync(ordersQuery, salesQuery, cancellationToken);
+        var topSuppliers = await GetTopSuppliersAsync(purchasesQuery, cancellationToken);
 
         var totalRevenue = onlineRevenue + manualRevenue;
         var grossProfit = totalRevenue - costOfGoodsSold;
@@ -273,6 +279,8 @@ public sealed class FinancialReportService(
             orderCount,
             saleCount,
             purchaseCount,
+            returnedOrderCount,
+            returnedOrderAmount,
             customerCount,
             productCount,
             lowStock,
@@ -280,6 +288,8 @@ public sealed class FinancialReportService(
             cashTrend,
             profitTrend,
             topProducts,
+            topCustomers,
+            topSuppliers,
             pagedLines,
             totalResults,
             page,
@@ -379,7 +389,7 @@ public sealed class FinancialReportService(
         var currency = NormalizeCurrency(currencyCode, await GetMainCurrencyAsync(cancellationToken));
 
         var onlineInvoices = await context.Orders.AsNoTracking()
-            .Where(item => item.CustomerId == customerId && item.Status != OrderStatus.Cancelled &&
+            .Where(item => item.CustomerId == customerId && item.Status != OrderStatus.Cancelled && item.Status != OrderStatus.Returned &&
                 item.Currency == currency && item.CreatedAt <= end)
             .Select(item => new
             {
@@ -541,7 +551,7 @@ public sealed class FinancialReportService(
         CancellationToken cancellationToken)
     {
         var onlineRows = await context.Orders.AsNoTracking()
-            .Where(item => item.CreatedAt <= end && item.Status != OrderStatus.Cancelled &&
+            .Where(item => item.CreatedAt <= end && item.Status != OrderStatus.Cancelled && item.Status != OrderStatus.Returned &&
                 item.Currency == currency && (!branchId.HasValue || item.BranchId == branchId.Value))
             .Select(item => new
             {
@@ -609,7 +619,7 @@ public sealed class FinancialReportService(
                     item.Total,
                     paid,
                     currency,
-                    "in",
+                    item.Status == OrderStatus.Returned ? "out" : "in",
                     item.BranchId,
                     branches);
             }));
@@ -783,7 +793,7 @@ public sealed class FinancialReportService(
         CancellationToken cancellationToken)
     {
         var online = await context.Orders.AsNoTracking()
-            .Where(item => item.Status != OrderStatus.Cancelled && item.Currency == currency &&
+            .Where(item => item.Status != OrderStatus.Cancelled && item.Status != OrderStatus.Returned && item.Currency == currency &&
                 item.CreatedAt >= start.ToDateTime(TimeOnly.MinValue) &&
                 item.CreatedAt < end.AddDays(1).ToDateTime(TimeOnly.MinValue) &&
                 (!branchId.HasValue || item.BranchId == branchId.Value))
@@ -853,14 +863,17 @@ public sealed class FinancialReportService(
     {
         var topOnline = await context.OrderItems.AsNoTracking()
             .Where(item => item.Order.CreatedAt >= start && item.Order.CreatedAt <= end &&
-                item.Order.Status != OrderStatus.Cancelled && item.Order.Currency == currency &&
+                item.Order.Status != OrderStatus.Cancelled && item.Order.Status != OrderStatus.Returned && item.Order.Currency == currency &&
                 (!branchId.HasValue || item.Order.BranchId == branchId.Value))
             .GroupBy(item => new { item.ProductId, item.Product.Name })
             .Select(group => new TopProductResponse(
                 group.Key.ProductId,
                 group.Key.Name,
                 group.Sum(item => item.Quantity),
-                group.Sum(item => (item.OrderedQuantity > 0 ? item.OrderedQuantity * item.SellingUnitPrice : item.Quantity * item.UnitPrice) - item.Discount + item.Tax)))
+                group.Sum(item => (item.OrderedQuantity > 0 ? item.OrderedQuantity * item.SellingUnitPrice : item.Quantity * item.UnitPrice) - item.Discount + item.Tax),
+                group.Sum(item => item.Quantity * item.UnitCost),
+                0,
+                0))
             .ToListAsync(cancellationToken);
         var topManual = await context.InventorySaleItems.AsNoTracking()
             .Where(item => item.InventorySale.SaleDate >= startOnly && item.InventorySale.SaleDate <= endOnly &&
@@ -871,21 +884,80 @@ public sealed class FinancialReportService(
                 group.Key.ProductId,
                 group.Key.Name,
                 group.Sum(item => item.Quantity),
-                group.Sum(item => item.LineTotal)))
+                group.Sum(item => item.LineTotal),
+                group.Sum(item => item.Quantity * item.UnitCost),
+                0,
+                0))
             .ToListAsync(cancellationToken);
 
         return topOnline
             .Concat(topManual)
             .GroupBy(item => new { item.ProductId, item.ProductName })
-            .Select(group => new TopProductResponse(
-                group.Key.ProductId,
-                group.Key.ProductName,
-                group.Sum(item => item.Quantity),
-                group.Sum(item => item.Revenue)))
+            .Select(group =>
+            {
+                var revenue = group.Sum(item => item.Revenue);
+                var cost = group.Sum(item => item.Cost);
+                var profit = revenue - cost;
+                return new TopProductResponse(
+                    group.Key.ProductId,
+                    group.Key.ProductName,
+                    group.Sum(item => item.Quantity),
+                    revenue,
+                    cost,
+                    profit,
+                    Percentage(profit, revenue));
+            })
             .OrderByDescending(item => item.Revenue)
             .Take(10)
             .ToArray();
     }
+
+    private static async Task<IReadOnlyCollection<BusinessPartyMetricResponse>> GetTopCustomersAsync(
+        IQueryable<Order> orders,
+        IQueryable<InventorySale> sales,
+        CancellationToken cancellationToken)
+    {
+        var online = await orders.Where(item => item.Status != OrderStatus.Returned)
+            .GroupBy(item => new { Id = (long?)item.CustomerId, Name = item.Customer.FirstName + " " + (item.Customer.LastName ?? "") })
+            .Select(group => new BusinessPartyMetricResponse(
+                group.Key.Id,
+                group.Key.Name,
+                group.Count(),
+                group.Sum(item => item.Total),
+                group.Sum(item => item.Total - (item.PaymentStatus == PaymentStatus.Paid ? item.Total : 0))))
+            .ToListAsync(cancellationToken);
+        var manual = await sales
+            .GroupBy(item => new { item.CustomerId, Name = item.CustomerName ?? "Walk-in customer" })
+            .Select(group => new BusinessPartyMetricResponse(
+                group.Key.CustomerId,
+                group.Key.Name,
+                group.Count(),
+                group.Sum(item => item.Total),
+                group.Sum(item => item.Total > item.PaidAmount ? item.Total - item.PaidAmount : 0)))
+            .ToListAsync(cancellationToken);
+
+        return online.Concat(manual)
+            .GroupBy(item => new { item.Id, Name = item.Name.Trim() })
+            .Select(group => new BusinessPartyMetricResponse(group.Key.Id, group.Key.Name, group.Sum(item => item.TransactionCount), group.Sum(item => item.Amount), group.Sum(item => item.Balance)))
+            .OrderByDescending(item => item.Amount)
+            .Take(10)
+            .ToArray();
+    }
+
+    private static async Task<IReadOnlyCollection<BusinessPartyMetricResponse>> GetTopSuppliersAsync(
+        IQueryable<Purchase> purchases,
+        CancellationToken cancellationToken) =>
+        await purchases
+            .GroupBy(item => new { item.SupplierId, Name = item.Supplier != null ? item.Supplier.Name : "No supplier" })
+            .Select(group => new BusinessPartyMetricResponse(
+                group.Key.SupplierId,
+                group.Key.Name,
+                group.Count(),
+                group.Sum(item => item.Total),
+                group.Sum(item => item.Total > item.PaidAmount ? item.Total - item.PaidAmount : 0)))
+            .OrderByDescending(item => item.Amount)
+            .Take(10)
+            .ToListAsync(cancellationToken);
 
     private async Task<decimal> GetCashReceivedUntilAsync(
         DateTime asOf,
@@ -959,7 +1031,7 @@ public sealed class FinancialReportService(
             .ToListAsync(cancellationToken);
         var onlineSold = await context.OrderItems.AsNoTracking()
             .Where(item => item.AffectsInventory &&
-                item.Order.CreatedAt <= asOf && item.Order.Status != OrderStatus.Cancelled &&
+                item.Order.CreatedAt <= asOf && item.Order.Status != OrderStatus.Cancelled && item.Order.Status != OrderStatus.Returned &&
                 (!branchId.HasValue || item.Order.BranchId == branchId.Value))
             .GroupBy(item => item.ProductId)
             .Select(group => new { ProductId = group.Key, Quantity = group.Sum(item => item.Quantity) })

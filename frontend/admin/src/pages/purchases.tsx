@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     CreditCard,
     LoaderCircle,
@@ -8,6 +8,10 @@ import {
     Pencil,
     Save,
     Truck,
+    BookOpen,
+    Plus,
+    Rows3,
+    Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,6 +34,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
     Table,
     TableBody,
@@ -71,6 +76,7 @@ import type {
     DocumentItem,
     Purchase,
     Supplier,
+    SupplierLedger,
 } from "@/features/operations/operations-types";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -115,7 +121,10 @@ export default function PurchasesPage() {
     const [tab, setTab] = useState<"purchases" | "suppliers">("purchases");
     const [purchaseOpen, setPurchaseOpen] = useState(false);
     const [supplierOpen, setSupplierOpen] = useState(false);
+    const [supplierBulkOpen, setSupplierBulkOpen] = useState(false);
+    const [supplierRows, setSupplierRows] = useState([emptySupplier(), emptySupplier(), emptySupplier()]);
     const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+    const [ledgerSupplier, setLedgerSupplier] = useState<Supplier | null>(null);
     const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
     const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
     const [detailsPurchase, setDetailsPurchase] = useState<Purchase | null>(null);
@@ -126,6 +135,8 @@ export default function PurchasesPage() {
     const [form, setForm] = useState({
         purchaseDate: today(),
         discount: 0,
+        discountPercent: 0,
+        secondaryDiscountPercent: 0,
         tax: 0,
         otherCost: 0,
         paidAmount: 0,
@@ -135,14 +146,24 @@ export default function PurchasesPage() {
         notes: "",
     });
     const [supplier, setSupplier] = useState(emptySupplier);
+    const ledgerQuery = useQuery({
+        queryKey: ["operations", "supplier-ledger", ledgerSupplier?.id],
+        queryFn: async () => (await operationsService.supplierLedger(ledgerSupplier!.id)).data,
+        enabled: Boolean(ledgerSupplier),
+    });
 
     const subtotal = useMemo(
         () => items.reduce((sum, item) => sum + item.quantity * item.amount, 0),
         [items],
     );
+    const linesNet = useMemo(
+        () => items.reduce((sum, item) => sum + stackedLineTotal(item), 0),
+        [items],
+    );
+    const discountedSubtotal = stackedAmount(linesNet, form.discountPercent, form.secondaryDiscountPercent);
     const total = Math.max(
         0,
-        subtotal - form.discount + form.tax + form.otherCost,
+        discountedSubtotal - form.discount + form.tax + form.otherCost,
     );
     const remaining = Math.max(0, total - form.paidAmount);
 
@@ -153,6 +174,8 @@ export default function PurchasesPage() {
         setForm({
             purchaseDate: today(),
             discount: 0,
+            discountPercent: 0,
+            secondaryDiscountPercent: 0,
             tax: 0,
             otherCost: 0,
             paidAmount: 0,
@@ -242,6 +265,9 @@ export default function PurchasesPage() {
                     unitId: item.unitId,
                     quantity: item.quantity,
                     unitCost: item.amount,
+                    bonusQuantity: item.bonusQuantity,
+                    discountPercent: item.discountPercent,
+                    secondaryDiscountPercent: item.secondaryDiscountPercent,
                     lotNumber: nullable(item.lotNumber ?? ""),
                     expireDate: item.expireDate || null,
                 })),
@@ -288,6 +314,21 @@ export default function PurchasesPage() {
         }
     };
 
+    const saveSupplierSheet = async () => {
+        const rows = supplierRows.filter((row) => row.name.trim());
+        if (!rows.length) return toast.error("Add at least one supplier name.");
+        const normalizedNames = rows.map((row) => row.name.trim().toLocaleLowerCase());
+        if (new Set(normalizedNames).size !== normalizedNames.length) return toast.error("Supplier names must be unique within the sheet.");
+        setSaving(true);
+        try {
+            await Promise.all(rows.map((row) => operationsService.saveSupplier(null, { name: row.name.trim(), contactPerson: nullable(row.contactPerson), phone: nullable(row.phone), email: nullable(row.email), address: nullable(row.address), taxNumber: nullable(row.taxNumber), isActive: row.isActive })));
+            await queryClient.invalidateQueries({ queryKey: operationKeys.suppliers });
+            toast.success(`${rows.length} supplier(s) created.`);
+            setSupplierBulkOpen(false);
+            setSupplierRows([emptySupplier(), emptySupplier(), emptySupplier()]);
+        } catch (error) { toast.error(message(error)); } finally { setSaving(false); }
+    };
+
     const exportPdf = async () => {
         setExportingPdf(true);
         try {
@@ -308,6 +349,7 @@ export default function PurchasesPage() {
                     <div className="flex flex-wrap gap-2">
                             <Button variant="outline" disabled={exportingPdf} onClick={() => void exportPdf()}>{exportingPdf ? <LoaderCircle className="me-2 size-4 animate-spin" /> : <FileText className="me-2 size-4" />}Export PDF</Button>
                             {canManage ? <>
+                            <Button variant="outline" onClick={() => setSupplierBulkOpen(true)}><Rows3 className="me-2 size-4" />Supplier sheet</Button>
                             <Button variant="outline" onClick={() => openSupplier()}>
                                 <Truck className="me-2 size-4" />
                                 New supplier
@@ -451,13 +493,14 @@ export default function PurchasesPage() {
                                     <TableHead>Contact</TableHead>
                                     <TableHead>Phone / email</TableHead>
                                     <TableHead>Tax number</TableHead>
+                                    <TableHead className="text-end">Balance</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {suppliersLoading ? (
-                                    <Loading colSpan={6} />
+                                    <Loading colSpan={7} />
                                 ) : suppliers?.length ? (
                                     suppliers.map((item) => (
                                         <TableRow key={item.id}>
@@ -475,6 +518,7 @@ export default function PurchasesPage() {
                                                 </p>
                                             </TableCell>
                                             <TableCell>{item.taxNumber ?? "—"}</TableCell>
+                                            <TableCell className="text-end font-semibold">{formatMoney(item.outstandingBalance)}</TableCell>
                                             <TableCell>
                                                 <Badge
                                                     variant={
@@ -485,7 +529,7 @@ export default function PurchasesPage() {
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>
-                                                {canManage ? (
+                                                <div className="flex justify-end gap-1"><Button size="icon" variant="ghost" title="Supplier ledger" onClick={() => setLedgerSupplier(item)}><BookOpen className="size-4" /></Button>{canManage ? (
                                                     <Button
                                                         size="icon"
                                                         variant="ghost"
@@ -493,13 +537,13 @@ export default function PurchasesPage() {
                                                     >
                                                         <Pencil className="size-4" />
                                                     </Button>
-                                                ) : null}
+                                                ) : null}</div>
                                             </TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
                                     <Empty
-                                        colSpan={6}
+                                        colSpan={7}
                                         text="No suppliers have been added."
                                     />
                                 )}
@@ -604,6 +648,8 @@ export default function PurchasesPage() {
                                 setForm((current) => ({ ...current, discount }))
                             }
                         />
+                        <AmountInputRow label="Discount %" value={form.discountPercent} max={100} onChange={(discountPercent) => setForm((current) => ({ ...current, discountPercent }))} />
+                        <AmountInputRow label="Second discount %" value={form.secondaryDiscountPercent} max={100} onChange={(secondaryDiscountPercent) => setForm((current) => ({ ...current, secondaryDiscountPercent }))} />
                         <AmountInputRow
                             label="Tax"
                             value={form.tax}
@@ -804,6 +850,21 @@ export default function PurchasesPage() {
                 </DialogContent>
             </Dialog>
 
+            <Sheet open={supplierBulkOpen} onOpenChange={setSupplierBulkOpen}>
+                <SheetContent side="right" className="!w-screen !max-w-none border-0">
+                    <SheetHeader className="border-b"><SheetTitle>Supplier creation sheet</SheetTitle><SheetDescription>Add several companies/suppliers in one spreadsheet-style entry. Empty rows are ignored.</SheetDescription></SheetHeader>
+                    <div className="min-h-0 flex-1 overflow-auto p-4"><div className="min-w-[1150px] overflow-hidden rounded-xl border"><div className="grid grid-cols-[45px_180px_160px_150px_190px_150px_1fr_70px_45px] gap-2 border-b bg-muted/50 p-2 text-xs font-bold"><span>#</span><span>Company *</span><span>Contact</span><span>Phone</span><span>Email</span><span>Tax number</span><span>Address</span><span>Active</span><span /></div>{supplierRows.map((row, index) => <SupplierSheetRow key={index} row={row} index={index} onChange={(next) => setSupplierRows((current) => current.map((item, itemIndex) => itemIndex === index ? next : item))} onRemove={() => setSupplierRows((current) => current.filter((_, itemIndex) => itemIndex !== index))} />)}</div></div>
+                    <SheetFooter className="flex-row justify-between border-t"><Button variant="outline" onClick={() => setSupplierRows((current) => [...current, emptySupplier()])}><Plus />Add row</Button><div className="flex gap-2"><Button variant="outline" onClick={() => setSupplierBulkOpen(false)}>Cancel</Button><Button disabled={saving} onClick={() => void saveSupplierSheet()}>{saving ? <LoaderCircle className="animate-spin" /> : <Rows3 />}Save suppliers</Button></div></SheetFooter>
+                </SheetContent>
+            </Sheet>
+
+            <Dialog open={Boolean(ledgerSupplier)} onOpenChange={(next) => !next && setLedgerSupplier(null)}>
+                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
+                    <DialogHeader><DialogTitle>Supplier ledger · {ledgerSupplier?.name}</DialogTitle><DialogDescription>Purchases are debits, payments are credits, and the running balance is the amount still payable.</DialogDescription></DialogHeader>
+                    {ledgerQuery.isLoading ? <div className="grid h-40 place-items-center"><LoaderCircle className="size-6 animate-spin" /></div> : ledgerQuery.data ? <SupplierLedgerView ledger={ledgerQuery.data} formatMoney={formatMoney} /> : <p className="p-8 text-center text-destructive">Could not load the supplier ledger.</p>}
+                </DialogContent>
+            </Dialog>
+
             <PurchaseDetailsDialog
                 purchase={detailsPurchase}
                 open={Boolean(detailsPurchase)}
@@ -842,6 +903,12 @@ export default function PurchasesPage() {
     );
 }
 
+function SupplierLedgerView({ ledger, formatMoney }: { ledger: SupplierLedger; formatMoney: (value: number) => string }) {
+    return <div className="space-y-4"><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Purchases</p><p className="mt-1 text-xl font-bold">{formatMoney(ledger.totalPurchases)}</p></div><div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Payments</p><p className="mt-1 text-xl font-bold text-emerald-600">{formatMoney(ledger.totalPayments)}</p></div><div className="rounded-xl border border-primary/20 bg-primary/5 p-4"><p className="text-xs text-muted-foreground">Balance payable</p><p className="mt-1 text-xl font-bold text-primary">{formatMoney(ledger.closingBalance)}</p></div></div><div className="overflow-x-auto rounded-xl border"><Table className="min-w-[760px]"><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Reference</TableHead><TableHead>Description</TableHead><TableHead className="text-end">Debit</TableHead><TableHead className="text-end">Credit</TableHead><TableHead className="text-end">Balance</TableHead></TableRow></TableHeader><TableBody>{ledger.entries.map((entry, index) => <TableRow key={`${entry.type}-${entry.sourceId}-${index}`}><TableCell>{date(entry.date)}</TableCell><TableCell><Badge variant="outline">{entry.type}</Badge></TableCell><TableCell>{entry.reference}</TableCell><TableCell>{entry.description}</TableCell><TableCell className="text-end">{entry.debit ? formatMoney(entry.debit) : "—"}</TableCell><TableCell className="text-end">{entry.credit ? formatMoney(entry.credit) : "—"}</TableCell><TableCell className="text-end font-semibold">{formatMoney(entry.balance)}</TableCell></TableRow>)}</TableBody></Table></div></div>;
+}
+
+function SupplierSheetRow({ row, index, onChange, onRemove }: { row: ReturnType<typeof emptySupplier>; index: number; onChange: (row: ReturnType<typeof emptySupplier>) => void; onRemove: () => void }) { const field = (key: keyof ReturnType<typeof emptySupplier>, value: string | boolean) => onChange({ ...row, [key]: value }); return <div className="grid grid-cols-[45px_180px_160px_150px_190px_150px_1fr_70px_45px] gap-2 border-b p-2 last:border-b-0"><span className="self-center text-center font-semibold text-muted-foreground">{index + 1}</span><Input value={row.name} onChange={(event) => field("name", event.target.value)} /><Input value={row.contactPerson} onChange={(event) => field("contactPerson", event.target.value)} /><Input value={row.phone} onChange={(event) => field("phone", event.target.value)} /><Input type="email" value={row.email} onChange={(event) => field("email", event.target.value)} /><Input value={row.taxNumber} onChange={(event) => field("taxNumber", event.target.value)} /><Input value={row.address} onChange={(event) => field("address", event.target.value)} /><Checkbox checked={row.isActive} onCheckedChange={(checked) => field("isActive", checked === true)} /><Button size="icon" variant="ghost" onClick={onRemove}><Trash2 className="size-4 text-destructive" /></Button></div>; }
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div className="space-y-2">
@@ -877,6 +944,19 @@ function Empty({ colSpan, text }: { colSpan: number; text: string }) {
 function nullable(value: string) {
     const result = value.trim();
     return result || null;
+}
+
+function stackedAmount(amount: number, firstPercent: number, secondPercent: number) {
+    return amount * (1 - Math.min(100, Math.max(0, firstPercent)) / 100) *
+        (1 - Math.min(100, Math.max(0, secondPercent)) / 100);
+}
+
+function stackedLineTotal(item: DocumentItem) {
+    return stackedAmount(
+        item.quantity * item.amount,
+        item.discountPercent,
+        item.secondaryDiscountPercent,
+    );
 }
 
 function date(value: string) {

@@ -12,6 +12,7 @@ public interface IOperationsService
     Task<IReadOnlyList<SupplierResponse>> GetSuppliersAsync(string? search, int take, CancellationToken ct);
     Task<PagedResult<SupplierResponse>> GetSupplierPageAsync(string? search, int page, int pageSize, CancellationToken ct);
     Task<SupplierResponse> SaveSupplierAsync(long? id, CreateSupplierRequest request, CancellationToken ct);
+    Task<SupplierLedgerResponse> GetSupplierLedgerAsync(long id, CancellationToken ct);
     Task<PagedResult<PurchaseListItem>> GetPurchasesAsync(string? search, int page, int pageSize, CancellationToken ct);
     Task<PurchaseDetailsResponse> GetPurchaseAsync(long id, CancellationToken ct);
     Task<PurchaseListItem> CreatePurchaseAsync(CreatePurchaseRequest request, string? userId, bool canOverrideLineLimits, CancellationToken ct);
@@ -34,4 +35,6 @@ public interface IOperationsService
     Task<ExpenseCategoryResponse> SaveExpenseCategoryAsync(long? id, ExpenseCategoryUpsertRequest request, CancellationToken ct);
     Task<PagedResult<ExpenseResponse>> GetExpensesAsync(int page, int pageSize, CancellationToken ct);
     Task<ExpenseResponse> CreateExpenseAsync(CreateExpenseRequest request, string? userId, CancellationToken ct);
+    Task<PagedResult<JournalVoucherResponse>> GetJournalVouchersAsync(int page, int pageSize, CancellationToken ct);
+    Task<JournalVoucherResponse> CreateJournalVoucherAsync(CreateJournalVoucherRequest request, string? userId, CancellationToken ct);
 }

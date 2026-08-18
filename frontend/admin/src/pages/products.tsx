@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Eye, FileText, ImagePlus, LoaderCircle, Pencil, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -27,11 +27,14 @@ import { DeleteButton } from "@/components/delete-button";
 import { CustomerPricingFields, activePriceInputs, createCustomerPriceDrafts, validatePriceDrafts } from "@/features/products/components/customer-pricing-fields";
 import { ProductUnitConversionsFields, validateUnitConversions } from "@/features/products/components/product-unit-conversions-fields";
 import { QuickQuantityEditor, quickQuantitiesMatchStep } from "@/features/products/components/quick-quantity-editor";
+import { operationsService } from "@/features/operations/operations-service";
+import { useCompany } from "@/features/company/company-context";
 import {
     IMAGE_FILE_ACCEPT,
     isSupportedImageFile,
     MAXIMUM_IMAGE_FILE_SIZE,
 } from "@/lib/image-files";
+import { toFiniteNumber } from "@/lib/numbers";
 
 function getUpdateErrorMessage(error: unknown, messages: { connection: string; endpoint: string; failed: string }) {
     const apiError = error as {
@@ -59,6 +62,7 @@ export default function ProductsPage() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const { t } = useI18n();
+    const { formatMoney } = useCompany();
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
@@ -73,6 +77,16 @@ export default function ProductsPage() {
     const { data, isLoading, isError, isFetching } = useProducts({ ...filters, search: search || undefined, page, pageSize });
     const { data: lookups } = useProductLookupsQuery();
     const products = useMemo(() => data?.items ?? [], [data?.items]);
+    const costsQuery = useQuery({
+        queryKey: ["products", "stock-value", products.map((product) => product.id).join(",")],
+        queryFn: () => operationsService.products("", 500, true),
+        enabled: products.length > 0,
+        staleTime: 60_000,
+    });
+    const costsByProduct = useMemo(
+        () => new Map((costsQuery.data ?? []).map((product) => [product.id, product.currentUnitCost ?? 0])),
+        [costsQuery.data],
+    );
     const activeFilterCount = Object.values(filters).filter(value => value !== undefined).length;
     const selectedProducts = useMemo(() => products.filter(x => selected.includes(x.id)), [products, selected]);
 
@@ -95,6 +109,8 @@ export default function ProductsPage() {
                 name: item.name,
                 barcode: item.barcode,
                 strength: item.strength,
+                genericName: item.genericName,
+                formula: item.formula,
                 shortDescription: item.shortDescription,
                 description: item.description,
                 slug: item.slug,
@@ -151,6 +167,7 @@ export default function ProductsPage() {
             );
             if (unitError) return toast.error(`${draft.name}: ${t(unitError)}`);
         }
+        if (!window.confirm(`Confirm pricing and catalog changes for ${drafts.length} product(s)? Selling-price changes take effect immediately.`)) return;
         setSaving(true);
         try {
             const response = await productService.bulkUpdate(drafts);
@@ -203,7 +220,7 @@ export default function ProductsPage() {
         <div className="rounded-md border"><Table>
             <TableHeader><TableRow>
                 <TableHead className="w-10"><Checkbox aria-label="Select all" checked={products.length > 0 && selected.length === products.length} onCheckedChange={() => setSelected(selected.length === products.length ? [] : products.map(x => x.id))} /></TableHead>
-                <TableHead>{t("products.product")}</TableHead><TableHead>{t("products.barcode")}</TableHead><TableHead>{t("products.category")}</TableHead><TableHead>{t("products.price")}</TableHead><TableHead>{t("products.stock")}</TableHead><TableHead>{t("products.status")}</TableHead>
+                <TableHead>{t("products.product")}</TableHead><TableHead>{t("products.barcode")}</TableHead><TableHead>{t("products.category")}</TableHead><TableHead>{t("products.price")}</TableHead><TableHead>Available stock / value</TableHead><TableHead>{t("products.status")}</TableHead>
             </TableRow></TableHeader>
             <TableBody>
                 {isLoading && <TableRow><TableCell colSpan={7} className="h-28 text-center"><LoaderCircle className="mx-auto animate-spin" /></TableCell></TableRow>}
@@ -211,8 +228,8 @@ export default function ProductsPage() {
                 {!isLoading && !isError && products.length === 0 && <TableRow><TableCell colSpan={7} className="h-28 text-center text-muted-foreground">{t("products.empty")}</TableCell></TableRow>}
                 {products.map(product => <TableRow key={product.id} className="group cursor-pointer" data-state={selected.includes(product.id) ? "selected" : undefined} onDoubleClick={() => navigate(`/products/${product.id}`)}>
                     <TableCell onDoubleClick={event => event.stopPropagation()}><Checkbox aria-label={`Select ${product.name}`} checked={selected.includes(product.id)} onCheckedChange={() => toggle(product.id)} /></TableCell>
-                    <TableCell><div className="flex items-center gap-3">{resolveProductImageUrl(product.primaryImageUrl) ? <img src={resolveProductImageUrl(product.primaryImageUrl)!} alt="" className="size-10 shrink-0 rounded-md border bg-muted object-cover" /> : <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted"><ImagePlus className="size-4 text-muted-foreground" /></div>}<span><span className="block font-medium">{product.name}</span>{product.strength ? <span className="mt-0.5 block text-xs font-medium text-primary">{product.strength}</span> : null}</span></div></TableCell><TableCell>{product.barcode || "—"}</TableCell><TableCell>{product.categoryName}</TableCell>
-                    <TableCell>{product.price == null ? "—" : product.price.toLocaleString()}</TableCell><TableCell><div className="space-y-1"><span className="font-medium">{product.stock.toLocaleString()}</span>{product.usesDisplayStock ? <Badge variant="secondary" className="block w-fit text-[10px]">Display stock</Badge> : null}</div></TableCell>
+                    <TableCell><div className="flex items-center gap-3">{resolveProductImageUrl(product.primaryImageUrl) ? <img src={resolveProductImageUrl(product.primaryImageUrl)!} alt="" className="size-10 shrink-0 rounded-md border bg-muted object-cover" /> : <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted"><ImagePlus className="size-4 text-muted-foreground" /></div>}<span><span className="block font-medium">{product.name}</span>{product.strength ? <span className="mt-0.5 block text-xs font-medium text-primary">{product.strength}</span> : null}{product.genericName ? <span className="block text-xs text-muted-foreground">{product.genericName}</span> : null}</span></div></TableCell><TableCell>{product.barcode || "—"}</TableCell><TableCell>{product.categoryName}</TableCell>
+                    <TableCell>{product.price == null ? "—" : toFiniteNumber(product.price).toLocaleString()}</TableCell><TableCell><div className="space-y-1"><span className="font-medium">{toFiniteNumber(product.inventoryStock).toLocaleString()}</span><span className="block text-xs text-muted-foreground">{formatMoney(toFiniteNumber(product.inventoryStock) * toFiniteNumber(costsByProduct.get(product.id)))}</span>{product.usesDisplayStock ? <Badge variant="secondary" className="block w-fit text-[10px]">Display stock {toFiniteNumber(product.stock).toLocaleString()}</Badge> : null}</div></TableCell>
                     <TableCell className="relative"><Badge variant={product.isActive ? "outline" : "secondary"}>{product.isActive ? t("products.active") : t("products.inactive")}</Badge><Button type="button" variant="outline" size="icon-sm" className="absolute end-2 top-1/2 -translate-y-1/2 bg-background/95 text-primary opacity-0 shadow-sm backdrop-blur-sm transition-[opacity,transform,background-color] hover:bg-primary hover:text-primary-foreground group-hover:opacity-100 focus-visible:opacity-100" aria-label={t("details.open")} onClick={() => navigate(`/products/${product.id}`)}><Eye className="size-4" /></Button></TableCell>
                 </TableRow>)}
             </TableBody>
@@ -232,7 +249,7 @@ export default function ProductsPage() {
                         <GalleryImagePicker existingImages={item.images.filter(image => !image.isPrimary && !(item.removedImageIds ?? []).includes(image.id))} files={item.galleryImages ?? []} onChange={galleryImages => change(item.id, { galleryImages })} onRemoveExisting={imageId => change(item.id, { removedImageIds: [...(item.removedImageIds ?? []), imageId] })} />
                     </div>
                     <div className="space-y-4"><h3 className="font-semibold">{t("update.productNumber")} #{index + 1}</h3>
-                        <div className="grid gap-4 md:grid-cols-2"><div className="space-y-2"><Label>{t("form.name")} *</Label><Input value={item.name} onChange={e => change(item.id, { name: e.target.value })} /></div><div className="space-y-2"><Label>{t("update.barcode")}</Label><Input value={item.barcode ?? ""} onChange={e => change(item.id, { barcode: e.target.value || null })} /></div><div className="space-y-2"><Label>{t("products.strength")}</Label><Input value={item.strength ?? ""} placeholder={t("products.strengthPlaceholder")} onChange={e => change(item.id, { strength: e.target.value || null })} /></div><div className="space-y-2"><Label>{t("inventory.reorderPoint")}</Label><Input type="number" min={0} step="0.001" value={item.minimumStockQuantity} onChange={e => change(item.id, { minimumStockQuantity: e.target.value === "" ? 0 : Number(e.target.value) })} /><p className="text-xs text-muted-foreground">{t("inventory.reorderHelp")}</p></div></div>
+                        <div className="grid gap-4 md:grid-cols-2"><div className="space-y-2"><Label>{t("form.name")} *</Label><Input value={item.name} onChange={e => change(item.id, { name: e.target.value })} /></div><div className="space-y-2"><Label>{t("update.barcode")}</Label><Input value={item.barcode ?? ""} onChange={e => change(item.id, { barcode: e.target.value || null })} /></div><div className="space-y-2"><Label>{t("products.strength")}</Label><Input value={item.strength ?? ""} placeholder={t("products.strengthPlaceholder")} onChange={e => change(item.id, { strength: e.target.value || null })} /></div><div className="space-y-2"><Label>Generic / scientific name</Label><Input value={item.genericName ?? ""} onChange={e => change(item.id, { genericName: e.target.value || null })} /></div><div className="space-y-2"><Label>Formula / composition</Label><Input value={item.formula ?? ""} onChange={e => change(item.id, { formula: e.target.value || null })} /></div><div className="space-y-2"><Label>{t("inventory.reorderPoint")}</Label><Input type="number" min={0} step="0.001" value={item.minimumStockQuantity} onChange={e => change(item.id, { minimumStockQuantity: e.target.value === "" ? 0 : Number(e.target.value) })} /><p className="text-xs text-muted-foreground">{t("inventory.reorderHelp")}</p></div></div>
                         <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                             <LookupSelect label={`${t("update.category")} *`} value={item.categoryId} options={lookups?.categories ?? []} onChange={categoryId => change(item.id, { categoryId: categoryId! })} required searchText={t("update.searchOption")} emptyText={t("update.noMatch")} />
                             <LookupSelect label={t("form.brand")} value={item.brandId} options={lookups?.brands ?? []} onChange={brandId => change(item.id, { brandId })} searchText={t("update.searchOption")} emptyText={t("update.noMatch")} />

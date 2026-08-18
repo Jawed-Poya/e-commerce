@@ -25,6 +25,16 @@ export interface CompanySettings {
     expiryAlertSound: ExpiryAlertSound;
     maximumPurchaseLines: number;
     maximumManualSaleLines: number;
+    generalSalesDiscountPercent: number;
+    maximumCustomerDebt: number;
+    defaultDebtDueDays: number;
+    allowNegativeStockSales: boolean;
+    purchaseNumberPrefix: string;
+    nextPurchaseNumber: number;
+    purchaseNumberIncrement: number;
+    saleNumberPrefix: string;
+    nextSaleNumber: number;
+    saleNumberIncrement: number;
     allowUserClaimManagement: boolean;
 }
 

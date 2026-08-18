@@ -68,6 +68,7 @@ public static class DependencyInjection
         services.AddScoped<IProductReviewService, ProductReviewService>();
         services.AddScoped<IOperationsService, OperationsService>();
         services.AddScoped<IAuditLogService, AuditLogService>();
+        services.AddSingleton<StorePresenceTracker>();
         services.AddSingleton<ActivityLogQueue>();
         services.AddHostedService<ActivityLogWriterHostedService>();
         services.AddHostedService<AuditCleanupHostedService>();

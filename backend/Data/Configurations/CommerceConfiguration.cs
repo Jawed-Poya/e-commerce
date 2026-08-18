@@ -2,10 +2,20 @@ using API.Entities.Customers;
 using API.Entities.Orders;
 using API.Entities.Products;
 using ECommerce.Entities.Products;
+using ECommerce.Entities.Company;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace ECommerce.Data.Configurations;
+
+public sealed class CompanySettingConfiguration : IEntityTypeConfiguration<CompanySetting>
+{
+    public void Configure(EntityTypeBuilder<CompanySetting> b)
+    {
+        b.Property(x => x.GeneralSalesDiscountPercent).HasPrecision(5, 2);
+        b.Property(x => x.MaximumCustomerDebt).HasPrecision(18, 2);
+    }
+}
 
 public sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 {
@@ -15,6 +25,8 @@ public sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         b.Property(x => x.LastName).HasMaxLength(100);
         b.Property(x => x.Phone).HasMaxLength(30).IsRequired();
         b.Property(x => x.Email).HasMaxLength(256);
+        b.Property(x => x.AccountCredit).HasPrecision(18, 2);
+        b.Property(x => x.CreditLimit).HasPrecision(18, 2);
         b.HasIndex(x => x.Phone).IsUnique();
         b.HasIndex(x => x.Email).IsUnique().HasFilter("[Email] IS NOT NULL");
         b.HasOne(x => x.CustomerType).WithMany().HasForeignKey(x => x.CustomerTypeId).OnDelete(DeleteBehavior.Restrict);

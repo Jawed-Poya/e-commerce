@@ -19,7 +19,7 @@ export function quickQuantitiesMatchStep(values: number[], step: number) {
 }
 
 function alignedToStep(value: number, step?: number | null) {
-    if (!Number.isFinite(step) || step <= 0) return true;
+    if (step == null || !Number.isFinite(step) || step <= 0) return true;
     const ratio = value / step;
     return Math.abs(ratio - Math.round(ratio)) < 1e-9;
 }

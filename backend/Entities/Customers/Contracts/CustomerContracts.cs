@@ -8,7 +8,9 @@ public sealed record UpsertCustomerRequest(
     string Phone,
     string? Email,
     string? Address,
-    long? CustomerTypeId
+    long? CustomerTypeId,
+    decimal? CreditLimit = null,
+    int? DebtDueDays = null
 );
 
 public sealed record CustomerListItemResponse(
@@ -20,6 +22,10 @@ public sealed record CustomerListItemResponse(
     string? CustomerTypeName,
     int OrderCount,
     decimal TotalSpent,
+    decimal OutstandingDebt,
+    decimal AccountCredit,
+    decimal CreditLimit,
+    bool HasOverdueDebt,
     DateTime? LastOrderAt,
     DateTime CreatedAt
 );
@@ -48,6 +54,19 @@ public sealed record CustomerOrderSummaryResponse(
     DateTime CreatedAt
 );
 
+public sealed record CustomerEngagementResponse(
+    long CustomerId,
+    bool IsOnline,
+    int ActiveSessions,
+    string? CurrentPath,
+    string? PageTitle,
+    DateTime? LastSeenAt,
+    int VisitsLast30Days,
+    int UniqueSessionsLast30Days,
+    int ProductViewsLast30Days,
+    int SearchesLast30Days,
+    string? LastSearchTerm);
+
 public sealed record CustomerDetailsResponse(
     long Id,
     string FirstName,
@@ -58,6 +77,11 @@ public sealed record CustomerDetailsResponse(
     string? Address,
     long? CustomerTypeId,
     string? CustomerTypeName,
+    decimal OutstandingDebt,
+    decimal AccountCredit,
+    decimal CreditLimit,
+    int DebtDueDays,
+    bool HasOverdueDebt,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
     IReadOnlyCollection<CustomerAddressResponse> Addresses,

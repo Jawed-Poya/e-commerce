@@ -39,6 +39,7 @@ import type {
 } from "@/features/dashboard/dashboard-types";
 import { OrderStatusBadge as StatusBadge } from "@/features/orders/components/order-status-badge";
 import { formatMoney } from "@/lib/format-money";
+import { toFiniteNumber } from "@/lib/numbers";
 import { useI18n } from "@/i18n/i18n-provider";
 
 export default function Dashboard() {
@@ -110,31 +111,31 @@ export default function Dashboard() {
                 />
                 <MetricCard
                     label="Orders"
-                    value={data.kpis.totalOrders.toLocaleString()}
+                    value={toFiniteNumber(data.kpis.totalOrders).toLocaleString()}
                     help={`${data.kpis.pendingOrders} ${tr("pending")} · ${data.kpis.pendingPayments} ${tr("payments to review")}`}
                     icon={<ShoppingCart />}
                 />
                 <MetricCard
                     label="Website product views"
-                    value={data.kpis.totalProductViews.toLocaleString()}
+                    value={toFiniteNumber(data.kpis.totalProductViews).toLocaleString()}
                     help={`${data.kpis.activeProducts} ${tr("of")} ${data.kpis.totalProducts} ${tr("products active")}`}
                     icon={<Eye />}
                 />
                 <MetricCard
                     label="Customers"
-                    value={data.kpis.totalCustomers.toLocaleString()}
+                    value={toFiniteNumber(data.kpis.totalCustomers).toLocaleString()}
                     help="Registered and guest checkout customers"
                     icon={<Users />}
                 />
                 <MetricCard
                     label="Live storefront listeners"
-                    value={data.kpis.realtimeConnections.toLocaleString()}
+                    value={toFiniteNumber(data.kpis.realtimeConnections).toLocaleString()}
                     help="Active SignalR notification connections"
                     icon={<Radio />}
                 />
                 <MetricCard
                     label="Alerts generated (24h)"
-                    value={data.kpis.notificationsLast24Hours.toLocaleString()}
+                    value={toFiniteNumber(data.kpis.notificationsLast24Hours).toLocaleString()}
                     help="Price-change and stock-increase events"
                     icon={<BellRing />}
                 />
@@ -333,7 +334,7 @@ export default function Dashboard() {
                                         {item.name}
                                     </p>
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        Reorder at {item.minimumQuantity.toLocaleString()}
+                                        Reorder at {toFiniteNumber(item.minimumQuantity).toLocaleString()}
                                     </p>
                                 </div>
                                 <Badge
@@ -343,7 +344,7 @@ export default function Dashboard() {
                                             : "secondary"
                                     }
                                 >
-                                    {item.availableQuantity.toLocaleString()} left
+                                    {toFiniteNumber(item.availableQuantity).toLocaleString()} left
                                 </Badge>
                             </Link>
                         ))}
@@ -403,8 +404,8 @@ function SalesChart({
     currency: string;
 }) {
     const max = Math.max(...points.map((point) => point.revenue), 1);
-    const totalOrders = points.reduce((sum, point) => sum + point.orders, 0);
-    const totalRevenue = points.reduce((sum, point) => sum + point.revenue, 0);
+    const totalOrders = points.reduce((sum, point) => sum + toFiniteNumber(point.orders), 0);
+    const totalRevenue = points.reduce((sum, point) => sum + toFiniteNumber(point.revenue), 0);
 
     return (
         <div>
@@ -424,7 +425,7 @@ function SalesChart({
             </div>
             <div className="flex h-44 items-end gap-1 rounded-xl border bg-muted/20 px-3 pt-4">
                 {points.map((point, index) => {
-                    const height = Math.max((point.revenue / max) * 100, point.orders ? 8 : 2);
+                    const height = Math.max((toFiniteNumber(point.revenue) / Math.max(1, toFiniteNumber(max, 1))) * 100, toFiniteNumber(point.orders) ? 8 : 2);
                     return (
                         <div
                             key={point.date}
@@ -465,7 +466,9 @@ function InventoryRow({
     className: string;
     icon: React.ReactNode;
 }) {
-    const percentage = total ? Math.round((count / total) * 100) : 0;
+    const safeCount = toFiniteNumber(count);
+    const safeTotal = toFiniteNumber(total);
+    const percentage = safeTotal ? Math.round((safeCount / safeTotal) * 100) : 0;
     return (
         <div>
             <div className="mb-2 flex items-center justify-between gap-3">
@@ -474,7 +477,7 @@ function InventoryRow({
                     <span className="text-sm font-medium">{label}</span>
                 </div>
                 <span className="text-xs font-semibold">
-                    {count} · {percentage}%
+                    {safeCount} · {percentage}%
                 </span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-muted">
@@ -490,7 +493,7 @@ function InventoryRow({
 function SmallNumber({ label, value }: { label: string; value: number }) {
     return (
         <div>
-            <p className="font-semibold">{value.toLocaleString()}</p>
+            <p className="font-semibold">{toFiniteNumber(value).toLocaleString()}</p>
             <p className="mt-1 text-[10px] text-muted-foreground">{label}</p>
         </div>
     );
@@ -530,8 +533,8 @@ function ProductRanking({
                             <p className="truncate font-medium">{item.name}</p>
                             <p className="mt-1 text-xs text-muted-foreground">
                                 {mode === "views"
-                                    ? `${item.viewCount.toLocaleString()} storefront views`
-                                    : `${item.quantitySold.toLocaleString()} units sold`}
+                                    ? `${toFiniteNumber(item.viewCount).toLocaleString()} storefront views`
+                                    : `${toFiniteNumber(item.quantitySold).toLocaleString()} units sold`}
                             </p>
                         </div>
                         {mode === "sales" && (

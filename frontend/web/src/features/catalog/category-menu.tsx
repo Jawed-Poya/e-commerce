@@ -16,7 +16,7 @@ import { Link } from "react-router-dom";
 import { imageUrl } from "../../shared/api/api-client";
 import { Button } from "../../shared/components/ui/button";
 import { cn } from "../../shared/lib/utils";
-import { formatMoney } from "../../shared/lib/money";
+import { formatDecimal, formatMoney } from "../../shared/lib/money";
 import { productPath } from "../../shared/lib/product-path";
 import type { Product } from "../../shared/types/product";
 import { buildCategoryTree, type CategoryNode } from "./category-tree";
@@ -353,7 +353,7 @@ function MegaMenuProduct({ product }: { product: Product }) {
                                     <span className="inline-flex shrink-0 items-center gap-1">
                                         <Star className="size-2.5 fill-amber-400 text-amber-400" />
                                         {product.reviewCount > 0
-                                            ? product.averageRating.toFixed(1)
+                                            ? formatDecimal(product.averageRating)
                                             : "—"}
                                     </span>
                                     <span

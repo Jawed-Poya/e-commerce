@@ -6,6 +6,8 @@ public sealed class ProductDetailsDto
     public string Name { get; set; } = null!;
     public string? Barcode { get; set; }
     public string? Strength { get; set; }
+    public string? GenericName { get; set; }
+    public string? Formula { get; set; }
     public string? Slug { get; set; }
     public string? ShortDescription { get; set; }
     public string? Description { get; set; }

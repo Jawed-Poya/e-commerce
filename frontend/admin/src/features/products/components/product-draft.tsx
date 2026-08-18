@@ -186,7 +186,10 @@ export function ProductDraftCard({
     }) ?? 1;
 
     return (
-        <Card className="overflow-hidden">
+        <Card
+            className="scroll-mt-24 overflow-hidden"
+            data-product-index={index}
+        >
             <CardHeader className="flex flex-row items-center justify-between border-b bg-muted/20">
                 <CardTitle className="text-base">
                     Product #{index + 1}
@@ -238,6 +241,7 @@ export function ProductDraftCard({
                                 disabled={disabled}
                                 placeholder="Enter product name"
                                 {...register(`products.${index}.name`)}
+                                aria-invalid={Boolean(productErrors?.name)}
                             />
 
                             <FieldError
@@ -245,7 +249,11 @@ export function ProductDraftCard({
                             />
                         </div>
 
-                        <div className="space-y-1.5">
+                        <div
+                            className="space-y-1.5"
+                            data-field={`products.${index}.categoryId`}
+                            aria-invalid={Boolean(productErrors?.categoryId)}
+                        >
                             <Label htmlFor={`products-${index}-barcode`}>
                                 {t("products.barcode")}
                             </Label>
@@ -273,6 +281,18 @@ export function ProductDraftCard({
                                 {...register(`products.${index}.strength`)}
                             />
                             <FieldError message={productErrors?.strength?.message} />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label htmlFor={`products-${index}-generic-name`}>Generic / scientific name</Label>
+                            <Input id={`products-${index}-generic-name`} disabled={disabled} placeholder="Example: Paracetamol" {...register(`products.${index}.genericName`)} />
+                            <FieldError message={productErrors?.genericName?.message} />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label htmlFor={`products-${index}-formula`}>Formula / composition</Label>
+                            <Input id={`products-${index}-formula`} disabled={disabled} placeholder="Ingredients or product formula" {...register(`products.${index}.formula`)} />
+                            <FieldError message={productErrors?.formula?.message} />
                         </div>
                     </div>
 

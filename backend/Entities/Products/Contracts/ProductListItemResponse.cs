@@ -5,6 +5,8 @@ public sealed record ProductListItemResponse(
     string Name,
     string? Barcode,
     string? Strength,
+    string? GenericName,
+    string? Formula,
     string? ShortDescription,
     string? Description,
     string? Slug,

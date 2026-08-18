@@ -13,6 +13,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { useI18n } from "@/i18n/i18n-provider";
+import { toFiniteNumber } from "@/lib/numbers";
 import type { OrderDetails } from "../order-types";
 import { OrderStatusBadge } from "./order-status-badge";
 
@@ -228,7 +229,7 @@ export function OrderLotTraceability({ order }: Pick<OrderPanelProps, "order">) 
                                         </TableCell>
                                         <TableCell>{inventoryActionLabel(movement.type, t)}</TableCell>
                                         <TableCell className={amount < 0 ? "text-end font-semibold tabular-nums text-destructive" : "text-end font-semibold tabular-nums text-emerald-600 dark:text-emerald-400"}>
-                                            {amount > 0 ? "+" : ""}{amount.toLocaleString(locale, { maximumFractionDigits: 3 })}
+                                            {toFiniteNumber(amount) > 0 ? "+" : ""}{toFiniteNumber(amount).toLocaleString(locale, { maximumFractionDigits: 3 })}
                                         </TableCell>
                                     </TableRow>
                                 );

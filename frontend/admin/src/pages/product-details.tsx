@@ -14,8 +14,9 @@ import { ProductPricingDialog } from "@/features/products/components/product-pri
 import { resolveProductImageUrl } from "@/services/product.service";
 import { useI18n } from "@/i18n/i18n-provider";
 import { useCompany } from "@/features/company/company-context";
+import { toFiniteNumber } from "@/lib/numbers";
 
-const formatNumber = (value: number | null | undefined) => value == null ? "—" : value.toLocaleString();
+const formatNumber = (value: number | null | undefined) => value == null ? "—" : toFiniteNumber(value).toLocaleString();
 
 export default function ProductDetailsPage() {
     const { id } = useParams();

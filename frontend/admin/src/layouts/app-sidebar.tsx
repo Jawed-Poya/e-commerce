@@ -2,6 +2,7 @@ import * as React from "react";
 import {
     Activity,
     BarChart3,
+    BookOpen,
     BriefcaseBusiness,
     Building2,
     Crown,
@@ -131,6 +132,12 @@ const navigation: ProtectedGroup[] = [
                     {
                         titleKey: "nav.expenses",
                         url: "/operations/expenses",
+                        permission: Permissions.ExpensesView,
+                    },
+                    {
+                        titleKey: "nav.journalVouchers",
+                        url: "/operations/journal",
+                        icon: <BookOpen />,
                         permission: Permissions.ExpensesView,
                     },
                 ],

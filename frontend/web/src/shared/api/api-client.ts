@@ -69,13 +69,6 @@ export function apiUrl(path: string) {
     return new URL(path.replace(/^\/+/, ""), absoluteApiBaseUrl).toString();
 }
 
-type ApiEnvelope<T> = {
-    success: boolean;
-    message: string;
-    data: T;
-    errors?: Record<string, string[]>;
-};
-
 export class ApiError extends Error {
     readonly status: number;
     readonly errors?: Record<string, string[]>;
@@ -179,12 +172,18 @@ export async function apiGet<T>(
     );
 }
 
-export async function apiPost<T>(path: string, body?: unknown) {
+export async function apiPost<T>(
+    path: string,
+    body?: unknown,
+    options?: { keepalive?: boolean; signal?: AbortSignal },
+) {
     return readResponse<T>(
         await fetch(apiUrl(path), {
             method: "POST",
             headers: requestHeaders(true),
             body: body === undefined ? undefined : JSON.stringify(body),
+            keepalive: options?.keepalive,
+            signal: options?.signal,
         }),
     );
 }

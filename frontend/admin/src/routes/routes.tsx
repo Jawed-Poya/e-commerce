@@ -152,6 +152,12 @@ const routes: RouteObject[] = [
                                     import("@/pages/expenses").then((module) => module.default),
                                 ),
                             },
+                            {
+                                path: "journal",
+                                lazy: lazyAllowed(Permissions.ExpensesView, () =>
+                                    import("@/pages/journal-vouchers").then((module) => module.default),
+                                ),
+                            },
                         ],
                     },
                     {

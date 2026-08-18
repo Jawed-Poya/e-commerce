@@ -20,6 +20,12 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(x => x.Strength)
             .HasMaxLength(100);
 
+        builder.Property(x => x.GenericName)
+            .HasMaxLength(200);
+
+        builder.Property(x => x.Formula)
+            .HasMaxLength(500);
+
         builder.Property(x => x.ShortDescription)
             .HasMaxLength(500);
 

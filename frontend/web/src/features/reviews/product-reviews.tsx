@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { useI18n } from "../../i18n/i18n-provider";
 import { Button } from "../../shared/components/ui/button";
 import { cn } from "../../shared/lib/utils";
+import { formatDecimal } from "../../shared/lib/money";
 import { useAuth } from "../auth/auth-context";
 import { reviewApi } from "./review-api";
 
@@ -57,7 +58,7 @@ export function ProductReviews({ productId }: { productId: number }) {
                     <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">{t("reviews.title")}</p>
                         <div className="mt-4 flex items-end gap-3">
-                            <strong className="text-4xl font-black tracking-tight">{data?.averageRating.toFixed(1) ?? "0.0"}</strong>
+                            <strong className="text-4xl font-black tracking-tight">{formatDecimal(data?.averageRating)}</strong>
                             <div className="pb-1">
                                 <Stars value={Math.round(data?.averageRating ?? 0)} />
                                 <p className="mt-1 text-xs text-muted-foreground">{t("reviews.summary", { count: data?.reviewCount ?? 0 })}</p>

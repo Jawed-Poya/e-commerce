@@ -8,7 +8,7 @@ import {
   readReferenceItems,
   writeCachedValue,
 } from "@/features/offline/offline-reference-cache";
-import type { DocumentPayment, Expense, ExpenseCategory, ManualSale, ManualSaleLotMovement, OperationCustomer, OperationPolicy, OperationProduct, OperationSummary, PagedResult, Purchase, PurchaseDetails, SalaryPayment, Staff, Supplier } from "./operations-types";
+import type { CreateJournalVoucher, DocumentPayment, Expense, ExpenseCategory, JournalVoucher, ManualSale, ManualSaleLotMovement, OperationCustomer, OperationPolicy, OperationProduct, OperationSummary, PagedResult, Purchase, PurchaseDetails, SalaryPayment, Staff, Supplier, SupplierLedger } from "./operations-types";
 
 const base = "/admin/operations";
 
@@ -111,7 +111,7 @@ export const operationsService = {
       take,
       includeCurrentUnitCost: includeCurrentUnitCost || undefined,
     })).data,
-    (item, clean) => [item.name, item.strength, item.barcode, ...item.units.map((unit) => unit.barcode)].some((value) => normalize(value ?? "").includes(clean)),
+    (item, clean) => [item.name, item.strength, item.genericName, item.formula, item.barcode, ...item.units.map((unit) => unit.barcode)].some((value) => normalize(value ?? "").includes(clean)),
   ),
   customers: (search = "", take = 20) => cachedLookup(
     "customers",
@@ -124,7 +124,8 @@ export const operationsService = {
   suppliersResponse: async (search = "", take = 50) => ({ success: true, data: await getSuppliers(search, take), message: "" }),
   supplierPage: (search = "", page = 1, pageSize = 20) =>
     apiClient.get<PagedResult<Supplier>>(`${base}/suppliers/page`, { search: search || undefined, page, pageSize }),
-  saveSupplier: (id: number | null, body: Omit<Supplier, "id">) => id ? apiClient.put<Supplier>(`${base}/suppliers/${id}`, body) : apiClient.post<Supplier>(`${base}/suppliers`, body),
+  saveSupplier: (id: number | null, body: Omit<Supplier, "id" | "outstandingBalance">) => id ? apiClient.put<Supplier>(`${base}/suppliers/${id}`, body) : apiClient.post<Supplier>(`${base}/suppliers`, body),
+  supplierLedger: (id: number) => apiClient.get<SupplierLedger>(`${base}/suppliers/${id}/ledger`),
   purchases: (search = "", page = 1, pageSize = 20) => cachedDocumentPage(
     "purchases",
     search,
@@ -151,7 +152,7 @@ export const operationsService = {
   addSalePayment: (id: number, body: unknown) => apiClient.post<ManualSale>(`${base}/sales/${id}/payments`, body),
   staff: () => apiClient.get<Staff[]>(`${base}/staff`),
   staffPage: (search = "", page = 1, pageSize = 20) => apiClient.get<PagedResult<Staff>>(`${base}/staff/page`, { search: search || undefined, page, pageSize }),
-  saveStaff: (id: number | null, body: Omit<Staff, "id">) => id ? apiClient.put<Staff>(`${base}/staff/${id}`, body) : apiClient.post<Staff>(`${base}/staff`, body),
+  saveStaff: (id: number | null, body: Omit<Staff, "id" | "isSystemUser">) => id ? apiClient.put<Staff>(`${base}/staff/${id}`, body) : apiClient.post<Staff>(`${base}/staff`, body),
   deleteStaff: (id: number) => apiClient.delete<void>(`${base}/staff/${id}`),
   salaries: (page = 1, pageSize = 20) => apiClient.get<PagedResult<SalaryPayment>>(`${base}/salaries`, { page, pageSize }),
   createSalary: (body: unknown) => apiClient.post<SalaryPayment>(`${base}/salaries`, body),
@@ -161,6 +162,8 @@ export const operationsService = {
   saveExpenseCategory: (id: number | null, body: Omit<ExpenseCategory, "id">) => id ? apiClient.put<ExpenseCategory>(`${base}/expense-categories/${id}`, body) : apiClient.post<ExpenseCategory>(`${base}/expense-categories`, body),
   expenses: (page = 1, pageSize = 20) => apiClient.get<PagedResult<Expense>>(`${base}/expenses`, { page, pageSize }),
   createExpense: (body: unknown) => apiClient.post<Expense>(`${base}/expenses`, body),
+  journalVouchers: (page = 1, pageSize = 20) => apiClient.get<PagedResult<JournalVoucher>>(`${base}/journal-vouchers`, { page, pageSize }),
+  createJournalVoucher: (body: CreateJournalVoucher) => apiClient.post<JournalVoucher>(`${base}/journal-vouchers`, body),
 };
 
 export async function warmOfflineOperationReferences() {

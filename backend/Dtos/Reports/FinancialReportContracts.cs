@@ -43,6 +43,8 @@ public sealed record FinancialReportSummaryResponse(
     int OnlineOrders,
     int ManualSales,
     int PurchaseCount,
+    int ReturnedOrderCount,
+    decimal ReturnedOrderAmount,
     int CustomerCount,
     int ProductCount,
     int LowStockProducts,
@@ -50,13 +52,28 @@ public sealed record FinancialReportSummaryResponse(
     IReadOnlyCollection<FinancialTrendPoint> Trend,
     IReadOnlyCollection<FinancialTrendPoint> ProfitTrend,
     IReadOnlyCollection<TopProductResponse> TopProducts,
+    IReadOnlyCollection<BusinessPartyMetricResponse> TopCustomers,
+    IReadOnlyCollection<BusinessPartyMetricResponse> TopSuppliers,
     IReadOnlyCollection<FinancialReportLineResponse> Results,
     int TotalResults,
     int Page,
     int PageSize);
 
 public sealed record FinancialTrendPoint(DateOnly Date, decimal Revenue, decimal Cost, decimal Net);
-public sealed record TopProductResponse(long ProductId, string ProductName, decimal Quantity, decimal Revenue);
+public sealed record TopProductResponse(
+    long ProductId,
+    string ProductName,
+    decimal Quantity,
+    decimal Revenue,
+    decimal Cost,
+    decimal Profit,
+    decimal MarginPercent);
+public sealed record BusinessPartyMetricResponse(
+    long? Id,
+    string Name,
+    int TransactionCount,
+    decimal Amount,
+    decimal Balance);
 public sealed record FinancialReportLineResponse(
     string Source,
     long Id,

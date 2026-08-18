@@ -5,11 +5,12 @@ import { apiBaseUrl } from "@/api/axios";
 import type { PublicCompanyProfile } from "./company-types";
 import { useI18n } from "@/i18n/i18n-provider";
 import { resolveCompanyFontStack, resolveCompanyHeadingStack } from "@/features/company/company-fonts";
+import { toFiniteNumber } from "@/lib/numbers";
 
 interface CompanyContextValue {
     company: PublicCompanyProfile | null;
     loading: boolean;
-    formatMoney: (amount: number, currency?: string) => string;
+    formatMoney: (amount: unknown, currency?: string) => string;
 }
 
 const CompanyContext = createContext<CompanyContextValue | null>(null);
@@ -74,15 +75,16 @@ export function CompanyProvider({ children }: PropsWithChildren) {
         formatMoney(amount, currency) {
             const settings = company?.settings;
             const code = currency || settings?.mainCurrencyCode || "USD";
+            const safeAmount = toFiniteNumber(amount);
             try {
                 return new Intl.NumberFormat(language === "en" ? "en-US" : language === "ps" ? "ps-AF" : "fa-AF", {
                     style: "currency",
                     currency: code,
                     minimumFractionDigits: settings?.currencyDecimalPlaces ?? 2,
                     maximumFractionDigits: settings?.currencyDecimalPlaces ?? 2,
-                }).format(amount);
+                }).format(safeAmount);
             } catch {
-                const formatted = amount.toFixed(settings?.currencyDecimalPlaces ?? 2);
+                const formatted = safeAmount.toFixed(settings?.currencyDecimalPlaces ?? 2);
                 const symbol = settings?.currencySymbol || code;
                 return settings?.currencyPosition === "after" ? `${formatted} ${symbol}` : `${symbol}${formatted}`;
             }

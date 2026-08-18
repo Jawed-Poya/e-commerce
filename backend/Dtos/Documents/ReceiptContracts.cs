@@ -32,6 +32,7 @@ public sealed record ReceiptResponse(
     decimal Total,
     decimal PaidAmount,
     decimal BalanceAmount,
+    decimal PreviousBalance,
     string PaymentStatus,
     string? PaymentMethod,
     string? Notes,

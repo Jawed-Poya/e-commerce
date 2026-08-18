@@ -40,6 +40,30 @@ export interface CustomerVisitItem {
     isAuthenticated: boolean;
 }
 
+export interface VisitAnalytics {
+    generatedAt: string;
+    onlineVisitors: number;
+    authenticatedOnlineVisitors: number;
+    visitsLast24Hours: number;
+    uniqueVisitorsLast24Hours: number;
+    topProducts: { label: string; path: string; visits: number }[];
+    topSearches: { term: string; searches: number }[];
+    activeVisitors: {
+        sessionId: string;
+        customerId: number | null;
+        customerName: string | null;
+        currentPath: string;
+        pageTitle: string | null;
+        firstSeenAt: string;
+        lastSeenAt: string;
+        deviceType: string | null;
+        browser: string | null;
+        operatingSystem: string | null;
+        language: string | null;
+        isAuthenticated: boolean;
+    }[];
+}
+
 export const AuditActions = [
     "Create",
     "Update",

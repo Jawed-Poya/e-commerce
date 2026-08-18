@@ -148,6 +148,8 @@ public class ApplicationDbContext
     public DbSet<StaffSalaryInstallment> StaffSalaryInstallments => Set<StaffSalaryInstallment>();
     public DbSet<ExpenseCategory> ExpenseCategories => Set<ExpenseCategory>();
     public DbSet<Expense> Expenses => Set<Expense>();
+    public DbSet<JournalVoucher> JournalVouchers => Set<JournalVoucher>();
+    public DbSet<JournalVoucherLine> JournalVoucherLines => Set<JournalVoucherLine>();
 
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<Branch> Branches => Set<Branch>();
@@ -227,6 +229,8 @@ public class ApplicationDbContext
         builder.Entity<StaffSalaryInstallment>().HasQueryFilter(x => !x.IsDeleted && !x.StaffSalaryPayment.IsDeleted && !x.StaffSalaryPayment.Staff.IsDeleted);
         builder.Entity<ExpenseCategory>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<Expense>().HasQueryFilter(x => !x.IsDeleted && (x.Category == null || !x.Category.IsDeleted) && (x.GeneralTypeCategory == null || !x.GeneralTypeCategory.IsDeleted));
+        builder.Entity<JournalVoucher>().HasQueryFilter(x => !x.IsDeleted);
+        builder.Entity<JournalVoucherLine>().HasQueryFilter(x => !x.IsDeleted && !x.JournalVoucher.IsDeleted);
         builder.Entity<ProductImage>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted);
         builder.Entity<ProductInventory>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted);
         builder.Entity<ProductPrice>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted && !x.CustomerType.IsDeleted);

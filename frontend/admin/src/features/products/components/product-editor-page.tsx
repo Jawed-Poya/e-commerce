@@ -22,7 +22,7 @@ import { CustomerPricingFields, activePriceInputs, createCustomerPriceDrafts, va
 import { ProductUnitConversionsFields, validateUnitConversions } from "./product-unit-conversions-fields";
 import { QuickQuantityEditor, quickQuantitiesMatchStep } from "./quick-quantity-editor";
 
-const empty = { name: "", barcode: "", strength: "", shortDescription: "", description: "", slug: "", categoryId: 0, brandId: null as number | null, unitId: null as number | null, minimumValue: null as number | null, maximumValue: null as number | null, orderQuantityStep: 1, quickOrderQuantities: [] as number[], minimumStockQuantity: 0, usesDisplayStock: false, displayStockQuantity: null as number | null, isFeatured: false, isActive: true };
+const empty = { name: "", barcode: "", strength: "", genericName: "", formula: "", shortDescription: "", description: "", slug: "", categoryId: 0, brandId: null as number | null, unitId: null as number | null, minimumValue: null as number | null, maximumValue: null as number | null, orderQuantityStep: 1, quickOrderQuantities: [] as number[], minimumStockQuantity: 0, usesDisplayStock: false, displayStockQuantity: null as number | null, isFeatured: false, isActive: true };
 
 export function ProductEditorPage() {
   const params = useParams();
@@ -43,7 +43,7 @@ export function ProductEditorPage() {
 
   useEffect(() => {
     if (!product) return;
-    setForm({ name: product.name, barcode: product.barcode ?? "", strength: product.strength ?? "", shortDescription: product.shortDescription ?? "", description: product.description ?? "", slug: product.slug ?? "", categoryId: product.categoryId, brandId: product.brandId, unitId: product.unitId, minimumValue: product.minimumValue, maximumValue: product.maximumValue, orderQuantityStep: product.orderQuantityStep || 1, quickOrderQuantities: product.quickOrderQuantities ?? [], minimumStockQuantity: product.inventory?.minimumQuantity ?? 0, usesDisplayStock: product.usesDisplayStock, displayStockQuantity: product.displayStockQuantity, isFeatured: product.isFeatured, isActive: product.isActive });
+    setForm({ name: product.name, barcode: product.barcode ?? "", strength: product.strength ?? "", genericName: product.genericName ?? "", formula: product.formula ?? "", shortDescription: product.shortDescription ?? "", description: product.description ?? "", slug: product.slug ?? "", categoryId: product.categoryId, brandId: product.brandId, unitId: product.unitId, minimumValue: product.minimumValue, maximumValue: product.maximumValue, orderQuantityStep: product.orderQuantityStep || 1, quickOrderQuantities: product.quickOrderQuantities ?? [], minimumStockQuantity: product.inventory?.minimumQuantity ?? 0, usesDisplayStock: product.usesDisplayStock, displayStockQuantity: product.displayStockQuantity, isFeatured: product.isFeatured, isActive: product.isActive });
     setUnitConversions(product.unitConversions.filter(unit => !unit.isBaseUnit).map(unit => ({
       id: unit.id,
       unitId: unit.unitId,
@@ -96,6 +96,9 @@ export function ProductEditorPage() {
     const pricingError = canManagePricing ? validatePriceDrafts(prices) : null;
     if (pricingError) return toast.error(pricingError);
     if (!editing && !image) return toast.error("A primary product image is required.");
+    const sellingPricesChanged = Boolean(editing && product && canManagePricing &&
+      JSON.stringify(normalizePrices(activePrices)) !== JSON.stringify(normalizePrices(product.prices)));
+    if (sellingPricesChanged && !window.confirm("Confirm selling price change? This immediately affects new storefront and manual-sale pricing.")) return;
     setSaving(true);
     try {
       let productId = id;
@@ -128,6 +131,8 @@ export function ProductEditorPage() {
           <Field label="Product name *"><Input value={form.name} onChange={e => setForm(x => ({ ...x, name: e.target.value }))} /></Field>
           <Field label="Barcode"><Input value={form.barcode} onChange={e => setForm(x => ({ ...x, barcode: e.target.value }))} /></Field>
           <Field label={t("products.strength")}><Input value={form.strength} onChange={e => setForm(x => ({ ...x, strength: e.target.value }))} placeholder={t("products.strengthPlaceholder")} /></Field>
+          <Field label="Generic / scientific name"><Input value={form.genericName} onChange={e => setForm(x => ({ ...x, genericName: e.target.value }))} placeholder="Example: Paracetamol" /></Field>
+          <Field label="Formula / composition"><Input value={form.formula} onChange={e => setForm(x => ({ ...x, formula: e.target.value }))} placeholder="Ingredients or product formula" /></Field>
           <Field label="Category *"><SimpleCombobox<number> value={form.categoryId || null} onValueChange={(value) => setForm((x) => ({ ...x, categoryId: value ?? 0 }))} options={(lookups?.categories ?? []).map((option) => ({ value: option.id, label: option.name }))} placeholder="Select category" /></Field>
           <Field label="Brand"><SimpleCombobox<number> value={form.brandId} onValueChange={(value) => setForm((x) => ({ ...x, brandId: value }))} options={(lookups?.brands ?? []).map((option) => ({ value: option.id, label: option.name }))} placeholder="No brand" /></Field>
           <Field label={t("productUnits.baseUnit")}><SimpleCombobox<number> value={form.unitId} onValueChange={(value) => setForm((x) => ({ ...x, unitId: value }))} options={(lookups?.units ?? []).map((option) => ({ value: option.id, label: option.name }))} placeholder="Select base unit" /></Field>
@@ -181,3 +186,7 @@ export function ProductEditorPage() {
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="min-w-0 space-y-2"><Label className="block">{label}</Label><div className="min-w-0">{children}</div></div>; }
+
+function normalizePrices(prices: { customerTypeId: number; regularPrice: number; salePrice: number | null; startDate: string | null; endDate: string | null }[]) {
+  return prices.map(({ customerTypeId, regularPrice, salePrice, startDate, endDate }) => ({ customerTypeId, regularPrice, salePrice, startDate, endDate })).sort((a, b) => a.customerTypeId - b.customerTypeId);
+}

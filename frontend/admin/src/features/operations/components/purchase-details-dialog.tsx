@@ -20,6 +20,7 @@ import { PaymentBadge } from "@/features/operations/components/payment-ledger-di
 import { operationKeys, useOperationQuery } from "@/features/operations/operations-hooks";
 import { operationsService } from "@/features/operations/operations-service";
 import type { Purchase } from "@/features/operations/operations-types";
+import { toFiniteNumber } from "@/lib/numbers";
 
 interface PurchaseDetailsDialogProps {
     purchase: Purchase | null;
@@ -127,7 +128,7 @@ function Money({ label, value, format, strong = false }: { label: string; value:
 }
 
 function number(value: number) {
-    return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
+    return toFiniteNumber(value).toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
 function formatDate(value: string) {

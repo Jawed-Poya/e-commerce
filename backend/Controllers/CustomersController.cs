@@ -36,6 +36,19 @@ public sealed class CustomersController(ICustomerService customers) : Controller
         return Ok(ApiResponse<CustomerDetailsResponse>.Ok(result));
     }
 
+    [Authorize(Policy = AppPermissions.CustomersView)]
+    [HttpGet("{id:long}/engagement")]
+    public async Task<ActionResult<ApiResponse<CustomerEngagementResponse>>> GetEngagement(
+        long id,
+        CancellationToken cancellationToken)
+    {
+        var result = await customers.GetEngagementAsync(id, cancellationToken);
+        if (result is null)
+            return NotFound(ApiResponse<object>.Fail("Customer not found."));
+
+        return Ok(ApiResponse<CustomerEngagementResponse>.Ok(result));
+    }
+
     [Authorize(Policy = AppPermissions.CustomersManage)]
     [HttpPost]
     public async Task<ActionResult<ApiResponse<CustomerDetailsResponse>>> Create(

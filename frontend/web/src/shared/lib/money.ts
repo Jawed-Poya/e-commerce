@@ -8,15 +8,30 @@ export function configureMoney(currency: string, decimals = 2, locale?: string) 
     defaultLocale = locale;
 }
 
-export function formatMoney(amount: number, currency = defaultCurrency) {
+export function toFiniteNumber(value: unknown, fallback = 0) {
+    const number = typeof value === "number"
+        ? value
+        : typeof value === "string" && value.trim()
+            ? Number(value)
+            : Number.NaN;
+    return Number.isFinite(number) ? number : fallback;
+}
+
+export function formatDecimal(value: unknown, fractionDigits = 1) {
+    const digits = Math.max(0, Math.min(6, Math.trunc(toFiniteNumber(fractionDigits, 1))));
+    return toFiniteNumber(value).toFixed(digits);
+}
+
+export function formatMoney(amount: unknown, currency = defaultCurrency) {
+    const safeAmount = toFiniteNumber(amount);
     try {
         return new Intl.NumberFormat(defaultLocale, {
             style: "currency",
             currency,
             minimumFractionDigits: defaultDecimals,
             maximumFractionDigits: defaultDecimals,
-        }).format(amount);
+        }).format(safeAmount);
     } catch {
-        return `${currency} ${amount.toFixed(defaultDecimals)}`;
+        return `${currency} ${safeAmount.toFixed(defaultDecimals)}`;
     }
 }

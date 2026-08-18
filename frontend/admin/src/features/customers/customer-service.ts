@@ -1,5 +1,5 @@
 import apiClient from "@/api/api-client";
-import type { CustomerDetails, CustomerListItem, PagedResult, UpsertCustomerRequest } from "./customer-types";
+import type { CustomerDetails, CustomerEngagement, CustomerListItem, PagedResult, UpsertCustomerRequest } from "./customer-types";
 
 export const customerService = {
     async getCustomers(params: { search?: string; page?: number; pageSize?: number }) {
@@ -7,6 +7,9 @@ export const customerService = {
     },
     async getCustomer(id: number) {
         return (await apiClient.get<CustomerDetails>(`/customers/${id}`)).data;
+    },
+    async getEngagement(id: number) {
+        return (await apiClient.get<CustomerEngagement>(`/customers/${id}/engagement`)).data;
     },
     async createCustomer(request: UpsertCustomerRequest) {
         return (await apiClient.post<CustomerDetails>("/customers", request)).data;

@@ -45,6 +45,10 @@ export const ProductBulkItemSchema = z
             .trim()
             .max(100, "Strength cannot exceed 100 characters."),
 
+        genericName: z.string().trim().max(200, "Generic name cannot exceed 200 characters."),
+
+        formula: z.string().trim().max(500, "Formula cannot exceed 500 characters."),
+
         shortDescription: z
             .string()
             .trim()

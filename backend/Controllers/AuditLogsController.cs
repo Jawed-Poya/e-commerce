@@ -42,4 +42,9 @@ public sealed class AuditLogsController(IAuditLogService service) : ApiControlle
             cancellationToken);
         return Success(result);
     }
+
+    [HttpGet("visit-analytics")]
+    public async Task<ActionResult<ApiResponse<VisitAnalyticsResponse>>> VisitAnalytics(
+        CancellationToken cancellationToken = default) =>
+        Success(await service.GetVisitAnalyticsAsync(cancellationToken));
 }

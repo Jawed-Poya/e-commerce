@@ -1,4 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import { Button } from "../../shared/components/ui/button";
+import { apiGet } from "../../shared/api/api-client";
 
 const scriptId = "google-identity-services";
 const scriptUrl = "https://accounts.google.com/gsi/client";
@@ -11,7 +14,25 @@ export function GoogleSignInButton({
     disabled?: boolean;
 }) {
     const containerRef = useRef<HTMLDivElement>(null);
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
+    const environmentClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? "";
+    const [clientId, setClientId] = useState(environmentClientId);
+    const [configurationLoaded, setConfigurationLoaded] = useState(Boolean(environmentClientId));
+
+    useEffect(() => {
+        if (environmentClientId) return;
+        let active = true;
+        void apiGet<{ enabled: boolean; clientId: string | null }>("/auth/customer/google/config")
+            .then((configuration) => {
+                if (active) setClientId(configuration.enabled ? configuration.clientId?.trim() ?? "" : "");
+            })
+            .catch(() => {
+                // The regular sign-in form remains available if configuration cannot load.
+            })
+            .finally(() => {
+                if (active) setConfigurationLoaded(true);
+            });
+        return () => { active = false; };
+    }, [environmentClientId]);
 
     useEffect(() => {
         if (!clientId || disabled) return;
@@ -55,6 +76,24 @@ export function GoogleSignInButton({
         return () => script.removeEventListener("load", render);
     }, [clientId, disabled, onCredential]);
 
-    if (!clientId) return null;
+    if (!clientId) {
+        return (
+            <Button
+                type="button"
+                variant="outline"
+                className="h-11 w-full rounded-full bg-background font-bold"
+                disabled
+                title={configurationLoaded ? "Google sign-in is not configured" : "Loading Google sign-in"}
+            >
+                <span
+                    aria-hidden="true"
+                    className="grid size-6 place-items-center rounded-full bg-white text-base font-black text-[#4285F4] shadow-sm ring-1 ring-black/10"
+                >
+                    G
+                </span>
+                Continue with Google
+            </Button>
+        );
+    }
     return <div ref={containerRef} className={disabled ? "pointer-events-none opacity-60" : "min-h-11 w-full"} />;
 }

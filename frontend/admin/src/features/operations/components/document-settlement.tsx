@@ -53,10 +53,12 @@ export function AmountInputRow({
     label,
     value,
     onChange,
+    max,
 }: {
     label: string;
     value: number;
     onChange: (value: number) => void;
+    max?: number;
 }) {
     return (
         <div className="grid grid-cols-[1fr_140px] items-center gap-4">
@@ -67,6 +69,7 @@ export function AmountInputRow({
                 className="text-end tabular-nums"
                 type="number"
                 min={0}
+                max={max}
                 step="0.01"
                 value={value}
                 onChange={(event) => onChange(Number(event.target.value))}
@@ -133,4 +136,3 @@ function SectionHeading({
         </div>
     );
 }
-

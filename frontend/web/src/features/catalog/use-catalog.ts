@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { getLookups, getProducts, type CatalogParams } from "./catalog-api";
 
 export const useProducts = (params: CatalogParams) =>
@@ -10,6 +10,17 @@ export const useProducts = (params: CatalogParams) =>
     placeholderData: keepPreviousData,
     staleTime: 30_000,
   });
+
+export const useInfiniteProducts = (params: CatalogParams) =>
+  useInfiniteQuery({
+    queryKey: ["products", "infinite", params],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => getProducts({ ...params, page: pageParam }),
+    getNextPageParam: (lastPage) =>
+      lastPage.hasNextPage ? lastPage.page + 1 : undefined,
+    staleTime: 30_000,
+  });
+
 export const useLookups = () =>
   useQuery({
     queryKey: ["product-lookups"],

@@ -9,4 +9,5 @@ public interface IAuditLogService
     Task RecordStoreVisitAsync(RecordStoreVisitRequest request, HttpContext httpContext, CancellationToken ct);
     Task<AuditPageResponse<ActivityLogResponse>> GetActivityLogsAsync(string? search, string? action, int page, int pageSize, CancellationToken ct);
     Task<AuditPageResponse<CustomerVisitLogResponse>> GetVisitLogsAsync(string? search, int page, int pageSize, CancellationToken ct);
+    Task<VisitAnalyticsResponse> GetVisitAnalyticsAsync(CancellationToken ct);
 }

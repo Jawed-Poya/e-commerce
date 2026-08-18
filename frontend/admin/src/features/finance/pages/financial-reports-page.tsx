@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCompany } from "@/features/company/company-context";
 import { useI18n } from "@/i18n/i18n-provider";
+import { toFiniteNumber } from "@/lib/numbers";
 import { FinancialFilters } from "../components/financial-filters";
 import { FinancialInsights } from "../components/financial-insights";
 import { FinancialLedger } from "../components/financial-ledger";
@@ -24,7 +25,7 @@ export default function FinancialReportsPage() {
     const currency = data?.currencyCode;
     const money = (value: number) => formatMoney(value, currency);
     const totalPages = data
-        ? Math.max(1, Math.ceil(data.totalResults / data.pageSize))
+        ? Math.max(1, Math.ceil(toFiniteNumber(data.totalResults) / Math.max(1, toFiniteNumber(data.pageSize, 25))))
         : 1;
 
     return (

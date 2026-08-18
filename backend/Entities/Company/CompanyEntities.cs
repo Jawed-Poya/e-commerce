@@ -58,6 +58,16 @@ public sealed class CompanySetting
     [MaxLength(40)] public string ExpiryAlertSound { get; set; } = "critical-pulse";
     public int MaximumPurchaseLines { get; set; } = 50;
     public int MaximumManualSaleLines { get; set; } = 50;
+    public decimal GeneralSalesDiscountPercent { get; set; }
+    public decimal MaximumCustomerDebt { get; set; } = 300000m;
+    public int DefaultDebtDueDays { get; set; } = 30;
+    public bool AllowNegativeStockSales { get; set; }
+    [MaxLength(12)] public string PurchaseNumberPrefix { get; set; } = "PUR";
+    public long NextPurchaseNumber { get; set; } = 1;
+    public int PurchaseNumberIncrement { get; set; } = 1;
+    [MaxLength(12)] public string SaleNumberPrefix { get; set; } = "SAL";
+    public long NextSaleNumber { get; set; } = 1;
+    public int SaleNumberIncrement { get; set; } = 1;
     public bool AllowUserClaimManagement { get; set; } = true;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

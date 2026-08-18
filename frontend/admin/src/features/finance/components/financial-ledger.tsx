@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import type { FinancialReport } from "../finance-types";
 import { useI18n } from "@/i18n/i18n-provider";
+import { toFiniteNumber } from "@/lib/numbers";
 
 interface FinancialLedgerProps {
     report: FinancialReport;
@@ -52,7 +53,7 @@ export function FinancialLedger({
                         <CardTitle>{t("finance.transactionLedger")}</CardTitle>
                         <p className="mt-1 text-xs text-muted-foreground">
                             {tf("finance.matchingRecords", {
-                                count: report.totalResults.toLocaleString(locale),
+                                count: toFiniteNumber(report.totalResults).toLocaleString(locale),
                             })}
                         </p>
                     </div>

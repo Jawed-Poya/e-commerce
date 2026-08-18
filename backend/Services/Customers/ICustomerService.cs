@@ -14,6 +14,10 @@ public interface ICustomerService
         long id,
         CancellationToken cancellationToken = default);
 
+    Task<CustomerEngagementResponse?> GetEngagementAsync(
+        long id,
+        CancellationToken cancellationToken = default);
+
     Task<CustomerDetailsResponse> CreateAsync(
         UpsertCustomerRequest request,
         CancellationToken cancellationToken = default);

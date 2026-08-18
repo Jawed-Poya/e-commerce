@@ -131,7 +131,7 @@ export function CartPage() {
 
     return (
         <>
-            <main className="mx-auto w-full max-w-[1380px] px-4 pb-28 pt-6 sm:px-6 sm:pb-12 lg:px-8 lg:py-9">
+            <main className="mx-auto w-full max-w-[1380px] px-4 pb-40 pt-6 sm:px-6 md:pb-28 lg:px-8 lg:py-9">
                 <div className="flex flex-col justify-between gap-4 border-b pb-5 sm:flex-row sm:items-end">
                     <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary sm:text-xs">
@@ -376,7 +376,7 @@ export function CartPage() {
                 </div>
             </main>
 
-            <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-4 py-2.5 shadow-[0_-12px_35px_rgba(15,23,42,0.1)] backdrop-blur-xl lg:hidden">
+            <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t bg-background/95 px-4 py-2.5 shadow-[0_-12px_35px_rgba(15,23,42,0.1)] backdrop-blur-xl md:bottom-0 lg:hidden">
                 <div className="mx-auto flex max-w-xl items-center gap-4">
                     <div className="min-w-0">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">

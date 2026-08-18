@@ -98,7 +98,6 @@ export function CartQuantityControl({
 
         {showStepBadge && step > 1 ? (
           <Badge
-            variant="secondary"
             className={cn(
               "shrink-0 border border-primary/15 bg-primary/[0.06] font-black text-primary shadow-none",
               compact ? "h-6 px-1.5 text-[9px]" : "h-7 px-2 text-[10px]",

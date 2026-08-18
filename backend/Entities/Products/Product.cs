@@ -16,6 +16,12 @@ public class Product : BaseEntity
     /// </summary>
     public string? Strength { get; set; }
 
+    /// <summary>Generic or scientific name used for professional product lookup.</summary>
+    public string? GenericName { get; set; }
+
+    /// <summary>Composition/formula shown during purchasing and selling.</summary>
+    public string? Formula { get; set; }
+
     public string? ShortDescription { get; set; }
 
     public string? Description { get; set; }

@@ -17,6 +17,15 @@ public class Customer : BaseEntity
 
     public long? CustomerTypeId { get; set; }
 
+    /// <summary>Reusable customer money created by overpayments.</summary>
+    public decimal AccountCredit { get; set; }
+
+    /// <summary>Optional per-customer override; null uses the company limit.</summary>
+    public decimal? CreditLimit { get; set; }
+
+    /// <summary>Optional per-customer debt due period; null uses company settings.</summary>
+    public int? DebtDueDays { get; set; }
+
     public GeneralType? CustomerType { get; set; }
 
     public ICollection<Order> Orders { get; set; } = [];

@@ -3,8 +3,10 @@ import { useEffect, type PropsWithChildren } from "react";
 
 import { AuthProvider } from "../features/auth/auth-context";
 import { CartProvider } from "../features/cart/cart-context";
+import { ProductPinsProvider } from "../features/catalog/product-pins-context";
 import { CompanyProvider } from "../features/company/company-context";
 import { NotificationProvider } from "../features/notifications/notification-context";
+import { PwaInstallProvider } from "../features/pwa/pwa-install-context";
 import { I18nProvider } from "../i18n/i18n-provider";
 import { ThemeProvider } from "./theme-provider";
 
@@ -45,18 +47,22 @@ export function AppProviders({ children }: PropsWithChildren) {
     return (
         <ThemeProvider>
             <I18nProvider>
-                <QueryClientProvider client={queryClient}>
-                    <PwaQueryCacheWarmer />
-                    <CompanyProvider>
-                        <AuthProvider>
-                            <CartProvider>
-                                <NotificationProvider>
-                                    {children}
-                                </NotificationProvider>
-                            </CartProvider>
-                        </AuthProvider>
-                    </CompanyProvider>
-                </QueryClientProvider>
+                <PwaInstallProvider>
+                    <QueryClientProvider client={queryClient}>
+                        <PwaQueryCacheWarmer />
+                        <CompanyProvider>
+                            <AuthProvider>
+                                <ProductPinsProvider>
+                                    <CartProvider>
+                                        <NotificationProvider>
+                                            {children}
+                                        </NotificationProvider>
+                                    </CartProvider>
+                                </ProductPinsProvider>
+                            </AuthProvider>
+                        </CompanyProvider>
+                    </QueryClientProvider>
+                </PwaInstallProvider>
             </I18nProvider>
         </ThemeProvider>
     );

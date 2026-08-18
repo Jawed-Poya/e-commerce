@@ -1,10 +1,14 @@
-export function formatMoney(amount: number, currency: string) {
+import { toFiniteNumber } from "./numbers";
+
+export function formatMoney(amount: unknown, currency: string) {
+    const safeAmount = toFiniteNumber(amount);
+    const safeCurrency = typeof currency === "string" && currency.trim() ? currency.trim() : "USD";
     try {
         return new Intl.NumberFormat(undefined, {
             style: "currency",
-            currency,
-        }).format(amount);
+            currency: safeCurrency,
+        }).format(safeAmount);
     } catch {
-        return `${currency} ${amount.toFixed(2)}`;
+        return `${safeCurrency} ${safeAmount.toFixed(2)}`;
     }
 }

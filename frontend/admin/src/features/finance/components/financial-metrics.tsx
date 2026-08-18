@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
-import { Building2, Landmark, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
+import { Building2, Landmark, RotateCcw, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import type { CompanyWorth, FinancialReport } from "../finance-types";
 import { useI18n } from "@/i18n/i18n-provider";
+import { formatDecimal, toFiniteNumber } from "@/lib/numbers";
 
 interface FinancialMetricsProps {
     report: FinancialReport;
@@ -13,6 +14,8 @@ interface FinancialMetricsProps {
 
 export function FinancialMetrics({ report, worth, money }: FinancialMetricsProps) {
     const { t, tf } = useI18n();
+    const grossProfit = toFiniteNumber(report.grossProfit);
+    const netProfit = toFiniteNumber(report.netProfit);
 
     return (
         <div className="space-y-4">
@@ -37,19 +40,19 @@ export function FinancialMetrics({ report, worth, money }: FinancialMetricsProps
                     title={t("finance.grossProfit")}
                     value={money(report.grossProfit)}
                     detail={tf("finance.grossMargin", {
-                        percent: report.grossMarginPercent.toFixed(2),
+                        percent: formatDecimal(report.grossMarginPercent, 2),
                     })}
-                    icon={report.grossProfit >= 0 ? <TrendingUp /> : <TrendingDown />}
-                    tone={report.grossProfit >= 0 ? "positive" : "negative"}
+                    icon={grossProfit >= 0 ? <TrendingUp /> : <TrendingDown />}
+                    tone={grossProfit >= 0 ? "positive" : "negative"}
                 />
                 <Metric
                     title={t("finance.netProfit")}
                     value={money(report.netProfit)}
                     detail={tf("finance.netMargin", {
-                        percent: report.netMarginPercent.toFixed(2),
+                        percent: formatDecimal(report.netMarginPercent, 2),
                     })}
-                    icon={report.netProfit >= 0 ? <TrendingUp /> : <TrendingDown />}
-                    tone={report.netProfit >= 0 ? "positive" : "negative"}
+                    icon={netProfit >= 0 ? <TrendingUp /> : <TrendingDown />}
+                    tone={netProfit >= 0 ? "positive" : "negative"}
                 />
             </div>
 
@@ -85,7 +88,7 @@ export function FinancialMetrics({ report, worth, money }: FinancialMetricsProps
                 />
                 <Metric
                     title={t("finance.payables")}
-                    value={money(report.outstandingSupplierPayables + report.outstandingPayroll)}
+                    value={money(toFiniteNumber(report.outstandingSupplierPayables) + toFiniteNumber(report.outstandingPayroll))}
                     detail={tf("finance.payablesDetail", {
                         suppliers: money(report.outstandingSupplierPayables),
                         payroll: money(report.outstandingPayroll),
@@ -93,6 +96,7 @@ export function FinancialMetrics({ report, worth, money }: FinancialMetricsProps
                     icon={<TrendingDown />}
                 />
             </div>
+            {report.returnedOrderCount > 0 ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric title={t("finance.returns")} value={money(report.returnedOrderAmount)} detail={tf("finance.returnCount", { count: report.returnedOrderCount })} icon={<RotateCcw />} tone="negative" /></div> : null}
         </div>
     );
 }

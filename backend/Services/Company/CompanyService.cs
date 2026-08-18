@@ -86,6 +86,16 @@ public sealed class CompanyService(ApplicationDbContext context) : ICompanyServi
         settings.ExpiryAlertPeriodsJson = JsonSerializer.Serialize(periods);
         settings.ExpiryAlertSoundEnabled = request.ExpiryAlertSoundEnabled;
         settings.ExpiryAlertSound = Required(request.ExpiryAlertSound, "Expiry alert sound").ToLowerInvariant();
+        settings.GeneralSalesDiscountPercent = request.GeneralSalesDiscountPercent;
+        settings.MaximumCustomerDebt = request.MaximumCustomerDebt;
+        settings.DefaultDebtDueDays = request.DefaultDebtDueDays;
+        settings.AllowNegativeStockSales = request.AllowNegativeStockSales;
+        settings.PurchaseNumberPrefix = Required(request.PurchaseNumberPrefix, "Purchase number prefix").ToUpperInvariant();
+        settings.NextPurchaseNumber = request.NextPurchaseNumber;
+        settings.PurchaseNumberIncrement = request.PurchaseNumberIncrement;
+        settings.SaleNumberPrefix = Required(request.SaleNumberPrefix, "Sale number prefix").ToUpperInvariant();
+        settings.NextSaleNumber = request.NextSaleNumber;
+        settings.SaleNumberIncrement = request.SaleNumberIncrement;
         settings.AllowUserClaimManagement = request.AllowUserClaimManagement;
         settings.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync(cancellationToken);
@@ -246,6 +256,16 @@ public sealed class CompanyService(ApplicationDbContext context) : ICompanyServi
         settings.ExpiryAlertSound,
         settings.MaximumPurchaseLines,
         settings.MaximumManualSaleLines,
+        settings.GeneralSalesDiscountPercent,
+        settings.MaximumCustomerDebt,
+        settings.DefaultDebtDueDays,
+        settings.AllowNegativeStockSales,
+        settings.PurchaseNumberPrefix,
+        settings.NextPurchaseNumber,
+        settings.PurchaseNumberIncrement,
+        settings.SaleNumberPrefix,
+        settings.NextSaleNumber,
+        settings.SaleNumberIncrement,
         settings.AllowUserClaimManagement);
 
     private static CompanySettingEntity DefaultSettings() => new();
@@ -351,6 +371,18 @@ public sealed class CompanyService(ApplicationDbContext context) : ICompanyServi
             throw new ArgumentException("Expiry alert sound is not supported.");
         if (request.DefaultQuickOrderQuantities is not null)
             _ = NormalizeQuickOrderQuantities(request.DefaultQuickOrderQuantities, throwOnInvalid: true);
+        if (request.GeneralSalesDiscountPercent is < 0 or > 100)
+            throw new ArgumentException("General sales discount must be between 0 and 100 percent.");
+        if (request.MaximumCustomerDebt < 0)
+            throw new ArgumentException("Maximum customer debt cannot be negative.");
+        if (request.DefaultDebtDueDays is < 0 or > 3650)
+            throw new ArgumentException("Default debt due days must be between 0 and 3650.");
+        if (Required(request.PurchaseNumberPrefix, "Purchase number prefix").Length > 12 ||
+            Required(request.SaleNumberPrefix, "Sale number prefix").Length > 12)
+            throw new ArgumentException("Invoice number prefixes cannot exceed 12 characters.");
+        if (request.NextPurchaseNumber < 1 || request.NextSaleNumber < 1 ||
+            request.PurchaseNumberIncrement < 1 || request.SaleNumberIncrement < 1)
+            throw new ArgumentException("Invoice sequence values and increments must be at least 1.");
         return periods;
     }
 

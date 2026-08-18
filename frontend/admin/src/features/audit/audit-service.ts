@@ -1,5 +1,5 @@
 import apiClient from "@/api/api-client";
-import type { ActivityLogItem, AuditPage, CustomerVisitItem } from "./audit-types";
+import type { ActivityLogItem, AuditPage, CustomerVisitItem, VisitAnalytics } from "./audit-types";
 
 const base = "/admin/audit-logs";
 
@@ -17,4 +17,5 @@ export const auditService = {
             page,
             pageSize,
         }),
+    visitAnalytics: () => apiClient.get<VisitAnalytics>(`${base}/visit-analytics`),
 };

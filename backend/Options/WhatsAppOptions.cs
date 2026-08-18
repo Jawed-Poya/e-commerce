@@ -24,8 +24,9 @@ public sealed class WhatsAppOptions
         "Hello {CustomerName}, we are contacting you about order {OrderNumber}.";
 
     /// <summary>
-    /// Supported placeholders: {CustomerName}, {Phone}, and {SaleNumber}.
+    /// Supported placeholders: {CustomerName}, {Phone}, {SaleNumber},
+    /// {Total}, {Paid}, {Balance}, and {Currency}.
     /// </summary>
     public string SaleMessageTemplate { get; set; } =
-        "Hello {CustomerName}, we are contacting you about sale {SaleNumber}.";
+        "Receipt {SaleNumber}\nCustomer: {CustomerName}\nTotal: {Total} {Currency}\nPaid: {Paid} {Currency}\nBalance: {Balance} {Currency}\nThank you for your business.";
 }

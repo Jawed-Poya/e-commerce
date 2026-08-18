@@ -1,19 +1,28 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import {
-    ChevronLeft,
     ChevronRight,
+    LoaderCircle,
     PackageSearch,
     Search,
     SlidersHorizontal,
     X,
 } from "lucide-react";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type FormEvent,
+    type ReactNode,
+} from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { flattenCategoryTree } from "./category-tree";
 import { ProductCard } from "./product-card";
-import { useLookups, useProducts } from "./use-catalog";
+import { useProductPins } from "./product-pins-context";
+import { useInfiniteProducts, useLookups } from "./use-catalog";
 
+import { imageUrl } from "../../shared/api/api-client";
 import { Button } from "../../shared/components/ui/button";
 import {
     Select,
@@ -23,8 +32,9 @@ import {
     SelectValue,
 } from "../../shared/components/ui/select";
 import { Skeleton } from "../../shared/components/ui/skeleton";
+import { ScrollArea } from "../../shared/components/ui/scroll-area";
 import { formatMoney } from "../../shared/lib/money";
-import type { CategoryLookup } from "../../shared/types/product";
+import type { CategoryLookup, Product } from "../../shared/types/product";
 import { useI18n } from "../../i18n/i18n-provider";
 
 export function CatalogPage() {
@@ -32,8 +42,8 @@ export function CatalogPage() {
     const [params, setParams] = useSearchParams();
     const [search, setSearch] = useState(params.get("search") ?? "");
     const [filtersOpen, setFiltersOpen] = useState(false);
-
-    const page = Number(params.get("page") ?? 1);
+    const loadMoreRef = useRef<HTMLDivElement>(null);
+    const pins = useProductPins();
     const sort = params.get("sort") ?? "newest";
 
     const sortMap: Record<string, [string, boolean]> = {
@@ -54,8 +64,7 @@ export function CatalogPage() {
         Math.ceil(lookups.data?.maximumPrice ?? priceMinimum + 1),
     );
 
-    const query = useProducts({
-        page,
+    const query = useInfiniteProducts({
         pageSize: 12,
         search: params.get("search") ?? undefined,
         categoryId: params.get("categoryId")
@@ -82,6 +91,59 @@ export function CatalogPage() {
         sortBy,
         sortDescending,
     });
+
+    const loadedProducts = useMemo(
+        () => query.data?.pages.flatMap((result) => result.items) ?? [],
+        [query.data?.pages],
+    );
+    const matchingPinnedProducts = useMemo(
+        () =>
+            pins.pinnedProducts.filter((product) =>
+                matchesCatalogFilters(product, params),
+            ),
+        [params, pins.pinnedProducts],
+    );
+    const displayedProducts = useMemo(() => {
+        const products = new Map<number, (typeof loadedProducts)[number]>();
+
+        matchingPinnedProducts.forEach((product) =>
+            products.set(product.id, product),
+        );
+        loadedProducts.forEach((product) => {
+            if (pins.pinnedIds.includes(product.id)) {
+                products.set(product.id, product);
+            } else if (!products.has(product.id)) {
+                products.set(product.id, product);
+            }
+        });
+
+        return [
+            ...pins.pinnedIds
+                .map((id) => products.get(id))
+                .filter((product) => product != null),
+            ...[...products.values()].filter(
+                (product) => !pins.pinnedIds.includes(product.id),
+            ),
+        ];
+    }, [loadedProducts, matchingPinnedProducts, pins.pinnedIds]);
+    const firstPage = query.data?.pages[0];
+    const { fetchNextPage, hasNextPage, isFetchingNextPage } = query;
+
+    useEffect(() => {
+        const target = loadMoreRef.current;
+        if (!target || !hasNextPage) return;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting && !isFetchingNextPage) {
+                    void fetchNextPage();
+                }
+            },
+            { rootMargin: "500px 0px" },
+        );
+        observer.observe(target);
+        return () => observer.disconnect();
+    }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
     const update = (key: string, value?: string) => {
         const next = new URLSearchParams(params);
@@ -257,14 +319,14 @@ export function CatalogPage() {
                         </p>
                     </div>
 
-                    {!query.isLoading && query.data && (
+                    {!query.isLoading && firstPage && (
                         <div className="w-fit rounded-xl bg-background/[0.80] px-4 py-3 ring-1 ring-black/[0.05] dark:bg-white/[0.04] dark:ring-white/[0.05]">
                             <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                                 {t("catalog.availableNow")}
                             </span>
 
                             <span className="mt-1 block text-xl font-black">
-                                {query.data.totalCount}
+                                {firstPage.totalCount}
                             </span>
 
                             <span className="text-xs text-muted-foreground">
@@ -276,12 +338,12 @@ export function CatalogPage() {
             </section>
 
             {rootCategories.length > 0 ? (
-                <div className="mb-5 overflow-x-auto rounded-xl bg-card p-1.5 shadow-[0_12px_30px_-28px_rgba(15,23,42,.45)] ring-1 ring-black/[0.05] dark:bg-white/[0.025] dark:ring-white/[0.05]">
-                    <div className="flex min-w-max items-center gap-2">
+                <div className="mb-5 overflow-x-auto rounded-xl bg-card p-2 shadow-[0_12px_30px_-28px_rgba(15,23,42,.45)] ring-1 ring-black/[0.05] [scrollbar-width:none] dark:bg-white/[0.025] dark:ring-white/[0.05] [&::-webkit-scrollbar]:hidden">
+                    <div className="flex min-w-max snap-x snap-mandatory items-center gap-2">
                         <button
                             type="button"
                             onClick={() => update("categoryId")}
-                            className={`rounded-lg px-3 py-2 text-[13px] font-bold transition ${
+                            className={`h-11 snap-start rounded-xl px-3 text-[12px] font-bold transition ${
                                 !params.get("categoryId")
                                     ? "bg-primary text-primary-foreground shadow-sm"
                                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -294,14 +356,27 @@ export function CatalogPage() {
                                 key={item.id}
                                 type="button"
                                 onClick={() => update("categoryId", String(item.id))}
-                                className={`rounded-lg px-3 py-2 text-[13px] font-bold transition ${
+                                className={`flex h-11 w-40 snap-start items-center gap-2 rounded-xl px-2 text-start text-[12px] font-bold transition ${
                                     params.get("categoryId") === String(item.id)
                                         ? "bg-primary text-primary-foreground shadow-sm"
                                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                 }`}
                             >
-                                {item.name}
-                                <span className="ms-2 rounded-full bg-foreground/[0.08] px-1.5 py-0.5 text-[10px]">
+                                <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted/75">
+                                    {item.imageUrl ? (
+                                        <img
+                                            src={imageUrl(item.imageUrl) ?? ""}
+                                            alt=""
+                                            className="size-full object-contain p-0.5"
+                                        />
+                                    ) : (
+                                        <PackageSearch className="size-4" />
+                                    )}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate">
+                                    {item.name}
+                                </span>
+                                <span className="rounded-full bg-foreground/[0.08] px-1.5 py-0.5 text-[9px]">
                                     {item.productCount}
                                 </span>
                             </button>
@@ -311,7 +386,7 @@ export function CatalogPage() {
             ) : null}
 
             <div className="grid items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
-                <aside className="sticky top-28 hidden overflow-hidden rounded-xl bg-card shadow-[0_16px_38px_-34px_rgba(15,23,42,.48)] ring-1 ring-black/[0.05] lg:block dark:bg-white/[0.025] dark:ring-white/[0.05]">
+                <aside className="sticky top-28 hidden max-h-[calc(100vh-8rem)] overflow-hidden rounded-xl bg-card shadow-[0_16px_38px_-34px_rgba(15,23,42,.48)] ring-1 ring-black/[0.05] lg:flex lg:flex-col dark:bg-white/[0.025] dark:ring-white/[0.05]">
                     <div className="bg-muted/35 p-4 dark:bg-white/[0.025]">
                         <p className="text-xs font-black uppercase tracking-[0.14em] text-primary">
                             {t("catalog.filterProducts")}
@@ -320,7 +395,9 @@ export function CatalogPage() {
                             {t("catalog.filterDescription")}
                         </p>
                     </div>
-                    <div className="p-4">{filterPanel}</div>
+                    <ScrollArea className="min-h-0 flex-1">
+                        <div className="p-4 pe-5">{filterPanel}</div>
+                    </ScrollArea>
                 </aside>
 
                 <section className="min-w-0">
@@ -368,8 +445,8 @@ export function CatalogPage() {
                                 <Dialog.Portal>
                                     <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out data-[state=open]:fade-in" />
 
-                                    <Dialog.Content className="fixed inset-y-0 right-0 z-50 w-[90%] max-w-sm overflow-y-auto border-l bg-background shadow-2xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
-                                        <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/[0.95] px-5 py-5 backdrop-blur">
+                                    <Dialog.Content className="fixed inset-y-0 right-0 z-50 flex w-[90%] max-w-sm flex-col overflow-hidden border-l bg-background shadow-2xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
+                                        <div className="z-10 flex shrink-0 items-center justify-between border-b bg-background/[0.95] px-5 py-5 backdrop-blur">
                                             <div>
                                                 <Dialog.Title className="text-lg font-black">
                                                     {t("catalog.filterProducts")}
@@ -391,9 +468,11 @@ export function CatalogPage() {
                                             </Dialog.Close>
                                         </div>
 
-                                        <div className="p-4">{filterPanel}</div>
+                                        <ScrollArea className="min-h-0 flex-1">
+                                            <div className="p-4 pe-5">{filterPanel}</div>
+                                        </ScrollArea>
 
-                                        <div className="sticky bottom-0 border-t bg-background/[0.95] p-5 backdrop-blur">
+                                        <div className="shrink-0 border-t bg-background/[0.95] p-5 backdrop-blur">
                                             <Dialog.Close asChild>
                                                 <Button className="h-11 w-full rounded-xl">
                                                     {t("catalog.showProducts")}
@@ -475,7 +554,7 @@ export function CatalogPage() {
                     )}
 
                     {query.isLoading ? (
-                        <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
+                        <div className="grid auto-rows-fr grid-cols-2 gap-2.5 sm:gap-4">
                             {Array.from({ length: 8 }).map((_, index) => (
                                 <Skeleton
                                     key={index}
@@ -483,12 +562,12 @@ export function CatalogPage() {
                                 />
                             ))}
                         </div>
-                    ) : query.isError ? (
+                    ) : query.isError && !query.data ? (
                         <EmptyState
                             title={t("catalog.unavailableTitle")}
                             text={t("catalog.loadError")}
                         />
-                    ) : !query.data?.items.length ? (
+                    ) : !displayedProducts.length ? (
                         <EmptyState
                             title={t("catalog.noMatches")}
                             text={t("catalog.noMatchesDescription")}
@@ -498,16 +577,23 @@ export function CatalogPage() {
                         <>
                             <div className="mb-5 flex items-center justify-between gap-3">
                                 <p className="text-sm text-muted-foreground">
-                                    {t("catalog.showingPage", { count: query.data.items.length })}
+                                    {t("catalog.showingLoaded", {
+                                        count: displayedProducts.length,
+                                        total: firstPage?.totalCount ?? displayedProducts.length,
+                                    })}
                                 </p>
 
-                                <span className="hidden text-xs text-muted-foreground sm:block">
-                                    {t("catalog.pageOf", { page: query.data.page, pages: query.data.totalPages })}
-                                </span>
+                                {matchingPinnedProducts.length > 0 ? (
+                                    <span className="hidden text-xs font-bold text-primary sm:block">
+                                        {t("catalog.pinnedFirst", {
+                                            count: matchingPinnedProducts.length,
+                                        })}
+                                    </span>
+                                ) : null}
                             </div>
 
-                            <div className="grid auto-rows-fr grid-cols-1 items-stretch gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
-                                {query.data.items.map((product) => (
+                            <div className="grid auto-rows-fr grid-cols-2 items-stretch gap-2.5 sm:gap-4">
+                                {displayedProducts.map((product) => (
                                     <ProductCard
                                         key={product.id}
                                         product={product}
@@ -515,15 +601,31 @@ export function CatalogPage() {
                                 ))}
                             </div>
 
-                            <Pagination
-                                page={query.data.page}
-                                totalPages={query.data.totalPages}
-                                previous={query.data.hasPreviousPage}
-                                next={query.data.hasNextPage}
-                                onPage={(value) =>
-                                    update("page", String(value))
-                                }
-                            />
+                            <div
+                                ref={loadMoreRef}
+                                className="mt-8 flex min-h-16 items-center justify-center"
+                            >
+                                {query.hasNextPage ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="h-11 rounded-xl px-6"
+                                        disabled={query.isFetchingNextPage}
+                                        onClick={() => void query.fetchNextPage()}
+                                    >
+                                        {query.isFetchingNextPage ? (
+                                            <LoaderCircle className="size-4 animate-spin" />
+                                        ) : null}
+                                        {query.isFetchingNextPage
+                                            ? t("catalog.loadingMore")
+                                            : t("catalog.loadMore")}
+                                    </Button>
+                                ) : (
+                                    <p className="text-xs font-semibold text-muted-foreground">
+                                        {t("catalog.allLoaded")}
+                                    </p>
+                                )}
+                            </div>
                         </>
                     )}
                 </section>
@@ -931,70 +1033,43 @@ function formatCurrency(value: number) {
     return formatMoney(value);
 }
 
-function Pagination({
-    page,
-    totalPages,
-    previous,
-    next,
-    onPage,
-}: {
-    page: number;
-    totalPages: number;
-    previous: boolean;
-    next: boolean;
-    onPage: (page: number) => void;
-}) {
-    const first = Math.max(1, Math.min(page - 2, totalPages - 4));
+function matchesCatalogFilters(product: Product, params: URLSearchParams) {
+    const search = params.get("search")?.trim().toLocaleLowerCase();
+    const categoryId = Number(params.get("categoryId"));
+    const brandId = Number(params.get("brandId"));
+    const unitId = Number(params.get("unitId"));
+    const minimum = Number(params.get("minPrice"));
+    const maximum = Number(params.get("maxPrice"));
 
-    const pages = Array.from(
-        {
-            length: Math.min(5, totalPages),
-        },
-        (_, index) => first + index,
-    );
-
-    if (totalPages <= 1) {
-        return null;
+    if (
+        search &&
+        !`${product.name} ${product.barcode ?? ""}`
+            .toLocaleLowerCase()
+            .includes(search)
+    ) {
+        return false;
     }
-
-    return (
-        <nav
-            className="mt-12 flex items-center justify-center gap-1.5 rounded-2xl border bg-card p-2 shadow-sm"
-            aria-label="Product pages"
-        >
-            <Button
-                variant="ghost"
-                size="icon"
-                disabled={!previous}
-                onClick={() => onPage(page - 1)}
-                className="rounded-xl"
-            >
-                <ChevronLeft className="size-4 rtl:rotate-180" />
-            </Button>
-
-            {pages.map((value) => (
-                <Button
-                    key={value}
-                    variant={value === page ? "default" : "ghost"}
-                    size="icon"
-                    onClick={() => onPage(value)}
-                    className="rounded-xl"
-                >
-                    {value}
-                </Button>
-            ))}
-
-            <Button
-                variant="ghost"
-                size="icon"
-                disabled={!next}
-                onClick={() => onPage(page + 1)}
-                className="rounded-xl"
-            >
-                <ChevronRight className="size-4 rtl:rotate-180" />
-            </Button>
-        </nav>
-    );
+    if (categoryId && product.categoryId !== categoryId) return false;
+    if (brandId && product.brandId !== brandId) return false;
+    if (unitId && product.unitId !== unitId) return false;
+    if (
+        params.has("minPrice") &&
+        (product.price == null || product.price < minimum)
+    ) {
+        return false;
+    }
+    if (
+        params.has("maxPrice") &&
+        (product.price == null || product.price > maximum)
+    ) {
+        return false;
+    }
+    if (params.get("stock") === "in" && product.stock <= 0) return false;
+    if (params.get("stock") === "out" && product.stock > 0) return false;
+    if (params.get("isFeatured") === "true" && !product.isFeatured) {
+        return false;
+    }
+    return product.isActive;
 }
 
 function EmptyState({

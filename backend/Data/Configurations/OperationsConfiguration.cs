@@ -26,6 +26,8 @@ public sealed class PurchaseConfiguration : IEntityTypeConfiguration<Purchase>
         b.Property(x => x.ClientRequestId).HasMaxLength(100);
         b.Property(x => x.Subtotal).HasPrecision(18, 2);
         b.Property(x => x.Discount).HasPrecision(18, 2);
+        b.Property(x => x.DiscountPercent).HasPrecision(5, 2);
+        b.Property(x => x.SecondaryDiscountPercent).HasPrecision(5, 2);
         b.Property(x => x.Tax).HasPrecision(18, 2);
         b.Property(x => x.OtherCost).HasPrecision(18, 2);
         b.Property(x => x.Total).HasPrecision(18, 2);
@@ -50,6 +52,9 @@ public sealed class PurchaseItemConfiguration : IEntityTypeConfiguration<Purchas
         b.Property(x => x.UnitConversionFactor).HasPrecision(18, 6);
         b.Property(x => x.EnteredUnitCost).HasPrecision(18, 2);
         b.Property(x => x.LineTotal).HasPrecision(18, 2);
+        b.Property(x => x.BonusQuantity).HasPrecision(18, 3);
+        b.Property(x => x.DiscountPercent).HasPrecision(5, 2);
+        b.Property(x => x.SecondaryDiscountPercent).HasPrecision(5, 2);
         b.ToTable(table => table.HasCheckConstraint("CK_PurchaseItem_UnitValues", "[Quantity] > 0 AND [EnteredQuantity] > 0 AND [UnitConversionFactor] > 0 AND [UnitCost] >= 0 AND [EnteredUnitCost] >= 0"));
         b.Property(x => x.LotNumber).HasMaxLength(100);
         b.HasOne(x => x.Purchase).WithMany(x => x.Items).HasForeignKey(x => x.PurchaseId).OnDelete(DeleteBehavior.Cascade);
@@ -69,9 +74,13 @@ public sealed class InventorySaleConfiguration : IEntityTypeConfiguration<Invent
         b.Property(x => x.ClientRequestId).HasMaxLength(100);
         b.Property(x => x.Subtotal).HasPrecision(18, 2);
         b.Property(x => x.Discount).HasPrecision(18, 2);
+        b.Property(x => x.DiscountPercent).HasPrecision(5, 2);
+        b.Property(x => x.SecondaryDiscountPercent).HasPrecision(5, 2);
         b.Property(x => x.Tax).HasPrecision(18, 2);
         b.Property(x => x.Total).HasPrecision(18, 2);
         b.Property(x => x.PaidAmount).HasPrecision(18, 2);
+        b.Property(x => x.CustomerCreditApplied).HasPrecision(18, 2);
+        b.Property(x => x.CustomerCreditCreated).HasPrecision(18, 2);
         b.HasIndex(x => x.SaleNumber).IsUnique();
         b.HasIndex(x => x.ClientRequestId).IsUnique().HasFilter("[ClientRequestId] IS NOT NULL");
         b.HasIndex(x => x.ReferenceNumber);
@@ -93,6 +102,9 @@ public sealed class InventorySaleItemConfiguration : IEntityTypeConfiguration<In
         b.Property(x => x.UnitConversionFactor).HasPrecision(18, 6);
         b.Property(x => x.EnteredUnitPrice).HasPrecision(18, 2);
         b.Property(x => x.LineTotal).HasPrecision(18, 2);
+        b.Property(x => x.BonusQuantity).HasPrecision(18, 3);
+        b.Property(x => x.DiscountPercent).HasPrecision(5, 2);
+        b.Property(x => x.SecondaryDiscountPercent).HasPrecision(5, 2);
         b.ToTable(table => table.HasCheckConstraint("CK_InventorySaleItem_UnitValues", "[Quantity] > 0 AND [EnteredQuantity] > 0 AND [UnitConversionFactor] > 0 AND [UnitPrice] >= 0 AND [EnteredUnitPrice] >= 0"));
         b.HasOne(x => x.InventorySale).WithMany(x => x.Items).HasForeignKey(x => x.InventorySaleId).OnDelete(DeleteBehavior.Cascade);
         b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
@@ -154,6 +166,35 @@ public sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
         b.HasIndex(x => x.ExpenseDate);
         b.HasOne(x => x.Category).WithMany(x => x.Expenses).HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.GeneralTypeCategory).WithMany().HasForeignKey(x => x.GeneralTypeCategoryId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class JournalVoucherConfiguration : IEntityTypeConfiguration<JournalVoucher>
+{
+    public void Configure(EntityTypeBuilder<JournalVoucher> b)
+    {
+        b.Property(x => x.VoucherNumber).HasMaxLength(50).IsRequired();
+        b.Property(x => x.CurrencyCode).HasMaxLength(10).IsRequired();
+        b.Property(x => x.Memo).HasMaxLength(1000).IsRequired();
+        b.Property(x => x.TotalDebit).HasPrecision(18, 2);
+        b.Property(x => x.TotalCredit).HasPrecision(18, 2);
+        b.HasIndex(x => x.VoucherNumber).IsUnique();
+        b.HasIndex(x => x.VoucherDate);
+        b.HasMany(x => x.Lines).WithOne(x => x.JournalVoucher).HasForeignKey(x => x.JournalVoucherId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class JournalVoucherLineConfiguration : IEntityTypeConfiguration<JournalVoucherLine>
+{
+    public void Configure(EntityTypeBuilder<JournalVoucherLine> b)
+    {
+        b.Property(x => x.AccountCode).HasMaxLength(50).IsRequired();
+        b.Property(x => x.AccountName).HasMaxLength(180).IsRequired();
+        b.Property(x => x.Description).HasMaxLength(500);
+        b.Property(x => x.Debit).HasPrecision(18, 2);
+        b.Property(x => x.Credit).HasPrecision(18, 2);
+        b.ToTable(table => table.HasCheckConstraint("CK_JournalVoucherLine_DebitCredit", "([Debit] > 0 AND [Credit] = 0) OR ([Credit] > 0 AND [Debit] = 0)"));
+        b.HasIndex(x => new { x.JournalVoucherId, x.AccountCode });
     }
 }
 

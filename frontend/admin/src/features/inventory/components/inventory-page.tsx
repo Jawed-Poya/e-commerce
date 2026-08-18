@@ -42,6 +42,7 @@ import { useProductLookupsQuery } from "@/features/products/hooks/use-product-mu
 import { useI18n } from "@/i18n/i18n-provider";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
+import { toFiniteNumber } from "@/lib/numbers";
 import { resolveProductImageUrl } from "@/services/product.service";
 
 type InventoryView = "overview" | "transactions";
@@ -382,5 +383,5 @@ function transactionOptions(t: ReturnType<typeof useI18n>["t"]): TransactionOpti
 
 function formatNumber(value: number | undefined) {
     if (value === undefined) return "0";
-    return value.toLocaleString(undefined, { maximumFractionDigits: 3 });
+    return toFiniteNumber(value).toLocaleString(undefined, { maximumFractionDigits: 3 });
 }

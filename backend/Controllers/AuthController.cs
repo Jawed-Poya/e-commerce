@@ -3,9 +3,11 @@ using ECommerce.Entities.Users.Contracts;
 using ECommerce.Services.Auth;
 using ECommerce.Services.Auth.Verification;
 using ECommerce.Services.Auditing;
+using ECommerce.Options;
 using ECommerce.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace ECommerce.Controllers;
 
@@ -14,7 +16,8 @@ namespace ECommerce.Controllers;
 public sealed class AuthController(
     IAuthService auth,
     IAccountVerificationService verification,
-    IAuditLogService audit) : ControllerBase
+    IAuditLogService audit,
+    IOptions<GoogleAuthOptions> googleOptions) : ControllerBase
 {
     [HttpPost("customer/register")]
     public async Task<ActionResult<ApiResponse<AuthResponse>>> RegisterCustomer(
@@ -100,6 +103,17 @@ public sealed class AuthController(
         {
             return Unauthorized(ApiResponse<object>.Fail(exception.Message));
         }
+    }
+
+    [HttpGet("customer/google/config")]
+    public ActionResult<ApiResponse<object>> GoogleConfiguration()
+    {
+        var clientId = googleOptions.Value.ClientId?.Trim();
+        return Ok(ApiResponse<object>.Ok(new
+        {
+            enabled = !string.IsNullOrWhiteSpace(clientId),
+            clientId
+        }));
     }
 
     [Authorize]

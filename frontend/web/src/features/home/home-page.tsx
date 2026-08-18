@@ -16,7 +16,7 @@ import {
     ShoppingBag,
     Sparkles,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import { useI18n } from "../../i18n/i18n-provider";
@@ -92,7 +92,7 @@ export function HomePage() {
     );
     const categories = buildCategoryTree(lookups.data?.categories ?? []).slice(
         0,
-        6,
+        12,
     );
     const featured = items.filter((item) => item.isFeatured);
     const featuredProducts = (featured.length >= 5 ? featured : items).slice(
@@ -440,27 +440,16 @@ export function HomePage() {
                 />
 
                 {lookups.isLoading ? (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="flex gap-3 overflow-hidden">
                         {Array.from({ length: 6 }).map((_, index) => (
                             <Skeleton
                                 key={index}
-                                className={cn(
-                                    "h-72 rounded-2xl",
-                                    index < 2 && "lg:col-span-2 lg:h-80",
-                                )}
+                                className="h-52 w-44 shrink-0 rounded-2xl sm:w-48"
                             />
                         ))}
                     </div>
                 ) : (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        {categories.map((category, index) => (
-                            <CategoryCard
-                                key={category.id}
-                                category={category}
-                                featured={index < 2}
-                            />
-                        ))}
-                    </div>
+                    <CategoryCarousel categories={categories} />
                 )}
             </section>
 
@@ -635,13 +624,57 @@ function TrustPoint({
     );
 }
 
-function CategoryCard({
-    category,
-    featured,
-}: {
-    category: CategoryNode;
-    featured: boolean;
-}) {
+function CategoryCarousel({ categories }: { categories: CategoryNode[] }) {
+    const { t } = useI18n();
+    const scrollerRef = useRef<HTMLDivElement>(null);
+
+    const scroll = (direction: -1 | 1) => {
+        const scroller = scrollerRef.current;
+        if (!scroller) return;
+        const rtlFactor = document.documentElement.dir === "rtl" ? -1 : 1;
+        scroller.scrollBy({
+            left: direction * rtlFactor * Math.min(scroller.clientWidth * 0.8, 640),
+            behavior: "smooth",
+        });
+    };
+
+    return (
+        <div>
+            <div className="mb-3 flex justify-end gap-2">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="size-9 rounded-xl"
+                    onClick={() => scroll(-1)}
+                    aria-label={t("carousel.previous")}
+                >
+                    <ArrowLeft className="size-4 rtl:rotate-180" />
+                </Button>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="size-9 rounded-xl"
+                    onClick={() => scroll(1)}
+                    aria-label={t("carousel.next")}
+                >
+                    <ArrowRight className="size-4 rtl:rotate-180" />
+                </Button>
+            </div>
+            <div
+                ref={scrollerRef}
+                className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+                {categories.map((category) => (
+                    <CategoryCard key={category.id} category={category} />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function CategoryCard({ category }: { category: CategoryNode }) {
     const { t } = useI18n();
     const categoryImage = imageUrl(category.imageUrl);
     const categoryMeta = category.children.length
@@ -655,64 +688,42 @@ function CategoryCard({
         <Link
             viewTransition
             to={`/products?categoryId=${category.id}`}
-            className={cn(
-                "group relative isolate overflow-hidden rounded-xl border border-border/75 bg-card shadow-[0_14px_38px_-32px_rgba(15,23,42,.52)] transition duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_24px_52px_-30px_rgba(15,23,42,.46)] dark:border-white/[0.07]",
-                featured
-                    ? "min-h-[310px] sm:min-h-[330px] lg:col-span-2"
-                    : "min-h-[270px] sm:min-h-[290px]",
-            )}
+            className="group relative isolate h-52 w-44 shrink-0 snap-start overflow-hidden rounded-2xl border border-border/75 bg-card shadow-[0_14px_38px_-32px_rgba(15,23,42,.52)] transition duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_24px_52px_-30px_rgba(15,23,42,.46)] sm:w-48 dark:border-white/[0.07]"
         >
-            <div className="absolute inset-0 bg-muted/25" />
-            {categoryImage ? (
-                <img
-                    src={categoryImage}
-                    alt={category.name}
-                    loading="lazy"
-                    decoding="async"
-                    className="absolute inset-0 size-full object-cover object-center transition duration-700 ease-out group-hover:scale-[1.035]"
-                />
-            ) : (
-                <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_75%_20%,color-mix(in_srgb,var(--brand-highlight)_28%,transparent),transparent_34%),linear-gradient(135deg,color-mix(in_srgb,var(--primary)_14%,var(--background)),var(--muted))] text-primary">
-                    <span className="grid size-24 place-items-center rounded-[28px] border border-primary/15 bg-background/75 shadow-xl backdrop-blur-sm">
-                        <ShoppingBag className="size-10" />
-                    </span>
-                </div>
-            )}
-
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-background/45 via-background/10 to-transparent" />
-
-            <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 p-3 sm:p-4">
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-black/[0.05] bg-card/95 px-2.5 py-1.5 text-[10px] font-black text-foreground shadow-sm backdrop-blur dark:border-white/[0.08]">
+            <div className="relative h-32 overflow-hidden border-b bg-muted/25">
+                {categoryImage ? (
+                    <img
+                        src={categoryImage}
+                        alt={category.name}
+                        loading="lazy"
+                        decoding="async"
+                        className="size-full object-contain object-center p-2 transition duration-500 ease-out group-hover:scale-[1.04]"
+                    />
+                ) : (
+                    <div className="grid size-full place-items-center bg-[radial-gradient(circle_at_75%_20%,color-mix(in_srgb,var(--brand-highlight)_28%,transparent),transparent_34%),linear-gradient(135deg,color-mix(in_srgb,var(--primary)_14%,var(--background)),var(--muted))] text-primary">
+                        <span className="grid size-14 place-items-center rounded-2xl border border-primary/15 bg-background/75 shadow-lg backdrop-blur-sm">
+                            <ShoppingBag className="size-6" />
+                        </span>
+                    </div>
+                )}
+                <span className="absolute start-2 top-2 inline-flex items-center gap-1.5 rounded-lg border border-black/[0.05] bg-card/95 px-2 py-1 text-[9px] font-black text-foreground shadow-sm backdrop-blur dark:border-white/[0.08]">
                     <ShoppingBag className="size-3 text-primary" />
                     {t("home.productCount", {
                         count: category.productCount,
                     })}
                 </span>
-                <span className="grid size-9 place-items-center rounded-lg border border-black/[0.05] bg-card/95 text-foreground shadow-sm backdrop-blur transition duration-300 group-hover:bg-primary group-hover:text-primary-foreground dark:border-white/[0.08]">
-                    <ArrowUpRight className="size-4" />
-                </span>
             </div>
 
-            <div
-                className={cn(
-                    "absolute inset-x-0 bottom-0 z-30 border-t border-border/80 bg-card/95 shadow-[0_-10px_30px_-24px_rgba(15,23,42,.42)] backdrop-blur-xl supports-[backdrop-filter]:bg-card/90 dark:border-white/[0.08]",
-                    featured ? "px-5 py-4 sm:px-6 sm:py-5" : "px-4 py-3.5",
-                )}
-            >
-                <p
-                    className={cn(
-                        "truncate font-black tracking-[-0.035em] text-foreground transition group-hover:text-primary",
-                        featured ? "text-xl sm:text-2xl" : "text-lg",
-                    )}
-                >
+            <div className="p-3">
+                <p className="truncate text-sm font-black tracking-[-0.025em] text-foreground transition group-hover:text-primary">
                     {category.name}
                 </p>
-                <div className="mt-1.5 flex min-w-0 items-center justify-between gap-3">
-                    <p className="min-w-0 truncate text-[11px] font-semibold text-muted-foreground sm:text-xs">
+                <div className="mt-1 flex min-w-0 items-center justify-between gap-2">
+                    <p className="min-w-0 truncate text-[10px] font-semibold text-muted-foreground">
                         {categoryMeta}
                     </p>
-                    <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.12em] text-primary">
-                        {t("common.open")}
+                    <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                        <ArrowUpRight className="size-3.5" />
                     </span>
                 </div>
             </div>

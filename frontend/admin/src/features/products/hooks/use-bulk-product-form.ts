@@ -4,6 +4,7 @@ import {
     useFieldArray,
     useForm,
     type Resolver,
+    type SubmitErrorHandler,
     type SubmitHandler,
 } from "react-hook-form";
 import { toast } from "sonner";
@@ -59,6 +60,8 @@ function createProductDraft(file: File): ProductBulkItemFormValues {
         name: defaultName,
         barcode: "",
         strength: "",
+        genericName: "",
+        formula: "",
         shortDescription: "",
         description: "",
 
@@ -101,6 +104,20 @@ function getErrorMessage(error: unknown) {
     }
 
     return "Failed to create products.";
+}
+
+function scrollToProduct(index: number, field?: string) {
+    requestAnimationFrame(() => {
+        const card = document.querySelector<HTMLElement>(`[data-product-index="${index}"]`);
+        const target = field
+            ? card?.querySelector<HTMLElement>(`[name="products.${index}.${field}"]`)
+            : null;
+        const focusTarget = target ?? card?.querySelector<HTMLElement>(
+            "input:not([disabled]), button:not([disabled]), textarea:not([disabled])",
+        );
+        (target ?? card)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        window.setTimeout(() => focusTarget?.focus({ preventScroll: true }), 350);
+    });
 }
 
 export function useBulkProductForm() {
@@ -221,13 +238,14 @@ export function useBulkProductForm() {
 
     const submitProducts: SubmitHandler<ProductBulkFormValues> = useCallback(
         async (values) => {
-            for (const product of values.products) {
+            for (const [index, product] of values.products.entries()) {
                 const unitError = validateUnitConversions(
                     product.unitId,
                     product.unitConversions,
                 );
                 if (unitError) {
                     toast.error(`${product.name}: ${t(unitError)}`);
+                    scrollToProduct(index, "unitId");
                     return;
                 }
             }
@@ -259,6 +277,26 @@ export function useBulkProductForm() {
         [createMutation, navigate, resetProducts, t],
     );
 
+    const handleInvalid: SubmitErrorHandler<ProductBulkFormValues> = useCallback(
+        (errors) => {
+            const productErrors = Array.isArray(errors.products) ? errors.products : [];
+            const firstIndex = productErrors.findIndex(Boolean);
+            const index = firstIndex >= 0 ? firstIndex : 0;
+            const firstField = productErrors[index]
+                ? Object.keys(productErrors[index] as Record<string, unknown>)[0]
+                : undefined;
+            const readableField = firstField
+                ? firstField.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()
+                : "required fields";
+
+            toast.error(
+                `Product #${index + 1}: please complete ${readableField} before submitting.`,
+            );
+            scrollToProduct(index, firstField);
+        },
+        [],
+    );
+
     useEffect(() => {
         return () => {
             revokePreviewUrls();
@@ -275,7 +313,7 @@ export function useBulkProductForm() {
         removeProduct,
         resetProducts,
 
-        submit: form.handleSubmit(submitProducts),
+        submit: form.handleSubmit(submitProducts, handleInvalid),
 
         isSubmitting: createMutation.isPending,
     };

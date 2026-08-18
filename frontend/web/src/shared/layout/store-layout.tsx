@@ -1,6 +1,7 @@
 import { StoreVisitTracker } from "../../features/analytics/store-visit-tracker";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
+    ArrowUp,
     BadgeCheck,
     Check,
     Heart,
@@ -9,6 +10,7 @@ import {
     Mail,
     MapPin,
     Menu,
+    MessageCircle,
     RotateCcw,
     Phone,
     Share2,
@@ -19,7 +21,7 @@ import {
     UserRound,
     X,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 
 import { useAuth } from "../../features/auth/auth-context";
@@ -32,7 +34,10 @@ import { GlobalSearch } from "../../features/catalog/global-search";
 import { useLookups } from "../../features/catalog/use-catalog";
 import { useCompany } from "../../features/company/company-context";
 import { NotificationCenter } from "../../features/notifications/notification-center";
-import { PwaInstallButton } from "../../features/pwa/pwa-install-button";
+import {
+    PwaInstallBanner,
+    PwaInstallButton,
+} from "../../features/pwa/pwa-install-button";
 import { LanguageSwitcher } from "../../i18n/language-switcher";
 import { useI18n } from "../../i18n/i18n-provider";
 import { imageUrl } from "../api/api-client";
@@ -159,6 +164,7 @@ function Logo({ inverse = false }: { inverse?: boolean }) {
 export function StoreLayout() {
     const [mobileOpen, setMobileOpen] = useState(false);
     const [shareConfirmed, setShareConfirmed] = useState(false);
+    const [showScrollTop, setShowScrollTop] = useState(false);
     const location = useLocation();
     const cart = useCart();
     const auth = useAuth();
@@ -177,6 +183,16 @@ export function StoreLayout() {
         company?.branches.find((branch) => branch.isMain && branch.isActive) ??
         company?.branches.find((branch) => branch.isActive);
     const contactPhone = company?.phone ?? primaryBranch?.phone ?? null;
+    const whatsappPhone = contactPhone
+        ? normalizeWhatsAppNumber(contactPhone)
+        : null;
+
+    useEffect(() => {
+        const updateScrollTop = () => setShowScrollTop(window.scrollY > 560);
+        updateScrollTop();
+        window.addEventListener("scroll", updateScrollTop, { passive: true });
+        return () => window.removeEventListener("scroll", updateScrollTop);
+    }, []);
     const contactAddress = company?.address ?? primaryBranch?.address ?? null;
     const mobileNav = [
         {
@@ -313,10 +329,12 @@ export function StoreLayout() {
                                 <LanguageSwitcher />
                                 <ThemeToggle />
                                 <NotificationCenter />
+                                <PwaInstallButton compact />
                             </div>
 
-                            <div className="sm:hidden [&_button]:size-9 [&_button]:rounded-lg [&_svg]:size-4.5">
+                            <div className="flex items-center sm:hidden [&_button]:size-9 [&_button]:rounded-lg [&_svg]:size-4.5">
                                 <ThemeToggle />
+                                <PwaInstallButton compact />
                             </div>
 
                             <Button
@@ -413,7 +431,6 @@ export function StoreLayout() {
                         </nav>
 
                         <div className="ms-auto hidden shrink-0 items-center gap-2 xl:flex">
-                            <PwaInstallButton compact />
                             <Button
                                 type="button"
                                 variant="ghost"
@@ -443,7 +460,7 @@ export function StoreLayout() {
             <footer
                 className={cn(
                     "bg-card",
-                    location.pathname === "/" ? "mt-0" : "mt-20",
+                    location.pathname === "/" ? "mt-12 sm:mt-16" : "mt-20",
                 )}
             >
                 <FooterTrustStrip />
@@ -543,18 +560,36 @@ export function StoreLayout() {
                 </div>
             </footer>
 
-            {contactPhone ? (
-                <a
-                    href={`tel:${contactPhone}`}
-                    className="fixed bottom-20 end-4 z-30 inline-flex size-11 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground shadow-xl shadow-primary/25 ring-1 ring-black/[0.06] transition hover:-translate-y-0.5 md:bottom-5 md:end-5 md:h-auto md:w-auto md:gap-2 md:px-3.5 md:py-2.5 dark:ring-white/[0.08]"
-                    aria-label={t("footer.contactNow")}
+            {showScrollTop ? (
+                <button
+                    type="button"
+                    onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                    className="fixed bottom-20 start-4 z-30 grid size-12 place-items-center rounded-full bg-foreground text-background shadow-xl ring-1 ring-background/20 transition hover:-translate-y-0.5 hover:bg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:bottom-5 md:start-5"
+                    aria-label={t("common.scrollToTop")}
+                    title={t("common.scrollToTop")}
                 >
-                    <Phone className="size-4" />
+                    <ArrowUp className="size-5" />
+                </button>
+            ) : null}
+
+            {whatsappPhone &&
+            location.pathname !== "/cart" &&
+            location.pathname !== "/checkout" ? (
+                <a
+                    href={`https://wa.me/${whatsappPhone}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="fixed bottom-20 end-4 z-30 inline-flex size-12 items-center justify-center rounded-full bg-[#25D366] text-sm font-bold text-white shadow-xl shadow-emerald-500/25 ring-1 ring-black/[0.06] transition hover:-translate-y-0.5 hover:bg-[#20bd5a] md:bottom-5 md:end-5 md:h-auto md:w-auto md:gap-2 md:px-4 md:py-3 dark:ring-white/[0.08]"
+                    aria-label={t("footer.whatsappNow")}
+                >
+                    <MessageCircle className="size-5 fill-current" />
                     <span className="hidden md:inline">
-                        {t("footer.contactNow")}
+                        {t("footer.whatsappNow")}
                     </span>
                 </a>
             ) : null}
+
+            {location.pathname === "/" ? <PwaInstallBanner /> : null}
 
             <nav
                 className="fixed inset-x-0 bottom-0 z-40 bg-background/[0.96] shadow-[0_-14px_36px_-30px_rgba(15,23,42,.55)] ring-1 ring-black/[0.06] backdrop-blur-xl md:hidden dark:ring-white/[0.06]"
@@ -671,6 +706,11 @@ export function StoreLayout() {
             </Dialog.Root>
         </div>
     );
+}
+
+function normalizeWhatsAppNumber(phone: string) {
+    const digits = phone.replace(/\D/g, "");
+    return digits.startsWith("0") ? `93${digits.slice(1)}` : digits;
 }
 
 

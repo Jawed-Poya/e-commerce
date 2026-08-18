@@ -19,6 +19,7 @@ import { SimpleCombobox } from "@/components/simple-combobox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
     Dialog,
     DialogContent,
@@ -42,6 +43,7 @@ import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
 import { useCompany } from "@/features/company/company-context";
 import { ReceiptActions } from "@/features/company/receipt-actions";
+import { formatPercent } from "@/lib/numbers";
 import { WhatsAppLink } from "@/features/customers/whatsapp-link";
 import { useI18n } from "@/i18n/i18n-provider";
 import {
@@ -117,20 +119,35 @@ export default function ManualSalesPage() {
         customerPhone: "",
         saleDate: today(),
         discount: 0,
+        discountPercent: 0,
+        secondaryDiscountPercent: 0,
         tax: 0,
         paidAmount: 0,
         paymentMethod: "Cash",
         paymentReferenceNumber: "",
         referenceNumber: "",
         notes: "",
+        useCustomerCredit: true,
+        debtDueDate: "",
     });
 
     const subtotal = useMemo(
         () => items.reduce((sum, item) => sum + item.quantity * item.amount, 0),
         [items],
     );
-    const total = Math.max(0, subtotal - form.discount + form.tax);
-    const remaining = Math.max(0, total - form.paidAmount);
+    const linesNet = useMemo(
+        () => items.reduce((sum, item) => sum + stackedLineTotal(item), 0),
+        [items],
+    );
+    const effectiveDiscountPercent = form.discountPercent > 0
+        ? form.discountPercent
+        : operationPolicy?.generalSalesDiscountPercent ?? 0;
+    const discountedSubtotal = stackedAmount(linesNet, effectiveDiscountPercent, form.secondaryDiscountPercent);
+    const total = Math.max(0, discountedSubtotal - form.discount + form.tax);
+    const creditApplied = selectedCustomer && form.useCustomerCredit
+        ? Math.min(selectedCustomer.accountCredit, Math.max(0, total - form.paidAmount))
+        : 0;
+    const remaining = Math.max(0, total - form.paidAmount - creditApplied);
     const profitPreview = useMemo(() => {
         const saleItems = getSubmittableDocumentLines(items);
         if (!saleItems.length || saleItems.some((item) => !isDocumentLineComplete(item))) {
@@ -152,7 +169,7 @@ export default function ManualSalesPage() {
             costOfGoods += baseQuantity * currentUnitCost;
         }
 
-        const netSales = Math.max(0, subtotal - form.discount);
+        const netSales = Math.max(0, discountedSubtotal - form.discount);
         const grossProfit = netSales - costOfGoods;
         const profitMargin =
             netSales > 0 ? (grossProfit / netSales) * 100 : 0;
@@ -164,7 +181,7 @@ export default function ManualSalesPage() {
             profitMargin,
             missingCostCount,
         };
-    }, [form.discount, items, subtotal]);
+    }, [discountedSubtotal, form.discount, items]);
 
     const reset = () => {
         setSelectedCustomer(null);
@@ -175,12 +192,16 @@ export default function ManualSalesPage() {
             customerPhone: "",
             saleDate: today(),
             discount: 0,
+            discountPercent: 0,
+            secondaryDiscountPercent: 0,
             tax: 0,
             paidAmount: 0,
             paymentMethod: "Cash",
             paymentReferenceNumber: "",
             referenceNumber: "",
             notes: "",
+            useCustomerCredit: true,
+            debtDueDate: "",
         });
     };
 
@@ -214,15 +235,15 @@ export default function ManualSalesPage() {
             const product = item.product;
             if (!product) continue;
             const baseQuantity = item.quantity * Math.max(item.conversionFactor, 0.000001);
-            if (baseQuantity > product.availableQuantity) {
+            if (!operationPolicy?.allowNegativeStockSales && baseQuantity > product.availableQuantity) {
                 return toast.error(
                     `${product.name}: ${tr("Available quantity")} ${product.availableQuantity} ${product.baseUnitName ?? tr("base units")}.`,
                 );
             }
         }
-        if (form.paidAmount < 0 || form.paidAmount > total) {
+        if (form.paidAmount < 0 || (!selectedCustomer && form.paidAmount > total)) {
             return toast.error(
-                tr("Opening payment must be between zero and the sale total."),
+                tr("A walk-in payment must be between zero and the sale total. Registered-customer overpayments are saved as account credit."),
             );
         }
 
@@ -239,17 +260,24 @@ export default function ManualSalesPage() {
                     : nullable(form.customerPhone),
                 saleDate: form.saleDate,
                 discount: form.discount,
+                discountPercent: form.discountPercent,
+                secondaryDiscountPercent: form.secondaryDiscountPercent,
                 tax: form.tax,
                 paidAmount: form.paidAmount,
                 paymentMethod: form.paymentMethod,
                 paymentReferenceNumber: nullable(form.paymentReferenceNumber),
                 referenceNumber: nullable(form.referenceNumber),
                 notes: nullable(form.notes),
+                useCustomerCredit: form.useCustomerCredit,
+                debtDueDate: form.debtDueDate || null,
                 items: documentItems.map((item) => ({
                     productId: item.productId,
                     unitId: item.unitId,
                     quantity: item.quantity,
                     unitPrice: item.amount,
+                    bonusQuantity: item.bonusQuantity,
+                    discountPercent: item.discountPercent,
+                    secondaryDiscountPercent: item.secondaryDiscountPercent,
                 })),
             });
             await Promise.all([
@@ -261,7 +289,7 @@ export default function ManualSalesPage() {
                 toast.success(response.message?.trim() || "Sale saved and will sync when the connection returns.");
             } else if (response.data.grossProfit > 0.005) {
                 toast.success(
-                    `Sale recorded · Gross profit ${formatMoney(response.data.grossProfit)} (${response.data.profitMargin.toFixed(1)}% margin).`,
+                    `Sale recorded · Gross profit ${formatMoney(response.data.grossProfit)} (${formatPercent(response.data.profitMargin)} margin).`,
                 );
             } else if (response.data.grossProfit < -0.005) {
                 toast.warning(
@@ -448,16 +476,21 @@ export default function ManualSalesPage() {
                                         customer.customerTypeName
                                             ? ` · ${customer.customerTypeName}`
                                             : ""
-                                    }`
+                                    } · Debt ${formatMoney(customer.outstandingDebt)} · Credit ${formatMoney(customer.accountCredit)}`
                                 }
                                 placeholder="Search customer name, phone or email…"
                             />
                             {selectedCustomer ? (
-                                <WhatsAppLink
-                                    url={selectedCustomer.whatsAppUrl}
-                                    customerName={selectedCustomer.name}
-                                    className="w-full sm:w-auto"
-                                />
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <WhatsAppLink
+                                        url={selectedCustomer.whatsAppUrl}
+                                        customerName={selectedCustomer.name}
+                                        className="w-full sm:w-auto"
+                                    />
+                                    <span className={selectedCustomer.hasOverdueDebt ? "text-xs font-semibold text-destructive" : "text-xs text-muted-foreground"}>
+                                        Debt {formatMoney(selectedCustomer.outstandingDebt)} / {formatMoney(selectedCustomer.creditLimit)}
+                                    </span>
+                                </div>
                             ) : null}
                         </div>
                         <Field label="Sale date">
@@ -551,6 +584,7 @@ export default function ManualSalesPage() {
                         canOverrideLineLimit={operationPolicy?.canOverrideLineLimits ?? false}
                         overrideLineLimit={lineLimitOverrideEnabled}
                         onOverrideLineLimitChange={setLineLimitOverrideEnabled}
+                        allowNegativeStock={operationPolicy?.allowNegativeStockSales ?? false}
                     />
                     <Separator />
 
@@ -570,6 +604,8 @@ export default function ManualSalesPage() {
                                 setForm((current) => ({ ...current, discount }))
                             }
                         />
+                        <AmountInputRow label={`Discount %${form.discountPercent === 0 && (operationPolicy?.generalSalesDiscountPercent ?? 0) > 0 ? ` (general ${operationPolicy?.generalSalesDiscountPercent}%)` : ""}`} value={form.discountPercent} max={100} onChange={(discountPercent) => setForm((current) => ({ ...current, discountPercent }))} />
+                        <AmountInputRow label="Second discount %" value={form.secondaryDiscountPercent} max={100} onChange={(secondaryDiscountPercent) => setForm((current) => ({ ...current, secondaryDiscountPercent }))} />
                         <AmountInputRow
                             label="Tax"
                             value={form.tax}
@@ -577,6 +613,13 @@ export default function ManualSalesPage() {
                                 setForm((current) => ({ ...current, tax }))
                             }
                         />
+                        {selectedCustomer ? (
+                            <label className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3 text-sm">
+                                <Checkbox checked={form.useCustomerCredit} onCheckedChange={(checked) => setForm((current) => ({ ...current, useCustomerCredit: checked === true }))} />
+                                <span><strong className="block">Use account credit</strong><span className="text-xs text-muted-foreground">Available {formatMoney(selectedCustomer.accountCredit)} · applying {formatMoney(creditApplied)}</span></span>
+                            </label>
+                        ) : null}
+                        {remaining > 0 && selectedCustomer ? <Field label="Debt due date"><Input type="date" value={form.debtDueDate} onChange={(event) => setForm((current) => ({ ...current, debtDueDate: event.target.value }))} /></Field> : null}
                         <Separator />
                         <MoneySummaryRow label="Sale total" value={total} emphasis />
                         {profitPreview ? (
@@ -687,7 +730,7 @@ function SaleProfitResult({ sale, formatMoney }: { sale: ManualSale; formatMoney
         return (
             <div className="min-w-28">
                 <p className="font-semibold text-emerald-600 dark:text-emerald-400">Profit {formatMoney(sale.grossProfit)}</p>
-                <p className="text-xs text-muted-foreground">{sale.profitMargin.toFixed(1)}% gross margin</p>
+                <p className="text-xs text-muted-foreground">{formatPercent(sale.profitMargin)} gross margin</p>
             </div>
         );
     }
@@ -763,7 +806,7 @@ function SaleProfitPreview({
             </AlertTitle>
             <AlertDescription className="space-y-1">
                 <p className="font-semibold text-current">
-                    {formatMoney(Math.abs(preview.grossProfit))} · {preview.profitMargin.toFixed(1)}% {tr("margin")}
+                    {formatMoney(Math.abs(preview.grossProfit))} · {formatPercent(preview.profitMargin)} {tr("margin")}
                 </p>
                 <p>
                     {tr("Net sales")} {formatMoney(preview.netSales)} · {tr("Cost of goods sold")} {formatMoney(preview.costOfGoods)}
@@ -813,6 +856,19 @@ function Empty({ colSpan, text }: { colSpan: number; text: string }) {
 function nullable(value: string) {
     const result = value.trim();
     return result || null;
+}
+
+function stackedAmount(amount: number, firstPercent: number, secondPercent: number) {
+    return amount * (1 - Math.min(100, Math.max(0, firstPercent)) / 100) *
+        (1 - Math.min(100, Math.max(0, secondPercent)) / 100);
+}
+
+function stackedLineTotal(item: DocumentItem) {
+    return stackedAmount(
+        item.quantity * item.amount,
+        item.discountPercent,
+        item.secondaryDiscountPercent,
+    );
 }
 
 function date(value: string) {

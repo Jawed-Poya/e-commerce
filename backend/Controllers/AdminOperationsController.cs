@@ -65,6 +65,11 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
     public Task<IActionResult> UpdateSupplier(long id, CreateSupplierRequest request, CancellationToken ct) => Handle(async () => ApiResponse<SupplierResponse>.Ok(await service.SaveSupplierAsync(id, request, ct), "Supplier updated."));
 
     [Authorize(Policy = AppPermissions.PurchasesView)]
+    [HttpGet("suppliers/{id:long}/ledger")]
+    public Task<IActionResult> SupplierLedger(long id, CancellationToken ct) =>
+        Handle(async () => ApiResponse<SupplierLedgerResponse>.Ok(await service.GetSupplierLedgerAsync(id, ct)));
+
+    [Authorize(Policy = AppPermissions.PurchasesView)]
     [HttpGet("purchases")]
     public async Task<IActionResult> Purchases([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default) =>
         Ok(ApiResponse<PagedResult<PurchaseListItem>>.Ok(await service.GetPurchasesAsync(search, page, pageSize, ct)));
@@ -167,6 +172,16 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
     [Authorize(Policy = AppPermissions.ExpensesManage)]
     [HttpPost("expenses")]
     public Task<IActionResult> CreateExpense(CreateExpenseRequest request, CancellationToken ct) => Handle(async () => ApiResponse<ExpenseResponse>.Ok(await service.CreateExpenseAsync(request, UserId(), ct), "Expense recorded."));
+
+    [Authorize(Policy = AppPermissions.ExpensesView)]
+    [HttpGet("journal-vouchers")]
+    public async Task<IActionResult> JournalVouchers([FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default) =>
+        Ok(ApiResponse<PagedResult<JournalVoucherResponse>>.Ok(await service.GetJournalVouchersAsync(page, pageSize, ct)));
+
+    [Authorize(Policy = AppPermissions.ExpensesManage)]
+    [HttpPost("journal-vouchers")]
+    public Task<IActionResult> CreateJournalVoucher(CreateJournalVoucherRequest request, CancellationToken ct) =>
+        Handle(async () => ApiResponse<JournalVoucherResponse>.Ok(await service.CreateJournalVoucherAsync(request, UserId(), ct), "Balanced journal voucher posted."));
 
     private string? UserId() => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
 

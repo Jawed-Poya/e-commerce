@@ -27,6 +27,7 @@ import type {
     InventoryTransactionType,
 } from "@/features/inventory/types/inventory-types";
 import { useI18n } from "@/i18n/i18n-provider";
+import { toFiniteNumber } from "@/lib/numbers";
 
 type AdjustmentAction = {
     id: string;
@@ -256,7 +257,7 @@ function formatDate(value: string, locale: string) {
 }
 
 function formatNumber(value: number) {
-    return value.toLocaleString(undefined, { maximumFractionDigits: 3 });
+    return toFiniteNumber(value).toLocaleString(undefined, { maximumFractionDigits: 3 });
 }
 
 function StockPreview({ label, value, signed = false, className = "" }: { label: string; value: number; signed?: boolean; className?: string }) {

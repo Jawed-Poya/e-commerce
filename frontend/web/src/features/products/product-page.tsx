@@ -16,7 +16,7 @@ import { apiGet, apiPost, imageUrl } from "../../shared/api/api-client";
 import { Badge } from "../../shared/components/ui/badge";
 import { Button } from "../../shared/components/ui/button";
 import { Skeleton } from "../../shared/components/ui/skeleton";
-import { formatMoney } from "../../shared/lib/money";
+import { formatDecimal, formatMoney } from "../../shared/lib/money";
 import { cn } from "../../shared/lib/utils";
 import type { ProductDetails } from "../../shared/types/product";
 import {
@@ -56,7 +56,7 @@ export function ProductPage() {
     permission: notificationPermission,
     enableBrowserNotifications,
   } = useStoreNotifications();
-  const { t, formatNumber } = useI18n();
+  const { t } = useI18n();
   const productId = q.data?.isActive ? q.data.id : undefined;
 
   useEffect(() => {
@@ -397,7 +397,7 @@ export function ProductPage() {
                   </span>
                   <span className="inline-flex items-center gap-1">
                     <Star className="size-3.5 fill-amber-400 text-amber-400" />
-                    {p.reviewCount > 0 ? p.averageRating.toFixed(1) : "—"} ({p.reviewCount})
+                    {p.reviewCount > 0 ? formatDecimal(p.averageRating) : "—"} ({p.reviewCount})
                   </span>
                 </div>
               </div>

@@ -124,6 +124,9 @@ public sealed class OrderService(
             var orderItems = new List<OrderItem>(groupedItems.Count);
             var productCosts = await inventoryCosts.GetCurrentUnitCostsAsync(productIds, cancellationToken);
             var defaultCustomerTypeId = await defaultCustomerType.GetIdAsync(cancellationToken);
+            var generalDiscountPercent = Math.Clamp(await context.CompanySettings.AsNoTracking()
+                .Select(setting => (decimal?)setting.GeneralSalesDiscountPercent)
+                .SingleOrDefaultAsync(cancellationToken) ?? 0, 0, 100);
 
             foreach (var requested in groupedItems)
             {
@@ -134,12 +137,16 @@ public sealed class OrderService(
                 if (baseQuantity <= 0)
                     throw new InvalidOperationException("Product quantities must be greater than zero.");
 
-                var baseUnitPrice = ResolveEffectivePrice(
+                var configuredBaseUnitPrice = ResolveEffectivePrice(
                     product,
                     customer.CustomerTypeId,
                     defaultCustomerTypeId,
                     today)
                     ?? throw new InvalidOperationException($"No active price is configured for '{product.Name}'.");
+                var baseUnitPrice = decimal.Round(
+                    configuredBaseUnitPrice * (1 - generalDiscountPercent / 100m),
+                    6,
+                    MidpointRounding.AwayFromZero);
                 var sellingUnitPrice = decimal.Round(baseUnitPrice * selectedUnit.ConversionFactor, 2);
                 var normalizedBasePrice = decimal.Round(sellingUnitPrice / selectedUnit.ConversionFactor, 6);
 

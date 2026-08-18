@@ -11,6 +11,9 @@ export function createEmptyDocumentItem(): DocumentItem {
         conversionFactor: 1,
         quantity: 1,
         amount: 0,
+        bonusQuantity: 0,
+        discountPercent: 0,
+        secondaryDiscountPercent: 0,
         lotNumber: "",
         expireDate: null,
     };
@@ -23,6 +26,9 @@ export function isDocumentLineEmpty(item: DocumentItem) {
         item.unitId == null &&
         item.quantity === 1 &&
         item.amount === 0 &&
+        item.bonusQuantity === 0 &&
+        item.discountPercent === 0 &&
+        item.secondaryDiscountPercent === 0 &&
         !(item.lotNumber ?? "").trim() &&
         !item.expireDate
     );
@@ -38,6 +44,9 @@ export function isDocumentLineComplete(item: DocumentItem) {
         item.quantity > 0 &&
         Number.isFinite(item.amount) &&
         item.amount >= 0
+        && item.bonusQuantity >= 0
+        && item.discountPercent >= 0 && item.discountPercent <= 100
+        && item.secondaryDiscountPercent >= 0 && item.secondaryDiscountPercent <= 100
     );
 }
 

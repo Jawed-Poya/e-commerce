@@ -1,5 +1,6 @@
 import apiClient from "@/api/api-client";
 import { resolveApiAssetUrl } from "@/api/axios";
+import { prepareProductImage } from "@/lib/image-files";
 
 export function resolveProductImageUrl(path: string | null | undefined) {
     return resolveApiAssetUrl(path);
@@ -10,6 +11,8 @@ export interface ProductListItem {
     name: string;
     barcode: string | null;
     strength: string | null;
+    genericName: string | null;
+    formula: string | null;
     shortDescription: string | null;
     description: string | null;
     slug: string | null;
@@ -123,6 +126,8 @@ export interface CreateSingleProductInput {
     name: string;
     barcode?: string | null;
     strength?: string | null;
+    genericName?: string | null;
+    formula?: string | null;
     shortDescription?: string | null;
     description?: string | null;
     slug?: string | null;
@@ -148,7 +153,7 @@ export interface CreateSingleProductResult {
 }
 
 export type BulkUpdateProduct = Pick<ProductListItem,
-    "id" | "name" | "barcode" | "strength" | "categoryId" | "brandId" | "unitId" |
+    "id" | "name" | "barcode" | "strength" | "genericName" | "formula" | "categoryId" | "brandId" | "unitId" |
     "shortDescription" | "description" | "slug" | "minimumValue" |
     "maximumValue" | "orderQuantityStep" | "quickOrderQuantities" | "usesDisplayStock" | "displayStockQuantity" | "isFeatured" | "isActive" | "primaryImageUrl" | "images"> & { minimumStockQuantity: number; image?: File; galleryImages?: File[]; removedImageIds?: number[]; prices: ProductPriceInput[]; unitConversions?: ProductUnitConversionInput[] };
 
@@ -160,14 +165,18 @@ export const productService = {
     getAll(params?: ProductListFilters) {
         return apiClient.get<PagedProducts>("/products", params);
     },
-    createSingle(product: CreateSingleProductInput) {
+    async createSingle(product: CreateSingleProductInput) {
         const formData = new FormData();
         const prefix = "Products[0]";
-        formData.append(`${prefix}.Image`, product.image, product.image.name);
-        product.galleryImages?.forEach(image => formData.append(`${prefix}.GalleryImages`, image, image.name));
+        const primaryImage = await prepareProductImage(product.image);
+        const galleryImages = await Promise.all((product.galleryImages ?? []).map(prepareProductImage));
+        formData.append(`${prefix}.Image`, primaryImage, primaryImage.name);
+        galleryImages.forEach(image => formData.append(`${prefix}.GalleryImages`, image, image.name));
         append(formData, `${prefix}.Name`, product.name.trim());
         append(formData, `${prefix}.Barcode`, product.barcode?.trim() || null);
         append(formData, `${prefix}.Strength`, product.strength?.trim() || null);
+        append(formData, `${prefix}.GenericName`, product.genericName?.trim() || null);
+        append(formData, `${prefix}.Formula`, product.formula?.trim() || null);
         append(formData, `${prefix}.ShortDescription`, product.shortDescription?.trim() || null);
         append(formData, `${prefix}.Description`, product.description?.trim() || null);
         append(formData, `${prefix}.Slug`, product.slug?.trim() || null);
@@ -203,14 +212,21 @@ export const productService = {
         });
         return apiClient.post<CreateSingleProductResult>("/products/bulk", formData);
     },
-    bulkUpdate(products: BulkUpdateProduct[]) {
+    async bulkUpdate(products: BulkUpdateProduct[]) {
         const formData = new FormData();
-        products.forEach((product, index) => {
+        const processedProducts = await Promise.all(products.map(async product => ({
+            ...product,
+            image: product.image ? await prepareProductImage(product.image) : undefined,
+            galleryImages: await Promise.all((product.galleryImages ?? []).map(prepareProductImage)),
+        })));
+        processedProducts.forEach((product, index) => {
             const prefix = `Products[${index}]`;
             append(formData, `${prefix}.Id`, product.id);
             append(formData, `${prefix}.Name`, product.name.trim());
             append(formData, `${prefix}.Barcode`, product.barcode?.trim());
             append(formData, `${prefix}.Strength`, product.strength?.trim());
+            append(formData, `${prefix}.GenericName`, product.genericName?.trim());
+            append(formData, `${prefix}.Formula`, product.formula?.trim());
             append(formData, `${prefix}.ShortDescription`, product.shortDescription?.trim());
             append(formData, `${prefix}.Description`, product.description?.trim());
             append(formData, `${prefix}.Slug`, product.slug?.trim());
