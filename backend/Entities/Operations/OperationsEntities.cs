@@ -7,6 +7,24 @@ namespace ECommerce.Entities.Operations;
 
 public enum PurchaseStatus { Draft = 1, Received = 2, Cancelled = 3 }
 public enum DocumentPaymentStatus { Unpaid = 1, Partial = 2, Paid = 3 }
+public enum JournalVoucherType
+{
+    ManualAdjustment = 1,
+    OpeningBalance = 2,
+    FundsTransfer = 3,
+    OwnerEquity = 4,
+    Purchase = 10,
+    PurchasePayment = 11,
+    ManualSale = 20,
+    SaleReceipt = 21,
+    OnlineSale = 22,
+    OnlineReceipt = 23,
+    Expense = 30,
+    PayrollAccrual = 40,
+    PayrollPayment = 41,
+    Reversal = 90
+}
+public enum JournalVoucherStatus { Posted = 1, Reversed = 2 }
 
 public sealed class Supplier : BaseEntity
 {
@@ -222,10 +240,28 @@ public sealed class JournalVoucher : BaseEntity
     public string VoucherNumber { get; set; } = null!;
     public DateOnly VoucherDate { get; set; }
     public string CurrencyCode { get; set; } = "USD";
+    public JournalVoucherType VoucherType { get; set; } = JournalVoucherType.ManualAdjustment;
+    public JournalVoucherStatus Status { get; set; } = JournalVoucherStatus.Posted;
+    public bool IsSystemGenerated { get; set; }
+    public string? ReferenceNumber { get; set; }
+    public string? SourceType { get; set; }
+    public long? SourceId { get; set; }
+    public string? SourceNumber { get; set; }
+    public string? CounterpartyType { get; set; }
+    public long? CounterpartyId { get; set; }
+    public string? CounterpartyName { get; set; }
     public string Memo { get; set; } = null!;
     public decimal TotalDebit { get; set; }
     public decimal TotalCredit { get; set; }
     public string? CreatedByUserId { get; set; }
+    public DateTime PostedAt { get; set; }
+    public string? PostedByUserId { get; set; }
+    public DateTime? ReversedAt { get; set; }
+    public string? ReversedByUserId { get; set; }
+    public string? ReversalReason { get; set; }
+    public long? ReversalOfVoucherId { get; set; }
+    public JournalVoucher? ReversalOfVoucher { get; set; }
+    public ICollection<JournalVoucher> Reversals { get; set; } = [];
     public ICollection<JournalVoucherLine> Lines { get; set; } = [];
 }
 

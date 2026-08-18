@@ -234,6 +234,7 @@ public sealed record ExpenseResponse(long Id, DateOnly ExpenseDate, long Categor
 public sealed class CreateJournalVoucherRequest
 {
     public DateOnly VoucherDate { get; set; }
+    public JournalVoucherType VoucherType { get; set; } = JournalVoucherType.ManualAdjustment;
     public string Memo { get; set; } = null!;
     public string? ReferenceNumber { get; set; }
     public List<CreateJournalVoucherLineRequest> Lines { get; set; } = [];
@@ -249,5 +250,33 @@ public sealed class CreateJournalVoucherLineRequest
 }
 
 public sealed record JournalVoucherLineResponse(long Id, string AccountCode, string AccountName, string? Description, decimal Debit, decimal Credit);
-public sealed record JournalVoucherResponse(long Id, string VoucherNumber, DateOnly VoucherDate, string CurrencyCode, string Memo, decimal TotalDebit, decimal TotalCredit, DateTime CreatedAt, IReadOnlyList<JournalVoucherLineResponse> Lines);
-public sealed record JournalAccountBalanceResponse(string AccountCode, string AccountName, decimal TotalDebit, decimal TotalCredit, decimal Balance, int EntryCount);
+public sealed record JournalVoucherResponse(
+    long Id,
+    string VoucherNumber,
+    DateOnly VoucherDate,
+    string CurrencyCode,
+    JournalVoucherType VoucherType,
+    JournalVoucherStatus Status,
+    bool IsSystemGenerated,
+    string? ReferenceNumber,
+    string? SourceType,
+    long? SourceId,
+    string? SourceNumber,
+    string? CounterpartyType,
+    long? CounterpartyId,
+    string? CounterpartyName,
+    string Memo,
+    decimal TotalDebit,
+    decimal TotalCredit,
+    string? OperatorName,
+    DateTime PostedAt,
+    DateTime? ReversedAt,
+    string? ReversalReason,
+    long? ReversalOfVoucherId,
+    long? ReversalVoucherId,
+    DateTime CreatedAt,
+    IReadOnlyList<JournalVoucherLineResponse> Lines);
+public sealed record JournalAccountBalanceResponse(string AccountCode, string AccountName, string CurrencyCode, decimal TotalDebit, decimal TotalCredit, decimal Balance, int EntryCount);
+public sealed record JournalVoucherSummaryResponse(int TotalVouchers, int SystemGeneratedVouchers, int ManualVouchers, int ReversedVouchers, decimal TotalPostedDebits, string CurrencyCode, DateOnly? LastPostingDate);
+public sealed record JournalVoucherSyncResponse(int CreatedVouchers);
+public sealed class ReverseJournalVoucherRequest { public string Reason { get; set; } = null!; }

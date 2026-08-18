@@ -175,11 +175,27 @@ public sealed class JournalVoucherConfiguration : IEntityTypeConfiguration<Journ
     {
         b.Property(x => x.VoucherNumber).HasMaxLength(50).IsRequired();
         b.Property(x => x.CurrencyCode).HasMaxLength(10).IsRequired();
+        b.Property(x => x.ReferenceNumber).HasMaxLength(100);
+        b.Property(x => x.SourceType).HasMaxLength(50);
+        b.Property(x => x.SourceNumber).HasMaxLength(100);
+        b.Property(x => x.CounterpartyType).HasMaxLength(50);
+        b.Property(x => x.CounterpartyName).HasMaxLength(250);
+        b.Property(x => x.ReversalReason).HasMaxLength(1000);
         b.Property(x => x.Memo).HasMaxLength(1000).IsRequired();
         b.Property(x => x.TotalDebit).HasPrecision(18, 2);
         b.Property(x => x.TotalCredit).HasPrecision(18, 2);
         b.HasIndex(x => x.VoucherNumber).IsUnique();
         b.HasIndex(x => x.VoucherDate);
+        b.HasIndex(x => new { x.SourceType, x.SourceId })
+            .IsUnique()
+            .HasFilter("[SourceType] IS NOT NULL AND [SourceId] IS NOT NULL AND [IsDeleted] = 0");
+        b.HasIndex(x => x.ReversalOfVoucherId)
+            .IsUnique()
+            .HasFilter("[ReversalOfVoucherId] IS NOT NULL AND [IsDeleted] = 0");
+        b.HasOne(x => x.ReversalOfVoucher)
+            .WithMany(x => x.Reversals)
+            .HasForeignKey(x => x.ReversalOfVoucherId)
+            .OnDelete(DeleteBehavior.Restrict);
         b.HasMany(x => x.Lines).WithOne(x => x.JournalVoucher).HasForeignKey(x => x.JournalVoucherId).OnDelete(DeleteBehavior.Cascade);
     }
 }

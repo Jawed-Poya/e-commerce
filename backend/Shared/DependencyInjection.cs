@@ -5,6 +5,7 @@ using ECommerce.Entities.Users;
 using ECommerce.Options;
 using ECommerce.Services.Auth;
 using ECommerce.Services.Auth.Verification;
+using ECommerce.Services.Accounting;
 using ECommerce.Services.Auditing;
 using ECommerce.Services.Customers;
 using ECommerce.Services.Company;
@@ -46,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IInventoryService, InventoryService>();
         services.AddScoped<IInventoryLotAllocator, InventoryLotAllocator>();
         services.AddScoped<IInventoryCostService, InventoryCostService>();
+        services.AddScoped<IAccountingPostingService, AccountingPostingService>();
         services.AddScoped<IFinancialReportService, FinancialReportService>();
         services.AddScoped<IFinancialDocumentService, FinancialDocumentService>();
         services.AddScoped<IOrderInventoryService, OrderInventoryService>();

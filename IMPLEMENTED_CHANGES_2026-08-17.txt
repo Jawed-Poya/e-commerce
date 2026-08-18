@@ -600,6 +600,38 @@ Project: D:\e-commerce
     - Journal vouchers.
     - Staff system-user detection.
 
+91A. Rebuilt journal vouchers as a workflow-backed accounting ledger.
+    - Purchases automatically post Inventory / Accounts Payable accruals.
+    - Initial and later supplier payments automatically settle Accounts Payable.
+    - Manual sales automatically post Accounts Receivable, Sales Revenue,
+      Sales Tax, Cost of Goods Sold, and Inventory entries.
+    - Customer receipts, account-credit use, and overpayments automatically post
+      to Cash/Bank, Accounts Receivable, and Customer Credit/Deposits.
+    - Delivered online orders automatically post revenue and inventory cost, while
+      paid online payments post separate Cash/Bank and Receivable settlements.
+    - Expenses automatically post expense and payment-account entries.
+    - Payroll automatically posts salary accruals and installment payments.
+    - Every automatic voucher stores its source type/id/number, customer/supplier/
+      staff/vendor, branch, currency, and responsible system user.
+    - Duplicate source postings are prevented by a filtered unique database index.
+    - Historical transactions can be synchronized idempotently from the voucher page.
+    - Voucher filtering is available by search, type, origin, and posting status.
+    - Account balances now consolidate automatic workflow entries and adjustments.
+    - General-ledger balances remain separated by currency, preventing mixed-currency totals.
+    - Manual entries are limited to controlled adjustments, opening balances,
+      funds transfers, and owner-equity transactions.
+    - Posted manual vouchers are immutable and reversed through a separate balanced
+      reversal voucher with a mandatory audit reason.
+    - System-generated vouchers must be corrected through their originating workflow.
+
+91B. Added professional voucher workflow schema.
+    - Voucher type and Posted/Reversed status.
+    - Automatic/manual origin marker.
+    - External reference and source-document identity.
+    - Counterparty identity and name.
+    - Posting operator/timestamp and reversal audit fields.
+    - Self-referencing reversal relationship and one-reversal-only unique index.
+
 ===============================================================================
 15. NEW OR IMPORTANT FILES
 ===============================================================================

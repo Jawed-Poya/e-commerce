@@ -15,6 +15,7 @@ using ECommerce.Services.Inventory;
 using ECommerce.Services.Notifications;
 using ECommerce.Services.Storefront;
 using ECommerce.Services.Company;
+using ECommerce.Services.Accounting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
@@ -36,6 +37,7 @@ public sealed class OrderService(
     IStorefrontContentService storefrontContent,
     IInventoryCostService inventoryCosts,
     IOrderInventoryService orderInventory,
+    IAccountingPostingService accounting,
     IOptions<WhatsAppOptions> whatsAppOptions) : IOrderService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -482,6 +484,7 @@ public sealed class OrderService(
             }
 
             order.Status = request.Status;
+            order.UpdatedAt = DateTime.UtcNow;
             order.StatusHistory.Add(new OrderStatusHistory
             {
                 FromStatus = previousStatus,
@@ -489,6 +492,14 @@ public sealed class OrderService(
                 Note = CleanOptional(request.Note),
                 ChangedByUserId = CleanOptional(userId)
             });
+
+            if (request.Status == OrderStatus.Delivered)
+            {
+                await accounting.PostOnlineSaleAsync(order, userId, cancellationToken);
+                foreach (var paidPayment in order.Payments.Where(item =>
+                             item.Status is PaymentStatus.Paid or PaymentStatus.PartiallyRefunded))
+                    await accounting.PostOnlinePaymentAsync(order, paidPayment, userId, cancellationToken);
+            }
 
             var adminNotification = await adminNotifications.CreateOrderStatusChangedAsync(
                 order.Id,
@@ -561,6 +572,10 @@ public sealed class OrderService(
             : null;
 
         order.PaymentStatus = request.Status;
+
+        if (order.Status == OrderStatus.Delivered &&
+            request.Status is PaymentStatus.Paid or PaymentStatus.PartiallyRefunded)
+            await accounting.PostOnlinePaymentAsync(order, payment, userId, cancellationToken);
         order.StatusHistory.Add(new OrderStatusHistory
         {
             FromStatus = order.Status,

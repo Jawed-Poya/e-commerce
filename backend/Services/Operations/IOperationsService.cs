@@ -1,4 +1,5 @@
 using ECommerce.Entities.Common;
+using ECommerce.Entities.Operations;
 using ECommerce.Entities.Operations.Contracts;
 
 namespace ECommerce.Services.Operations;
@@ -36,7 +37,10 @@ public interface IOperationsService
     Task<ExpenseCategoryResponse> SaveExpenseCategoryAsync(long? id, ExpenseCategoryUpsertRequest request, CancellationToken ct);
     Task<PagedResult<ExpenseResponse>> GetExpensesAsync(int page, int pageSize, CancellationToken ct);
     Task<ExpenseResponse> CreateExpenseAsync(CreateExpenseRequest request, string? userId, CancellationToken ct);
-    Task<PagedResult<JournalVoucherResponse>> GetJournalVouchersAsync(int page, int pageSize, CancellationToken ct);
+    Task<PagedResult<JournalVoucherResponse>> GetJournalVouchersAsync(string? search, JournalVoucherType? type, JournalVoucherStatus? status, bool? systemGenerated, int page, int pageSize, CancellationToken ct);
+    Task<JournalVoucherSummaryResponse> GetJournalVoucherSummaryAsync(CancellationToken ct);
     Task<IReadOnlyList<JournalAccountBalanceResponse>> GetJournalAccountBalancesAsync(CancellationToken ct);
     Task<JournalVoucherResponse> CreateJournalVoucherAsync(CreateJournalVoucherRequest request, string? userId, CancellationToken ct);
+    Task<JournalVoucherResponse> ReverseJournalVoucherAsync(long id, string reason, string? userId, CancellationToken ct);
+    Task<JournalVoucherSyncResponse> SyncJournalVouchersAsync(string? userId, CancellationToken ct);
 }

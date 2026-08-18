@@ -7,6 +7,7 @@ using ECommerce.Entities.Products;
 using ECommerce.Services.Customers;
 using ECommerce.Services.Inventory;
 using ECommerce.Services.Company;
+using ECommerce.Services.Accounting;
 using ECommerce.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -18,6 +19,7 @@ public sealed class OperationsService(
     IDefaultCustomerTypeResolver defaultCustomerTypeResolver,
     IInventoryCostService inventoryCosts,
     IInventoryLotAllocator lotAllocator,
+    IAccountingPostingService accounting,
     IBranchContext branchContext,
     IOptions<WhatsAppOptions> whatsAppOptions) : IOperationsService
 {
@@ -577,6 +579,10 @@ public sealed class OperationsService(
 
         context.Purchases.Add(purchase);
         await context.SaveChangesAsync(ct);
+        await accounting.PostPurchaseAsync(purchase, supplierName, userId, ct);
+        foreach (var payment in purchase.Payments.OrderBy(item => item.Id))
+            await accounting.PostPurchasePaymentAsync(purchase, payment, supplierName, userId, ct);
+        await context.SaveChangesAsync(ct);
         var warehouse = await context.Warehouses
             .Where(x => x.IsActive && (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value))
             .OrderByDescending(x => x.Code == MainWarehouseCode)
@@ -643,9 +649,12 @@ public sealed class OperationsService(
             ?? throw new KeyNotFoundException("Purchase not found.");
         var remaining = Math.Max(0, purchase.Total - purchase.PaidAmount);
         if (request.Amount > remaining) throw new ArgumentException($"Payment cannot exceed the remaining balance of {remaining:0.00}.");
-        purchase.Payments.Add(NewPurchasePayment(request.Amount, PaymentDate(request.PaymentDate), request.PaymentMethod, request.ReferenceNumber, request.Notes, userId));
+        var payment = NewPurchasePayment(request.Amount, PaymentDate(request.PaymentDate), request.PaymentMethod, request.ReferenceNumber, request.Notes, userId);
+        purchase.Payments.Add(payment);
         purchase.PaidAmount += request.Amount;
         purchase.PaymentStatus = PaymentStatus(purchase.PaidAmount, purchase.Total);
+        await context.SaveChangesAsync(ct);
+        await accounting.PostPurchasePaymentAsync(purchase, payment, purchase.Supplier?.Name, userId, ct);
         await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return MapPurchase(purchase, purchase.Supplier?.Name);
@@ -915,6 +924,15 @@ public sealed class OperationsService(
 
         context.InventorySales.Add(sale);
         await context.SaveChangesAsync(ct);
+        var accountingCustomerName = registeredCustomerName ?? request.CustomerName ?? "Walk-in customer";
+        await accounting.PostManualSaleAsync(sale, accountingCustomerName, userId, ct);
+        var accountingReceivable = sale.Total;
+        foreach (var payment in sale.Payments.OrderBy(item => item.Id))
+        {
+            await accounting.PostSalePaymentAsync(sale, payment, accountingReceivable, accountingCustomerName, userId, ct);
+            accountingReceivable = Math.Max(0, accountingReceivable - payment.Amount);
+        }
+        await context.SaveChangesAsync(ct);
         foreach (var line in normalizedItems)
         {
             if (line.Product.UsesDisplayStock)
@@ -967,7 +985,8 @@ public sealed class OperationsService(
         var creditCreated = Math.Max(0, request.Amount - remaining);
         if (creditCreated > 0 && sale.Customer is null)
             throw new ArgumentException($"Payment cannot exceed the remaining balance of {remaining:0.00} for a walk-in customer.");
-        sale.Payments.Add(NewSalePayment(request.Amount, PaymentDate(request.PaymentDate), request.PaymentMethod, request.ReferenceNumber, request.Notes, userId));
+        var payment = NewSalePayment(request.Amount, PaymentDate(request.PaymentDate), request.PaymentMethod, request.ReferenceNumber, request.Notes, userId);
+        sale.Payments.Add(payment);
         sale.PaidAmount += request.Amount;
         if (sale.Customer is not null && creditCreated > 0)
         {
@@ -977,9 +996,13 @@ public sealed class OperationsService(
         sale.PaymentStatus = PaymentStatus(sale.PaidAmount, sale.Total);
         sale.PaymentMethod = PaymentMethod(request.PaymentMethod);
         await context.SaveChangesAsync(ct);
+        var customerName = sale.Customer is null
+            ? sale.CustomerName ?? "Walk-in customer"
+            : (sale.Customer.FirstName + " " + (sale.Customer.LastName ?? "")).Trim();
+        await accounting.PostSalePaymentAsync(sale, payment, remaining, customerName, userId, ct);
+        await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        var name = sale.Customer is null ? sale.CustomerName ?? "Walk-in customer" : (sale.Customer.FirstName + " " + (sale.Customer.LastName ?? "")).Trim();
-        return MapSale(sale, name);
+        return MapSale(sale, customerName);
     }
 
     public async Task<IReadOnlyList<StaffResponse>> GetStaffAsync(CancellationToken ct) =>
@@ -1059,6 +1082,7 @@ public sealed class OperationsService(
 
     public async Task<SalaryPaymentResponse> CreateSalaryPaymentAsync(CreateSalaryPaymentRequest request, string? userId, CancellationToken ct)
     {
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
         if (request.PeriodMonth is < 1 or > 12 || request.PeriodYear < 2000) throw new ArgumentException("A valid salary period is required.");
         if (request.Bonus < 0 || request.Deduction < 0) throw new ArgumentException("Bonus and deduction cannot be negative.");
         var staff = await context.StaffMembers.SingleOrDefaultAsync(
@@ -1098,6 +1122,11 @@ public sealed class OperationsService(
             entity.Installments.Add(NewSalaryInstallment(request.PaidAmount, paidDate, request.PaymentMethod, request.ReferenceNumber, "Initial salary payment", userId));
         context.StaffSalaryPayments.Add(entity);
         await context.SaveChangesAsync(ct);
+        await accounting.PostPayrollAccrualAsync(entity, staff.FullName, userId, ct);
+        foreach (var payment in entity.Installments.OrderBy(item => item.Id))
+            await accounting.PostPayrollPaymentAsync(entity, payment, staff.FullName, userId, ct);
+        await context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return MapSalary(entity, staff.FullName);
     }
 
@@ -1117,12 +1146,15 @@ public sealed class OperationsService(
         var remaining = Math.Max(0, salary.NetAmount - salary.PaidAmount);
         if (request.Amount > remaining) throw new ArgumentException($"Payment cannot exceed the remaining balance of {remaining:0.00}.");
         var date = PaymentDate(request.PaymentDate);
-        salary.Installments.Add(NewSalaryInstallment(request.Amount, date, request.PaymentMethod, request.ReferenceNumber, request.Notes, userId));
+        var payment = NewSalaryInstallment(request.Amount, date, request.PaymentMethod, request.ReferenceNumber, request.Notes, userId);
+        salary.Installments.Add(payment);
         salary.PaidAmount += request.Amount;
         salary.PaymentStatus = PaymentStatus(salary.PaidAmount, salary.NetAmount);
         salary.PaidDate = date;
         salary.PaymentMethod = PaymentMethod(request.PaymentMethod);
         salary.ReferenceNumber = Clean(request.ReferenceNumber) ?? salary.ReferenceNumber;
+        await context.SaveChangesAsync(ct);
+        await accounting.PostPayrollPaymentAsync(salary, payment, salary.Staff.FullName, userId, ct);
         await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return MapSalary(salary, salary.Staff.FullName);
@@ -1166,6 +1198,7 @@ public sealed class OperationsService(
 
     public async Task<ExpenseResponse> CreateExpenseAsync(CreateExpenseRequest request, string? userId, CancellationToken ct)
     {
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
         RequireText(request.Description, "Expense description");
         if (request.Amount <= 0) throw new ArgumentException("Expense amount must be greater than zero.");
         var category = await context.Types.SingleOrDefaultAsync(x => x.Id == request.CategoryId && x.Group == GeneralTypeEnum.ExpenseCategory, ct) ?? throw new ArgumentException("Expense category not found.");
@@ -1184,23 +1217,90 @@ public sealed class OperationsService(
         };
         context.Expenses.Add(entity);
         await context.SaveChangesAsync(ct);
+        await accounting.PostExpenseAsync(entity, category.Name, userId, ct);
+        await context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return new ExpenseResponse(entity.Id, entity.ExpenseDate, category.Id, category.Name, entity.Amount, entity.Vendor, entity.PaymentMethod, entity.ReferenceNumber, entity.Description, entity.CreatedAt);
     }
 
-    public async Task<PagedResult<JournalVoucherResponse>> GetJournalVouchersAsync(int page, int pageSize, CancellationToken ct)
+    public async Task<PagedResult<JournalVoucherResponse>> GetJournalVouchersAsync(
+        string? search,
+        JournalVoucherType? type,
+        JournalVoucherStatus? status,
+        bool? systemGenerated,
+        int page,
+        int pageSize,
+        CancellationToken ct)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 10, 100);
         var query = context.JournalVouchers.AsNoTracking()
             .Where(x => !branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value);
+        var clean = Clean(search);
+        if (clean is not null)
+            query = query.Where(item =>
+                item.VoucherNumber.Contains(clean) ||
+                item.Memo.Contains(clean) ||
+                (item.ReferenceNumber != null && item.ReferenceNumber.Contains(clean)) ||
+                (item.SourceNumber != null && item.SourceNumber.Contains(clean)) ||
+                (item.CounterpartyName != null && item.CounterpartyName.Contains(clean)));
+        if (type.HasValue) query = query.Where(item => item.VoucherType == type.Value);
+        if (status.HasValue) query = query.Where(item => item.Status == status.Value);
+        if (systemGenerated.HasValue) query = query.Where(item => item.IsSystemGenerated == systemGenerated.Value);
         var totalCount = await query.CountAsync(ct);
         var items = await query.OrderByDescending(x => x.VoucherDate).ThenByDescending(x => x.Id)
             .Skip((page - 1) * pageSize).Take(pageSize)
             .Select(x => new JournalVoucherResponse(
-                x.Id, x.VoucherNumber, x.VoucherDate, x.CurrencyCode, x.Memo, x.TotalDebit, x.TotalCredit, x.CreatedAt,
+                x.Id,
+                x.VoucherNumber,
+                x.VoucherDate,
+                x.CurrencyCode,
+                x.VoucherType,
+                x.Status,
+                x.IsSystemGenerated,
+                x.ReferenceNumber,
+                x.SourceType,
+                x.SourceId,
+                x.SourceNumber,
+                x.CounterpartyType,
+                x.CounterpartyId,
+                x.CounterpartyName,
+                x.Memo,
+                x.TotalDebit,
+                x.TotalCredit,
+                context.Users.Where(user => user.Id == (x.CreatedByUserId ?? x.PostedByUserId)).Select(user => user.FullName).FirstOrDefault(),
+                x.PostedAt,
+                x.ReversedAt,
+                x.ReversalReason,
+                x.ReversalOfVoucherId,
+                x.Reversals.Select(reversal => (long?)reversal.Id).FirstOrDefault(),
+                x.CreatedAt,
                 x.Lines.OrderBy(line => line.Id).Select(line => new JournalVoucherLineResponse(line.Id, line.AccountCode, line.AccountName, line.Description, line.Debit, line.Credit)).ToList()))
             .ToListAsync(ct);
         return new PagedResult<JournalVoucherResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
+    }
+
+    public async Task<JournalVoucherSummaryResponse> GetJournalVoucherSummaryAsync(CancellationToken ct)
+    {
+        var currencyCode = await GetCurrencyCodeAsync(ct);
+        var query = context.JournalVouchers.AsNoTracking()
+            .Where(item => !branchContext.BranchId.HasValue || item.BranchId == branchContext.BranchId.Value);
+        var summary = await query
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                Total = group.Count(),
+                System = group.Count(item => item.IsSystemGenerated),
+                Manual = group.Count(item => !item.IsSystemGenerated && item.VoucherType != JournalVoucherType.Reversal),
+                Reversed = group.Count(item => item.Status == JournalVoucherStatus.Reversed),
+                Debits = group.Where(item =>
+                    item.Status == JournalVoucherStatus.Posted && item.CurrencyCode == currencyCode).Sum(item => item.TotalDebit),
+                LastDate = group.Max(item => (DateOnly?)item.VoucherDate)
+            })
+            .SingleOrDefaultAsync(ct);
+        return summary is null
+            ? new JournalVoucherSummaryResponse(0, 0, 0, 0, 0, currencyCode, null)
+            : new JournalVoucherSummaryResponse(summary.Total, summary.System, summary.Manual, summary.Reversed, summary.Debits, currencyCode, summary.LastDate);
     }
 
     public async Task<IReadOnlyList<JournalAccountBalanceResponse>> GetJournalAccountBalancesAsync(CancellationToken ct)
@@ -1209,11 +1309,12 @@ public sealed class OperationsService(
             .Where(line => !branchContext.BranchId.HasValue ||
                 line.JournalVoucher.BranchId == branchContext.BranchId.Value);
         var balances = await query
-            .GroupBy(line => new { line.AccountCode, line.AccountName })
+            .GroupBy(line => new { line.AccountCode, line.AccountName, line.JournalVoucher.CurrencyCode })
             .Select(group => new
             {
                 group.Key.AccountCode,
                 group.Key.AccountName,
+                group.Key.CurrencyCode,
                 TotalDebit = group.Sum(line => line.Debit),
                 TotalCredit = group.Sum(line => line.Credit),
                 EntryCount = group.Count()
@@ -1222,26 +1323,34 @@ public sealed class OperationsService(
             .ToListAsync(ct);
 
         return balances
-            .GroupBy(item => item.AccountCode, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(item => new { item.AccountCode, item.CurrencyCode })
             .Select(group =>
             {
                 var totalDebit = group.Sum(item => item.TotalDebit);
                 var totalCredit = group.Sum(item => item.TotalCredit);
                 return new JournalAccountBalanceResponse(
-                    group.Key,
+                    group.Key.AccountCode,
                     group.First().AccountName,
+                    group.Key.CurrencyCode,
                     totalDebit,
                     totalCredit,
                     totalDebit - totalCredit,
                     group.Sum(item => item.EntryCount));
             })
             .OrderBy(item => item.AccountCode)
+            .ThenBy(item => item.CurrencyCode)
             .ToArray();
     }
 
     public async Task<JournalVoucherResponse> CreateJournalVoucherAsync(CreateJournalVoucherRequest request, string? userId, CancellationToken ct)
     {
         RequireText(request.Memo, "Voucher memo");
+        if (request.VoucherType is not (
+                JournalVoucherType.ManualAdjustment or
+                JournalVoucherType.OpeningBalance or
+                JournalVoucherType.FundsTransfer or
+                JournalVoucherType.OwnerEquity))
+            throw new ArgumentException("Manual vouchers can be adjustments, opening balances, funds transfers, or owner-equity entries. Operational vouchers are generated from their source workflow.");
         if (request.Lines.Count is < 2 or > 200)
             throw new ArgumentException("A journal voucher requires between 2 and 200 account lines.");
 
@@ -1288,20 +1397,30 @@ public sealed class OperationsService(
         if (debit <= 0 || Math.Abs(debit - credit) > 0.009m)
             throw new ArgumentException($"The voucher is not balanced. Debit is {debit:N2} and credit is {credit:N2}.");
 
-        var requestedNumber = Clean(request.ReferenceNumber);
-        var voucherNumber = requestedNumber ?? DocumentNumber("JV");
-        if (await context.JournalVouchers.AnyAsync(item => item.VoucherNumber == voucherNumber, ct))
-            throw new ArgumentException("This voucher number already exists.");
+        var voucherNumber = DocumentNumber(request.VoucherType switch
+        {
+            JournalVoucherType.OpeningBalance => "OBV",
+            JournalVoucherType.FundsTransfer => "TRV",
+            JournalVoucherType.OwnerEquity => "EQV",
+            _ => "JV"
+        });
+        var now = DateTime.UtcNow;
 
         var entity = new JournalVoucher
         {
             VoucherNumber = voucherNumber,
             VoucherDate = request.VoucherDate == default ? DateOnly.FromDateTime(DateTime.UtcNow) : request.VoucherDate,
             CurrencyCode = await GetCurrencyCodeAsync(ct),
+            VoucherType = request.VoucherType,
+            Status = JournalVoucherStatus.Posted,
+            IsSystemGenerated = false,
+            ReferenceNumber = Clean(request.ReferenceNumber),
             Memo = request.Memo.Trim(),
             TotalDebit = debit,
             TotalCredit = credit,
             CreatedByUserId = userId,
+            PostedByUserId = userId,
+            PostedAt = now,
             Lines = request.Lines.Select(line => new JournalVoucherLine
             {
                 AccountCode = line.AccountCode.Trim(),
@@ -1313,11 +1432,54 @@ public sealed class OperationsService(
         };
         context.JournalVouchers.Add(entity);
         await context.SaveChangesAsync(ct);
-        return new JournalVoucherResponse(
-            entity.Id, entity.VoucherNumber, entity.VoucherDate, entity.CurrencyCode, entity.Memo,
-            entity.TotalDebit, entity.TotalCredit, entity.CreatedAt,
-            entity.Lines.Select(line => new JournalVoucherLineResponse(line.Id, line.AccountCode, line.AccountName, line.Description, line.Debit, line.Credit)).ToList());
+        return await GetJournalVoucherByIdAsync(entity.Id, ct);
     }
+
+    public async Task<JournalVoucherResponse> ReverseJournalVoucherAsync(long id, string reason, string? userId, CancellationToken ct)
+    {
+        var reversal = await accounting.ReverseManualVoucherAsync(id, reason, userId, ct);
+        return await GetJournalVoucherByIdAsync(reversal.Id, ct);
+    }
+
+    public async Task<JournalVoucherSyncResponse> SyncJournalVouchersAsync(string? userId, CancellationToken ct)
+    {
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+        var created = await accounting.SyncOperationalVouchersAsync(userId, ct);
+        await transaction.CommitAsync(ct);
+        return new JournalVoucherSyncResponse(created);
+    }
+
+    private async Task<JournalVoucherResponse> GetJournalVoucherByIdAsync(long id, CancellationToken ct) =>
+        await context.JournalVouchers.AsNoTracking()
+            .Where(item => item.Id == id &&
+                (!branchContext.BranchId.HasValue || item.BranchId == branchContext.BranchId.Value))
+            .Select(x => new JournalVoucherResponse(
+                x.Id,
+                x.VoucherNumber,
+                x.VoucherDate,
+                x.CurrencyCode,
+                x.VoucherType,
+                x.Status,
+                x.IsSystemGenerated,
+                x.ReferenceNumber,
+                x.SourceType,
+                x.SourceId,
+                x.SourceNumber,
+                x.CounterpartyType,
+                x.CounterpartyId,
+                x.CounterpartyName,
+                x.Memo,
+                x.TotalDebit,
+                x.TotalCredit,
+                context.Users.Where(user => user.Id == (x.CreatedByUserId ?? x.PostedByUserId)).Select(user => user.FullName).FirstOrDefault(),
+                x.PostedAt,
+                x.ReversedAt,
+                x.ReversalReason,
+                x.ReversalOfVoucherId,
+                x.Reversals.Select(reversal => (long?)reversal.Id).FirstOrDefault(),
+                x.CreatedAt,
+                x.Lines.OrderBy(line => line.Id).Select(line => new JournalVoucherLineResponse(line.Id, line.AccountCode, line.AccountName, line.Description, line.Debit, line.Credit)).ToList()))
+            .SingleAsync(ct);
 
 
     private async Task<Dictionary<long, Product>> LoadProductsForUnitsAsync(long[] productIds, CancellationToken ct) =>

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using ECommerce.Entities;
 using ECommerce.Entities.Common;
+using ECommerce.Entities.Operations;
 using ECommerce.Entities.Operations.Contracts;
 using ECommerce.Services.Operations;
 using ECommerce.Shared;
@@ -191,8 +192,21 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
 
     [Authorize(Policy = AppPermissions.ExpensesView)]
     [HttpGet("journal-vouchers")]
-    public async Task<IActionResult> JournalVouchers([FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default) =>
-        Ok(ApiResponse<PagedResult<JournalVoucherResponse>>.Ok(await service.GetJournalVouchersAsync(page, pageSize, ct)));
+    public async Task<IActionResult> JournalVouchers(
+        [FromQuery] string? search,
+        [FromQuery] JournalVoucherType? type,
+        [FromQuery] JournalVoucherStatus? status,
+        [FromQuery] bool? systemGenerated,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken ct = default) =>
+        Ok(ApiResponse<PagedResult<JournalVoucherResponse>>.Ok(
+            await service.GetJournalVouchersAsync(search, type, status, systemGenerated, page, pageSize, ct)));
+
+    [Authorize(Policy = AppPermissions.ExpensesView)]
+    [HttpGet("journal-vouchers/summary")]
+    public async Task<IActionResult> JournalVoucherSummary(CancellationToken ct = default) =>
+        Ok(ApiResponse<JournalVoucherSummaryResponse>.Ok(await service.GetJournalVoucherSummaryAsync(ct)));
 
     [Authorize(Policy = AppPermissions.ExpensesView)]
     [HttpGet("journal-vouchers/accounts")]
@@ -202,7 +216,21 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
     [Authorize(Policy = AppPermissions.ExpensesManage)]
     [HttpPost("journal-vouchers")]
     public Task<IActionResult> CreateJournalVoucher(CreateJournalVoucherRequest request, CancellationToken ct) =>
-        Handle(async () => ApiResponse<JournalVoucherResponse>.Ok(await service.CreateJournalVoucherAsync(request, UserId(), ct), "Balanced journal voucher posted."));
+        Handle(async () => ApiResponse<JournalVoucherResponse>.Ok(await service.CreateJournalVoucherAsync(request, UserId(), ct), "Balanced adjustment voucher posted."));
+
+    [Authorize(Policy = AppPermissions.ExpensesManage)]
+    [HttpPost("journal-vouchers/{id:long}/reverse")]
+    public Task<IActionResult> ReverseJournalVoucher(long id, ReverseJournalVoucherRequest request, CancellationToken ct) =>
+        Handle(async () => ApiResponse<JournalVoucherResponse>.Ok(
+            await service.ReverseJournalVoucherAsync(id, request.Reason, UserId(), ct),
+            "Voucher reversed with a balancing audit entry."));
+
+    [Authorize(Policy = AppPermissions.ExpensesManage)]
+    [HttpPost("journal-vouchers/sync")]
+    public Task<IActionResult> SyncJournalVouchers(CancellationToken ct) =>
+        Handle(async () => ApiResponse<JournalVoucherSyncResponse>.Ok(
+            await service.SyncJournalVouchersAsync(UserId(), ct),
+            "Operational accounting vouchers synchronized."));
 
     private string? UserId() => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
 

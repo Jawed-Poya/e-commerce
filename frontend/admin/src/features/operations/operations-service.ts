@@ -8,7 +8,7 @@ import {
   readReferenceItems,
   writeCachedValue,
 } from "@/features/offline/offline-reference-cache";
-import type { CreateJournalVoucher, DocumentPayment, Expense, ExpenseCategory, JournalAccountBalance, JournalVoucher, ManualSale, ManualSaleLotMovement, OperationCustomer, OperationPolicy, OperationProduct, OperationSummary, PagedResult, Purchase, PurchaseDetails, QuickCreateProduct, SalaryPayment, Staff, Supplier, SupplierLedger } from "./operations-types";
+import type { CreateJournalVoucher, DocumentPayment, Expense, ExpenseCategory, JournalAccountBalance, JournalVoucher, JournalVoucherStatus, JournalVoucherSummary, JournalVoucherType, ManualSale, ManualSaleLotMovement, OperationCustomer, OperationPolicy, OperationProduct, OperationSummary, PagedResult, Purchase, PurchaseDetails, QuickCreateProduct, SalaryPayment, Staff, Supplier, SupplierLedger } from "./operations-types";
 
 const base = "/admin/operations";
 
@@ -164,9 +164,12 @@ export const operationsService = {
   saveExpenseCategory: (id: number | null, body: Omit<ExpenseCategory, "id">) => id ? apiClient.put<ExpenseCategory>(`${base}/expense-categories/${id}`, body) : apiClient.post<ExpenseCategory>(`${base}/expense-categories`, body),
   expenses: (page = 1, pageSize = 20) => apiClient.get<PagedResult<Expense>>(`${base}/expenses`, { page, pageSize }),
   createExpense: (body: unknown) => apiClient.post<Expense>(`${base}/expenses`, body),
-  journalVouchers: (page = 1, pageSize = 20) => apiClient.get<PagedResult<JournalVoucher>>(`${base}/journal-vouchers`, { page, pageSize }),
+  journalVouchers: (params: { search?: string; type?: JournalVoucherType; status?: JournalVoucherStatus; systemGenerated?: boolean; page?: number; pageSize?: number } = {}) => apiClient.get<PagedResult<JournalVoucher>>(`${base}/journal-vouchers`, params),
+  journalVoucherSummary: () => apiClient.get<JournalVoucherSummary>(`${base}/journal-vouchers/summary`),
   journalAccountBalances: () => apiClient.get<JournalAccountBalance[]>(`${base}/journal-vouchers/accounts`),
   createJournalVoucher: (body: CreateJournalVoucher) => apiClient.post<JournalVoucher>(`${base}/journal-vouchers`, body),
+  reverseJournalVoucher: (id: number, reason: string) => apiClient.post<JournalVoucher>(`${base}/journal-vouchers/${id}/reverse`, { reason }),
+  syncJournalVouchers: () => apiClient.post<{ createdVouchers: number }>(`${base}/journal-vouchers/sync`),
 };
 
 export async function warmOfflineOperationReferences() {
