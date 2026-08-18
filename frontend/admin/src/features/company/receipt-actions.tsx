@@ -27,6 +27,7 @@ export function ReceiptActions({ source, id, compact = false }: ReceiptActionsPr
         setDownloading(true);
         try {
             await companyService.downloadReceipt(source, id, format, thermal);
+            toast.success(tr(format === "pdf" ? "PDF generated successfully." : "Receipt image generated successfully."));
         } catch (error) {
             toast.error(tr(getErrorMessage(error)));
         } finally {

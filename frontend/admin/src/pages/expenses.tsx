@@ -23,6 +23,7 @@ import { operationsService } from "@/features/operations/operations-service";
 import { companyService } from "@/features/company/company-service";
 import type { ExpenseCategory } from "@/features/operations/operations-types";
 import { useCompany } from "@/features/company/company-context";
+import { useI18n } from "@/i18n/i18n-provider";
 
 const today = () => new Date().toISOString().slice(0, 10);
 type ExpenseDraft = { expenseDate: string; categoryId: string; amount: number; vendor: string; paymentMethod: string; referenceNumber: string; description: string };
@@ -32,6 +33,7 @@ export default function ExpensesPage() {
     const queryClient = useQueryClient();
     const { user } = useAdminAuth();
     const { formatMoney } = useCompany();
+    const { tr } = useI18n();
     const canManage = hasPermission(user, Permissions.ExpensesManage);
     const [expensePage, setExpensePage] = useState(1);
     const [expensePageSize, setExpensePageSize] = useState(20);
@@ -80,6 +82,7 @@ export default function ExpensesPage() {
         setExportingPdf(true);
         try {
             await companyService.exportOperationalPdf("expenses");
+            toast.success(tr("Expense PDF generated."));
         } catch (error) {
             toast.error(message(error));
         } finally {

@@ -38,7 +38,7 @@ function initialFilters(): FinancialFilterState {
 }
 
 export function useFinancialReport() {
-    const { t } = useI18n();
+    const { t, tr } = useI18n();
     const [filters, setFilters] = useState<FinancialFilterState>(initialFilters);
     const debouncedSearch = useDebouncedValue(filters.search);
     const request = useMemo(
@@ -77,6 +77,8 @@ export function useFinancialReport() {
     const exportReport = useMutation({
         mutationFn: (format: "excel" | "pdf") =>
             financeService.exportReport(format, request),
+        onSuccess: (_result, format) =>
+            toast.success(tr(format === "pdf" ? "PDF generated successfully." : "Excel file generated successfully.")),
         onError: (error) =>
             toast.error(getApiErrorMessage(error, t("finance.loadFailed"))),
     });
@@ -89,6 +91,7 @@ export function useFinancialReport() {
                 currencyCode: filters.currencyCode || undefined,
                 search: filters.search.trim() || undefined,
             }),
+        onSuccess: () => toast.success(tr("Sales PDF generated.")),
         onError: (error) =>
             toast.error(getApiErrorMessage(error, t("finance.loadFailed"))),
     });

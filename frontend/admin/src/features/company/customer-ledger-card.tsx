@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { WhatsAppLink } from "@/features/customers/whatsapp-link";
+import { useI18n } from "@/i18n/i18n-provider";
 import { useCompany } from "./company-context";
 import { companyService } from "./company-service";
 
@@ -25,6 +26,7 @@ export function CustomerLedgerCard({
     whatsAppUrl,
 }: CustomerLedgerCardProps) {
     const { company, formatMoney } = useCompany();
+    const { tr } = useI18n();
     const [range, setRange] = useState(() => presetDates("month"));
     const [exporting, setExporting] = useState<"excel" | "pdf" | null>(null);
     const currencyCode = company?.settings.mainCurrencyCode;
@@ -44,6 +46,7 @@ export function CustomerLedgerCard({
         setExporting(format);
         try {
             await companyService.exportCustomerLedger(customerId, format, params);
+            toast.success(tr(format === "pdf" ? "PDF generated successfully." : "Excel file generated successfully."));
         } catch (error) {
             toast.error(getErrorMessage(error));
         } finally {

@@ -61,7 +61,7 @@ function getUpdateErrorMessage(error: unknown, messages: { connection: string; e
 export default function ProductsPage() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
-    const { t } = useI18n();
+    const { t, tr } = useI18n();
     const { formatMoney } = useCompany();
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(1);
@@ -184,6 +184,7 @@ export default function ProductsPage() {
         setExportingPdf(true);
         try {
             await companyService.exportOperationalPdf("products", { search: search || undefined });
+            toast.success(tr("Product PDF generated."));
         } catch (error) {
             toast.error(getUpdateErrorMessage(error, { connection: "Could not connect to the PDF service.", endpoint: "The product PDF endpoint is unavailable.", failed: "Product PDF could not be generated." }));
         } finally {
