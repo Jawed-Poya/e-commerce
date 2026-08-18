@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
 import { ListPagination } from "@/components/list-pagination";
+import { SimpleCombobox } from "@/components/simple-combobox";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -185,7 +186,20 @@ function BulkCustomerRow({ row, index, customerTypes, defaultCustomerTypeId, onC
 }
 
 function CustomerTypeSelect({ value, options, defaultId, onChange }: { value: string; options: { id: number; name: string }[]; defaultId: number | null; onChange: (value: string) => void }) {
-    return <select className="border-input h-9 w-full rounded-md border bg-background px-3 text-sm" value={value || String(defaultId ?? "")} onChange={(event) => onChange(event.target.value)}><option value="">Default</option>{options.map((option) => <option key={option.id} value={option.id}>{option.name}{option.id === defaultId ? " (Default)" : ""}</option>)}</select>;
+    const selectedValue = value || (defaultId ? String(defaultId) : null);
+    return (
+        <SimpleCombobox<string>
+            value={selectedValue}
+            onValueChange={(next) => onChange(next ?? "")}
+            options={options.map((option) => ({
+                value: String(option.id),
+                label: option.name,
+                description: option.id === defaultId ? "Default customer type" : undefined,
+            }))}
+            placeholder="Select customer type"
+            emptyText="No customer types found."
+        />
+    );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-2"><Label>{label}</Label>{children}</div>; }
