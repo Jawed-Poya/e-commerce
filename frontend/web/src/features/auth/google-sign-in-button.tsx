@@ -14,25 +14,31 @@ export function GoogleSignInButton({
     disabled?: boolean;
 }) {
     const containerRef = useRef<HTMLDivElement>(null);
-    const environmentClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? "";
-    const [clientId, setClientId] = useState(environmentClientId);
-    const [configurationLoaded, setConfigurationLoaded] = useState(Boolean(environmentClientId));
+    const [clientId, setClientId] = useState("");
+    const [configurationLoaded, setConfigurationLoaded] = useState(false);
 
     useEffect(() => {
-        if (environmentClientId) return;
         let active = true;
+
+        // Keep the backend as the single source of truth for Google OAuth.
+        // The same client ID that renders the Google button is therefore also
+        // the one used by the API to validate the returned ID token audience.
         void apiGet<{ enabled: boolean; clientId: string | null }>("/auth/customer/google/config")
             .then((configuration) => {
-                if (active) setClientId(configuration.enabled ? configuration.clientId?.trim() ?? "" : "");
+                if (!active) return;
+                setClientId(configuration.enabled ? configuration.clientId?.trim() ?? "" : "");
             })
             .catch(() => {
-                // The regular sign-in form remains available if configuration cannot load.
+                if (active) setClientId("");
             })
             .finally(() => {
                 if (active) setConfigurationLoaded(true);
             });
-        return () => { active = false; };
-    }, [environmentClientId]);
+
+        return () => {
+            active = false;
+        };
+    }, []);
 
     useEffect(() => {
         if (!clientId || disabled) return;
@@ -83,7 +89,7 @@ export function GoogleSignInButton({
                 variant="outline"
                 className="h-11 w-full rounded-full bg-background font-bold"
                 disabled
-                title={configurationLoaded ? "Google sign-in is not configured" : "Loading Google sign-in"}
+                title={configurationLoaded ? "Google sign-in is not configured on the server" : "Loading Google sign-in"}
             >
                 <span
                     aria-hidden="true"
@@ -95,5 +101,6 @@ export function GoogleSignInButton({
             </Button>
         );
     }
+
     return <div ref={containerRef} className={disabled ? "pointer-events-none opacity-60" : "min-h-11 w-full"} />;
 }
