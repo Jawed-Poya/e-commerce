@@ -37,7 +37,7 @@ export const updateCustomerProfile = (request: { fullName: string; email: string
     apiPut<unknown>("/auth/profile", request);
 
 export const setCustomerPassword = (newPassword: string) =>
-    apiPost<Record<string, never>>("/auth/set-password", { newPassword });
+    apiPost<Record<string, never>>("/auth/customer/set-password", { newPassword });
 
 export const changeCustomerPassword = (currentPassword: string, newPassword: string) =>
-    apiPost<Record<string, never>>("/auth/change-password", { currentPassword, newPassword });
+    apiPost<Record<string, never>>("/auth/customer/change-password", { currentPassword, newPassword });

@@ -295,6 +295,7 @@ public sealed class AuthController(
     }
 
     [Authorize]
+    [HttpPost("customer/set-password")]
     [HttpPost("set-password")]
     public async Task<ActionResult<ApiResponse<object>>> SetPassword(
         SetPasswordRequest request)
@@ -316,6 +317,7 @@ public sealed class AuthController(
     }
 
     [Authorize]
+    [HttpPost("customer/change-password")]
     [HttpPost("change-password")]
     public async Task<ActionResult<ApiResponse<object>>> ChangePassword(
         ChangePasswordRequest request)
