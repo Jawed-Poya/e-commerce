@@ -154,8 +154,20 @@ function Metric({ icon, label, value, tone }: { icon: ReactNode; label: string; 
 function FilterSelect({ value, onChange, children }: { value: string; onChange: (value: string) => void; children: ReactNode }) { return <select className="border-input h-9 w-full rounded-md border bg-background px-3 text-sm" value={value} onChange={(event) => onChange(event.target.value)}>{children}</select>; }
 function templateLine(code: string, description: string): DraftLine { const account = standardAccounts.find((item) => item.code === code); return { key: crypto.randomUUID(), accountCode: code, accountName: account?.name ?? "", description, debit: 0, credit: 0 }; }
 function Field({ label, children }: { label: string; children: ReactNode }) { return <div className="space-y-2"><Label>{label}</Label>{children}</div>; }
-function date(value: string) { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${value.slice(0, 10)}T00:00:00Z`)); }
-function dateTime(value: string) { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
+function date(value: string | null | undefined) {
+    if (!value) return "Date unavailable";
+    const parsed = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+    return Number.isNaN(parsed.getTime())
+        ? "Date unavailable"
+        : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "UTC" }).format(parsed);
+}
+function dateTime(value: string | null | undefined) {
+    if (!value) return "Not recorded";
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime())
+        ? "Not recorded"
+        : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(parsed);
+}
 function invalid(id: string, text: string) { toast.error(text); document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" }); document.getElementById(id)?.querySelector<HTMLElement>("input,textarea")?.focus(); }
 function voucherLabel(type: JournalVoucherType) { return voucherTypes.find((item) => item.value === type)?.label ?? type; }
 function sourceHref(voucher: JournalVoucher) { if (!voucher.sourceType || !voucher.sourceId) return null; if (voucher.sourceType === "OnlineOrder") return `/orders/${voucher.sourceId}`; if (voucher.sourceType === "OnlinePayment") return voucher.sourceNumber ? `/orders?search=${encodeURIComponent(voucher.sourceNumber)}` : "/orders"; if (voucher.sourceType === "Purchase" || voucher.sourceType === "PurchasePayment") return "/operations/purchases"; if (voucher.sourceType === "ManualSale" || voucher.sourceType === "SalePayment") return "/operations/sales"; if (voucher.sourceType === "Expense") return "/operations/expenses"; if (voucher.sourceType === "Payroll" || voucher.sourceType === "PayrollPayment") return "/operations/staff"; return null; }
