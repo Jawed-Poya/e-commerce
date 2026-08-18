@@ -160,7 +160,7 @@ export function ProductEditorPage() {
           <div className="lg:col-span-2"><Field label="Short description"><Textarea value={form.shortDescription} onChange={e => setForm(x => ({ ...x, shortDescription: e.target.value }))} rows={2} /></Field></div>
           <div className="lg:col-span-2"><Field label="Full description"><Textarea value={form.description} onChange={e => setForm(x => ({ ...x, description: e.target.value }))} rows={6} /></Field></div>
           <label className="flex items-center gap-3 rounded-lg border p-3"><Checkbox checked={form.isActive} onCheckedChange={v => setForm(x => ({ ...x, isActive: v === true }))} /><span><strong className="block text-sm">Active product</strong><span className="text-xs text-muted-foreground">Visible and available for sale.</span></span></label>
-          <label className="flex items-center gap-3 rounded-lg border p-3"><Checkbox checked={form.isFeatured} onCheckedChange={v => setForm(x => ({ ...x, isFeatured: v === true }))} /><span><strong className="block text-sm">Featured product</strong><span className="text-xs text-muted-foreground">Highlight it on the storefront.</span></span></label>
+          <label className="flex items-center gap-3 rounded-lg border p-3"><Checkbox checked={form.isFeatured} onCheckedChange={v => setForm(x => ({ ...x, isFeatured: v === true }))} /><span><strong className="block text-sm">{t("products.pinToggleTitle")}</strong><span className="text-xs text-muted-foreground">{t("products.pinToggleHelp")}</span></span></label>
         </CardContent></Card>
 
         <ProductUnitConversionsFields

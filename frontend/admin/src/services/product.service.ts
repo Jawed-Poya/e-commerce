@@ -152,6 +152,11 @@ export interface CreateSingleProductResult {
     products: { id: number; name: string; barcode: string | null; slug: string; primaryImageUrl: string }[];
 }
 
+export interface StorefrontPinResult {
+    productId: number;
+    isPinned: boolean;
+}
+
 export type BulkUpdateProduct = Pick<ProductListItem,
     "id" | "name" | "barcode" | "strength" | "genericName" | "formula" | "categoryId" | "brandId" | "unitId" |
     "shortDescription" | "description" | "slug" | "minimumValue" |
@@ -272,6 +277,9 @@ export const productService = {
     },
     getBySlug(slug: string) {
         return apiClient.get<ProductDetails>(`/products/by-slug/${encodeURIComponent(slug)}`);
+    },
+    setStorefrontPin(productId: number, isPinned: boolean) {
+        return apiClient.patch<StorefrontPinResult>(`/products/${productId}/storefront-pin`, { isPinned });
     },
     replacePrices(productId: number, prices: ProductPriceInput[]) {
         return apiClient.put<ProductPrice[]>(`/products/${productId}/prices`, { prices });

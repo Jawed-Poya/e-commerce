@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Eye, FileText, ImagePlus, LoaderCircle, Pencil, Plus, Search, SlidersHorizontal, X } from "lucide-react";
+import { Eye, FileText, ImagePlus, LoaderCircle, Pencil, Pin, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -73,6 +73,7 @@ export default function ProductsPage() {
     const [open, setOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     const [exportingPdf, setExportingPdf] = useState(false);
+    const [pinningProductId, setPinningProductId] = useState<number | null>(null);
     const [activeEditor, setActiveEditor] = useState(0);
     const { data, isLoading, isError, isFetching } = useProducts({ ...filters, search: search || undefined, page, pageSize });
     const { data: lookups } = useProductLookupsQuery();
@@ -190,6 +191,24 @@ export default function ProductsPage() {
         }
     };
 
+    const toggleStorefrontPin = async (product: ProductListItem) => {
+        if (pinningProductId !== null) return;
+        setPinningProductId(product.id);
+        try {
+            const response = await productService.setStorefrontPin(product.id, !product.isFeatured);
+            toast.success(response.message ?? t(product.isFeatured ? "products.pinRemoved" : "products.pinAdded"));
+            await queryClient.invalidateQueries({ queryKey: productKeys.all });
+        } catch (error) {
+            toast.error(getUpdateErrorMessage(error, {
+                connection: "Could not connect to the product API.",
+                endpoint: "The storefront pin endpoint is unavailable.",
+                failed: t("products.pinFailed"),
+            }));
+        } finally {
+            setPinningProductId(null);
+        }
+    };
+
     const deleteSelected = async () => {
         try {
             await productService.deleteMany(selected);
@@ -220,16 +239,17 @@ export default function ProductsPage() {
         <div className="rounded-md border"><Table>
             <TableHeader><TableRow>
                 <TableHead className="w-10"><Checkbox aria-label="Select all" checked={products.length > 0 && selected.length === products.length} onCheckedChange={() => setSelected(selected.length === products.length ? [] : products.map(x => x.id))} /></TableHead>
-                <TableHead>{t("products.product")}</TableHead><TableHead>{t("products.barcode")}</TableHead><TableHead>{t("products.category")}</TableHead><TableHead>{t("products.price")}</TableHead><TableHead>Available stock / value</TableHead><TableHead>{t("products.status")}</TableHead>
+                <TableHead>{t("products.product")}</TableHead><TableHead>{t("products.barcode")}</TableHead><TableHead>{t("products.category")}</TableHead><TableHead>{t("products.price")}</TableHead><TableHead>Available stock / value</TableHead><TableHead>{t("products.storefrontColumn")}</TableHead><TableHead>{t("products.status")}</TableHead>
             </TableRow></TableHeader>
             <TableBody>
-                {isLoading && <TableRow><TableCell colSpan={7} className="h-28 text-center"><LoaderCircle className="mx-auto animate-spin" /></TableCell></TableRow>}
-                {isError && <TableRow><TableCell colSpan={7} className="h-28 text-center text-destructive">{t("products.loadError")}</TableCell></TableRow>}
-                {!isLoading && !isError && products.length === 0 && <TableRow><TableCell colSpan={7} className="h-28 text-center text-muted-foreground">{t("products.empty")}</TableCell></TableRow>}
+                {isLoading && <TableRow><TableCell colSpan={8} className="h-28 text-center"><LoaderCircle className="mx-auto animate-spin" /></TableCell></TableRow>}
+                {isError && <TableRow><TableCell colSpan={8} className="h-28 text-center text-destructive">{t("products.loadError")}</TableCell></TableRow>}
+                {!isLoading && !isError && products.length === 0 && <TableRow><TableCell colSpan={8} className="h-28 text-center text-muted-foreground">{t("products.empty")}</TableCell></TableRow>}
                 {products.map(product => <TableRow key={product.id} className="group cursor-pointer" data-state={selected.includes(product.id) ? "selected" : undefined} onDoubleClick={() => navigate(`/products/${product.id}`)}>
                     <TableCell onDoubleClick={event => event.stopPropagation()}><Checkbox aria-label={`Select ${product.name}`} checked={selected.includes(product.id)} onCheckedChange={() => toggle(product.id)} /></TableCell>
                     <TableCell><div className="flex items-center gap-3">{resolveProductImageUrl(product.primaryImageUrl) ? <img src={resolveProductImageUrl(product.primaryImageUrl)!} alt="" className="size-10 shrink-0 rounded-md border bg-muted object-cover" /> : <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted"><ImagePlus className="size-4 text-muted-foreground" /></div>}<span><span className="block font-medium">{product.name}</span>{product.strength ? <span className="mt-0.5 block text-xs font-medium text-primary">{product.strength}</span> : null}{product.genericName ? <span className="block text-xs text-muted-foreground">{product.genericName}</span> : null}</span></div></TableCell><TableCell>{product.barcode || "—"}</TableCell><TableCell>{product.categoryName}</TableCell>
                     <TableCell>{product.price == null ? "—" : toFiniteNumber(product.price).toLocaleString()}</TableCell><TableCell><div className="space-y-1"><span className="font-medium">{toFiniteNumber(product.inventoryStock).toLocaleString()}</span><span className="block text-xs text-muted-foreground">{formatMoney(toFiniteNumber(product.inventoryStock) * toFiniteNumber(costsByProduct.get(product.id)))}</span>{product.usesDisplayStock ? <Badge variant="secondary" className="block w-fit text-[10px]">Display stock {toFiniteNumber(product.stock).toLocaleString()}</Badge> : null}</div></TableCell>
+                    <TableCell onDoubleClick={event => event.stopPropagation()}><Button type="button" size="sm" variant={product.isFeatured ? "secondary" : "outline"} disabled={pinningProductId !== null} aria-pressed={product.isFeatured} title={t(product.isFeatured ? "products.unpinTitle" : "products.pinTitle")} onClick={() => void toggleStorefrontPin(product)}>{pinningProductId === product.id ? <LoaderCircle className="animate-spin" /> : <Pin className={product.isFeatured ? "fill-current" : ""} />}{t(product.isFeatured ? "products.pinned" : "products.pinToTop")}</Button></TableCell>
                     <TableCell className="relative"><Badge variant={product.isActive ? "outline" : "secondary"}>{product.isActive ? t("products.active") : t("products.inactive")}</Badge><Button type="button" variant="outline" size="icon-sm" className="absolute end-2 top-1/2 -translate-y-1/2 bg-background/95 text-primary opacity-0 shadow-sm backdrop-blur-sm transition-[opacity,transform,background-color] hover:bg-primary hover:text-primary-foreground group-hover:opacity-100 focus-visible:opacity-100" aria-label={t("details.open")} onClick={() => navigate(`/products/${product.id}`)}><Eye className="size-4" /></Button></TableCell>
                 </TableRow>)}
             </TableBody>
@@ -280,7 +300,7 @@ export default function ProductsPage() {
                         /> : null}
                         <div className="grid gap-4 sm:grid-cols-2">
                             <ToggleCard title={t("bulk.activeProduct")} description={t("update.activeHelp")} checked={item.isActive} onChange={isActive => change(item.id, { isActive })} />
-                            <ToggleCard title={t("bulk.featuredProduct")} description={t("update.featuredHelp")} checked={item.isFeatured} onChange={isFeatured => change(item.id, { isFeatured })} />
+                            <ToggleCard title={t("products.pinToggleTitle")} description={t("products.pinToggleHelp")} checked={item.isFeatured} onChange={isFeatured => change(item.id, { isFeatured })} />
                         </div>
                     </div>
                 </div>;

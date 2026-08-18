@@ -125,6 +125,7 @@ public class ProductService : IProductService
         {
             Id = product.Id,
             Name = product.Name,
+            IsFeatured = product.IsFeatured,
             Price = product.Prices
                 .Where(price => price.CustomerTypeId == effectiveTypeId)
                 .Select(price => (decimal?)(price.SalePrice.HasValue &&
@@ -148,10 +149,16 @@ public class ProductService : IProductService
 
         pageQuery = filter.SortBy?.ToLowerInvariant() switch
         {
-            "name" => filter.SortDescending ? pageQuery.OrderByDescending(product => product.Name) : pageQuery.OrderBy(product => product.Name),
-            "price" => filter.SortDescending ? pageQuery.OrderByDescending(product => product.Price) : pageQuery.OrderBy(product => product.Price),
-            "createdat" => filter.SortDescending ? pageQuery.OrderByDescending(product => product.Id) : pageQuery.OrderBy(product => product.Id),
-            _ => pageQuery.OrderByDescending(product => product.Id)
+            "name" => filter.SortDescending
+                ? pageQuery.OrderByDescending(product => product.IsFeatured).ThenByDescending(product => product.Name).ThenByDescending(product => product.Id)
+                : pageQuery.OrderByDescending(product => product.IsFeatured).ThenBy(product => product.Name).ThenByDescending(product => product.Id),
+            "price" => filter.SortDescending
+                ? pageQuery.OrderByDescending(product => product.IsFeatured).ThenByDescending(product => product.Price).ThenByDescending(product => product.Id)
+                : pageQuery.OrderByDescending(product => product.IsFeatured).ThenBy(product => product.Price).ThenByDescending(product => product.Id),
+            "createdat" => filter.SortDescending
+                ? pageQuery.OrderByDescending(product => product.IsFeatured).ThenByDescending(product => product.Id)
+                : pageQuery.OrderByDescending(product => product.IsFeatured).ThenBy(product => product.Id),
+            _ => pageQuery.OrderByDescending(product => product.IsFeatured).ThenByDescending(product => product.Id)
         };
 
         var page = Math.Max(1, filter.Page);
@@ -828,6 +835,27 @@ public class ProductService : IProductService
         await _context.SaveChangesAsync();
     }
 
+    public async Task<StorefrontPinResponse> SetStorefrontPinAsync(
+        long id,
+        bool isPinned,
+        CancellationToken cancellationToken = default)
+    {
+        var product = await _context.Products
+            .FirstOrDefaultAsync(item => item.Id == id && !item.IsDeleted, cancellationToken);
+
+        if (product is null)
+            throw new KeyNotFoundException("Product not found.");
+
+        if (product.IsFeatured != isPinned)
+        {
+            product.IsFeatured = isPinned;
+            product.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        return new StorefrontPinResponse(product.Id, product.IsFeatured);
+    }
+
 
 
 
@@ -1479,6 +1507,7 @@ public class ProductService : IProductService
     {
         public long Id { get; init; }
         public string Name { get; init; } = string.Empty;
+        public bool IsFeatured { get; init; }
         public decimal? Price { get; init; }
     }
 

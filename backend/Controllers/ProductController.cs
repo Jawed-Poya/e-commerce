@@ -103,6 +103,30 @@ public class ProductsController : ControllerBase
         return NoContent();
     }
 
+    [Authorize(Policy = AppPermissions.ProductsManage)]
+    [HttpPatch("{id:long}/storefront-pin")]
+    public async Task<ActionResult<ApiResponse<StorefrontPinResponse>>> SetStorefrontPin(
+        long id,
+        SetStorefrontPinRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _service.SetStorefrontPinAsync(
+                id,
+                request.IsPinned,
+                cancellationToken);
+            var message = result.IsPinned
+                ? "Product pinned to the top of the storefront."
+                : "Product removed from the top of the storefront.";
+            return Ok(ApiResponse<StorefrontPinResponse>.Ok(result, message));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(ApiResponse<StorefrontPinResponse>.Fail(exception.Message));
+        }
+    }
+
 
     [HttpGet("lookups")]
     [ProducesResponseType(

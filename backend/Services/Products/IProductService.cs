@@ -25,6 +25,11 @@ public interface IProductService
 
     Task ToggleStatusAsync(long id);
 
+    Task<StorefrontPinResponse> SetStorefrontPinAsync(
+        long id,
+        bool isPinned,
+        CancellationToken cancellationToken = default);
+
     Task<CreateBulkProductsResponse> CreateBulkAsync(
     CreateBulkProductsRequest request,
     CancellationToken cancellationToken = default

@@ -674,9 +674,9 @@ export function ProductDraftCard({
                                     className={`flex items-center justify-between rounded-lg border p-4 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${field.value ? "border-primary/50 bg-primary/5" : "hover:bg-muted/50"}`}
                                 >
                                     <div>
-                                        <Label>{t("bulk.featuredProduct")}</Label>
+                                        <Label>{t("products.pinToggleTitle")}</Label>
                                         <p className="text-xs text-muted-foreground">
-                                            {t("bulk.featuredHelp")}
+                                            {t("products.pinToggleHelp")}
                                         </p>
                                     </div>
 
