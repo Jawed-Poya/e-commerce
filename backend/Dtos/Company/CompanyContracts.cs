@@ -102,7 +102,7 @@ public sealed record UpdateCompanySettingsRequest(
     decimal GeneralSalesDiscountPercent = 0,
     decimal MaximumCustomerDebt = 300000,
     int DefaultDebtDueDays = 30,
-    bool AllowNegativeStockSales = false,
+    bool AllowNegativeStockSales = true,
     string PurchaseNumberPrefix = "PUR",
     long NextPurchaseNumber = 1,
     int PurchaseNumberIncrement = 1,

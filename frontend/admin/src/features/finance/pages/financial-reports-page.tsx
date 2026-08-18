@@ -12,6 +12,7 @@ import { useCompany } from "@/features/company/company-context";
 import { useI18n } from "@/i18n/i18n-provider";
 import { toFiniteNumber } from "@/lib/numbers";
 import { FinancialFilters } from "../components/financial-filters";
+import { FinancialComparisons } from "../components/financial-comparisons";
 import { FinancialInsights } from "../components/financial-insights";
 import { FinancialLedger } from "../components/financial-ledger";
 import { FinancialMetrics } from "../components/financial-metrics";
@@ -101,7 +102,8 @@ export default function FinancialReportsPage() {
                         worth={controller.worthQuery.data}
                         money={money}
                     />
-                    <FinancialInsights report={data} money={money} />
+                    <FinancialComparisons report={data} money={money} />
+                    <FinancialInsights report={data} money={money} branchId={controller.filters.branchId} />
                     <FinancialLedger
                         report={data}
                         totalPages={totalPages}

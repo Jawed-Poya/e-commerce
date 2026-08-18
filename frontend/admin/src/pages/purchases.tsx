@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     CreditCard,
@@ -56,6 +57,10 @@ import {
     isDocumentLineComplete,
 } from "@/features/operations/document-line-state";
 import {
+    calculateLineNet,
+    calculateStackedDiscountNet,
+} from "@/features/operations/discount-calculations";
+import {
     AmountInputRow,
     DocumentSettlementLayout,
     MoneySummaryRow,
@@ -92,6 +97,7 @@ const emptySupplier = () => ({
 
 export default function PurchasesPage() {
     const queryClient = useQueryClient();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { formatMoney } = useCompany();
     const { tr } = useI18n();
     const { user } = useAdminAuth();
@@ -118,13 +124,15 @@ export default function PurchasesPage() {
         operationsService.policy,
     );
 
-    const [tab, setTab] = useState<"purchases" | "suppliers">("purchases");
+    const [tab, setTab] = useState<"purchases" | "suppliers">(
+        searchParams.get("tab") === "suppliers" ? "suppliers" : "purchases",
+    );
     const [purchaseOpen, setPurchaseOpen] = useState(false);
     const [supplierOpen, setSupplierOpen] = useState(false);
     const [supplierBulkOpen, setSupplierBulkOpen] = useState(false);
     const [supplierRows, setSupplierRows] = useState([emptySupplier(), emptySupplier(), emptySupplier()]);
     const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-    const [ledgerSupplier, setLedgerSupplier] = useState<Supplier | null>(null);
+    const [ledgerSupplier, setLedgerSupplier] = useState<Pick<Supplier, "id" | "name"> | null>(null);
     const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
     const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
     const [detailsPurchase, setDetailsPurchase] = useState<Purchase | null>(null);
@@ -152,6 +160,24 @@ export default function PurchasesPage() {
         enabled: Boolean(ledgerSupplier),
     });
 
+    useEffect(() => {
+        if (searchParams.get("tab") === "suppliers") setTab("suppliers");
+        const supplierId = Number(searchParams.get("supplierId"));
+        if (Number.isSafeInteger(supplierId) && supplierId > 0) {
+            setLedgerSupplier((current) => current?.id === supplierId
+                ? current
+                : { id: supplierId, name: "Supplier" });
+        }
+    }, [searchParams]);
+
+    const closeSupplierLedger = () => {
+        setLedgerSupplier(null);
+        if (!searchParams.has("supplierId")) return;
+        const next = new URLSearchParams(searchParams);
+        next.delete("supplierId");
+        setSearchParams(next, { replace: true });
+    };
+
     const subtotal = useMemo(
         () => items.reduce((sum, item) => sum + item.quantity * item.amount, 0),
         [items],
@@ -160,7 +186,7 @@ export default function PurchasesPage() {
         () => items.reduce((sum, item) => sum + stackedLineTotal(item), 0),
         [items],
     );
-    const discountedSubtotal = stackedAmount(linesNet, form.discountPercent, form.secondaryDiscountPercent);
+    const discountedSubtotal = calculateStackedDiscountNet(linesNet, form.discountPercent, form.secondaryDiscountPercent);
     const total = Math.max(
         0,
         discountedSubtotal - form.discount + form.tax + form.otherCost,
@@ -267,7 +293,6 @@ export default function PurchasesPage() {
                     unitCost: item.amount,
                     bonusQuantity: item.bonusQuantity,
                     discountPercent: item.discountPercent,
-                    secondaryDiscountPercent: item.secondaryDiscountPercent,
                     lotNumber: nullable(item.lotNumber ?? ""),
                     expireDate: item.expireDate || null,
                 })),
@@ -648,8 +673,8 @@ export default function PurchasesPage() {
                                 setForm((current) => ({ ...current, discount }))
                             }
                         />
-                        <AmountInputRow label="Discount %" value={form.discountPercent} max={100} onChange={(discountPercent) => setForm((current) => ({ ...current, discountPercent }))} />
-                        <AmountInputRow label="Second discount %" value={form.secondaryDiscountPercent} max={100} onChange={(secondaryDiscountPercent) => setForm((current) => ({ ...current, secondaryDiscountPercent }))} />
+                        <AmountInputRow label="General discount 1 %" value={form.discountPercent} max={100} onChange={(discountPercent) => setForm((current) => ({ ...current, discountPercent }))} />
+                        <AmountInputRow label="General discount 2 %" value={form.secondaryDiscountPercent} max={100} onChange={(secondaryDiscountPercent) => setForm((current) => ({ ...current, secondaryDiscountPercent }))} />
                         <AmountInputRow
                             label="Tax"
                             value={form.tax}
@@ -858,9 +883,9 @@ export default function PurchasesPage() {
                 </SheetContent>
             </Sheet>
 
-            <Dialog open={Boolean(ledgerSupplier)} onOpenChange={(next) => !next && setLedgerSupplier(null)}>
+            <Dialog open={Boolean(ledgerSupplier)} onOpenChange={(next) => !next && closeSupplierLedger()}>
                 <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
-                    <DialogHeader><DialogTitle>Supplier ledger · {ledgerSupplier?.name}</DialogTitle><DialogDescription>Purchases are debits, payments are credits, and the running balance is the amount still payable.</DialogDescription></DialogHeader>
+                    <DialogHeader><DialogTitle>Supplier ledger · {ledgerQuery.data?.supplierName ?? ledgerSupplier?.name}</DialogTitle><DialogDescription>Purchases are debits, payments are credits, and the running balance is the amount still payable.</DialogDescription></DialogHeader>
                     {ledgerQuery.isLoading ? <div className="grid h-40 place-items-center"><LoaderCircle className="size-6 animate-spin" /></div> : ledgerQuery.data ? <SupplierLedgerView ledger={ledgerQuery.data} formatMoney={formatMoney} /> : <p className="p-8 text-center text-destructive">Could not load the supplier ledger.</p>}
                 </DialogContent>
             </Dialog>
@@ -903,8 +928,9 @@ export default function PurchasesPage() {
     );
 }
 
-function SupplierLedgerView({ ledger, formatMoney }: { ledger: SupplierLedger; formatMoney: (value: number) => string }) {
-    return <div className="space-y-4"><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Purchases</p><p className="mt-1 text-xl font-bold">{formatMoney(ledger.totalPurchases)}</p></div><div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Payments</p><p className="mt-1 text-xl font-bold text-emerald-600">{formatMoney(ledger.totalPayments)}</p></div><div className="rounded-xl border border-primary/20 bg-primary/5 p-4"><p className="text-xs text-muted-foreground">Balance payable</p><p className="mt-1 text-xl font-bold text-primary">{formatMoney(ledger.closingBalance)}</p></div></div><div className="overflow-x-auto rounded-xl border"><Table className="min-w-[760px]"><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Reference</TableHead><TableHead>Description</TableHead><TableHead className="text-end">Debit</TableHead><TableHead className="text-end">Credit</TableHead><TableHead className="text-end">Balance</TableHead></TableRow></TableHeader><TableBody>{ledger.entries.map((entry, index) => <TableRow key={`${entry.type}-${entry.sourceId}-${index}`}><TableCell>{date(entry.date)}</TableCell><TableCell><Badge variant="outline">{entry.type}</Badge></TableCell><TableCell>{entry.reference}</TableCell><TableCell>{entry.description}</TableCell><TableCell className="text-end">{entry.debit ? formatMoney(entry.debit) : "—"}</TableCell><TableCell className="text-end">{entry.credit ? formatMoney(entry.credit) : "—"}</TableCell><TableCell className="text-end font-semibold">{formatMoney(entry.balance)}</TableCell></TableRow>)}</TableBody></Table></div></div>;
+function SupplierLedgerView({ ledger, formatMoney }: { ledger: SupplierLedger; formatMoney: (value: number, currency?: string) => string }) {
+    const money = (value: number) => formatMoney(value, ledger.currencyCode);
+    return <div className="space-y-4"><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Purchases</p><p className="mt-1 text-xl font-bold">{money(ledger.totalPurchases)}</p></div><div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Payments</p><p className="mt-1 text-xl font-bold text-emerald-600">{money(ledger.totalPayments)}</p></div><div className="rounded-xl border border-primary/20 bg-primary/5 p-4"><p className="text-xs text-muted-foreground">Balance payable</p><p className="mt-1 text-xl font-bold text-primary">{money(ledger.closingBalance)}</p></div></div><div className="overflow-x-auto rounded-xl border"><Table className="min-w-[760px]"><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Reference</TableHead><TableHead>Description</TableHead><TableHead className="text-end">Debit</TableHead><TableHead className="text-end">Credit</TableHead><TableHead className="text-end">Balance</TableHead></TableRow></TableHeader><TableBody>{ledger.entries.map((entry, index) => <TableRow key={`${entry.type}-${entry.sourceId}-${index}`}><TableCell>{date(entry.date)}</TableCell><TableCell><Badge variant="outline">{entry.type}</Badge></TableCell><TableCell>{entry.reference}</TableCell><TableCell>{entry.description}</TableCell><TableCell className="text-end">{entry.debit ? money(entry.debit) : "—"}</TableCell><TableCell className="text-end">{entry.credit ? money(entry.credit) : "—"}</TableCell><TableCell className="text-end font-semibold">{money(entry.balance)}</TableCell></TableRow>)}</TableBody></Table></div></div>;
 }
 
 function SupplierSheetRow({ row, index, onChange, onRemove }: { row: ReturnType<typeof emptySupplier>; index: number; onChange: (row: ReturnType<typeof emptySupplier>) => void; onRemove: () => void }) { const field = (key: keyof ReturnType<typeof emptySupplier>, value: string | boolean) => onChange({ ...row, [key]: value }); return <div className="grid grid-cols-[45px_180px_160px_150px_190px_150px_1fr_70px_45px] gap-2 border-b p-2 last:border-b-0"><span className="self-center text-center font-semibold text-muted-foreground">{index + 1}</span><Input value={row.name} onChange={(event) => field("name", event.target.value)} /><Input value={row.contactPerson} onChange={(event) => field("contactPerson", event.target.value)} /><Input value={row.phone} onChange={(event) => field("phone", event.target.value)} /><Input type="email" value={row.email} onChange={(event) => field("email", event.target.value)} /><Input value={row.taxNumber} onChange={(event) => field("taxNumber", event.target.value)} /><Input value={row.address} onChange={(event) => field("address", event.target.value)} /><Checkbox checked={row.isActive} onCheckedChange={(checked) => field("isActive", checked === true)} /><Button size="icon" variant="ghost" onClick={onRemove}><Trash2 className="size-4 text-destructive" /></Button></div>; }
@@ -946,17 +972,8 @@ function nullable(value: string) {
     return result || null;
 }
 
-function stackedAmount(amount: number, firstPercent: number, secondPercent: number) {
-    return amount * (1 - Math.min(100, Math.max(0, firstPercent)) / 100) *
-        (1 - Math.min(100, Math.max(0, secondPercent)) / 100);
-}
-
 function stackedLineTotal(item: DocumentItem) {
-    return stackedAmount(
-        item.quantity * item.amount,
-        item.discountPercent,
-        item.secondaryDiscountPercent,
-    );
+    return calculateLineNet(item.quantity, item.amount, item.discountPercent);
 }
 
 function date(value: string) {

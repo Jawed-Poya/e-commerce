@@ -63,6 +63,27 @@ public sealed class FinancialReportsController(
         return Success(ledger);
     }
 
+    [HttpGet("products/{productId:long}/performance")]
+    public async Task<ActionResult<ApiResponse<ProductPerformanceReportResponse>>> GetProductPerformance(
+        long productId,
+        [FromQuery] DateTime? startDate,
+        [FromQuery] DateTime? endDate,
+        [FromQuery] long? branchId,
+        [FromQuery] string? currencyCode)
+    {
+        using var operation = ServerOperation.CreateReadScope();
+        var report = await TransientSqlRetry.ExecuteAsync(
+            token => reports.GetProductPerformanceAsync(
+                productId,
+                startDate,
+                endDate,
+                branchId,
+                currencyCode,
+                token),
+            operation.Token);
+        return Success(report);
+    }
+
     [HttpGet("export/excel")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<IActionResult> ExportExcel([FromQuery] FinancialReportRequest request) =>

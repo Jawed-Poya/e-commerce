@@ -55,6 +55,10 @@ import {
     isDocumentLineComplete,
 } from "@/features/operations/document-line-state";
 import {
+    calculateLineNet,
+    calculateStackedDiscountNet,
+} from "@/features/operations/discount-calculations";
+import {
     AmountInputRow,
     DocumentSettlementLayout,
     MoneySummaryRow,
@@ -142,7 +146,7 @@ export default function ManualSalesPage() {
     const effectiveDiscountPercent = form.discountPercent > 0
         ? form.discountPercent
         : operationPolicy?.generalSalesDiscountPercent ?? 0;
-    const discountedSubtotal = stackedAmount(linesNet, effectiveDiscountPercent, form.secondaryDiscountPercent);
+    const discountedSubtotal = calculateStackedDiscountNet(linesNet, effectiveDiscountPercent, form.secondaryDiscountPercent);
     const total = Math.max(0, discountedSubtotal - form.discount + form.tax);
     const creditApplied = selectedCustomer && form.useCustomerCredit
         ? Math.min(selectedCustomer.accountCredit, Math.max(0, total - form.paidAmount))
@@ -182,6 +186,22 @@ export default function ManualSalesPage() {
             missingCostCount,
         };
     }, [discountedSubtotal, form.discount, items]);
+    const negativeStockPreview = useMemo(() => {
+        if (!operationPolicy?.allowNegativeStockSales) return [];
+        return getSubmittableDocumentLines(items).flatMap((item) => {
+            if (!item.product || !isDocumentLineComplete(item)) return [];
+            const requested = item.quantity * Math.max(item.conversionFactor, 0.000001);
+            const available = item.product.availableQuantity;
+            if (requested <= available) return [];
+            return [{
+                id: item.productId,
+                name: item.product.name,
+                available,
+                afterSale: available - requested,
+                unit: item.product.baseUnitName ?? tr("base units"),
+            }];
+        });
+    }, [items, operationPolicy?.allowNegativeStockSales, tr]);
 
     const reset = () => {
         setSelectedCustomer(null);
@@ -277,7 +297,6 @@ export default function ManualSalesPage() {
                     unitPrice: item.amount,
                     bonusQuantity: item.bonusQuantity,
                     discountPercent: item.discountPercent,
-                    secondaryDiscountPercent: item.secondaryDiscountPercent,
                 })),
             });
             await Promise.all([
@@ -586,6 +605,18 @@ export default function ManualSalesPage() {
                         onOverrideLineLimitChange={setLineLimitOverrideEnabled}
                         allowNegativeStock={operationPolicy?.allowNegativeStockSales ?? false}
                     />
+                    {negativeStockPreview.length ? (
+                        <Alert className="border-amber-500/35 bg-amber-500/5 text-amber-950 dark:text-amber-100">
+                            <TriangleAlert className="text-amber-600" />
+                            <AlertTitle>Negative stock will be recorded</AlertTitle>
+                            <AlertDescription>
+                                <p>This sale is allowed. The inventory balance will remain negative until a purchase for the product is received.</p>
+                                <ul className="mt-2 space-y-1 text-xs">
+                                    {negativeStockPreview.map((item) => <li key={item.id}><strong>{item.name}</strong>: {item.available.toLocaleString()} → {item.afterSale.toLocaleString()} {item.unit}</li>)}
+                                </ul>
+                            </AlertDescription>
+                        </Alert>
+                    ) : null}
                     <Separator />
 
                     <DocumentSettlementLayout
@@ -604,8 +635,8 @@ export default function ManualSalesPage() {
                                 setForm((current) => ({ ...current, discount }))
                             }
                         />
-                        <AmountInputRow label={`Discount %${form.discountPercent === 0 && (operationPolicy?.generalSalesDiscountPercent ?? 0) > 0 ? ` (general ${operationPolicy?.generalSalesDiscountPercent}%)` : ""}`} value={form.discountPercent} max={100} onChange={(discountPercent) => setForm((current) => ({ ...current, discountPercent }))} />
-                        <AmountInputRow label="Second discount %" value={form.secondaryDiscountPercent} max={100} onChange={(secondaryDiscountPercent) => setForm((current) => ({ ...current, secondaryDiscountPercent }))} />
+                        <AmountInputRow label={`General discount 1 %${form.discountPercent === 0 && (operationPolicy?.generalSalesDiscountPercent ?? 0) > 0 ? ` (default ${operationPolicy?.generalSalesDiscountPercent}%)` : ""}`} value={form.discountPercent} max={100} onChange={(discountPercent) => setForm((current) => ({ ...current, discountPercent }))} />
+                        <AmountInputRow label="General discount 2 %" value={form.secondaryDiscountPercent} max={100} onChange={(secondaryDiscountPercent) => setForm((current) => ({ ...current, secondaryDiscountPercent }))} />
                         <AmountInputRow
                             label="Tax"
                             value={form.tax}
@@ -858,17 +889,8 @@ function nullable(value: string) {
     return result || null;
 }
 
-function stackedAmount(amount: number, firstPercent: number, secondPercent: number) {
-    return amount * (1 - Math.min(100, Math.max(0, firstPercent)) / 100) *
-        (1 - Math.min(100, Math.max(0, secondPercent)) / 100);
-}
-
 function stackedLineTotal(item: DocumentItem) {
-    return stackedAmount(
-        item.quantity * item.amount,
-        item.discountPercent,
-        item.secondaryDiscountPercent,
-    );
+    return calculateLineNet(item.quantity, item.amount, item.discountPercent);
 }
 
 function date(value: string) {

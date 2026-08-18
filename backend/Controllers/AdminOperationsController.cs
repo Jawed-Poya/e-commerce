@@ -41,6 +41,22 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
             await service.GetProductLookupsAsync(search, take, canIncludeCost, ct)));
     }
 
+    [HttpPost("products/quick")]
+    public async Task<IActionResult> QuickCreateProduct(
+        QuickCreateProductRequest request,
+        CancellationToken ct)
+    {
+        if (!HasAnyPermission(
+                AppPermissions.ProductsManage,
+                AppPermissions.PurchasesManage,
+                AppPermissions.ManualSalesManage))
+            return Forbid();
+
+        return await Handle(async () => ApiResponse<OperationProductLookup>.Ok(
+            await service.QuickCreateProductAsync(request, ct),
+            "Product created and selected."));
+    }
+
     [Authorize(Policy = AppPermissions.ManualSalesView)]
     [HttpGet("customers")]
     public async Task<IActionResult> Customers([FromQuery] string? search, [FromQuery] int take = 20, CancellationToken ct = default) =>
@@ -177,6 +193,11 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
     [HttpGet("journal-vouchers")]
     public async Task<IActionResult> JournalVouchers([FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default) =>
         Ok(ApiResponse<PagedResult<JournalVoucherResponse>>.Ok(await service.GetJournalVouchersAsync(page, pageSize, ct)));
+
+    [Authorize(Policy = AppPermissions.ExpensesView)]
+    [HttpGet("journal-vouchers/accounts")]
+    public async Task<IActionResult> JournalAccountBalances(CancellationToken ct = default) =>
+        Ok(ApiResponse<IReadOnlyList<JournalAccountBalanceResponse>>.Ok(await service.GetJournalAccountBalancesAsync(ct)));
 
     [Authorize(Policy = AppPermissions.ExpensesManage)]
     [HttpPost("journal-vouchers")]

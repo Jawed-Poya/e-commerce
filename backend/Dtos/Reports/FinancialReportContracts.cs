@@ -134,3 +134,41 @@ public sealed record CustomerLedgerResponse(
     decimal CostOfGoodsSold,
     decimal GrossProfit,
     IReadOnlyCollection<LedgerEntryResponse> Entries);
+
+public sealed record ProductPerformanceTrendResponse(
+    DateOnly Date,
+    decimal Quantity,
+    decimal Revenue,
+    decimal Cost,
+    decimal Profit);
+
+public sealed record ProductPerformanceTransactionResponse(
+    DateTime Date,
+    string Type,
+    string Reference,
+    decimal Quantity,
+    decimal Amount,
+    decimal Cost,
+    decimal Profit);
+
+public sealed record ProductPerformanceReportResponse(
+    long ProductId,
+    string ProductName,
+    DateTime StartDate,
+    DateTime EndDate,
+    string CurrencyCode,
+    decimal QuantitySold,
+    decimal Revenue,
+    decimal CostOfGoodsSold,
+    decimal GrossProfit,
+    decimal MarginPercent,
+    int SalesTransactionCount,
+    decimal QuantityPurchased,
+    decimal PurchaseCost,
+    int PurchaseTransactionCount,
+    decimal ReturnedQuantity,
+    decimal ReturnedAmount,
+    decimal CurrentStockQuantity,
+    decimal CurrentStockValue,
+    IReadOnlyCollection<ProductPerformanceTrendResponse> Trend,
+    IReadOnlyCollection<ProductPerformanceTransactionResponse> Transactions);

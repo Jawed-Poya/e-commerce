@@ -3,6 +3,7 @@ import type {
     CompanyWorth,
     FinancialReport,
     FinancialReportFilters,
+    ProductPerformanceReport,
 } from "./finance-types";
 import { toFiniteNumber } from "@/lib/numbers";
 
@@ -34,6 +35,34 @@ function normalizeReport(report: FinancialReport): FinancialReport {
     return normalized;
 }
 
+function normalizeProductPerformance(report: ProductPerformanceReport): ProductPerformanceReport {
+    const numericFields = [
+        "productId", "quantitySold", "revenue", "costOfGoodsSold", "grossProfit",
+        "marginPercent", "salesTransactionCount", "quantityPurchased", "purchaseCost",
+        "purchaseTransactionCount", "returnedQuantity", "returnedAmount",
+        "currentStockQuantity", "currentStockValue",
+    ] as const satisfies readonly (keyof ProductPerformanceReport)[];
+    const normalized = { ...report };
+    for (const key of numericFields) {
+        (normalized as unknown as Record<string, unknown>)[key] = toFiniteNumber(report[key]);
+    }
+    normalized.trend = (report.trend ?? []).map(item => ({
+        ...item,
+        quantity: toFiniteNumber(item.quantity),
+        revenue: toFiniteNumber(item.revenue),
+        cost: toFiniteNumber(item.cost),
+        profit: toFiniteNumber(item.profit),
+    }));
+    normalized.transactions = (report.transactions ?? []).map(item => ({
+        ...item,
+        quantity: toFiniteNumber(item.quantity),
+        amount: toFiniteNumber(item.amount),
+        cost: toFiniteNumber(item.cost),
+        profit: toFiniteNumber(item.profit),
+    }));
+    return normalized;
+}
+
 export const financeService = {
     report: async (filters: FinancialReportFilters) =>
         normalizeReport((await apiClient.get<FinancialReport>("/admin/reports", filters)).data),
@@ -43,6 +72,12 @@ export const financeService = {
         branchId?: string | number;
         currencyCode?: string;
     }) => (await apiClient.get<CompanyWorth>("/admin/reports/company-worth", params)).data,
+    productPerformance: async (
+        productId: number,
+        params: { startDate?: string; endDate?: string; branchId?: string | number; currencyCode?: string },
+    ) => normalizeProductPerformance(
+        (await apiClient.get<ProductPerformanceReport>(`/products/${productId}/performance`, params)).data,
+    ),
     exportReport: (format: "excel" | "pdf", filters: FinancialReportFilters) =>
         apiClient.download(`/admin/reports/export/${format}`, filters),
     exportSalesPdf: (params: {

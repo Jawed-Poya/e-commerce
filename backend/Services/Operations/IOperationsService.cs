@@ -8,6 +8,7 @@ public interface IOperationsService
     Task<OperationSummary> GetSummaryAsync(CancellationToken ct);
     Task<OperationPolicyResponse> GetPolicyAsync(bool canOverrideLineLimits, CancellationToken ct);
     Task<IReadOnlyList<OperationProductLookup>> GetProductLookupsAsync(string? search, int take, bool includeCurrentUnitCost, CancellationToken ct);
+    Task<OperationProductLookup> QuickCreateProductAsync(QuickCreateProductRequest request, CancellationToken ct);
     Task<IReadOnlyList<OperationCustomerLookup>> GetCustomerLookupsAsync(string? search, int take, CancellationToken ct);
     Task<IReadOnlyList<SupplierResponse>> GetSuppliersAsync(string? search, int take, CancellationToken ct);
     Task<PagedResult<SupplierResponse>> GetSupplierPageAsync(string? search, int page, int pageSize, CancellationToken ct);
@@ -36,5 +37,6 @@ public interface IOperationsService
     Task<PagedResult<ExpenseResponse>> GetExpensesAsync(int page, int pageSize, CancellationToken ct);
     Task<ExpenseResponse> CreateExpenseAsync(CreateExpenseRequest request, string? userId, CancellationToken ct);
     Task<PagedResult<JournalVoucherResponse>> GetJournalVouchersAsync(int page, int pageSize, CancellationToken ct);
+    Task<IReadOnlyList<JournalAccountBalanceResponse>> GetJournalAccountBalancesAsync(CancellationToken ct);
     Task<JournalVoucherResponse> CreateJournalVoucherAsync(CreateJournalVoucherRequest request, string? userId, CancellationToken ct);
 }

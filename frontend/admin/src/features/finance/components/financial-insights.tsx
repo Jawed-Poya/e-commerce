@@ -1,17 +1,25 @@
 import { BarChart3 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { FinancialReport } from "../finance-types";
 import { useI18n } from "@/i18n/i18n-provider";
 import { formatPercent, toFiniteNumber } from "@/lib/numbers";
+import { useAdminAuth } from "@/features/auth/auth-context";
+import { hasPermission, Permissions } from "@/features/auth/permissions";
 
 interface FinancialInsightsProps {
     report: FinancialReport;
     money: (value: number) => string;
+    branchId?: string;
 }
 
-export function FinancialInsights({ report, money }: FinancialInsightsProps) {
+export function FinancialInsights({ report, money, branchId }: FinancialInsightsProps) {
     const { locale, t, tf } = useI18n();
+    const { user } = useAdminAuth();
+    const canViewProducts = hasPermission(user, Permissions.ProductsView);
+    const canViewCustomers = hasPermission(user, Permissions.CustomersView);
+    const canViewPurchases = hasPermission(user, Permissions.PurchasesView);
     const chartMaximum = Math.max(
         1,
         ...report.profitTrend.flatMap((item) => [
@@ -90,7 +98,7 @@ export function FinancialInsights({ report, money }: FinancialInsightsProps) {
                                     {index + 1}
                                 </span>
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-semibold">{product.productName}</p>
+                                    {canViewProducts ? <Link className="block truncate text-sm font-semibold hover:text-primary hover:underline" to={productReportHref(product.productId, report, branchId)}>{product.productName}</Link> : <p className="truncate text-sm font-semibold">{product.productName}</p>}
                                     <p className="text-xs text-muted-foreground">
                                         {tf("finance.quantitySold", {
                                             quantity: toFiniteNumber(product.quantity).toLocaleString(locale),
@@ -112,13 +120,23 @@ export function FinancialInsights({ report, money }: FinancialInsightsProps) {
                     )}
                 </CardContent>
             </Card>
-            <PartyRanking title={t("finance.topCustomers")} items={report.topCustomers} money={money} />
-            <PartyRanking title={t("finance.topSuppliers")} items={report.topSuppliers} money={money} />
+            <PartyRanking title={t("finance.topCustomers")} items={report.topCustomers} money={money} getHref={canViewCustomers ? item => item.id ? `/customers/${item.id}` : null : undefined} />
+            <PartyRanking title={t("finance.topSuppliers")} items={report.topSuppliers} money={money} getHref={canViewPurchases ? item => item.id ? `/operations/purchases?tab=suppliers&supplierId=${item.id}` : null : undefined} />
         </div>
     );
 }
 
-function PartyRanking({ title, items, money }: { title: string; items: FinancialReport["topCustomers"]; money: (value: number) => string }) {
+function productReportHref(productId: number, report: FinancialReport, branchId?: string) {
+    const query = new URLSearchParams({
+        reportStart: report.startDate.slice(0, 10),
+        reportEnd: report.endDate.slice(0, 10),
+        reportCurrency: report.currencyCode,
+    });
+    if (branchId) query.set("reportBranch", branchId);
+    return `/products/${productId}?${query.toString()}#performance-report`;
+}
+
+function PartyRanking({ title, items, money, getHref }: { title: string; items: FinancialReport["topCustomers"]; money: (value: number) => string; getHref?: (item: FinancialReport["topCustomers"][number]) => string | null }) {
     const { t, tf } = useI18n();
-    return <Card className="shadow-none"><CardHeader><CardTitle>{title}</CardTitle></CardHeader><CardContent className="space-y-3">{items.length ? items.map((item, index) => <div key={`${item.id}-${item.name}`} className="flex items-center gap-3 rounded-xl bg-muted/35 p-3 ring-1 ring-foreground/5"><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-xs font-bold text-primary">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.name}</p><p className="text-xs text-muted-foreground">{tf("finance.transactionCount", { count: item.transactionCount })} · {t("finance.balance")} {money(item.balance)}</p></div><span className="text-sm font-semibold tabular-nums">{money(item.amount)}</span></div>) : <p className="py-12 text-center text-sm text-muted-foreground">{t("finance.noTransactions")}</p>}</CardContent></Card>;
+    return <Card className="shadow-none"><CardHeader><CardTitle>{title}</CardTitle></CardHeader><CardContent className="space-y-3">{items.length ? items.map((item, index) => { const href = getHref?.(item); return <div key={`${item.id}-${item.name}`} className="flex items-center gap-3 rounded-xl bg-muted/35 p-3 ring-1 ring-foreground/5"><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-xs font-bold text-primary">{index + 1}</span><div className="min-w-0 flex-1">{href ? <Link className="block truncate text-sm font-semibold hover:text-primary hover:underline" to={href}>{item.name}</Link> : <p className="truncate text-sm font-semibold">{item.name}</p>}<p className="text-xs text-muted-foreground">{tf("finance.transactionCount", { count: item.transactionCount })} · {t("finance.balance")} {money(item.balance)}</p></div><span className="text-sm font-semibold tabular-nums">{money(item.amount)}</span></div>; }) : <p className="py-12 text-center text-sm text-muted-foreground">{t("finance.noTransactions")}</p>}</CardContent></Card>;
 }

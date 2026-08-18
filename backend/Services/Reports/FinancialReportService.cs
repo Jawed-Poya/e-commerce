@@ -360,6 +360,219 @@ public sealed class FinancialReportService(
             Percentage(period.NetProfit, totalAssets));
     }
 
+    public async Task<ProductPerformanceReportResponse> GetProductPerformanceAsync(
+        long productId,
+        DateTime? startDate,
+        DateTime? endDate,
+        long? branchId,
+        string? currencyCode,
+        CancellationToken cancellationToken = default)
+    {
+        branchId = ResolveBranchId(branchId);
+        var end = (endDate ?? DateTime.UtcNow).Date.AddDays(1).AddTicks(-1);
+        var start = (startDate ?? end.Date.AddYears(-1).AddDays(1)).Date;
+        ValidateRange(start, end, null, null);
+        var startOnly = DateOnly.FromDateTime(start);
+        var endOnly = DateOnly.FromDateTime(end);
+        var currency = NormalizeCurrency(currencyCode, await GetMainCurrencyAsync(cancellationToken));
+
+        if (branchId.HasValue && !await context.Branches.AsNoTracking()
+                .AnyAsync(item => item.Id == branchId.Value && item.IsActive, cancellationToken))
+            throw new ArgumentException("The selected branch is not available for this company.");
+
+        var product = await context.Products.AsNoTracking()
+            .Where(item => item.Id == productId && !item.IsDeleted)
+            .Select(item => new
+            {
+                item.Id,
+                item.Name,
+                item.UsesDisplayStock,
+                item.DisplayStockQuantity
+            })
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? throw new KeyNotFoundException("Product not found.");
+
+        var onlineRows = await context.OrderItems.AsNoTracking()
+            .Where(item => item.ProductId == productId &&
+                item.Order.CreatedAt >= start && item.Order.CreatedAt <= end &&
+                item.Order.Status != OrderStatus.Cancelled && item.Order.Currency == currency &&
+                (!branchId.HasValue || item.Order.BranchId == branchId.Value))
+            .Select(item => new
+            {
+                item.OrderId,
+                Date = item.Order.CreatedAt,
+                Reference = item.Order.OrderNumber,
+                IsReturn = item.Order.Status == OrderStatus.Returned,
+                item.Quantity,
+                Amount = (item.OrderedQuantity > 0
+                    ? item.OrderedQuantity * item.SellingUnitPrice
+                    : item.Quantity * item.UnitPrice) - item.Discount + item.Tax,
+                Cost = item.Quantity * item.UnitCost
+            })
+            .ToListAsync(cancellationToken);
+
+        var manualRows = await context.InventorySaleItems.AsNoTracking()
+            .Where(item => item.ProductId == productId &&
+                item.InventorySale.SaleDate >= startOnly && item.InventorySale.SaleDate <= endOnly &&
+                item.InventorySale.CurrencyCode == currency &&
+                (!branchId.HasValue || item.InventorySale.BranchId == branchId.Value))
+            .Select(item => new
+            {
+                item.InventorySaleId,
+                item.InventorySale.SaleDate,
+                Reference = item.InventorySale.SaleNumber,
+                item.Quantity,
+                Amount = item.LineTotal,
+                Cost = item.Quantity * item.UnitCost
+            })
+            .ToListAsync(cancellationToken);
+
+        var purchaseRows = await context.PurchaseItems.AsNoTracking()
+            .Where(item => item.ProductId == productId &&
+                item.Purchase.PurchaseDate >= startOnly && item.Purchase.PurchaseDate <= endOnly &&
+                item.Purchase.Status != PurchaseStatus.Cancelled && item.Purchase.CurrencyCode == currency &&
+                (!branchId.HasValue || item.Purchase.BranchId == branchId.Value))
+            .Select(item => new
+            {
+                item.PurchaseId,
+                item.Purchase.PurchaseDate,
+                Reference = item.Purchase.PurchaseNumber,
+                item.Quantity,
+                Amount = item.LineTotal
+            })
+            .ToListAsync(cancellationToken);
+
+        var movements = new List<ProductPerformanceSeed>(
+            onlineRows.Count + manualRows.Count + purchaseRows.Count);
+        movements.AddRange(onlineRows.Select(item => new ProductPerformanceSeed(
+            item.Date,
+            item.IsReturn ? "Online return" : "Online sale",
+            item.Reference,
+            item.OrderId,
+            item.Quantity,
+            item.Amount,
+            item.Cost,
+            item.IsReturn,
+            false)));
+        movements.AddRange(manualRows.Select(item => new ProductPerformanceSeed(
+            item.SaleDate.ToDateTime(TimeOnly.MinValue),
+            "Manual sale",
+            item.Reference,
+            item.InventorySaleId,
+            item.Quantity,
+            item.Amount,
+            item.Cost,
+            false,
+            false)));
+        movements.AddRange(purchaseRows.Select(item => new ProductPerformanceSeed(
+            item.PurchaseDate.ToDateTime(TimeOnly.MinValue),
+            "Purchase",
+            item.Reference,
+            item.PurchaseId,
+            item.Quantity,
+            item.Amount,
+            item.Amount,
+            false,
+            true)));
+
+        var sales = movements.Where(item => !item.IsReturn && !item.IsPurchase).ToArray();
+        var returns = movements.Where(item => item.IsReturn).ToArray();
+        var purchases = movements.Where(item => item.IsPurchase).ToArray();
+        var quantitySold = sales.Sum(item => item.Quantity);
+        var revenue = sales.Sum(item => item.Amount);
+        var costOfGoodsSold = sales.Sum(item => item.Cost);
+        var grossProfit = revenue - costOfGoodsSold;
+
+        decimal currentStockQuantity;
+        decimal currentStockValue;
+        if (product.UsesDisplayStock)
+        {
+            currentStockQuantity = Math.Max(0, product.DisplayStockQuantity ?? 0);
+            currentStockValue = 0;
+        }
+        else
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var physicalAvailable = await context.ProductInventories.AsNoTracking()
+                .Where(item => item.ProductId == productId &&
+                    (!branchId.HasValue || item.BranchId == branchId.Value))
+                .SumAsync(item => (decimal?)(item.Quantity - item.ReservedQuantity), cancellationToken) ?? 0;
+            var expiredAvailable = await context.InventoryLots.AsNoTracking()
+                .Where(item => item.ProductId == productId && item.ExpiresAt.HasValue &&
+                    item.ExpiresAt.Value < today && item.Quantity > item.ReservedQuantity &&
+                    (!branchId.HasValue || item.Warehouse.BranchId == branchId.Value))
+                .SumAsync(item => (decimal?)(item.Quantity - item.ReservedQuantity), cancellationToken) ?? 0;
+            var availableLots = context.InventoryLots.AsNoTracking()
+                .Where(item => item.ProductId == productId && item.Quantity > item.ReservedQuantity &&
+                    (!item.ExpiresAt.HasValue || item.ExpiresAt.Value >= today) &&
+                    (!branchId.HasValue || item.Warehouse.BranchId == branchId.Value));
+            currentStockQuantity = Math.Max(0, physicalAvailable - expiredAvailable);
+            currentStockValue = await availableLots.Where(item => item.UnitCost.HasValue)
+                .SumAsync(item => (decimal?)((item.Quantity - item.ReservedQuantity) * item.UnitCost!.Value), cancellationToken) ?? 0;
+        }
+
+        var salesByDate = sales
+            .GroupBy(item => DateOnly.FromDateTime(item.Date))
+            .ToDictionary(
+                group => group.Key,
+                group => new
+                {
+                    Quantity = group.Sum(item => item.Quantity),
+                    Revenue = group.Sum(item => item.Amount),
+                    Cost = group.Sum(item => item.Cost)
+                });
+        var trend = Enumerable.Range(0, endOnly.DayNumber - startOnly.DayNumber + 1)
+            .Select(offset =>
+            {
+                var date = startOnly.AddDays(offset);
+                var point = salesByDate.GetValueOrDefault(date);
+                var pointRevenue = point?.Revenue ?? 0;
+                var pointCost = point?.Cost ?? 0;
+                return new ProductPerformanceTrendResponse(
+                    date,
+                    point?.Quantity ?? 0,
+                    pointRevenue,
+                    pointCost,
+                    pointRevenue - pointCost);
+            })
+            .ToArray();
+        var transactions = movements
+            .OrderByDescending(item => item.Date)
+            .ThenByDescending(item => item.SourceId)
+            .Take(250)
+            .Select(item => new ProductPerformanceTransactionResponse(
+                item.Date,
+                item.Type,
+                item.Reference,
+                item.Quantity,
+                item.Amount,
+                item.Cost,
+                item.IsPurchase || item.IsReturn ? 0 : item.Amount - item.Cost))
+            .ToArray();
+
+        return new ProductPerformanceReportResponse(
+            product.Id,
+            product.Name,
+            start,
+            end,
+            currency,
+            quantitySold,
+            revenue,
+            costOfGoodsSold,
+            grossProfit,
+            Percentage(grossProfit, revenue),
+            sales.Select(item => (item.Type, item.SourceId)).Distinct().Count(),
+            purchases.Sum(item => item.Quantity),
+            purchases.Sum(item => item.Amount),
+            purchases.Select(item => item.SourceId).Distinct().Count(),
+            returns.Sum(item => item.Quantity),
+            returns.Sum(item => item.Amount),
+            currentStockQuantity,
+            currentStockValue,
+            trend,
+            transactions);
+    }
+
     public async Task<CustomerLedgerResponse> GetCustomerLedgerAsync(
         long customerId,
         DateTime? startDate,
@@ -917,15 +1130,32 @@ public sealed class FinancialReportService(
         IQueryable<InventorySale> sales,
         CancellationToken cancellationToken)
     {
-        var online = await orders.Where(item => item.Status != OrderStatus.Returned)
-            .GroupBy(item => new { Id = (long?)item.CustomerId, Name = item.Customer.FirstName + " " + (item.Customer.LastName ?? "") })
+        var onlineRows = await orders.Where(item => item.Status != OrderStatus.Returned)
+            .Select(item => new
+            {
+                Id = (long?)item.CustomerId,
+                Name = item.Customer.FirstName + " " + (item.Customer.LastName ?? ""),
+                item.Total,
+                item.PaymentStatus,
+                Paid = item.Payments
+                    .Where(payment => payment.Status == PaymentStatus.Paid ||
+                        payment.Status == PaymentStatus.PartiallyRefunded)
+                    .Sum(payment => (decimal?)payment.Amount) ?? 0
+            })
+            .ToListAsync(cancellationToken);
+        var online = onlineRows
+            .GroupBy(item => new { item.Id, item.Name })
             .Select(group => new BusinessPartyMetricResponse(
                 group.Key.Id,
                 group.Key.Name,
                 group.Count(),
                 group.Sum(item => item.Total),
-                group.Sum(item => item.Total - (item.PaymentStatus == PaymentStatus.Paid ? item.Total : 0))))
-            .ToListAsync(cancellationToken);
+                group.Sum(item => Math.Max(
+                    0,
+                    item.Total - (item.Paid > 0
+                        ? item.Paid
+                        : item.PaymentStatus == PaymentStatus.Paid ? item.Total : 0)))))
+            .ToList();
         var manual = await sales
             .GroupBy(item => new { item.CustomerId, Name = item.CustomerName ?? "Walk-in customer" })
             .Select(group => new BusinessPartyMetricResponse(
@@ -1158,4 +1388,15 @@ public sealed class FinancialReportService(
         decimal Debit,
         decimal Credit,
         long SourceId);
+
+    private sealed record ProductPerformanceSeed(
+        DateTime Date,
+        string Type,
+        string Reference,
+        long SourceId,
+        decimal Quantity,
+        decimal Amount,
+        decimal Cost,
+        bool IsReturn,
+        bool IsPurchase);
 }

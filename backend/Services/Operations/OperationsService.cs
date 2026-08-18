@@ -69,7 +69,7 @@ public sealed class OperationsService(
             settings?.GeneralSalesDiscountPercent ?? 0,
             settings?.MaximumCustomerDebt ?? 300000,
             settings?.DefaultDebtDueDays ?? 30,
-            settings?.AllowNegativeStockSales ?? false);
+            settings?.AllowNegativeStockSales ?? true);
     }
 
     public async Task<IReadOnlyList<OperationProductLookup>> GetProductLookupsAsync(
@@ -143,6 +143,103 @@ public sealed class OperationsService(
                     : currentUnitCosts.GetValueOrDefault(product.Id),
                 units);
         }).ToList();
+    }
+
+    public async Task<OperationProductLookup> QuickCreateProductAsync(
+        QuickCreateProductRequest request,
+        CancellationToken ct)
+    {
+        var name = Clean(request.Name);
+        if (name is null) throw new ArgumentException("Product name is required.");
+        if (name.Length > 200) throw new ArgumentException("Product name cannot exceed 200 characters.");
+        if (request.CategoryId <= 0) throw new ArgumentException("Product category is required.");
+        if (request.UnitId <= 0) throw new ArgumentException("Base unit is required.");
+        if (request.DefaultSalePrice is < 0) throw new ArgumentException("Default selling price cannot be negative.");
+
+        var barcode = Clean(request.Barcode);
+        if (barcode?.Length > 100) throw new ArgumentException("Barcode cannot exceed 100 characters.");
+        if (Clean(request.Strength)?.Length > 100) throw new ArgumentException("Strength cannot exceed 100 characters.");
+        if (Clean(request.GenericName)?.Length > 200) throw new ArgumentException("Generic name cannot exceed 200 characters.");
+        if (Clean(request.Formula)?.Length > 500) throw new ArgumentException("Formula cannot exceed 500 characters.");
+        if (barcode is not null)
+        {
+            var barcodeExists = await context.Products.AsNoTracking()
+                .AnyAsync(product => product.Barcode == barcode ||
+                    product.UnitConversions.Any(unit => unit.Barcode == barcode), ct);
+            if (barcodeExists)
+                throw new ArgumentException($"Barcode '{barcode}' already belongs to another product or selling unit.");
+        }
+
+        var typeNames = await context.Types.AsNoTracking()
+            .Where(type => type.Id == request.CategoryId || type.Id == request.UnitId)
+            .Select(type => new { type.Id, type.Name, type.Group })
+            .ToListAsync(ct);
+        var category = typeNames.SingleOrDefault(type =>
+            type.Id == request.CategoryId && type.Group == GeneralTypeEnum.ProductCategory);
+        if (category is null) throw new ArgumentException("The selected product category is invalid.");
+        var unit = typeNames.SingleOrDefault(type =>
+            type.Id == request.UnitId && type.Group == GeneralTypeEnum.ProductUnit);
+        if (unit is null) throw new ArgumentException("The selected base unit is invalid.");
+
+        var product = new Product
+        {
+            Name = name,
+            Barcode = barcode,
+            Strength = Clean(request.Strength),
+            GenericName = Clean(request.GenericName),
+            Formula = Clean(request.Formula),
+            CategoryId = category.Id,
+            UnitId = unit.Id,
+            IsActive = true,
+            IsFeatured = false,
+            OrderQuantityStep = 1,
+            Slug = CreateQuickProductSlug(name),
+            Inventory = new ProductInventory
+            {
+                Quantity = 0,
+                ReservedQuantity = 0,
+                MinimumQuantity = 0
+            }
+        };
+
+        if (request.DefaultSalePrice.HasValue)
+        {
+            product.Prices.Add(new ProductPrice
+            {
+                CustomerTypeId = await defaultCustomerTypeResolver.GetIdAsync(ct),
+                RegularPrice = request.DefaultSalePrice.Value
+            });
+        }
+
+        context.Products.Add(product);
+        await context.SaveChangesAsync(ct);
+
+        var baseUnit = new OperationProductUnitLookup(
+            unit.Id,
+            unit.Name,
+            1,
+            barcode,
+            request.DefaultSalePrice,
+            0,
+            true,
+            true);
+
+        return new OperationProductLookup(
+            product.Id,
+            product.Name,
+            product.Strength,
+            product.GenericName,
+            product.Formula,
+            product.Barcode,
+            0,
+            request.DefaultSalePrice,
+            product.MinimumValue,
+            product.MaximumValue,
+            false,
+            unit.Id,
+            unit.Name,
+            null,
+            [baseUnit]);
     }
 
     public async Task<IReadOnlyList<OperationCustomerLookup>> GetCustomerLookupsAsync(string? search, int take, CancellationToken ct)
@@ -253,17 +350,22 @@ public sealed class OperationsService(
 
     public async Task<SupplierLedgerResponse> GetSupplierLedgerAsync(long id, CancellationToken ct)
     {
+        var currencyCode = await GetCurrencyCodeAsync(ct);
         var supplier = await context.Suppliers.AsNoTracking()
             .Where(x => x.Id == id && (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value))
             .Select(x => new { x.Id, x.Name })
             .SingleOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Supplier not found.");
         var purchases = await context.Purchases.AsNoTracking()
-            .Where(x => x.SupplierId == id && x.Status != PurchaseStatus.Cancelled)
+            .Where(x => x.SupplierId == id && x.Status != PurchaseStatus.Cancelled &&
+                x.CurrencyCode == currencyCode &&
+                (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value))
             .Select(x => new { x.Id, x.PurchaseNumber, x.PurchaseDate, x.Total })
             .ToListAsync(ct);
         var payments = await context.PurchasePayments.AsNoTracking()
-            .Where(x => x.Purchase.SupplierId == id && x.Purchase.Status != PurchaseStatus.Cancelled)
+            .Where(x => x.Purchase.SupplierId == id && x.Purchase.Status != PurchaseStatus.Cancelled &&
+                x.Purchase.CurrencyCode == currencyCode &&
+                (!branchContext.BranchId.HasValue || x.Purchase.BranchId == branchContext.BranchId.Value))
             .Select(x => new { x.Id, x.PurchaseId, x.Purchase.PurchaseNumber, x.PaymentDate, x.Amount, x.PaymentMethod })
             .ToListAsync(ct);
 
@@ -280,6 +382,7 @@ public sealed class OperationsService(
         return new SupplierLedgerResponse(
             supplier.Id,
             supplier.Name,
+            currencyCode,
             purchases.Sum(x => x.Total),
             payments.Sum(x => x.Amount),
             balance,
@@ -397,7 +500,7 @@ public sealed class OperationsService(
             var selectedUnit = ResolveOperationUnit(product, item.UnitId);
             var receivedQuantity = item.Quantity + item.BonusQuantity;
             var baseQuantity = decimal.Round(receivedQuantity * selectedUnit.ConversionFactor, 3, MidpointRounding.AwayFromZero);
-            var lineTotal = StackedNet(item.Quantity * item.UnitCost, item.DiscountPercent, item.SecondaryDiscountPercent);
+            var lineTotal = PercentageNet(item.Quantity * item.UnitCost, item.DiscountPercent);
             var baseUnitCost = decimal.Round(lineTotal / baseQuantity, 4, MidpointRounding.AwayFromZero);
             if (baseQuantity <= 0)
                 throw new ArgumentException($"The quantity for '{product.Name}' is too small for base-unit precision.");
@@ -416,10 +519,9 @@ public sealed class OperationsService(
         }
 
         var subtotal = normalizedItems.Sum(line => line.Request.Quantity * line.Request.UnitCost);
-        var linesNet = normalizedItems.Sum(line => StackedNet(
+        var linesNet = normalizedItems.Sum(line => PercentageNet(
             line.Request.Quantity * line.Request.UnitCost,
-            line.Request.DiscountPercent,
-            line.Request.SecondaryDiscountPercent));
+            line.Request.DiscountPercent));
         var documentNet = StackedNet(linesNet, request.DiscountPercent, request.SecondaryDiscountPercent);
         var effectiveDiscount = Math.Min(subtotal, subtotal - documentNet + request.Discount);
         var total = Math.Max(0, subtotal - effectiveDiscount + request.Tax + request.OtherCost);
@@ -460,13 +562,12 @@ public sealed class OperationsService(
                 SelectedUnitName = line.Unit.UnitName,
                 UnitConversionFactor = line.Unit.ConversionFactor,
                 EnteredUnitCost = line.Request.UnitCost,
-                LineTotal = StackedNet(
+                LineTotal = PercentageNet(
                     line.Request.Quantity * line.Request.UnitCost,
-                    line.Request.DiscountPercent,
-                    line.Request.SecondaryDiscountPercent),
+                    line.Request.DiscountPercent),
                 BonusQuantity = line.Request.BonusQuantity,
                 DiscountPercent = line.Request.DiscountPercent,
-                SecondaryDiscountPercent = line.Request.SecondaryDiscountPercent,
+                SecondaryDiscountPercent = 0,
                 LotNumber = Clean(line.Request.LotNumber),
                 ExpireDate = line.Request.ExpireDate
             });
@@ -662,7 +763,6 @@ public sealed class OperationsService(
         foreach (var item in request.Items)
         {
             ValidatePercentage(item.DiscountPercent, "Line discount");
-            ValidatePercentage(item.SecondaryDiscountPercent, "Secondary line discount");
         }
         EnsureNoDuplicateProducts(request.Items.Select(item => item.ProductId), "sale");
 
@@ -677,7 +777,7 @@ public sealed class OperationsService(
                 x.DefaultDebtDueDays,
                 x.AllowNegativeStockSales))
             .SingleOrDefaultAsync(ct)
-            ?? new SalesPolicySettings(0, 300000, 30, false);
+            ?? new SalesPolicySettings(0, 300000, 30, true);
         var expiredAvailableByProduct = await InventoryAvailability.LoadExpiredAvailableByProductAsync(
             context,
             productIds,
@@ -723,10 +823,9 @@ public sealed class OperationsService(
         }
 
         var subtotal = normalizedItems.Sum(line => line.Request.Quantity * line.Request.UnitPrice);
-        var linesNet = normalizedItems.Sum(line => StackedNet(
+        var linesNet = normalizedItems.Sum(line => PercentageNet(
             line.Request.Quantity * line.Request.UnitPrice,
-            line.Request.DiscountPercent,
-            line.Request.SecondaryDiscountPercent));
+            line.Request.DiscountPercent));
         var primaryDiscountPercent = request.DiscountPercent > 0
             ? request.DiscountPercent
             : salesSettings.GeneralSalesDiscountPercent;
@@ -801,13 +900,12 @@ public sealed class OperationsService(
                 SelectedUnitName = line.Unit.UnitName,
                 UnitConversionFactor = line.Unit.ConversionFactor,
                 EnteredUnitPrice = line.Request.UnitPrice,
-                LineTotal = StackedNet(
+                LineTotal = PercentageNet(
                     line.Request.Quantity * line.Request.UnitPrice,
-                    line.Request.DiscountPercent,
-                    line.Request.SecondaryDiscountPercent),
+                    line.Request.DiscountPercent),
                 BonusQuantity = line.Request.BonusQuantity,
                 DiscountPercent = line.Request.DiscountPercent,
-                SecondaryDiscountPercent = line.Request.SecondaryDiscountPercent
+                SecondaryDiscountPercent = 0
             });
 
         if (request.PaidAmount > 0)
@@ -1105,6 +1203,42 @@ public sealed class OperationsService(
         return new PagedResult<JournalVoucherResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
     }
 
+    public async Task<IReadOnlyList<JournalAccountBalanceResponse>> GetJournalAccountBalancesAsync(CancellationToken ct)
+    {
+        var query = context.JournalVoucherLines.AsNoTracking()
+            .Where(line => !branchContext.BranchId.HasValue ||
+                line.JournalVoucher.BranchId == branchContext.BranchId.Value);
+        var balances = await query
+            .GroupBy(line => new { line.AccountCode, line.AccountName })
+            .Select(group => new
+            {
+                group.Key.AccountCode,
+                group.Key.AccountName,
+                TotalDebit = group.Sum(line => line.Debit),
+                TotalCredit = group.Sum(line => line.Credit),
+                EntryCount = group.Count()
+            })
+            .OrderBy(item => item.AccountCode)
+            .ToListAsync(ct);
+
+        return balances
+            .GroupBy(item => item.AccountCode, StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                var totalDebit = group.Sum(item => item.TotalDebit);
+                var totalCredit = group.Sum(item => item.TotalCredit);
+                return new JournalAccountBalanceResponse(
+                    group.Key,
+                    group.First().AccountName,
+                    totalDebit,
+                    totalCredit,
+                    totalDebit - totalCredit,
+                    group.Sum(item => item.EntryCount));
+            })
+            .OrderBy(item => item.AccountCode)
+            .ToArray();
+    }
+
     public async Task<JournalVoucherResponse> CreateJournalVoucherAsync(CreateJournalVoucherRequest request, string? userId, CancellationToken ct)
     {
         RequireText(request.Memo, "Voucher memo");
@@ -1118,6 +1252,36 @@ public sealed class OperationsService(
             if (line.Debit < 0 || line.Credit < 0 || (line.Debit > 0) == (line.Credit > 0))
                 throw new ArgumentException($"Line {index + 1} must contain either a positive debit or a positive credit, not both.");
         }
+
+        var inconsistentAccount = request.Lines
+            .GroupBy(line => line.AccountCode.Trim(), StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(group => group
+                .Select(line => line.AccountName.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Skip(1)
+                .Any());
+        if (inconsistentAccount is not null)
+            throw new ArgumentException(
+                $"Account {inconsistentAccount.Key} has more than one name in this voucher. Use one consistent chart-of-accounts name.");
+
+        var requestedAccounts = request.Lines
+            .GroupBy(line => line.AccountCode.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First().AccountName.Trim(),
+                StringComparer.OrdinalIgnoreCase);
+        var requestedCodes = requestedAccounts.Keys.ToArray();
+        var savedAccounts = await context.JournalVoucherLines.AsNoTracking()
+            .Where(line => requestedCodes.Contains(line.AccountCode))
+            .Select(line => new { line.AccountCode, line.AccountName })
+            .Distinct()
+            .ToListAsync(ct);
+        var savedConflict = savedAccounts.FirstOrDefault(saved =>
+            requestedAccounts.TryGetValue(saved.AccountCode, out var requestedName) &&
+            !saved.AccountName.Equals(requestedName, StringComparison.OrdinalIgnoreCase));
+        if (savedConflict is not null)
+            throw new ArgumentException(
+                $"Account {savedConflict.AccountCode} is already named '{savedConflict.AccountName}'. Use the existing chart-of-accounts name.");
 
         var debit = decimal.Round(request.Lines.Sum(line => line.Debit), 2, MidpointRounding.AwayFromZero);
         var credit = decimal.Round(request.Lines.Sum(line => line.Credit), 2, MidpointRounding.AwayFromZero);
@@ -1473,7 +1637,6 @@ public sealed class OperationsService(
         foreach (var item in request.Items)
         {
             ValidatePercentage(item.DiscountPercent, "Line discount");
-            ValidatePercentage(item.SecondaryDiscountPercent, "Secondary line discount");
         }
     }
 
@@ -1489,6 +1652,12 @@ public sealed class OperationsService(
         ValidatePercentage(secondPercent, "Secondary discount");
         var afterFirst = amount * (1 - firstPercent / 100m);
         return decimal.Round(afterFirst * (1 - secondPercent / 100m), 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static decimal PercentageNet(decimal amount, decimal discountPercent)
+    {
+        ValidatePercentage(discountPercent, "Line discount");
+        return decimal.Round(amount * (1 - discountPercent / 100m), 2, MidpointRounding.AwayFromZero);
     }
 
     private static void ValidateInitialPayment(decimal paid, decimal total)
@@ -1559,6 +1728,18 @@ public sealed class OperationsService(
     private static string PaymentMethod(string? value) => string.IsNullOrWhiteSpace(value) ? "Cash" : value.Trim();
     private static DateOnly PaymentDate(DateOnly value) => value == default ? DateOnly.FromDateTime(DateTime.UtcNow) : value;
     private static string DocumentNumber(string prefix) => $"{prefix}-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Random.Shared.Next(1000, 9999)}";
+    private static string CreateQuickProductSlug(string name)
+    {
+        var normalized = new string(name.Trim().ToLowerInvariant()
+            .Select(character => char.IsLetterOrDigit(character) ? character : '-')
+            .ToArray());
+        while (normalized.Contains("--", StringComparison.Ordinal))
+            normalized = normalized.Replace("--", "-", StringComparison.Ordinal);
+        normalized = normalized.Trim('-');
+        if (string.IsNullOrWhiteSpace(normalized)) normalized = "product";
+        normalized = normalized[..Math.Min(normalized.Length, 241)];
+        return $"{normalized}-{Guid.NewGuid():N}"[..(normalized.Length + 9)];
+    }
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static void RequireText(string? value, string field) { if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException($"{field} is required."); }
 }

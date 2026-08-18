@@ -7,6 +7,8 @@ using ECommerce.Entities.Products.Exceptions;
 using ECommerce.Entities.Products.Filters;
 using ECommerce.Entities.Products.Requests;
 using ECommerce.Services.Products;
+using ECommerce.Services.Reports;
+using ECommerce.Dtos.Reports;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using ECommerce.Shared;
@@ -20,10 +22,34 @@ public class ProductsController : ControllerBase
         260L * 1024L * 1024L;
 
     private readonly IProductService _service;
+    private readonly IFinancialReportService _reports;
 
-    public ProductsController(IProductService service)
+    public ProductsController(IProductService service, IFinancialReportService reports)
     {
         _service = service;
+        _reports = reports;
+    }
+
+    [Authorize(Policy = AppPermissions.FinancialReportsView)]
+    [HttpGet("{id:long}/performance")]
+    public async Task<ActionResult<ApiResponse<ProductPerformanceReportResponse>>> GetPerformance(
+        long id,
+        [FromQuery] DateTime? startDate,
+        [FromQuery] DateTime? endDate,
+        [FromQuery] long? branchId,
+        [FromQuery] string? currencyCode)
+    {
+        using var operation = ServerOperation.CreateReadScope();
+        var report = await TransientSqlRetry.ExecuteAsync(
+            token => _reports.GetProductPerformanceAsync(
+                id,
+                startDate,
+                endDate,
+                branchId,
+                currencyCode,
+                token),
+            operation.Token);
+        return Ok(ApiResponse<ProductPerformanceReportResponse>.Ok(report));
     }
 
     [HttpGet]

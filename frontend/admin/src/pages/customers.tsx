@@ -35,6 +35,7 @@ type CustomerForm = {
 };
 
 const emptyForm = (): CustomerForm => ({ firstName: "", lastName: "", phone: "", email: "", address: "", customerTypeId: "", creditLimit: "", debtDueDays: "" });
+const customerSheetGridClass = "grid grid-cols-[48px_150px_150px_160px_190px_150px_140px_130px_320px_48px] gap-2";
 
 export default function CustomersPage() {
     const queryClient = useQueryClient();
@@ -55,6 +56,7 @@ export default function CustomersPage() {
     const query = useQuery({
         queryKey: ["customers", deferredSearch, page, pageSize],
         queryFn: () => customerService.getCustomers({ search: deferredSearch || undefined, page, pageSize }),
+        refetchInterval: 20_000,
     });
     const create = useMutation({
         mutationFn: (request: UpsertCustomerRequest) => customerService.createCustomer(request),
@@ -134,7 +136,7 @@ export default function CustomersPage() {
                             {data?.items.map((customer) => (
                                 <TableRow key={customer.id} className={customer.hasOverdueDebt ? "bg-destructive/[0.035]" : undefined}>
                                     <TableCell><Checkbox checked={selected.includes(customer.id)} onCheckedChange={(checked) => setSelected((current) => checked === true ? [...new Set([...current, customer.id])] : current.filter((id) => id !== customer.id))} /></TableCell>
-                                    <TableCell><div className="flex items-center gap-2"><span className="font-semibold">{customer.name}</span>{customer.hasOverdueDebt ? <Badge variant="destructive"><AlertTriangle className="size-3" />Overdue</Badge> : null}</div><div className="text-muted-foreground">{customer.email ?? "No email"}</div></TableCell>
+                                    <TableCell><div className="flex items-center gap-2"><span className="font-semibold">{customer.name}</span>{customer.isOnline ? <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700"><span className="size-2 animate-pulse rounded-full bg-emerald-500" />Online{customer.activeSessions > 1 ? ` · ${customer.activeSessions}` : ""}</Badge> : null}{customer.hasOverdueDebt ? <Badge variant="destructive"><AlertTriangle className="size-3" />Overdue</Badge> : null}</div><div className="text-muted-foreground">{customer.email ?? "No email"}</div></TableCell>
                                     <TableCell><a className="hover:text-primary hover:underline" href={`tel:${customer.phone}`}>{customer.phone}</a></TableCell>
                                     <TableCell>{customer.customerTypeName ?? "Default"}</TableCell>
                                     <TableCell>{formatMoney(customer.totalSpent)}</TableCell>
@@ -160,8 +162,8 @@ export default function CustomersPage() {
                     <SheetHeader className="border-b"><SheetTitle>Customer sheet</SheetTitle><SheetDescription>{selected.length ? "Edit selected customers together." : "Create several customers in a spreadsheet-style form."} Empty rows are ignored.</SheetDescription></SheetHeader>
                     <div className="min-h-0 flex-1 overflow-auto p-4">
                         {bulkLoading ? <div className="grid h-48 place-items-center"><LoaderCircle className="size-6 animate-spin" /></div> : (
-                            <div className="min-w-[1250px] overflow-hidden rounded-xl border">
-                                <div className="grid grid-cols-[50px_150px_150px_160px_190px_150px_140px_130px_1fr_50px] gap-2 border-b bg-muted/50 p-2 text-xs font-bold"><span>#</span><span>First name *</span><span>Last name</span><span>Phone *</span><span>Email</span><span>Customer type</span><span>Credit limit</span><span>Debt due days</span><span>Address</span><span /></div>
+                            <div className="w-full min-w-[1560px] overflow-hidden rounded-xl border">
+                                <div className={`${customerSheetGridClass} sticky top-0 z-10 border-b bg-muted p-2 text-xs font-bold shadow-sm`}><span>#</span><span>First name *</span><span>Last name</span><span>Phone *</span><span>Email</span><span>Customer type</span><span>Credit limit</span><span>Debt due days</span><span>Address</span><span /></div>
                                 {rows.map((row, index) => <BulkCustomerRow key={`${row.id ?? "new"}-${index}`} row={row} index={index} customerTypes={lookups?.customerTypes ?? []} defaultCustomerTypeId={lookups?.defaultCustomerTypeId ?? null} onChange={(next) => setRows((current) => current.map((item, itemIndex) => itemIndex === index ? next : item))} onRemove={() => setRows((current) => current.filter((_, itemIndex) => itemIndex !== index))} />)}
                             </div>
                         )}
@@ -179,7 +181,7 @@ function CustomerFields({ form, setForm, customerTypes, defaultCustomerTypeId }:
 
 function BulkCustomerRow({ row, index, customerTypes, defaultCustomerTypeId, onChange, onRemove }: { row: CustomerForm; index: number; customerTypes: { id: number; name: string }[]; defaultCustomerTypeId: number | null; onChange: (row: CustomerForm) => void; onRemove: () => void }) {
     const field = (key: keyof CustomerForm, value: string) => onChange({ ...row, [key]: value });
-    return <div className="grid grid-cols-[50px_150px_150px_160px_190px_150px_140px_130px_1fr_50px] gap-2 border-b p-2 last:border-b-0"><span className="self-center text-center font-semibold text-muted-foreground">{index + 1}</span><Input value={row.firstName} onChange={(event) => field("firstName", event.target.value)} /><Input value={row.lastName} onChange={(event) => field("lastName", event.target.value)} /><Input value={row.phone} onChange={(event) => field("phone", event.target.value)} /><Input type="email" value={row.email} onChange={(event) => field("email", event.target.value)} /><CustomerTypeSelect value={row.customerTypeId} options={customerTypes} defaultId={defaultCustomerTypeId} onChange={(value) => field("customerTypeId", value)} /><Input type="number" min={0} value={row.creditLimit} onChange={(event) => field("creditLimit", event.target.value)} /><Input type="number" min={0} max={3650} value={row.debtDueDays} onChange={(event) => field("debtDueDays", event.target.value)} /><Input value={row.address} onChange={(event) => field("address", event.target.value)} /><Button size="icon" variant="ghost" onClick={onRemove}><Trash2 className="size-4 text-destructive" /></Button></div>;
+    return <div className={`${customerSheetGridClass} border-b p-2 last:border-b-0`}><span className="self-center text-center font-semibold text-muted-foreground">{index + 1}</span><Input value={row.firstName} onChange={(event) => field("firstName", event.target.value)} /><Input value={row.lastName} onChange={(event) => field("lastName", event.target.value)} /><Input value={row.phone} onChange={(event) => field("phone", event.target.value)} /><Input type="email" value={row.email} onChange={(event) => field("email", event.target.value)} /><CustomerTypeSelect value={row.customerTypeId} options={customerTypes} defaultId={defaultCustomerTypeId} onChange={(value) => field("customerTypeId", value)} /><Input type="number" min={0} value={row.creditLimit} onChange={(event) => field("creditLimit", event.target.value)} /><Input type="number" min={0} max={3650} value={row.debtDueDays} onChange={(event) => field("debtDueDays", event.target.value)} /><Input aria-label={`Address for customer row ${index + 1}`} placeholder="Street, city, area or delivery details" title={row.address || "Customer address"} value={row.address} onChange={(event) => field("address", event.target.value)} /><Button type="button" aria-label={`Remove customer row ${index + 1}`} size="icon" variant="ghost" onClick={onRemove}><Trash2 className="size-4 text-destructive" /></Button></div>;
 }
 
 function CustomerTypeSelect({ value, options, defaultId, onChange }: { value: string; options: { id: number; name: string }[]; defaultId: number | null; onChange: (value: string) => void }) {

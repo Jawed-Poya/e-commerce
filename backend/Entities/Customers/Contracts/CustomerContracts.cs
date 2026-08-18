@@ -26,6 +26,8 @@ public sealed record CustomerListItemResponse(
     decimal AccountCredit,
     decimal CreditLimit,
     bool HasOverdueDebt,
+    bool IsOnline,
+    int ActiveSessions,
     DateTime? LastOrderAt,
     DateTime CreatedAt
 );

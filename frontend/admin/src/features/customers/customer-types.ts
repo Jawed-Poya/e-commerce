@@ -15,6 +15,8 @@ export interface CustomerListItem {
     accountCredit: number;
     creditLimit: number;
     hasOverdueDebt: boolean;
+    isOnline: boolean;
+    activeSessions: number;
     lastOrderAt: string | null;
     createdAt: string;
 }

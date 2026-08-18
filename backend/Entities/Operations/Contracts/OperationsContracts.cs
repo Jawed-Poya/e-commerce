@@ -28,6 +28,19 @@ public sealed record OperationProductLookup(
     string? BaseUnitName,
     decimal? CurrentUnitCost,
     IReadOnlyList<OperationProductUnitLookup> Units);
+
+public sealed class QuickCreateProductRequest
+{
+    public string Name { get; set; } = null!;
+    public string? Barcode { get; set; }
+    public string? Strength { get; set; }
+    public string? GenericName { get; set; }
+    public string? Formula { get; set; }
+    public long CategoryId { get; set; }
+    public long UnitId { get; set; }
+    public decimal? DefaultSalePrice { get; set; }
+}
+
 public sealed record OperationCustomerLookup(long Id, string Name, string Phone, string? WhatsAppUrl, string? Email, string? CustomerTypeName, decimal AccountCredit, decimal OutstandingDebt, decimal CreditLimit, bool HasOverdueDebt);
 public sealed record OperationSummary(decimal PurchasesThisMonth, decimal SalesThisMonth, decimal ExpensesThisMonth, decimal SalariesThisMonth, int LowStockProducts);
 public sealed record OperationPolicyResponse(int MaximumPurchaseLines, int MaximumManualSaleLines, bool CanOverrideLineLimits, decimal GeneralSalesDiscountPercent, decimal MaximumCustomerDebt, int DefaultDebtDueDays, bool AllowNegativeStockSales);
@@ -44,7 +57,7 @@ public sealed class CreateSupplierRequest
 }
 public sealed record SupplierResponse(long Id, string Name, string? ContactPerson, string? Phone, string? Email, string? Address, string? TaxNumber, bool IsActive, decimal OutstandingBalance);
 public sealed record SupplierLedgerEntryResponse(DateOnly Date, string Type, string Reference, string Description, decimal Debit, decimal Credit, decimal Balance, long SourceId);
-public sealed record SupplierLedgerResponse(long SupplierId, string SupplierName, decimal TotalPurchases, decimal TotalPayments, decimal ClosingBalance, IReadOnlyList<SupplierLedgerEntryResponse> Entries);
+public sealed record SupplierLedgerResponse(long SupplierId, string SupplierName, string CurrencyCode, decimal TotalPurchases, decimal TotalPayments, decimal ClosingBalance, IReadOnlyList<SupplierLedgerEntryResponse> Entries);
 
 public sealed class CreatePurchaseRequest
 {
@@ -72,7 +85,6 @@ public sealed class PurchaseItemRequest
     public decimal UnitCost { get; set; }
     public decimal BonusQuantity { get; set; }
     public decimal DiscountPercent { get; set; }
-    public decimal SecondaryDiscountPercent { get; set; }
     public string? LotNumber { get; set; }
     public DateOnly? ExpireDate { get; set; }
 }
@@ -144,7 +156,6 @@ public sealed class InventorySaleItemRequest
     public decimal UnitPrice { get; set; }
     public decimal BonusQuantity { get; set; }
     public decimal DiscountPercent { get; set; }
-    public decimal SecondaryDiscountPercent { get; set; }
 }
 public sealed record InventorySaleListItem(long Id, string SaleNumber, string? ReferenceNumber, DateOnly SaleDate, string CustomerName, string? CustomerPhone, string? WhatsAppUrl, int ItemCount, decimal Total, decimal PaidAmount, decimal RemainingAmount, DocumentPaymentStatus PaymentStatus, decimal CostOfGoods, decimal GrossProfit, decimal ProfitMargin, DateTime CreatedAt);
 public sealed record InventorySaleLotMovementResponse(
@@ -239,3 +250,4 @@ public sealed class CreateJournalVoucherLineRequest
 
 public sealed record JournalVoucherLineResponse(long Id, string AccountCode, string AccountName, string? Description, decimal Debit, decimal Credit);
 public sealed record JournalVoucherResponse(long Id, string VoucherNumber, DateOnly VoucherDate, string CurrencyCode, string Memo, decimal TotalDebit, decimal TotalCredit, DateTime CreatedAt, IReadOnlyList<JournalVoucherLineResponse> Lines);
+public sealed record JournalAccountBalanceResponse(string AccountCode, string AccountName, decimal TotalDebit, decimal TotalCredit, decimal Balance, int EntryCount);

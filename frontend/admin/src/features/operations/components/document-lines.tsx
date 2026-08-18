@@ -28,6 +28,8 @@ import {
     isDocumentLineComplete,
     isDocumentLineEmpty,
 } from "@/features/operations/document-line-state";
+import { calculateLineNet } from "@/features/operations/discount-calculations";
+import { QuickProductDialog } from "@/features/operations/components/quick-product-dialog";
 import { operationsService } from "@/features/operations/operations-service";
 import type {
     DocumentItem,
@@ -152,6 +154,7 @@ export function DocumentLines({
     const overrideActive = canOverrideLineLimit && overrideLineLimit;
     const effectiveMaximumLines = overrideActive ? 500 : safeMaximumLines;
     const atLineLimit = items.length >= effectiveMaximumLines;
+    const canPlaceCreatedProduct = !atLineLimit || items.some(isDocumentLineEmpty);
 
     const summary = useMemo(() => {
         const ready = items.filter(
@@ -264,6 +267,34 @@ export function DocumentLines({
         });
     };
 
+    const addCreatedProduct = (product: OperationProduct) => {
+        const unit = defaultUnit(product);
+        const line: DocumentItem = {
+            ...emptyItem(),
+            product,
+            productId: product.id,
+            unitId: unit.unitId || null,
+            unitName: unit.unitName,
+            conversionFactor: unit.conversionFactor,
+            quantity: 1,
+            amount: mode === "sale" ? unit.defaultPrice ?? 0 : 0,
+        };
+
+        setItems((current) => {
+            const emptyIndex = current.findIndex(isDocumentLineEmpty);
+            const targetIndex = emptyIndex >= 0 ? emptyIndex : current.length;
+            window.requestAnimationFrame(() => {
+                linesContainerRef.current
+                    ?.querySelector<HTMLElement>(`[data-document-line="${targetIndex}"]`)
+                    ?.scrollIntoView({ behavior: "smooth", block: "center" });
+            });
+            if (emptyIndex >= 0) {
+                return current.map((item, index) => index === emptyIndex ? line : item);
+            }
+            return [...current, line];
+        });
+    };
+
     return (
         <section className="relative space-y-4">
             <div className="sticky top-0 z-30 -mx-1 rounded-xl border border-border/80 bg-background/95 px-3 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:px-4">
@@ -313,7 +344,7 @@ export function DocumentLines({
                         </p>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 sm:justify-end">
+                    <div className="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
                         {canOverrideLineLimit ? (
                             <Button
                                 type="button"
@@ -341,16 +372,23 @@ export function DocumentLines({
                                 {formatMoney(summary.total)}
                             </p>
                         </div>
-                        <Button
-                            type="button"
-                            size="lg"
-                            className="min-w-32 shadow-sm"
-                            onClick={add}
-                            disabled={atLineLimit}
-                        >
-                            <Plus className="me-1 size-4" />
-                            {tr("Add product")}
-                        </Button>
+                        <div className="flex flex-wrap gap-2">
+                            <QuickProductDialog
+                                mode={mode}
+                                disabled={!canPlaceCreatedProduct}
+                                onCreated={addCreatedProduct}
+                            />
+                            <Button
+                                type="button"
+                                size="lg"
+                                className="min-w-32 shadow-sm"
+                                onClick={add}
+                                disabled={atLineLimit}
+                            >
+                                <Plus className="me-1 size-4" />
+                                {tr("Add product")}
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -646,17 +684,6 @@ export function DocumentLines({
                                         />
                                     </LineField>
 
-                                    <LineField label={tr("Second discount %")}>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            max={100}
-                                            step="0.01"
-                                            value={item.secondaryDiscountPercent}
-                                            onChange={(event) => update(index, { secondaryDiscountPercent: Number(event.target.value) })}
-                                        />
-                                    </LineField>
-
                                     <LineField
                                         label={`${mode === "purchase" ? tr("Unit cost") : tr("Unit price")} · ${unit?.unitName ?? tr("Unit")}`}
                                     >
@@ -734,9 +761,7 @@ export function DocumentLines({
 }
 
 function stackedLineTotal(item: DocumentItem) {
-    const gross = item.quantity * item.amount;
-    const first = gross * (1 - Math.min(100, Math.max(0, item.discountPercent)) / 100);
-    return first * (1 - Math.min(100, Math.max(0, item.secondaryDiscountPercent)) / 100);
+    return calculateLineNet(item.quantity, item.amount, item.discountPercent);
 }
 
 function LineStateBadge({

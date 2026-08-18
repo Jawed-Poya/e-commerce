@@ -80,6 +80,10 @@ public sealed class CustomerService(
                 customer.CreatedAt
             })
             .ToListAsync(cancellationToken);
+        var activeCustomers = presence.GetActive(DateTime.UtcNow)
+            .Where(session => session.CustomerId.HasValue)
+            .GroupBy(session => session.CustomerId!.Value)
+            .ToDictionary(group => group.Key, group => group.Count());
 
         return new PagedResult<CustomerListItemResponse>
         {
@@ -99,6 +103,8 @@ public sealed class CustomerService(
                     row.AccountCredit,
                     row.CreditLimit,
                     row.HasOverdueDebt,
+                    activeCustomers.ContainsKey(row.Id),
+                    activeCustomers.GetValueOrDefault(row.Id),
                     row.LastOrderAt,
                     row.CreatedAt);
             }).ToList(),

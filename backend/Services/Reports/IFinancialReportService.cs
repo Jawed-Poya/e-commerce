@@ -22,4 +22,12 @@ public interface IFinancialReportService
         DateTime? endDate,
         string? currencyCode,
         CancellationToken cancellationToken = default);
+
+    Task<ProductPerformanceReportResponse> GetProductPerformanceAsync(
+        long productId,
+        DateTime? startDate,
+        DateTime? endDate,
+        long? branchId,
+        string? currencyCode,
+        CancellationToken cancellationToken = default);
 }

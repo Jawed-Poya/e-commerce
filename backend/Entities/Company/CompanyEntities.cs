@@ -61,7 +61,7 @@ public sealed class CompanySetting
     public decimal GeneralSalesDiscountPercent { get; set; }
     public decimal MaximumCustomerDebt { get; set; } = 300000m;
     public int DefaultDebtDueDays { get; set; } = 30;
-    public bool AllowNegativeStockSales { get; set; }
+    public bool AllowNegativeStockSales { get; set; } = true;
     [MaxLength(12)] public string PurchaseNumberPrefix { get; set; } = "PUR";
     public long NextPurchaseNumber { get; set; } = 1;
     public int PurchaseNumberIncrement { get; set; } = 1;

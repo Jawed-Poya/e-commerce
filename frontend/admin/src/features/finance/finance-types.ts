@@ -103,6 +103,47 @@ export interface CompanyWorth {
     returnOnAssetsPercent: number;
 }
 
+export interface ProductPerformanceTrend {
+    date: string;
+    quantity: number;
+    revenue: number;
+    cost: number;
+    profit: number;
+}
+
+export interface ProductPerformanceTransaction {
+    date: string;
+    type: string;
+    reference: string;
+    quantity: number;
+    amount: number;
+    cost: number;
+    profit: number;
+}
+
+export interface ProductPerformanceReport {
+    productId: number;
+    productName: string;
+    startDate: string;
+    endDate: string;
+    currencyCode: string;
+    quantitySold: number;
+    revenue: number;
+    costOfGoodsSold: number;
+    grossProfit: number;
+    marginPercent: number;
+    salesTransactionCount: number;
+    quantityPurchased: number;
+    purchaseCost: number;
+    purchaseTransactionCount: number;
+    returnedQuantity: number;
+    returnedAmount: number;
+    currentStockQuantity: number;
+    currentStockValue: number;
+    trend: ProductPerformanceTrend[];
+    transactions: ProductPerformanceTransaction[];
+}
+
 export interface FinancialReportFilters {
     startDate?: string;
     endDate?: string;

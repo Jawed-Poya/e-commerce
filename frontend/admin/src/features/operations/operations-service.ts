@@ -8,7 +8,7 @@ import {
   readReferenceItems,
   writeCachedValue,
 } from "@/features/offline/offline-reference-cache";
-import type { CreateJournalVoucher, DocumentPayment, Expense, ExpenseCategory, JournalVoucher, ManualSale, ManualSaleLotMovement, OperationCustomer, OperationPolicy, OperationProduct, OperationSummary, PagedResult, Purchase, PurchaseDetails, SalaryPayment, Staff, Supplier, SupplierLedger } from "./operations-types";
+import type { CreateJournalVoucher, DocumentPayment, Expense, ExpenseCategory, JournalAccountBalance, JournalVoucher, ManualSale, ManualSaleLotMovement, OperationCustomer, OperationPolicy, OperationProduct, OperationSummary, PagedResult, Purchase, PurchaseDetails, QuickCreateProduct, SalaryPayment, Staff, Supplier, SupplierLedger } from "./operations-types";
 
 const base = "/admin/operations";
 
@@ -113,6 +113,8 @@ export const operationsService = {
     })).data,
     (item, clean) => [item.name, item.strength, item.genericName, item.formula, item.barcode, ...item.units.map((unit) => unit.barcode)].some((value) => normalize(value ?? "").includes(clean)),
   ),
+  quickCreateProduct: (body: QuickCreateProduct) =>
+    apiClient.post<OperationProduct>(`${base}/products/quick`, body),
   customers: (search = "", take = 20) => cachedLookup(
     "customers",
     search,
@@ -163,6 +165,7 @@ export const operationsService = {
   expenses: (page = 1, pageSize = 20) => apiClient.get<PagedResult<Expense>>(`${base}/expenses`, { page, pageSize }),
   createExpense: (body: unknown) => apiClient.post<Expense>(`${base}/expenses`, body),
   journalVouchers: (page = 1, pageSize = 20) => apiClient.get<PagedResult<JournalVoucher>>(`${base}/journal-vouchers`, { page, pageSize }),
+  journalAccountBalances: () => apiClient.get<JournalAccountBalance[]>(`${base}/journal-vouchers/accounts`),
   createJournalVoucher: (body: CreateJournalVoucher) => apiClient.post<JournalVoucher>(`${base}/journal-vouchers`, body),
 };
 

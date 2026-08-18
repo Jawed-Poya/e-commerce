@@ -6,6 +6,7 @@ import {
     useMemo,
     useRef,
     useState,
+    type Context,
     type PropsWithChildren,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -39,7 +40,18 @@ type ValidateSessionOptions = {
     showLoader?: boolean;
 };
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+const authContextKey = "__commerceAdminAuthContext";
+const authContextHost = globalThis as typeof globalThis & {
+    [authContextKey]?: Context<AuthContextValue | null>;
+};
+
+// Keep one context identity even when a PWA update or React fast refresh loads
+// provider and consumer modules from different chunks during the transition.
+// Without this stable host, consumers can occasionally see a different Context
+// instance and incorrectly report that the provider is missing.
+const AuthContext =
+    authContextHost[authContextKey] ??
+    (authContextHost[authContextKey] = createContext<AuthContextValue | null>(null));
 
 function readStoredUser(): AuthUser | null {
     try {
@@ -143,7 +155,7 @@ export function AdminAuthProvider({ children }: PropsWithChildren) {
                 }
             }
         },
-        [clearSessionState],
+        [clearSessionState, queryClient],
     );
 
     const refresh = useCallback(async () => {
