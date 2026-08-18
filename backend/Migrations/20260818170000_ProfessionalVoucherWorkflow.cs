@@ -12,6 +12,9 @@ public sealed class ProfessionalVoucherWorkflow : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
+        // Keep schema creation separate from every statement that references the
+        // new columns. SQL Server compiles each migration command independently,
+        // so the new columns are visible before UPDATE/index/FK commands compile.
         migrationBuilder.Sql("""
 IF OBJECT_ID(N'[dbo].[JournalVouchers]', N'U') IS NOT NULL
 BEGIN
@@ -47,26 +50,67 @@ BEGIN
         ALTER TABLE [dbo].[JournalVouchers] ADD [ReversalReason] nvarchar(1000) NULL;
     IF COL_LENGTH(N'dbo.JournalVouchers', N'ReversalOfVoucherId') IS NULL
         ALTER TABLE [dbo].[JournalVouchers] ADD [ReversalOfVoucherId] bigint NULL;
+END;
+""");
 
+        migrationBuilder.Sql("""
+IF OBJECT_ID(N'[dbo].[JournalVouchers]', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.JournalVouchers', N'IsSystemGenerated') IS NOT NULL
+   AND COL_LENGTH(N'dbo.JournalVouchers', N'PostedAt') IS NOT NULL
+   AND COL_LENGTH(N'dbo.JournalVouchers', N'PostedByUserId') IS NOT NULL
+BEGIN
     UPDATE [dbo].[JournalVouchers]
     SET [PostedAt] = [CreatedAt],
         [PostedByUserId] = COALESCE([PostedByUserId], [CreatedByUserId])
     WHERE [IsSystemGenerated] = 0;
+END;
+""");
 
-    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_JournalVouchers_SourceType_SourceId' AND [object_id] = OBJECT_ID(N'[dbo].[JournalVouchers]'))
-        CREATE UNIQUE INDEX [IX_JournalVouchers_SourceType_SourceId]
-        ON [dbo].[JournalVouchers] ([SourceType], [SourceId])
-        WHERE [SourceType] IS NOT NULL AND [SourceId] IS NOT NULL AND [IsDeleted] = 0;
+        migrationBuilder.Sql("""
+IF OBJECT_ID(N'[dbo].[JournalVouchers]', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.JournalVouchers', N'SourceType') IS NOT NULL
+   AND COL_LENGTH(N'dbo.JournalVouchers', N'SourceId') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1
+       FROM sys.indexes
+       WHERE [name] = N'IX_JournalVouchers_SourceType_SourceId'
+         AND [object_id] = OBJECT_ID(N'[dbo].[JournalVouchers]'))
+BEGIN
+    CREATE UNIQUE INDEX [IX_JournalVouchers_SourceType_SourceId]
+    ON [dbo].[JournalVouchers] ([SourceType], [SourceId])
+    WHERE [SourceType] IS NOT NULL
+      AND [SourceId] IS NOT NULL
+      AND [IsDeleted] = 0;
+END;
+""");
 
-    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_JournalVouchers_ReversalOfVoucherId' AND [object_id] = OBJECT_ID(N'[dbo].[JournalVouchers]'))
-        CREATE UNIQUE INDEX [IX_JournalVouchers_ReversalOfVoucherId]
-        ON [dbo].[JournalVouchers] ([ReversalOfVoucherId])
-        WHERE [ReversalOfVoucherId] IS NOT NULL AND [IsDeleted] = 0;
+        migrationBuilder.Sql("""
+IF OBJECT_ID(N'[dbo].[JournalVouchers]', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.JournalVouchers', N'ReversalOfVoucherId') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1
+       FROM sys.indexes
+       WHERE [name] = N'IX_JournalVouchers_ReversalOfVoucherId'
+         AND [object_id] = OBJECT_ID(N'[dbo].[JournalVouchers]'))
+BEGIN
+    CREATE UNIQUE INDEX [IX_JournalVouchers_ReversalOfVoucherId]
+    ON [dbo].[JournalVouchers] ([ReversalOfVoucherId])
+    WHERE [ReversalOfVoucherId] IS NOT NULL
+      AND [IsDeleted] = 0;
+END;
+""");
 
-    IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE [name] = N'FK_JournalVouchers_JournalVouchers_ReversalOfVoucherId')
-        ALTER TABLE [dbo].[JournalVouchers] WITH CHECK
-        ADD CONSTRAINT [FK_JournalVouchers_JournalVouchers_ReversalOfVoucherId]
-        FOREIGN KEY ([ReversalOfVoucherId]) REFERENCES [dbo].[JournalVouchers] ([Id]);
+        migrationBuilder.Sql("""
+IF OBJECT_ID(N'[dbo].[JournalVouchers]', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.JournalVouchers', N'ReversalOfVoucherId') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1
+       FROM sys.foreign_keys
+       WHERE [name] = N'FK_JournalVouchers_JournalVouchers_ReversalOfVoucherId')
+BEGIN
+    ALTER TABLE [dbo].[JournalVouchers] WITH CHECK
+    ADD CONSTRAINT [FK_JournalVouchers_JournalVouchers_ReversalOfVoucherId]
+    FOREIGN KEY ([ReversalOfVoucherId]) REFERENCES [dbo].[JournalVouchers] ([Id]);
 END;
 """);
     }
