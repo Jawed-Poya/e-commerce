@@ -11,5 +11,6 @@ public interface IAuthService
     Task<AuthUserResponse?> GetCurrentAsync(CancellationToken cancellationToken = default);
     Task<UserProfileResponse?> GetProfileAsync(CancellationToken cancellationToken = default);
     Task<UserProfileResponse> UpdateProfileAsync(UpdateUserProfileRequest request, CancellationToken cancellationToken = default);
+    Task SetPasswordAsync(SetPasswordRequest request, CancellationToken cancellationToken = default);
     Task ChangePasswordAsync(ChangePasswordRequest request, CancellationToken cancellationToken = default);
 }

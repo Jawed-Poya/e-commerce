@@ -5,6 +5,7 @@ using ECommerce.Entities.Users;
 using ECommerce.Options;
 using ECommerce.Services.Auth;
 using ECommerce.Services.Auth.Verification;
+using ECommerce.Services.Auth.PasswordRecovery;
 using ECommerce.Services.Accounting;
 using ECommerce.Services.Auditing;
 using ECommerce.Services.Customers;
@@ -57,6 +58,7 @@ public static class DependencyInjection
         services.AddScoped<IDefaultCustomerTypeResolver, DefaultCustomerTypeResolver>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IAccountVerificationService, AccountVerificationService>();
+        services.AddScoped<IPasswordRecoveryService, PasswordRecoveryService>();
         services.AddScoped<IStoreNotificationService, StoreNotificationService>();
         services.AddScoped<IAdminNotificationService, AdminNotificationService>();
         services.AddScoped<IInventoryExpiryAlertService, InventoryExpiryAlertService>();
@@ -88,6 +90,12 @@ public static class DependencyInjection
         services.Configure<SeedAdminOptions>(configuration.GetSection(SeedAdminOptions.SectionName));
         services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
         services.Configure<AccountVerificationOptions>(configuration.GetSection(AccountVerificationOptions.SectionName));
+        var passwordResetMinutes = Math.Clamp(
+            configuration.GetValue<int?>($"{AccountVerificationOptions.SectionName}:PasswordResetLifetimeMinutes") ?? 30,
+            10,
+            1440);
+        services.Configure<DataProtectionTokenProviderOptions>(options =>
+            options.TokenLifespan = TimeSpan.FromMinutes(passwordResetMinutes));
         services.Configure<WhatsAppOptions>(configuration.GetSection(WhatsAppOptions.SectionName));
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
         services.Configure<DatabaseMaintenanceOptions>(configuration.GetSection(DatabaseMaintenanceOptions.SectionName));

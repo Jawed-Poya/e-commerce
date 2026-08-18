@@ -109,6 +109,12 @@ const routes: RouteObject[] = [
         }),
       },
       {
+        path: "account/reset-password",
+        lazy: async () => ({
+          Component: (await import("../features/auth/reset-password-page")).ResetPasswordPage,
+        }),
+      },
+      {
         path: "account",
         lazy: async () => ({
           Component: (await import("../features/account/account-page"))

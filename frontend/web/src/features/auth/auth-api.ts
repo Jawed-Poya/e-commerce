@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "../../shared/api/api-client";
+import { apiGet, apiPost, apiPut } from "../../shared/api/api-client";
 import type {
     AuthResponse,
     AuthUser,
@@ -26,3 +26,18 @@ export const confirmVerificationCode = (
     channel: VerificationChannel,
     code: string,
 ) => apiPost<AuthUser>("/auth/verification/confirm", { channel, code });
+
+export const requestPasswordReset = (email: string) =>
+    apiPost<Record<string, never>>("/auth/customer/forgot-password", { email });
+
+export const resetCustomerPassword = (email: string, token: string, newPassword: string) =>
+    apiPost<Record<string, never>>("/auth/customer/reset-password", { email, token, newPassword });
+
+export const updateCustomerProfile = (request: { fullName: string; email: string | null; phone: string | null }) =>
+    apiPut<unknown>("/auth/profile", request);
+
+export const setCustomerPassword = (newPassword: string) =>
+    apiPost<Record<string, never>>("/auth/set-password", { newPassword });
+
+export const changeCustomerPassword = (currentPassword: string, newPassword: string) =>
+    apiPost<Record<string, never>>("/auth/change-password", { currentPassword, newPassword });

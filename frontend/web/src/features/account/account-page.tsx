@@ -1,17 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     ArrowRight,
     BadgeCheck,
     CalendarDays,
+    Eye,
+    EyeOff,
+    KeyRound,
     LogOut,
     LoaderCircle,
     Mail,
+    Pencil,
+    Save,
     PackageSearch,
     Phone,
     ShieldCheck,
     ReceiptText,
     UserRound,
+    X,
 } from "lucide-react";
 import { Link, Navigate } from "react-router-dom";
 
@@ -19,7 +25,7 @@ import { ListPagination } from "../../shared/components/list-pagination";
 import { Button } from "../../shared/components/ui/button";
 import { formatMoney } from "../../shared/lib/money";
 import { useAuth } from "../auth/auth-context";
-import { confirmVerificationCode, sendVerificationCode } from "../auth/auth-api";
+import { changeCustomerPassword, confirmVerificationCode, sendVerificationCode, setCustomerPassword, updateCustomerProfile } from "../auth/auth-api";
 import type { VerificationChannel } from "../auth/auth-types";
 import { ApiError } from "../../shared/api/api-client";
 import { getAccountOrders } from "./account-api";
@@ -35,6 +41,29 @@ export function AccountPage() {
     const [verificationError, setVerificationError] = useState<string | null>(null);
     const [orderPage, setOrderPage] = useState(1);
     const orderPageSize = 10;
+    const [profileEditing, setProfileEditing] = useState(false);
+    const [profileBusy, setProfileBusy] = useState(false);
+    const [profileMessage, setProfileMessage] = useState<string | null>(null);
+    const [profileError, setProfileError] = useState<string | null>(null);
+    const [profileForm, setProfileForm] = useState({
+        fullName: auth.user?.fullName ?? "",
+        email: auth.user?.email ?? "",
+        phone: auth.user?.phone ?? "",
+    });
+    const [securityBusy, setSecurityBusy] = useState(false);
+    const [securityMessage, setSecurityMessage] = useState<string | null>(null);
+    const [securityError, setSecurityError] = useState<string | null>(null);
+    const [showSecurityPassword, setShowSecurityPassword] = useState(false);
+    const [securityForm, setSecurityForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+
+    useEffect(() => {
+        if (!auth.user || profileEditing) return;
+        setProfileForm({
+            fullName: auth.user.fullName,
+            email: auth.user.email ?? "",
+            phone: auth.user.phone ?? "",
+        });
+    }, [auth.user, profileEditing]);
 
     const orders = useQuery({
         queryKey: ["account-orders", auth.user?.customerId, orderPage, orderPageSize],
@@ -48,6 +77,59 @@ export function AccountPage() {
 
     const user = auth.user;
     if (!user) return null;
+
+    const saveProfile = async () => {
+        if (!profileForm.fullName.trim()) {
+            setProfileError(t("account.fullNameRequired"));
+            return;
+        }
+        setProfileBusy(true);
+        setProfileError(null);
+        setProfileMessage(null);
+        try {
+            await updateCustomerProfile({
+                fullName: profileForm.fullName.trim(),
+                email: profileForm.email.trim() || null,
+                phone: profileForm.phone.trim() || null,
+            });
+            await auth.refresh();
+            setProfileEditing(false);
+            setProfileMessage(t("account.profileUpdated"));
+        } catch (error) {
+            setProfileError(error instanceof ApiError ? error.message : t("account.profileUpdateError"));
+        } finally {
+            setProfileBusy(false);
+        }
+    };
+
+    const savePassword = async () => {
+        setSecurityError(null);
+        setSecurityMessage(null);
+        if (securityForm.newPassword !== securityForm.confirmPassword) {
+            setSecurityError(t("account.passwordsDoNotMatch"));
+            return;
+        }
+        if (securityForm.newPassword.length < 6) {
+            setSecurityError(t("account.passwordMinimum"));
+            return;
+        }
+
+        setSecurityBusy(true);
+        try {
+            if (user.hasPassword) {
+                await changeCustomerPassword(securityForm.currentPassword, securityForm.newPassword);
+            } else {
+                await setCustomerPassword(securityForm.newPassword);
+            }
+            await auth.refresh();
+            setSecurityForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+            setSecurityMessage(user.hasPassword ? t("account.passwordChanged") : t("account.passwordCreated"));
+        } catch (error) {
+            setSecurityError(error instanceof ApiError ? error.message : t("account.passwordUpdateError"));
+        } finally {
+            setSecurityBusy(false);
+        }
+    };
 
     const requestVerification = async (channel: VerificationChannel) => {
         setVerificationBusy(true);
@@ -113,6 +195,74 @@ export function AccountPage() {
                     <ProfileCard icon={<ReceiptText />} label={t("account.orders")} value={String(orders.data?.totalCount ?? 0)} description={t("account.ordersDescription")} />
                 </div>
             </section>
+
+            <div className="mt-6 grid gap-5 lg:grid-cols-[1.08fr_.92fr]">
+                <section className="overflow-hidden rounded-2xl border bg-card">
+                    <div className="flex items-center justify-between gap-3 border-b bg-muted/30 p-4 sm:p-5">
+                        <div>
+                            <p className="flex items-center gap-2 text-sm font-black"><UserRound className="size-5 text-primary" /> {t("account.profileInformation")}</p>
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">{t("account.profileInformationHelp")}</p>
+                        </div>
+                        {profileEditing ? (
+                            <Button type="button" variant="ghost" size="sm" className="rounded-lg" disabled={profileBusy} onClick={() => {
+                                setProfileEditing(false);
+                                setProfileError(null);
+                                setProfileForm({ fullName: user.fullName, email: user.email ?? "", phone: user.phone ?? "" });
+                            }}><X /> {t("common.cancel")}</Button>
+                        ) : (
+                            <Button type="button" variant="outline" size="sm" className="rounded-lg" onClick={() => { setProfileEditing(true); setProfileMessage(null); }}><Pencil /> {t("common.edit")}</Button>
+                        )}
+                    </div>
+                    <div className="p-4 sm:p-5">
+                        {profileEditing ? (
+                            <div className="grid gap-4">
+                                <AccountField label={t("common.fullName")} value={profileForm.fullName} onChange={(value) => setProfileForm((current) => ({ ...current, fullName: value }))} autoComplete="name" required />
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <AccountField label={t("common.email")} value={profileForm.email} onChange={(value) => setProfileForm((current) => ({ ...current, email: value }))} type="email" autoComplete="email" />
+                                    <AccountField label={t("common.phone")} value={profileForm.phone} onChange={(value) => setProfileForm((current) => ({ ...current, phone: value }))} autoComplete="tel" placeholder="07xxxxxxxx" />
+                                </div>
+                                <p className="text-xs leading-5 text-muted-foreground">{t("account.contactChangeHelp")}</p>
+                                {profileError ? <StatusMessage error>{profileError}</StatusMessage> : null}
+                                <Button type="button" className="w-fit rounded-xl" disabled={profileBusy} onClick={() => void saveProfile()}>
+                                    {profileBusy ? <LoaderCircle className="animate-spin" /> : <Save />} {profileBusy ? t("common.saving") : t("common.saveChanges")}
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <InfoRow icon={<UserRound />} label={t("common.fullName")} value={user.fullName} />
+                                <InfoRow icon={<Mail />} label={t("common.email")} value={user.email ?? t("common.notSet")} accent={!user.email} />
+                                <InfoRow icon={<Phone />} label={t("common.phone")} value={user.phone ?? t("common.notSet")} accent={!user.phone} />
+                                <InfoRow icon={<ShieldCheck />} label={t("account.contactStatus")} value={user.canPlaceOrders ? t("account.checkoutReady") : t("account.verificationRequired")} />
+                            </div>
+                        )}
+                        {!profileEditing && profileMessage ? <div className="mt-4"><StatusMessage>{profileMessage}</StatusMessage></div> : null}
+                    </div>
+                </section>
+
+                <section className="overflow-hidden rounded-2xl border bg-card">
+                    <div className="border-b bg-muted/30 p-4 sm:p-5">
+                        <div className="flex items-start gap-3">
+                            <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${user.hasPassword ? "bg-primary/10 text-primary" : "bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}><KeyRound className="size-5" /></span>
+                            <div>
+                                <p className="text-sm font-black">{user.hasPassword ? t("account.changePassword") : t("account.createPassword")}</p>
+                                <p className="mt-1 text-xs leading-5 text-muted-foreground">{user.hasPassword ? t("account.changePasswordHelp") : t("account.googlePasswordHelp")}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="grid gap-4 p-4 sm:p-5">
+                        {user.hasPassword ? (
+                            <SecurityPasswordField label={t("account.currentPassword")} value={securityForm.currentPassword} show={showSecurityPassword} onChange={(value) => setSecurityForm((current) => ({ ...current, currentPassword: value }))} onToggle={() => setShowSecurityPassword((value) => !value)} autoComplete="current-password" />
+                        ) : null}
+                        <SecurityPasswordField label={t("auth.newPassword")} value={securityForm.newPassword} show={showSecurityPassword} onChange={(value) => setSecurityForm((current) => ({ ...current, newPassword: value }))} onToggle={() => setShowSecurityPassword((value) => !value)} autoComplete="new-password" />
+                        <SecurityPasswordField label={t("auth.confirmPassword")} value={securityForm.confirmPassword} show={showSecurityPassword} onChange={(value) => setSecurityForm((current) => ({ ...current, confirmPassword: value }))} onToggle={() => setShowSecurityPassword((value) => !value)} autoComplete="new-password" />
+                        {securityError ? <StatusMessage error>{securityError}</StatusMessage> : null}
+                        {securityMessage ? <StatusMessage>{securityMessage}</StatusMessage> : null}
+                        <Button type="button" className="w-fit rounded-xl" disabled={securityBusy || !securityForm.newPassword || !securityForm.confirmPassword || (user.hasPassword && !securityForm.currentPassword)} onClick={() => void savePassword()}>
+                            {securityBusy ? <LoaderCircle className="animate-spin" /> : <KeyRound />} {securityBusy ? t("common.saving") : user.hasPassword ? t("account.updatePassword") : t("account.createPasswordAction")}
+                        </Button>
+                    </div>
+                </section>
+            </div>
 
             <section className="mt-6 overflow-hidden rounded-2xl border bg-card">
                 <div className="flex flex-col gap-3 border-b bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -230,6 +380,36 @@ export function AccountPage() {
             </section>
         </main>
     );
+}
+
+function AccountField({ label, value, onChange, type = "text", autoComplete, placeholder, required }: { label: string; value: string; onChange: (value: string) => void; type?: string; autoComplete?: string; placeholder?: string; required?: boolean }) {
+    return (
+        <label className="grid gap-1.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{label}{required ? " *" : ""}</span>
+            <input required={required} type={type} autoComplete={autoComplete} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="store-input" />
+        </label>
+    );
+}
+
+function SecurityPasswordField({ label, value, show, onChange, onToggle, autoComplete }: { label: string; value: string; show: boolean; onChange: (value: string) => void; onToggle: () => void; autoComplete: string }) {
+    const { t } = useI18n();
+    return (
+        <label className="grid gap-1.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
+            <span className="relative">
+                <input type={show ? "text" : "password"} minLength={6} autoComplete={autoComplete} value={value} onChange={(event) => onChange(event.target.value)} className="store-input pe-11" />
+                <button type="button" onClick={onToggle} className="absolute end-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label={show ? t("auth.hidePassword") : t("auth.showPassword")}>{show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button>
+            </span>
+        </label>
+    );
+}
+
+function InfoRow({ icon, label, value, accent = false }: { icon: React.ReactNode; label: string; value: string; accent?: boolean }) {
+    return <div className={`flex items-center gap-3 rounded-xl border p-3.5 ${accent ? "border-amber-500/20 bg-amber-500/5" : "bg-background"}`}><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary [&_svg]:size-4">{icon}</span><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p><p className="mt-1 truncate text-sm font-bold">{value}</p></div></div>;
+}
+
+function StatusMessage({ children, error = false }: { children: React.ReactNode; error?: boolean }) {
+    return <div role={error ? "alert" : "status"} className={`rounded-xl border p-3 text-sm ${error ? "border-destructive/20 bg-destructive/5 text-destructive" : "border-emerald-500/20 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300"}`}>{children}</div>;
 }
 
 function ProfileCard({ icon, label, value, description }: { icon: React.ReactNode; label: string; value: string; description: string }) {

@@ -143,6 +143,7 @@ async function warmStorefrontRouteModules() {
     import("../features/orders/order-success-page"),
     import("../features/orders/order-tracking-page"),
     import("../features/auth/auth-page"),
+    import("../features/auth/reset-password-page"),
     import("../features/account/account-page"),
     import("../shared/components/not-found-page"),
   ]);

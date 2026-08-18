@@ -216,7 +216,7 @@ public sealed class AuthService(
         if (user is null) return null;
         var roles = (await userManager.GetRolesAsync(user)).ToArray();
         var permissions = await GetPermissionsAsync(user, roles, cancellationToken);
-        return MapProfile(user, roles, permissions);
+        return MapProfile(user, roles, permissions, await userManager.HasPasswordAsync(user));
     }
 
     public async Task<UserProfileResponse> UpdateProfileAsync(
@@ -226,14 +226,19 @@ public sealed class AuthService(
         var user = await FindCurrentUserAsync()
             ?? throw new UnauthorizedAccessException("Authentication is required.");
         var fullName = Clean(request.FullName) ?? throw new ArgumentException("Full name is required.");
-        var email = NormalizeEmail(request.Email) ?? throw new ArgumentException("Email is required.");
+        var submittedEmail = Clean(request.Email);
+        var email = NormalizeEmail(submittedEmail);
+        if (submittedEmail is not null && email is null)
+            throw new ArgumentException("Enter a valid email address.");
         var phone = NormalizePhone(request.Phone);
         if (phone.Length > 0 && phone.Length < 6) throw new ArgumentException("Enter a valid phone number.");
 
         var emailChanged = !string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase);
         var phoneValue = phone.Length == 0 ? null : phone;
         var phoneChanged = !string.Equals(user.PhoneNumber, phoneValue, StringComparison.Ordinal);
-        if (emailChanged && await context.Users.AnyAsync(item => item.Id != user.Id && item.Email == email, cancellationToken))
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        if (emailChanged && email is not null &&
+            await context.Users.AnyAsync(item => item.Id != user.Id && item.Email == email, cancellationToken))
             throw new InvalidOperationException("This email address is already in use.");
         if (phoneChanged && phoneValue is not null && await context.Users.AnyAsync(item => item.Id != user.Id && item.PhoneNumber == phoneValue, cancellationToken))
             throw new InvalidOperationException("This phone number is already in use.");
@@ -246,15 +251,69 @@ public sealed class AuthService(
         if (CompanyUserName.RequiresRepair(user.UserName)) user.UserName = CompanyUserName.Create(user.Id);
         EnsureSucceeded(await userManager.UpdateAsync(user), "Could not update the profile.");
 
+        // Keep the linked commerce customer in sync with the storefront account.
+        // A registration-only account may not have a Customer link until checkout.
+        var customerClaim = await context.UserClaims
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                claim => claim.UserId == user.Id && claim.ClaimType == AuthClaims.CustomerId,
+                cancellationToken);
+        if (long.TryParse(customerClaim?.ClaimValue, out var customerId))
+        {
+            var customer = await context.Customers
+                .FirstOrDefaultAsync(item => item.Id == customerId, cancellationToken);
+            if (customer is not null)
+            {
+                if (phoneValue is null)
+                    throw new InvalidOperationException("A phone number is required for a linked customer account.");
+
+                var (firstName, lastName) = SplitFullName(fullName);
+                if (phoneValue is not null && phoneChanged &&
+                    await context.Customers.AnyAsync(
+                        item => item.Id != customer.Id && item.Phone == phoneValue,
+                        cancellationToken))
+                    throw new InvalidOperationException("This phone number is already used by another customer.");
+                if (emailChanged && email is not null &&
+                    await context.Customers.AnyAsync(
+                        item => item.Id != customer.Id && item.Email == email,
+                        cancellationToken))
+                    throw new InvalidOperationException("This email address is already used by another customer.");
+
+                customer.FirstName = firstName;
+                customer.LastName = lastName;
+                customer.Phone = phoneValue;
+                if (emailChanged) customer.Email = email;
+                await context.SaveChangesAsync(cancellationToken);
+            }
+        }
+
         var roles = (await userManager.GetRolesAsync(user)).ToArray();
         var permissions = await GetPermissionsAsync(user, roles, cancellationToken);
-        return MapProfile(user, roles, permissions);
+        var response = MapProfile(user, roles, permissions, await userManager.HasPasswordAsync(user));
+        await transaction.CommitAsync(cancellationToken);
+        return response;
+    }
+
+    public async Task SetPasswordAsync(SetPasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        var user = await FindCurrentUserAsync()
+            ?? throw new UnauthorizedAccessException("Authentication is required.");
+        if (string.IsNullOrWhiteSpace(request.NewPassword))
+            throw new ArgumentException("A new password is required.");
+        if (await userManager.HasPasswordAsync(user))
+            throw new InvalidOperationException("This account already has a password. Use change password instead.");
+
+        EnsureSucceeded(
+            await userManager.AddPasswordAsync(user, request.NewPassword),
+            "Could not set the password.");
     }
 
     public async Task ChangePasswordAsync(ChangePasswordRequest request, CancellationToken cancellationToken = default)
     {
         var user = await FindCurrentUserAsync()
             ?? throw new UnauthorizedAccessException("Authentication is required.");
+        if (!await userManager.HasPasswordAsync(user))
+            throw new InvalidOperationException("This account does not have a password yet. Set a password first.");
         if (string.IsNullOrWhiteSpace(request.CurrentPassword) || string.IsNullOrWhiteSpace(request.NewPassword))
             throw new ArgumentException("Current and new passwords are required.");
         EnsureSucceeded(
@@ -356,7 +415,8 @@ public sealed class AuthService(
             user.BranchId,
             user.EmailConfirmed,
             user.PhoneNumberConfirmed,
-            user.EmailConfirmed || user.PhoneNumberConfirmed);
+            user.EmailConfirmed || user.PhoneNumberConfirmed,
+            await userManager.HasPasswordAsync(user));
     }
 
     private async Task<IReadOnlyCollection<string>> GetPermissionsAsync(
@@ -404,7 +464,8 @@ public sealed class AuthService(
     private static UserProfileResponse MapProfile(
         User user,
         IReadOnlyCollection<string> roles,
-        IReadOnlyCollection<string> permissions) =>
+        IReadOnlyCollection<string> permissions,
+        bool hasPassword) =>
         new(
             user.Id,
             user.FullName,
@@ -418,7 +479,14 @@ public sealed class AuthService(
             user.CreatedAt,
             user.EmailConfirmed,
             user.PhoneNumberConfirmed,
-            user.EmailConfirmed || user.PhoneNumberConfirmed);
+            user.EmailConfirmed || user.PhoneNumberConfirmed,
+            hasPassword);
+
+    private static (string FirstName, string? LastName) SplitFullName(string fullName)
+    {
+        var parts = fullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return parts.Length == 1 ? (parts[0], null) : (parts[0], parts[1]);
+    }
 
     private static string NormalizePhone(string? value) =>
         string.Concat((value ?? string.Empty).Where(character => char.IsDigit(character) || character == '+')).Trim();

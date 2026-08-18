@@ -13,6 +13,7 @@ export interface AuthUser {
     emailVerified: boolean;
     phoneVerified: boolean;
     canPlaceOrders: boolean;
+    hasPassword: boolean;
 }
 
 export interface AuthResponse {

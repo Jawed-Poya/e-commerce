@@ -4,6 +4,9 @@ namespace ECommerce.Entities.Users.Contracts;
 
 public sealed record LoginRequest(string Identifier, string Password);
 public sealed record GoogleSignInRequest(string Credential);
+public sealed record ForgotPasswordRequest(string Email);
+public sealed record ResetPasswordRequest(string Email, string Token, string NewPassword);
+public sealed record SetPasswordRequest(string NewPassword);
 
 public sealed record RegisterCustomerRequest(
     string FirstName,
@@ -27,7 +30,8 @@ public sealed record AuthUserResponse(
     long? BranchId,
     bool EmailVerified,
     bool PhoneVerified,
-    bool CanPlaceOrders
+    bool CanPlaceOrders,
+    bool HasPassword
 );
 
 public sealed record AuthResponse(
@@ -49,11 +53,12 @@ public sealed record UserProfileResponse(
     DateTime CreatedAt,
     bool EmailVerified,
     bool PhoneVerified,
-    bool CanPlaceOrders);
+    bool CanPlaceOrders,
+    bool HasPassword);
 
 public sealed record UpdateUserProfileRequest(
     string FullName,
-    string Email,
+    string? Email,
     string? Phone);
 
 public sealed record ChangePasswordRequest(

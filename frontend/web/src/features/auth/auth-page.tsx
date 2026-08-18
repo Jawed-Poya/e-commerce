@@ -4,6 +4,7 @@ import {
     BadgeCheck,
     Eye,
     EyeOff,
+    KeyRound,
     LockKeyhole,
     Mail,
     MapPin,
@@ -23,6 +24,7 @@ import { cn } from "../../shared/lib/utils";
 import { useAuth } from "./auth-context";
 import { useI18n } from "../../i18n/i18n-provider";
 import { GoogleSignInButton } from "./google-sign-in-button";
+import { requestPasswordReset } from "./auth-api";
 
 export function AuthPage() {
     const auth = useAuth();
@@ -30,10 +32,11 @@ export function AuthPage() {
     const { t } = useI18n();
     const navigate = useNavigate();
     const location = useLocation();
-    const [mode, setMode] = useState<"login" | "register">("login");
+    const [mode, setMode] = useState<"login" | "register" | "forgot">("login");
     const [showPassword, setShowPassword] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [message, setMessage] = useState<string | null>(null);
     const [form, setForm] = useState({
         firstName: "",
         lastName: "",
@@ -52,8 +55,15 @@ export function AuthPage() {
         event.preventDefault();
         setSubmitting(true);
         setError(null);
+        setMessage(null);
 
         try {
+            if (mode === "forgot") {
+                await requestPasswordReset(form.email.trim());
+                setMessage(t("auth.resetEmailSent"));
+                return;
+            }
+
             if (mode === "login") {
                 await auth.login({
                     identifier: form.identifier.trim(),
@@ -282,30 +292,40 @@ export function AuthPage() {
                                 <span className="h-px w-7 bg-brand-orange" />
                                 {mode === "login"
                                     ? t("auth.welcomeBack")
-                                    : t("auth.join", { company: companyName })}
+                                    : mode === "forgot"
+                                      ? t("auth.passwordRecovery")
+                                      : t("auth.join", { company: companyName })}
                             </div>
                             <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] sm:text-[34px] sm:leading-tight">
                                 {mode === "login"
                                     ? t("auth.signInTitle")
-                                    : t("auth.createTitle")}
+                                    : mode === "forgot"
+                                      ? t("auth.forgotTitle")
+                                      : t("auth.createTitle")}
                             </h2>
                             <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
                                 {mode === "login"
                                     ? t("auth.loginDescription")
-                                    : t("auth.registerDescription")}
+                                    : mode === "forgot"
+                                      ? t("auth.forgotDescription")
+                                      : t("auth.registerDescription")}
                             </p>
                         </div>
 
                         <div className="mt-6 rounded-2xl border border-border/75 bg-background p-4 shadow-[0_20px_50px_-42px_rgba(15,23,42,.55)] dark:border-white/[0.08] sm:p-5">
-                            <GoogleSignInButton
-                                onCredential={handleGoogleCredential}
-                                disabled={submitting}
-                            />
-                            <div className="my-4 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                                <span className="h-px flex-1 bg-border" />
-                                {t("auth.orContinueWithPassword")}
-                                <span className="h-px flex-1 bg-border" />
-                            </div>
+                            {mode !== "forgot" ? (
+                                <>
+                                    <GoogleSignInButton
+                                        onCredential={handleGoogleCredential}
+                                        disabled={submitting}
+                                    />
+                                    <div className="my-4 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                                        <span className="h-px flex-1 bg-border" />
+                                        {t("auth.orContinueWithPassword")}
+                                        <span className="h-px flex-1 bg-border" />
+                                    </div>
+                                </>
+                            ) : null}
 
                             <form onSubmit={submit} className="grid gap-3.5">
                                 {mode === "register" ? (
@@ -346,6 +366,15 @@ export function AuthPage() {
                                             placeholder={t("auth.optionalEmail")}
                                         />
                                     </>
+                                ) : mode === "forgot" ? (
+                                    <AuthField
+                                        label={t("common.email")}
+                                        required
+                                        type="email"
+                                        value={form.email}
+                                        onChange={(value) => update("email", value)}
+                                        placeholder={t("auth.resetEmailPlaceholder")}
+                                    />
                                 ) : (
                                     <AuthField
                                         label={t("auth.identifier")}
@@ -360,6 +389,7 @@ export function AuthPage() {
                                     />
                                 )}
 
+                                {mode !== "forgot" ? (
                                 <label className="grid gap-1.5">
                                     <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                         {t("common.password")} *
@@ -412,7 +442,31 @@ export function AuthPage() {
                                             )}
                                         </button>
                                     </span>
+                                    {mode === "login" ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setMode("forgot");
+                                                setError(null);
+                                                setMessage(null);
+                                                setForm((current) => ({
+                                                    ...current,
+                                                    email: current.identifier.includes("@") ? current.identifier : current.email,
+                                                }));
+                                            }}
+                                            className="w-fit text-xs font-bold text-primary transition hover:underline"
+                                        >
+                                            {t("auth.forgotPassword")}
+                                        </button>
+                                    ) : null}
                                 </label>
+                                ) : null}
+
+                                {message && (
+                                    <div role="status" className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm leading-6 text-emerald-700 dark:text-emerald-300">
+                                        {message}
+                                    </div>
+                                )}
 
                                 {error && (
                                     <div
@@ -433,12 +487,24 @@ export function AuthPage() {
                                         ? t("auth.wait")
                                         : mode === "login"
                                           ? t("auth.signIn")
-                                          : t("auth.createAccount")}
+                                          : mode === "forgot"
+                                            ? t("auth.sendResetLink")
+                                            : t("auth.createAccount")}
                                     {!submitting && (
-                                        <ArrowRight className="rtl:rotate-180" />
+                                        mode === "forgot" ? <KeyRound /> : <ArrowRight className="rtl:rotate-180" />
                                     )}
                                 </Button>
                             </form>
+                            {mode === "forgot" ? (
+                                <button
+                                    type="button"
+                                    onClick={() => { setMode("login"); setError(null); setMessage(null); }}
+                                    className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-muted-foreground transition hover:text-foreground"
+                                >
+                                    <ArrowLeft className="size-4 rtl:rotate-180" />
+                                    {t("auth.backToSignIn")}
+                                </button>
+                            ) : null}
                         </div>
 
                         <div className="mt-4 flex items-start gap-3 rounded-xl border border-border/70 bg-muted/[0.28] p-3.5 dark:border-white/[0.08] dark:bg-slate-950/25">

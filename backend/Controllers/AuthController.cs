@@ -2,6 +2,7 @@ using ECommerce.Entities;
 using ECommerce.Entities.Users.Contracts;
 using ECommerce.Services.Auth;
 using ECommerce.Services.Auth.Verification;
+using ECommerce.Services.Auth.PasswordRecovery;
 using ECommerce.Services.Auditing;
 using ECommerce.Options;
 using ECommerce.Shared;
@@ -16,6 +17,7 @@ namespace ECommerce.Controllers;
 public sealed class AuthController(
     IAuthService auth,
     IAccountVerificationService verification,
+    IPasswordRecoveryService passwordRecovery,
     IAuditLogService audit,
     IOptions<GoogleAuthOptions> googleOptions) : ControllerBase
 {
@@ -114,6 +116,52 @@ public sealed class AuthController(
             enabled = !string.IsNullOrWhiteSpace(clientId),
             clientId
         }));
+    }
+
+    [HttpPost("customer/forgot-password")]
+    public async Task<ActionResult<ApiResponse<object>>> ForgotPassword(
+        ForgotPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await passwordRecovery.RequestResetAsync(request.Email, cancellationToken);
+            return Ok(ApiResponse<object>.Ok(
+                new { },
+                "If a customer account exists for this email, a password reset link has been sent."));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
+        }
+    }
+
+    [HttpPost("customer/reset-password")]
+    public async Task<ActionResult<ApiResponse<object>>> ResetPassword(
+        ResetPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await passwordRecovery.ResetAsync(
+                request.Email,
+                request.Token,
+                request.NewPassword,
+                cancellationToken);
+            return Ok(ApiResponse<object>.Ok(new { }, "Password reset successfully. You can sign in now."));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
+        }
     }
 
     [Authorize]
@@ -243,6 +291,27 @@ public sealed class AuthController(
         catch (InvalidOperationException exception)
         {
             return Conflict(ApiResponse<object>.Fail(exception.Message));
+        }
+    }
+
+    [Authorize]
+    [HttpPost("set-password")]
+    public async Task<ActionResult<ApiResponse<object>>> SetPassword(
+        SetPasswordRequest request)
+    {
+        try
+        {
+            using var operation = ServerOperation.CreateWriteScope();
+            await auth.SetPasswordAsync(request, operation.Token);
+            return Ok(ApiResponse<object>.Ok(new { }, "Password created successfully."));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
         }
     }
 
