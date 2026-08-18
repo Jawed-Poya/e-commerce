@@ -946,18 +946,29 @@ public sealed class FinancialReportService(
 
     private static async Task<IReadOnlyCollection<BusinessPartyMetricResponse>> GetTopSuppliersAsync(
         IQueryable<Purchase> purchases,
-        CancellationToken cancellationToken) =>
-        await purchases
+        CancellationToken cancellationToken)
+    {
+        var rows = await purchases
             .GroupBy(item => new { item.SupplierId, Name = item.Supplier != null ? item.Supplier.Name : "No supplier" })
-            .Select(group => new BusinessPartyMetricResponse(
+            .Select(group => new
+            {
                 group.Key.SupplierId,
                 group.Key.Name,
-                group.Count(),
-                group.Sum(item => item.Total),
-                group.Sum(item => item.Total > item.PaidAmount ? item.Total - item.PaidAmount : 0)))
+                TransactionCount = group.Count(),
+                Amount = group.Sum(item => item.Total),
+                Balance = group.Sum(item => item.Total > item.PaidAmount ? item.Total - item.PaidAmount : 0)
+            })
             .OrderByDescending(item => item.Amount)
             .Take(10)
             .ToListAsync(cancellationToken);
+
+        return rows.Select(item => new BusinessPartyMetricResponse(
+            item.SupplierId,
+            item.Name,
+            item.TransactionCount,
+            item.Amount,
+            item.Balance)).ToArray();
+    }
 
     private async Task<decimal> GetCashReceivedUntilAsync(
         DateTime asOf,

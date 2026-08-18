@@ -8,6 +8,10 @@ export interface ApiResponse<T> {
     success: boolean;
 }
 
+type DownloadResult = { filename: string; size: number };
+
+const downloadDeduplicationWindowMs = 1_500;
+
 function normalizeApiResponse<T>(response: ApiResponse<T>): ApiResponse<T> {
     if (!response || typeof response !== "object") {
         throw new Error("The server returned an invalid API response.");
@@ -17,6 +21,8 @@ function normalizeApiResponse<T>(response: ApiResponse<T>): ApiResponse<T> {
 }
 
 class ApiClient {
+    private readonly activeDownloads = new Map<string, Promise<DownloadResult>>();
+
     async get<T>(url: string, params?: object): Promise<ApiResponse<T>> {
         const response = await axiosInstance.get<ApiResponse<T>>(url, { params });
         return normalizeApiResponse(response.data);
@@ -37,7 +43,30 @@ class ApiClient {
         return normalizeApiResponse(response.data);
     }
 
-    async download(url: string, params?: object): Promise<{ filename: string; size: number }> {
+    download(url: string, params?: object): Promise<DownloadResult> {
+        const requestKey = createDownloadUrl(url, params, 0);
+        const activeDownload = this.activeDownloads.get(requestKey);
+        if (activeDownload) return activeDownload;
+
+        const download = this.downloadOnce(url, params);
+        this.activeDownloads.set(requestKey, download);
+
+        const release = () => {
+            window.setTimeout(() => {
+                if (this.activeDownloads.get(requestKey) === download) {
+                    this.activeDownloads.delete(requestKey);
+                }
+            }, downloadDeduplicationWindowMs);
+        };
+        void download.then(release, () => {
+            if (this.activeDownloads.get(requestKey) === download) {
+                this.activeDownloads.delete(requestKey);
+            }
+        });
+        return download;
+    }
+
+    private async downloadOnce(url: string, params?: object): Promise<DownloadResult> {
         const { blob, filename } = await this.getBlob(url, params);
         const href = URL.createObjectURL(blob);
         const link = document.createElement("a");
