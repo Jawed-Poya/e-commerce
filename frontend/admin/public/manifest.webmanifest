@@ -2,6 +2,7 @@
   "name": "Default Company Admin",
   "short_name": "Default Co.",
   "description": "Manage products, inventory, purchases, sales, and reports.",
+  "id": "/?pwa=admin",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

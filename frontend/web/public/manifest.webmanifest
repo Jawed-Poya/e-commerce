@@ -2,7 +2,7 @@
   "name": "Default Company Store",
   "short_name": "Default Co.",
   "description": "Browse products, track orders, receive price and stock alerts, and shop from any device.",
-  "id": "/",
+  "id": "/?pwa=storefront",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

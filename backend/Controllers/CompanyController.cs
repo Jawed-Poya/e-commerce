@@ -34,15 +34,6 @@ public sealed class CompanyController(
             token => companyService.GetPublicProfileAsync(token),
             operation.Token);
 
-        string? AssetUrl(string? path)
-        {
-            if (string.IsNullOrWhiteSpace(path)) return null;
-            if (Uri.TryCreate(path, UriKind.Absolute, out var absolute)) return absolute.ToString();
-            var normalized = path.StartsWith('/') ? path : $"/{path}";
-            return $"{Request.Scheme}://{Request.Host}{normalized}";
-        }
-
-        var icon = AssetUrl(profile.FaviconUrl) ?? AssetUrl(profile.LogoUrl);
         var requestOrigin = Request.Headers.Origin.FirstOrDefault();
         Uri? clientOrigin = Uri.TryCreate(requestOrigin, UriKind.Absolute, out var parsedOrigin)
             ? parsedOrigin
@@ -58,18 +49,26 @@ public sealed class CompanyController(
         var appRoot = clientOrigin.ToString().TrimEnd('/') + "/";
         var isAdmin = string.Equals(app, "admin", StringComparison.OrdinalIgnoreCase);
         var appName = isAdmin ? $"{profile.Name} Admin" : profile.Name;
-        var icons = icon is null
-            ? Array.Empty<object>()
-            : new object[]
-            {
-                new { src = icon, sizes = "192x192", purpose = "any" },
-                new { src = icon, sizes = "512x512", purpose = "any maskable" }
-            };
+
+        // PWA installability requires real 192x192 and 512x512 icons. Company
+        // logo/favicon uploads are intentionally flexible and can be any image size,
+        // so declaring one of those files as both required sizes can make Chromium
+        // reject the manifest. Both frontends ship these guaranteed-size icons.
+        var pwaIcon192 = $"{appRoot}pwa-192.png";
+        var pwaIcon512 = $"{appRoot}pwa-512.png";
+        var icons = new object[]
+        {
+            new { src = pwaIcon192, sizes = "192x192", type = "image/png", purpose = "any" },
+            new { src = pwaIcon512, sizes = "512x512", type = "image/png", purpose = "any" },
+            new { src = pwaIcon512, sizes = "512x512", type = "image/png", purpose = "maskable" }
+        };
 
         Response.Headers["Cache-Control"] = "no-cache, max-age=0";
         return new JsonResult(new
         {
-            id = isAdmin ? $"{appRoot}#admin" : $"{appRoot}#storefront",
+            // URL fragments are ignored for manifest identity, so use a stable
+            // same-origin query value to keep admin/storefront identities distinct.
+            id = isAdmin ? $"{appRoot}?pwa=admin" : $"{appRoot}?pwa=storefront",
             name = appName,
             short_name = appName.Length > 24 ? appName[..24] : appName,
             description = isAdmin

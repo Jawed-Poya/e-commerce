@@ -109,8 +109,18 @@ export function CompanyProvider({ children }: PropsWithChildren) {
 
         const manifestLink = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
         if (manifestLink) {
-            manifestLink.href = `${apiBaseUrl}/company/manifest.webmanifest`;
-            manifestLink.crossOrigin = "anonymous";
+            const dynamicManifestUrl = new URL(
+                `${apiBaseUrl}/company/manifest.webmanifest`,
+                window.location.origin,
+            );
+
+            // Keep the install manifest on the app origin. A deployment may point
+            // VITE_API_BASE_URL at a different host; in that case the static
+            // manifest remains the reliable installable fallback.
+            if (dynamicManifestUrl.origin === window.location.origin) {
+                manifestLink.href = dynamicManifestUrl.toString();
+                manifestLink.removeAttribute("crossorigin");
+            }
         }
 
     }, [company, language]);

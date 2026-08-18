@@ -62,8 +62,18 @@ export function CompanyProvider({ children }: PropsWithChildren) {
         if (touchIcon && (favicon || logo)) touchIcon.href = favicon || logo || touchIcon.href;
         const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
         if (manifest) {
-            manifest.href = `${apiBaseUrl}/company/manifest.webmanifest?app=admin`;
-            manifest.crossOrigin = "anonymous";
+            const dynamicManifestUrl = new URL(
+                `${apiBaseUrl}/company/manifest.webmanifest?app=admin`,
+                window.location.origin,
+            );
+
+            // A PWA manifest should stay on the same origin as the installed app.
+            // If the API is hosted elsewhere, keep the static manifest from
+            // index.html instead of replacing it with a cross-origin manifest.
+            if (dynamicManifestUrl.origin === window.location.origin) {
+                manifest.href = dynamicManifestUrl.toString();
+                manifest.removeAttribute("crossorigin");
+            }
         }
         document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
             ?.setAttribute("content", settings.adminPrimaryColor);
