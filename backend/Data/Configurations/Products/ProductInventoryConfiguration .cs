@@ -28,8 +28,10 @@ public sealed class ProductInventoryConfiguration
 
         builder.ToTable(table =>
         {
-            table.HasCheckConstraint("CK_ProductInventory_Quantity", "[Quantity] >= 0");
-            table.HasCheckConstraint("CK_ProductInventory_ReservedQuantity", "[ReservedQuantity] >= 0 AND [ReservedQuantity] <= [Quantity]");
+            // Quantity may go below zero when the company allows negative-stock sales.
+            // Reserved quantity still cannot itself be negative, but it may temporarily
+            // exceed physical stock while inventory is in a deficit/backorder state.
+            table.HasCheckConstraint("CK_ProductInventory_ReservedQuantity", "[ReservedQuantity] >= 0");
             table.HasCheckConstraint("CK_ProductInventory_MinimumQuantity", "[MinimumQuantity] >= 0");
         });
 

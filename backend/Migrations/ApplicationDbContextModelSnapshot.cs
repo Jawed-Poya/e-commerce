@@ -765,9 +765,7 @@ namespace ECommerce.Migrations
                         {
                             t.HasCheckConstraint("CK_ProductInventory_MinimumQuantity", "[MinimumQuantity] >= 0");
 
-                            t.HasCheckConstraint("CK_ProductInventory_Quantity", "[Quantity] >= 0");
-
-                            t.HasCheckConstraint("CK_ProductInventory_ReservedQuantity", "[ReservedQuantity] >= 0 AND [ReservedQuantity] <= [Quantity]");
+                            t.HasCheckConstraint("CK_ProductInventory_ReservedQuantity", "[ReservedQuantity] >= 0");
                         });
                 });
 

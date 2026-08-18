@@ -119,7 +119,7 @@ public sealed class OperationsService(
                 ? Math.Max(0, product.DisplayStockQuantity ?? 0)
                 : product.Inventory is null
                     ? 0
-                    : InventoryAvailability.SellableAvailable(
+                    : InventoryAvailability.SellableBalance(
                         product.Inventory.Quantity,
                         product.Inventory.ReservedQuantity,
                         expiredAvailableByProduct.GetValueOrDefault(product.Id));
@@ -804,7 +804,7 @@ public sealed class OperationsService(
                 ? Math.Max(0, product.DisplayStockQuantity ?? 0)
                 : product.Inventory is null
                     ? 0
-                    : InventoryAvailability.SellableAvailable(
+                    : InventoryAvailability.SellableBalance(
                         product.Inventory.Quantity,
                         product.Inventory.ReservedQuantity,
                         expiredAvailableByProduct.GetValueOrDefault(product.Id));
@@ -1561,7 +1561,7 @@ public sealed class OperationsService(
     {
         if (baseQuantity > availableBaseQuantity)
         {
-            var availableSelectedQuantity = availableBaseQuantity / selectedUnit.ConversionFactor;
+            var availableSelectedQuantity = Math.Max(0, availableBaseQuantity) / selectedUnit.ConversionFactor;
             throw new ArgumentException(
                 $"Only {availableSelectedQuantity:N3} unexpired {selectedUnit.UnitName} of '{product.Name}' are available. Expired stock cannot be sold.");
         }

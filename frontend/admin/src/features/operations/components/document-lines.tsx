@@ -97,10 +97,12 @@ function selectedBounds(item: DocumentItem, mode: "purchase" | "sale", allowNega
         minimum: 0.001,
         maximum: allowNegativeStock
             ? Number.POSITIVE_INFINITY
-            :
-            unit?.availableQuantity ??
-            product?.availableQuantity ??
-            Number.MAX_SAFE_INTEGER,
+            : Math.max(
+                  0,
+                  unit?.availableQuantity ??
+                      product?.availableQuantity ??
+                      Number.MAX_SAFE_INTEGER,
+              ),
     };
 }
 

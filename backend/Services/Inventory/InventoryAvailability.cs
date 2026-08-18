@@ -19,11 +19,17 @@ public static class InventoryAvailability
     public static decimal PhysicalAvailable(decimal quantity, decimal reservedQuantity) =>
         Math.Max(0, quantity - reservedQuantity);
 
+    public static decimal SellableBalance(
+        decimal quantity,
+        decimal reservedQuantity,
+        decimal expiredAvailableQuantity) =>
+        quantity - reservedQuantity - Math.Max(0, expiredAvailableQuantity);
+
     public static decimal SellableAvailable(
         decimal quantity,
         decimal reservedQuantity,
         decimal expiredAvailableQuantity) =>
-        Math.Max(0, PhysicalAvailable(quantity, reservedQuantity) - Math.Max(0, expiredAvailableQuantity));
+        Math.Max(0, SellableBalance(quantity, reservedQuantity, expiredAvailableQuantity));
 
     public static async Task<IReadOnlyDictionary<long, decimal>> LoadExpiredAvailableByProductAsync(
         ApplicationDbContext context,
