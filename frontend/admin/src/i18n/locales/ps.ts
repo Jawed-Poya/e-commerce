@@ -1,3 +1,4 @@
+import { customerPs } from "@/features/customers/i18n/customer-translations";
 import type { en } from "./en";
 import { inventoryPs } from "@/features/inventory/i18n/inventory-translations";
 import { pricingPs } from "@/features/products/i18n/pricing-translations";
@@ -30,6 +31,7 @@ export const ps: Record<keyof typeof en, string> = {
   "offline.title": "آفلاین همغږي", "offline.connected": "نښلول شوی", "offline.working": "په آفلاین حالت کې کار", "offline.connectedDescription": "ځنډېدلي پېرودونه او پلورونه په اتومات ډول همغږي کېږي.", "offline.workingDescription": "ملاتړ شوي عملیات په خوندي ډول په دې وسیله کې ساتل کېږي.", "offline.empty": "هیڅ ځنډېدلی آفلاین عملیات نشته.", "offline.syncNow": "اوس همغږي کړئ", "offline.syncing": "همغږي روانه ده…", "offline.waiting": "په تمه", "offline.everythingSynced": "ټول معلومات همغږي دي.", "offline.synced": "{count} آفلاین عملیات همغږي شول.", "offline.syncedOne": "۱ آفلاین عملیات همغږي شو.", "offline.retryCount": "{count} بیا هڅې",
   "nav.workspace": "سوداګري", "nav.commerce": "سوداګري", "nav.operations": "عملیات", "nav.administration": "اداره", "nav.reports": "راپورونه", "nav.financialReports": "مالي راپورونه", "nav.companySettings": "د شرکت تنظیمات", "nav.controlCenter": "د سوداګرۍ د مدیریت مرکز", "nav.reviews": "کتنې", "nav.overview": "لنډیز", "nav.purchases": "پېرودونه", "nav.manualSales": "لاسي پلور", "nav.staffPayroll": "کارکوونکي او معاش", "nav.expenses": "لګښتونه", "nav.journalVouchers": "د ژورنال سندونه", "nav.company": "د شرکت پروفایل", "nav.storefront": "پلورنځی", "nav.trash": "کثافات", "nav.auditLogs": "د فعالیت او لیدنو راپور", "nav.tenants": "شرکت", "nav.databaseMaintenance": "د ډیټابېس ساتنه",
   "products.storefrontColumn": "پلورنځی", "products.pinToTop": "پورته سنجاق", "products.pinned": "سنجاق شوی", "products.pinTitle": "دا محصول د پلورنځي په سر کې سنجاق کړئ", "products.unpinTitle": "دا محصول د پلورنځي له سر څخه لرې کړئ", "products.pinAdded": "محصول د پلورنځي په سر کې سنجاق شو.", "products.pinRemoved": "محصول د پلورنځي له سر څخه لرې شو.", "products.pinFailed": "د پلورنځي سنجاق بدل نشو.", "products.pinToggleTitle": "په پلورنځي کې سنجاق", "products.pinToggleHelp": "په ځانګړو برخو کې یې وښایئ او په پلورنځي کې یې له عادي محصولاتو پورته وساتئ.",
+  ...customerPs,
   ...inventoryPs,
   ...pricingPs,
   ...companyPs,

@@ -75,7 +75,7 @@ export function InventoryPage() {
 }
 
 function InventoryOverview() {
-    const { t } = useI18n();
+    const { t, tr } = useI18n();
     const navigate = useNavigate();
     const [search, setSearch] = useState("");
     const debouncedSearch = useDebouncedValue(search, 300);
@@ -163,7 +163,7 @@ function InventoryOverview() {
                             <MobileValue label={t("inventory.expired")} value={formatNumber(item.expiredQuantity)} />
                             <MobileValue label={t("inventory.reorderPoint")} value={formatNumber(item.minimumQuantity)} />
                         </div>
-                        <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3"><div><Expiry item={item} /><p className="mt-1 text-[10px] text-muted-foreground">{item.activeLotCount} active lot{item.activeLotCount === 1 ? "" : "s"}</p></div><div className="flex shrink-0 gap-1"><Button variant="outline" size="icon-sm" aria-label="View stock lots" onClick={() => setViewingLots(item)}><Layers3 className="size-4" /></Button><Button variant="outline" size="icon-sm" aria-label={t("inventory.adjustStock")} onClick={() => setAdjusting(item)}><SlidersHorizontal className="size-4" /></Button><Button variant="outline" size="icon-sm" aria-label={t("inventory.settingsTitle")} onClick={() => setEditingSettings(item)}><Settings2 className="size-4" /></Button><Button variant="ghost" size="icon-sm" aria-label={t("details.open")} onClick={() => navigate(`/products/${item.productId}`)}><Eye className="size-4" /></Button></div></div>
+                        <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3"><div><Expiry item={item} /><p className="mt-1 text-[10px] text-muted-foreground">{item.activeLotCount} {tr("Active lots")}</p></div><div className="flex shrink-0 gap-1"><Button variant="outline" size="icon-sm" aria-label={tr("View stock lots")} onClick={() => setViewingLots(item)}><Layers3 className="size-4" /></Button><Button variant="outline" size="icon-sm" aria-label={t("inventory.adjustStock")} onClick={() => setAdjusting(item)}><SlidersHorizontal className="size-4" /></Button><Button variant="outline" size="icon-sm" aria-label={t("inventory.settingsTitle")} onClick={() => setEditingSettings(item)}><Settings2 className="size-4" /></Button><Button variant="ghost" size="icon-sm" aria-label={t("details.open")} onClick={() => navigate(`/products/${item.productId}`)}><Eye className="size-4" /></Button></div></div>
                     </div>)}
                 </div>
 
@@ -192,8 +192,8 @@ function InventoryOverview() {
                                 <TableCell className="text-end"><div className="font-semibold tabular-nums">{formatNumber(item.availableQuantity)}</div><StockLevel available={item.availableQuantity} minimum={item.minimumQuantity} /></TableCell>
                                 <NumberCell value={item.expiredQuantity} muted={item.expiredQuantity === 0} />
                                 <NumberCell value={item.minimumQuantity} muted={item.minimumQuantity === 0} />
-                                <TableCell><Expiry item={item} /><p className="mt-1 text-[10px] text-muted-foreground">{item.activeLotCount} active lot{item.activeLotCount === 1 ? "" : "s"}</p></TableCell>
-                                <TableCell onDoubleClick={event => event.stopPropagation()}><div className="flex justify-end gap-1"><Button variant="outline" size="icon-sm" aria-label="View stock lots" onClick={() => setViewingLots(item)}><Layers3 className="size-4" /></Button><Button variant="outline" size="icon-sm" aria-label={t("inventory.adjustStock")} onClick={() => setAdjusting(item)}><SlidersHorizontal className="size-4" /></Button><Button variant="outline" size="icon-sm" aria-label={t("inventory.settingsTitle")} onClick={() => setEditingSettings(item)}><Settings2 className="size-4" /></Button><Button variant="ghost" size="icon-sm" aria-label={t("details.open")} onClick={() => navigate(`/products/${item.productId}`)}><Eye className="size-4" /></Button></div></TableCell>
+                                <TableCell><Expiry item={item} /><p className="mt-1 text-[10px] text-muted-foreground">{item.activeLotCount} {tr("Active lots")}</p></TableCell>
+                                <TableCell onDoubleClick={event => event.stopPropagation()}><div className="flex justify-end gap-1"><Button variant="outline" size="icon-sm" aria-label={tr("View stock lots")} onClick={() => setViewingLots(item)}><Layers3 className="size-4" /></Button><Button variant="outline" size="icon-sm" aria-label={t("inventory.adjustStock")} onClick={() => setAdjusting(item)}><SlidersHorizontal className="size-4" /></Button><Button variant="outline" size="icon-sm" aria-label={t("inventory.settingsTitle")} onClick={() => setEditingSettings(item)}><Settings2 className="size-4" /></Button><Button variant="ghost" size="icon-sm" aria-label={t("details.open")} onClick={() => navigate(`/products/${item.productId}`)}><Eye className="size-4" /></Button></div></TableCell>
                             </TableRow>)}
                         </TableBody>
                     </Table>

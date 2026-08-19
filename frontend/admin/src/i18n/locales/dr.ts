@@ -1,3 +1,4 @@
+import { customerDr } from "@/features/customers/i18n/customer-translations";
 import type { en } from "./en";
 import { inventoryDr } from "@/features/inventory/i18n/inventory-translations";
 import { pricingDr } from "@/features/products/i18n/pricing-translations";
@@ -30,6 +31,7 @@ export const dr: Record<keyof typeof en, string> = {
   "offline.title": "همگام‌سازی آفلاین", "offline.connected": "متصل", "offline.working": "کار در حالت آفلاین", "offline.connectedDescription": "خریدها و فروش‌های در انتظار به‌صورت خودکار همگام می‌شوند.", "offline.workingDescription": "عملیات پشتیبانی‌شده به‌صورت امن در این دستگاه ذخیره می‌شوند.", "offline.empty": "هیچ عملیات آفلاین در انتظار نیست.", "offline.syncNow": "همگام‌سازی اکنون", "offline.syncing": "در حال همگام‌سازی…", "offline.waiting": "در انتظار", "offline.everythingSynced": "همه اطلاعات همگام است.", "offline.synced": "{count} عملیات آفلاین همگام شد.", "offline.syncedOne": "۱ عملیات آفلاین همگام شد.", "offline.retryCount": "{count} تلاش دوباره",
   "nav.workspace": "کسب‌وکار", "nav.commerce": "تجارت", "nav.operations": "عملیات", "nav.administration": "مدیریت", "nav.reports": "گزارش‌ها", "nav.financialReports": "گزارش‌های مالی", "nav.companySettings": "تنظیمات شرکت", "nav.controlCenter": "مرکز مدیریت تجارت", "nav.reviews": "دیدگاه‌ها", "nav.overview": "نمای کلی", "nav.purchases": "خریدها", "nav.manualSales": "فروش دستی", "nav.staffPayroll": "کارمندان و معاش", "nav.expenses": "مصارف", "nav.journalVouchers": "اسناد روزنامه", "nav.company": "پروفایل شرکت", "nav.storefront": "فروشگاه", "nav.trash": "زباله‌دان", "nav.auditLogs": "گزارش فعالیت و بازدید", "nav.tenants": "شرکت", "nav.databaseMaintenance": "نگهداری دیتابیس",
   "products.storefrontColumn": "فروشگاه", "products.pinToTop": "سنجاق در بالا", "products.pinned": "سنجاق‌شده", "products.pinTitle": "سنجاق‌کردن این محصول در بالای فروشگاه", "products.unpinTitle": "برداشتن این محصول از بالای فروشگاه", "products.pinAdded": "محصول در بالای فروشگاه سنجاق شد.", "products.pinRemoved": "محصول از بالای فروشگاه برداشته شد.", "products.pinFailed": "تغییر سنجاق فروشگاه انجام نشد.", "products.pinToggleTitle": "سنجاق در فروشگاه", "products.pinToggleHelp": "در بخش‌های ویژه نمایش داده شود و بالاتر از محصولات عادی فروشگاه قرار گیرد.",
+  ...customerDr,
   ...inventoryDr,
   ...pricingDr,
   ...companyDr,

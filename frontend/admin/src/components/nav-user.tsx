@@ -73,12 +73,13 @@ function UserDropdownContent({ side = "bottom" }: { side?: "bottom" | "right" })
 }
 
 export function HeaderNavUser() {
+    const { tr } = useI18n();
     const auth = useAdminAuth();
     const user = auth.user;
     if (!user) return null;
     return (
         <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="size-8 p-0" aria-label="Open user menu" />}>
+            <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="size-8 p-0" aria-label={tr("Open user menu")} />}>
                 <Avatar size="sm"><AvatarFallback>{user.fullName.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
             </DropdownMenuTrigger>
             <UserDropdownContent />

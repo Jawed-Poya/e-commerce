@@ -1,3 +1,4 @@
+import { customerEn } from "@/features/customers/i18n/customer-translations";
 import { inventoryEn } from "@/features/inventory/i18n/inventory-translations";
 import { pricingEn } from "@/features/products/i18n/pricing-translations";
 
@@ -30,6 +31,7 @@ export const en = {
   "offline.title": "Offline synchronization", "offline.connected": "Connected", "offline.working": "Working offline", "offline.connectedDescription": "Pending purchases and sales sync automatically.", "offline.workingDescription": "Supported operations are safely stored on this device.", "offline.empty": "No pending offline operations.", "offline.syncNow": "Synchronize now", "offline.syncing": "Synchronizing…", "offline.waiting": "Waiting", "offline.everythingSynced": "Everything is synchronized.", "offline.synced": "{count} offline operations synchronized.", "offline.syncedOne": "1 offline operation synchronized.", "offline.retryCount": "{count} retries",
   "nav.workspace": "Business", "nav.commerce": "Commerce", "nav.operations": "Operations", "nav.administration": "Administration", "nav.reports": "Reports", "nav.financialReports": "Financial reports", "nav.companySettings": "Company settings", "nav.controlCenter": "Commerce control center", "nav.reviews": "Reviews", "nav.overview": "Overview", "nav.purchases": "Purchases", "nav.manualSales": "Manual sales", "nav.staffPayroll": "Staff & payroll", "nav.expenses": "Expenses", "nav.journalVouchers": "Journal vouchers", "nav.company": "Company profile", "nav.storefront": "Storefront", "nav.trash": "Trash", "nav.auditLogs": "Audit & visits", "nav.tenants": "Company", "nav.databaseMaintenance": "Database maintenance",
   "products.storefrontColumn": "Storefront", "products.pinToTop": "Pin to top", "products.pinned": "Pinned", "products.pinTitle": "Pin this product to the storefront top", "products.unpinTitle": "Remove this product from the storefront top", "products.pinAdded": "Product pinned to the storefront top.", "products.pinRemoved": "Product removed from the storefront top.", "products.pinFailed": "The storefront pin could not be changed.", "products.pinToggleTitle": "Pin on storefront", "products.pinToggleHelp": "Show it in featured sections and keep it above regular products in the shop.",
+  ...customerEn,
   ...inventoryEn,
   ...pricingEn,
   ...companyEn,

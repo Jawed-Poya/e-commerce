@@ -2,6 +2,11 @@ import type { Language } from "./i18n-provider";
 
 export const literalTranslations: Record<Exclude<Language, "en">, Record<string, string>> = {
   "dr": {
+    "Language": "زبان",
+    "Light theme": "حالت روشن",
+    "Dark theme": "حالت تاریک",
+    "View stock lots": "مشاهده دسته‌های موجودی",
+    "Active lots": "دسته‌های فعال",
     "View dashboard": "مشاهده داشبورد",
     "View business, sales, traffic, and inventory analytics.": "تحلیل‌های کسب‌وکار، فروش، بازدید و موجودی را مشاهده کنید.",
     "View products": "مشاهده محصولات",
@@ -987,6 +992,11 @@ export const literalTranslations: Record<Exclude<Language, "en">, Record<string,
     "Tablet": "تبلت",
   },
   "ps": {
+    "Language": "ژبه",
+    "Light theme": "روښانه بڼه",
+    "Dark theme": "تیاره بڼه",
+    "View stock lots": "د موجودۍ بستې کتل",
+    "Active lots": "فعاله بستې",
     "View dashboard": "ډشبورډ کتل",
     "View business, sales, traffic, and inventory analytics.": "د کاروبار، پلور، لیدنو او موجودۍ شننې وګورئ.",
     "View products": "محصولات کتل",
