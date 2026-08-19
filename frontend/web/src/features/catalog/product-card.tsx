@@ -248,13 +248,15 @@ export function ProductCard({
                     </div>
 
                     {cartItem && canAddToCart ? (
-                        <div className="mt-3 rounded-xl border border-primary/15 bg-primary/[0.03] p-2.5">
+                        <div className="mt-3 rounded-2xl border border-primary/15 bg-gradient-to-b from-primary/[0.07] to-primary/[0.025] p-3 shadow-[0_10px_26px_-22px_rgba(15,23,42,.55)]">
                             <CartQuantityControl
                                 item={liveCartItem!}
                                 compact
                                 className="w-full"
-                                showStepBadge={false}
+                                variant="productCard"
+                                showStepBadge
                                 showQuickQuantities
+                                quickQuantityLimit={5}
                             />
                         </div>
                     ) : null}

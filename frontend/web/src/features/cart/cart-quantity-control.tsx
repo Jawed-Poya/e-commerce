@@ -21,6 +21,8 @@ type CartQuantityControlProps = {
   className?: string;
   showStepBadge?: boolean;
   showQuickQuantities?: boolean;
+  variant?: "default" | "productCard";
+  quickQuantityLimit?: number;
 };
 
 export function CartQuantityControl({
@@ -29,6 +31,8 @@ export function CartQuantityControl({
   className,
   showStepBadge = true,
   showQuickQuantities = true,
+  variant = "default",
+  quickQuantityLimit,
 }: CartQuantityControlProps) {
   const cart = useCart();
   const { t, formatNumber } = useI18n();
@@ -36,7 +40,11 @@ export function CartQuantityControl({
   const minimum = minimumCartQuantity(item);
   const maximum = maximumCartQuantity(item);
   const canIncrease = item.quantity + step <= maximum + Number.EPSILON;
-  const presets = cartQuickQuantities(item);
+  const allPresets = cartQuickQuantities(item);
+  const presets = quickQuantityLimit == null
+    ? allPresets
+    : allPresets.slice(0, quickQuantityLimit);
+  const isProductCard = variant === "productCard";
 
   const decrease = () => {
     if (item.quantity <= minimum + Number.EPSILON) {
@@ -52,12 +60,38 @@ export function CartQuantityControl({
   };
 
   return (
-    <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
-      <div className="flex min-w-0 items-center gap-1.5">
+    <div
+      className={cn(
+        "flex min-w-0 flex-col",
+        isProductCard ? "gap-2.5" : "gap-1.5",
+        className,
+      )}
+    >
+      {isProductCard ? (
+        <div className="flex min-w-0 items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-primary">
+              {t("product.inCart")}
+            </p>
+            <p className="truncate text-[10px] text-muted-foreground">
+              {t("cart.currentQuantity", { count: formatNumber(item.quantity) })}
+            </p>
+          </div>
+          {showStepBadge && step > 1 ? (
+            <Badge className="shrink-0 border border-primary/15 bg-primary/[0.06] px-2 text-[9px] font-black text-primary shadow-none">
+              {t("cart.quantityStep", { count: formatNumber(step) })}
+            </Badge>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className={cn("flex min-w-0 items-center", isProductCard ? "w-full" : "gap-1.5")}>
         <div
           className={cn(
-            "inline-flex min-w-0 items-center overflow-hidden rounded-lg border border-primary/20 bg-background shadow-sm",
-            compact ? "h-8" : "h-11",
+            "min-w-0 overflow-hidden border border-primary/20 bg-background shadow-sm",
+            isProductCard
+              ? "grid h-11 w-full grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] rounded-xl"
+              : cn("inline-flex items-center rounded-lg", compact ? "h-8" : "h-11"),
           )}
         >
           <Button
@@ -67,16 +101,17 @@ export function CartQuantityControl({
             onClick={decrease}
             className={cn(
               "shrink-0 rounded-none text-primary hover:bg-primary/10 hover:text-primary",
-              compact ? "size-8" : "size-11",
+              isProductCard ? "size-11" : compact ? "size-8" : "size-11",
             )}
             aria-label={t("cart.decreaseQuantity")}
           >
-            <Minus className={compact ? "size-3.5" : "size-4"} />
+            <Minus className={compact && !isProductCard ? "size-3.5" : "size-4"} />
           </Button>
 
           <QuantityInput
             item={item}
             compact={compact}
+            stretch={isProductCard}
             onChange={(quantity) => cart.updateQuantity(item.lineKey, quantity, item)}
           />
 
@@ -88,15 +123,15 @@ export function CartQuantityControl({
             onClick={increase}
             className={cn(
               "shrink-0 rounded-none text-primary hover:bg-primary/10 hover:text-primary disabled:text-muted-foreground",
-              compact ? "size-8" : "size-11",
+              isProductCard ? "size-11" : compact ? "size-8" : "size-11",
             )}
             aria-label={t("cart.increaseQuantity")}
           >
-            <Plus className={compact ? "size-3.5" : "size-4"} />
+            <Plus className={compact && !isProductCard ? "size-3.5" : "size-4"} />
           </Button>
         </div>
 
-        {showStepBadge && step > 1 ? (
+        {!isProductCard && showStepBadge && step > 1 ? (
           <Badge
             className={cn(
               "shrink-0 border border-primary/15 bg-primary/[0.06] font-black text-primary shadow-none",
@@ -109,7 +144,14 @@ export function CartQuantityControl({
       </div>
 
       {showQuickQuantities && presets.length > 0 ? (
-        <div className="flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          className={cn(
+            "max-w-full items-center gap-1",
+            isProductCard
+              ? "grid grid-cols-4 sm:grid-cols-5"
+              : "flex flex-nowrap overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          )}
+        >
           {presets.map((quantity) => {
             const selected = Math.abs(item.quantity - quantity) < Number.EPSILON;
             return (
@@ -119,7 +161,10 @@ export function CartQuantityControl({
                 onClick={() => cart.updateQuantity(item.lineKey, quantity, item)}
                 aria-label={t("cart.setQuickQuantity", { count: formatNumber(quantity) })}
                 className={cn(
-                  "inline-flex h-6 min-w-8 shrink-0 items-center justify-center rounded-full border px-2 text-[10px] font-black tabular-nums transition",
+                  "inline-flex shrink-0 items-center justify-center border font-black tabular-nums transition",
+                  isProductCard
+                    ? "h-7 min-w-0 rounded-lg px-1.5 text-[10px]"
+                    : "h-6 min-w-8 rounded-full px-2 text-[10px]",
                   selected
                     ? "border-primary bg-primary text-primary-foreground shadow-sm"
                     : "border-primary/15 bg-primary/[0.045] text-primary hover:border-primary/30 hover:bg-primary/[0.09]",
@@ -138,10 +183,12 @@ export function CartQuantityControl({
 function QuantityInput({
   item,
   compact,
+  stretch,
   onChange,
 }: {
   item: CartItem;
   compact: boolean;
+  stretch: boolean;
   onChange: (quantity: number) => void;
 }) {
   const { t } = useI18n();
@@ -187,7 +234,11 @@ function QuantityInput({
       aria-label={t("cart.quantityInput", { name: item.name })}
       className={cn(
         "min-w-0 border-x border-primary/15 bg-primary/[0.035] text-center font-black tabular-nums text-foreground outline-none transition [appearance:textfield] focus:bg-primary/[0.08] focus:ring-2 focus:ring-inset focus:ring-primary/25 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-        compact ? "h-8 w-14 px-1 text-[11px]" : "h-11 w-20 px-2 text-sm",
+        stretch
+          ? "h-11 w-full px-2 text-sm"
+          : compact
+            ? "h-8 w-14 px-1 text-[11px]"
+            : "h-11 w-20 px-2 text-sm",
       )}
     />
   );
