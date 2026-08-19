@@ -353,7 +353,233 @@ export default function UsersPage() {
                 </div>
 
                 <div className="min-h-[280px]">
-                    <Table className="min-w-[1040px]">
+                    <div className="grid gap-3 p-3 sm:grid-cols-2 xl:hidden">
+                        {users.isLoading ? (
+                            <div className="grid min-h-40 place-items-center rounded-xl border text-sm text-muted-foreground sm:col-span-2">
+                                <span className="inline-flex items-center gap-2">
+                                    <LoaderCircle className="size-4 animate-spin" />
+                                    {tr("Loading users...")}
+                                </span>
+                            </div>
+                        ) : null}
+
+                        {users.isError ? (
+                            <div className="grid min-h-40 place-items-center rounded-xl border p-4 text-center sm:col-span-2">
+                                <div className="max-w-md space-y-2">
+                                    <p className="font-medium text-destructive">
+                                        {tr("Users could not be loaded.")}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {errorMessage(users.error)}
+                                    </p>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => users.refetch()}
+                                    >
+                                        <RefreshCw className="size-3.5" />
+                                        {tr("Try again")}
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {!users.isLoading && !users.isError
+                            ? userItems.map((user) => (
+                                  <article
+                                      key={user.id}
+                                      className="min-w-0 rounded-xl border bg-background p-4 shadow-xs"
+                                  >
+                                      <div className="flex items-start justify-between gap-3">
+                                          <div className="flex min-w-0 items-center gap-3">
+                                              <span className="grid size-10 shrink-0 place-items-center border bg-primary/10 font-bold text-primary">
+                                                  {getInitials(user.fullName)}
+                                              </span>
+                                              <div className="min-w-0">
+                                                  <p className="truncate font-semibold">
+                                                      {user.fullName}
+                                                  </p>
+                                                  <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                                                      {user.email ??
+                                                          user.phone ??
+                                                          tr("No contact information")}
+                                                  </p>
+                                              </div>
+                                          </div>
+                                          <Badge
+                                              variant="outline"
+                                              className={
+                                                  user.isActive
+                                                      ? "shrink-0 border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                                      : "shrink-0 border-destructive/30 bg-destructive/10 text-destructive"
+                                              }
+                                          >
+                                              {user.isActive ? tr("Active") : tr("Disabled")}
+                                          </Badge>
+                                      </div>
+
+                                      <div className="mt-4 grid grid-cols-2 gap-2">
+                                          <div className="rounded-lg bg-muted/35 p-2.5">
+                                              <p className="text-[10px] text-muted-foreground">
+                                                  {tr("Shop")}
+                                              </p>
+                                              <p className="mt-1 truncate text-sm font-medium">
+                                                  {user.branchName ?? tr("Company-wide")}
+                                              </p>
+                                              <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                                                  {user.branchId
+                                                      ? tr("Shop-scoped access")
+                                                      : tr("All shops")}
+                                              </p>
+                                          </div>
+                                          <div className="rounded-lg bg-muted/35 p-2.5">
+                                              <p className="text-[10px] text-muted-foreground">
+                                                  {tr("Access")}
+                                              </p>
+                                              <p className="mt-1 text-sm font-semibold tabular-nums">
+                                                  {user.permissionCount}
+                                              </p>
+                                              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                                                  {tr("effective permissions")}
+                                              </p>
+                                          </div>
+                                      </div>
+
+                                      <div className="mt-3 flex min-w-0 flex-wrap gap-1">
+                                          {user.roles.slice(0, 3).map((roleName) => (
+                                              <Badge
+                                                  key={roleName}
+                                                  variant="outline"
+                                                  className="max-w-full truncate"
+                                              >
+                                                  {roleName}
+                                              </Badge>
+                                          ))}
+                                          {user.roles.length > 3 ? (
+                                              <Badge variant="secondary">
+                                                  +{user.roles.length - 3}
+                                              </Badge>
+                                          ) : null}
+                                          {!user.roles.length ? (
+                                              <span className="text-[11px] text-muted-foreground">
+                                                  {tr("Direct access only")}
+                                              </span>
+                                          ) : null}
+                                      </div>
+
+                                      <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3">
+                                          <div className="min-w-0">
+                                              <p className="text-[10px] text-muted-foreground">
+                                                  {tr("Last login")}
+                                              </p>
+                                              {user.lastLoginAt ? (
+                                                  <p className="mt-0.5 truncate text-xs font-medium">
+                                                      {formatLoginDate(user.lastLoginAt)} ·{" "}
+                                                      {formatLoginTime(user.lastLoginAt)}
+                                                  </p>
+                                              ) : (
+                                                  <p className="mt-0.5 text-xs text-muted-foreground">
+                                                      {tr("Never signed in")}
+                                                  </p>
+                                              )}
+                                          </div>
+
+                                          {canManage ? (
+                                              <div className="inline-flex shrink-0 items-center overflow-hidden rounded-lg border bg-background">
+                                                  <Button
+                                                      variant="ghost"
+                                                      size="icon"
+                                                      className="size-8 rounded-none border-e"
+                                                      title={tr("Edit user")}
+                                                      onClick={() => void startEdit(user.id)}
+                                                  >
+                                                      <Pencil className="size-3.5" />
+                                                  </Button>
+                                                  <Button
+                                                      variant="ghost"
+                                                      size="icon"
+                                                      className="size-8 rounded-none border-e"
+                                                      title={tr("Reset password")}
+                                                      onClick={() =>
+                                                          void userService
+                                                              .getUser(user.id)
+                                                              .then(setPasswordUser)
+                                                      }
+                                                  >
+                                                      <KeyRound className="size-3.5" />
+                                                  </Button>
+                                                  {user.isActive ? (
+                                                      <ConfirmActionDialog
+                                                          trigger={
+                                                              <Button
+                                                                  variant="ghost"
+                                                                  size="icon"
+                                                                  title={tr("Deactivate")}
+                                                                  className="size-8 rounded-none text-destructive hover:text-destructive"
+                                                              >
+                                                                  <UserRoundX className="size-3.5" />
+                                                              </Button>
+                                                          }
+                                                          title={`${tr("Deactivate")} ${user.fullName}?`}
+                                                          description={tr(
+                                                              "The user will no longer be able to sign in. Their roles and permissions remain saved for later reactivation.",
+                                                          )}
+                                                          confirmLabel={tr("Deactivate user")}
+                                                          destructive
+                                                          pending={
+                                                              deactivate.isPending &&
+                                                              deactivate.variables === user.id
+                                                          }
+                                                          onConfirm={() =>
+                                                              deactivate.mutateAsync(user.id)
+                                                          }
+                                                      />
+                                                  ) : (
+                                                      <span className="grid size-8 place-items-center text-[10px] text-muted-foreground">
+                                                          —
+                                                      </span>
+                                                  )}
+                                              </div>
+                                          ) : (
+                                              <Badge variant="outline" className="shrink-0 text-muted-foreground">
+                                                  {tr("View only")}
+                                              </Badge>
+                                          )}
+                                      </div>
+                                  </article>
+                              ))
+                            : null}
+
+                        {!users.isLoading && !users.isError && !userItems.length ? (
+                            <div className="grid min-h-48 place-items-center rounded-xl border p-4 text-center sm:col-span-2">
+                                <div className="max-w-sm">
+                                    <span className="mx-auto mb-3 grid size-10 place-items-center border bg-muted/20 text-muted-foreground">
+                                        <UsersRound className="size-5" />
+                                    </span>
+                                    <p className="font-medium">
+                                        {tr("No users match these filters")}
+                                    </p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        {tr("Try another search, shop, role, or account status.")}
+                                    </p>
+                                    {hasFilters ? (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="mt-3"
+                                            onClick={clearFilters}
+                                        >
+                                            <X className="size-3.5" />
+                                            {tr("Clear filters")}
+                                        </Button>
+                                    ) : null}
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <div className="hidden xl:block">
+                        <Table className="min-w-[1040px]">
                         <TableHeader className="bg-muted/30">
                             <TableRow className="hover:bg-transparent">
                                 <TableHead className="w-[280px] px-4">User</TableHead>
@@ -536,7 +762,8 @@ export default function UsersPage() {
                                 </TableRow>
                             ) : null}
                         </TableBody>
-                    </Table>
+                        </Table>
+                    </div>
                 </div>
 
                 <ListPagination
