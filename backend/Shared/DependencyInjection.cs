@@ -32,6 +32,7 @@ public static class DependencyInjection
     {
         services.AddHttpContextAccessor();
         services.AddMemoryCache();
+        services.AddHttpClient();
         services.AddScoped<BranchContext>();
         services.AddScoped<IBranchContext>(provider => provider.GetRequiredService<BranchContext>());
         services.AddScoped<ICompanyPermissionService, CompanyPermissionService>();
@@ -60,6 +61,11 @@ public static class DependencyInjection
         services.AddScoped<IAccountVerificationService, AccountVerificationService>();
         services.AddScoped<IPasswordRecoveryService, PasswordRecoveryService>();
         services.AddScoped<IStoreNotificationService, StoreNotificationService>();
+        services.AddScoped<IStorePushService, StorePushService>();
+        services.AddSingleton<StorePushKeyStore>();
+        services.AddSingleton<StorePushSubscriptionStore>();
+        services.AddSingleton<StorePushDeliveryQueue>();
+        services.AddHostedService<StorePushDeliveryHostedService>();
         services.AddScoped<IAdminNotificationService, AdminNotificationService>();
         services.AddScoped<IInventoryExpiryAlertService, InventoryExpiryAlertService>();
         services.AddHostedService<InventoryExpiryAlertHostedService>();

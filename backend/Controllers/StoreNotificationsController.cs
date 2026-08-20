@@ -7,7 +7,9 @@ namespace ECommerce.Controllers;
 
 [ApiController]
 [Route("api/store/notifications")]
-public sealed class StoreNotificationsController(IStoreNotificationService notifications) : ControllerBase
+public sealed class StoreNotificationsController(
+    IStoreNotificationService notifications,
+    IStorePushService push) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<ApiResponse<StoreNotificationsResponse>>> Get(
@@ -20,5 +22,31 @@ public sealed class StoreNotificationsController(IStoreNotificationService notif
             productIds ?? [],
             cancellationToken);
         return Ok(ApiResponse<StoreNotificationsResponse>.Ok(result));
+    }
+
+    [HttpGet("push/public-key")]
+    public async Task<ActionResult<ApiResponse<StorePushPublicKeyResponse>>> GetPushPublicKey(
+        CancellationToken cancellationToken)
+    {
+        var result = await push.GetPublicKeyAsync(cancellationToken);
+        return Ok(ApiResponse<StorePushPublicKeyResponse>.Ok(result));
+    }
+
+    [HttpPost("push/subscription")]
+    public async Task<ActionResult<ApiResponse<object>>> SavePushSubscription(
+        [FromBody] StorePushSubscriptionRequest request,
+        CancellationToken cancellationToken)
+    {
+        await push.SaveSubscriptionAsync(request, cancellationToken);
+        return Ok(ApiResponse<object>.Ok(new { subscribed = true }));
+    }
+
+    [HttpPost("push/unsubscribe")]
+    public async Task<ActionResult<ApiResponse<object>>> RemovePushSubscription(
+        [FromBody] RemoveStorePushSubscriptionRequest request,
+        CancellationToken cancellationToken)
+    {
+        await push.RemoveSubscriptionAsync(request.Endpoint, cancellationToken);
+        return Ok(ApiResponse<object>.Ok(new { subscribed = false }));
     }
 }

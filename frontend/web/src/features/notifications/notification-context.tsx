@@ -20,6 +20,8 @@ import { useAuth } from "../auth/auth-context";
 import { useCart } from "../cart/cart-context";
 import {
     getStoreNotifications,
+    getStorePushPublicKey,
+    saveStorePushSubscription,
     type StoreNotification,
 } from "./notification-api";
 import {
@@ -180,6 +182,52 @@ export function NotificationProvider({ children }: PropsWithChildren) {
             window.removeEventListener("easycart-tracked-products-changed", syncTrackedIds);
     }, [syncTrackedIds]);
 
+    const syncPushSubscription = useCallback(async () => {
+        if (
+            !("Notification" in window) ||
+            Notification.permission !== "granted" ||
+            !("serviceWorker" in navigator) ||
+            !("PushManager" in window)
+        ) {
+            return false;
+        }
+
+        try {
+            const registration = await navigator.serviceWorker.getRegistration();
+            if (!registration) return false;
+
+            const { publicKey } = await getStorePushPublicKey();
+            let subscription = await registration.pushManager.getSubscription();
+            if (!subscription) {
+                subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(publicKey),
+                });
+            }
+
+            const json = subscription.toJSON();
+            const p256dh = json.keys?.p256dh ?? base64FromBuffer(
+                subscription.getKey("p256dh"),
+            );
+            const authKey = json.keys?.auth ?? base64FromBuffer(
+                subscription.getKey("auth"),
+            );
+
+            if (!p256dh || !authKey) return false;
+
+            await saveStorePushSubscription({
+                endpoint: subscription.endpoint,
+                p256dh,
+                auth: authKey,
+                productIds: trackedIds,
+            });
+            return true;
+        } catch (error) {
+            console.warn("Storefront Web Push subscription could not be synchronized.", error);
+            return false;
+        }
+    }, [trackedIds]);
+
     const poll = useCallback(async () => {
         if (!trackedIds.length) return;
 
@@ -276,13 +324,30 @@ export function NotificationProvider({ children }: PropsWithChildren) {
         };
     }, [poll]);
 
+    useEffect(() => {
+        if (permission !== "granted") return;
+
+        const sync = () => void syncPushSubscription();
+        sync();
+        window.addEventListener("commerce-pwa-ready", sync);
+        return () => window.removeEventListener("commerce-pwa-ready", sync);
+    }, [
+        auth.user?.customerTypeId,
+        auth.user?.userId,
+        permission,
+        syncPushSubscription,
+        trackedKey,
+    ]);
+
     const enableBrowserNotifications = useCallback(async () => {
         if (!("Notification" in window)) return false;
         const result = await Notification.requestPermission();
         setPermission(result);
-        if (result === "granted") await poll();
+        if (result === "granted") {
+            await Promise.all([poll(), syncPushSubscription()]);
+        }
         return result === "granted";
-    }, [poll]);
+    }, [poll, syncPushSubscription]);
 
     const markAllRead = useCallback(() => {
         const ids = items.map((item) => item.id);
@@ -340,4 +405,20 @@ function readSeenIds(): number[] {
 function sameNumberArray(left: number[], right: number[]) {
     return left.length === right.length &&
         left.every((value, index) => value === right[index]);
+}
+
+function urlBase64ToUint8Array(value: string) {
+    const padding = "=".repeat((4 - value.length % 4) % 4);
+    const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const raw = window.atob(base64);
+    return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+}
+
+function base64FromBuffer(buffer: ArrayBuffer | null) {
+    if (!buffer) return "";
+    let binary = "";
+    for (const byte of new Uint8Array(buffer)) {
+        binary += String.fromCharCode(byte);
+    }
+    return window.btoa(binary);
 }

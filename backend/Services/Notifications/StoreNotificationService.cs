@@ -13,6 +13,7 @@ public sealed class StoreNotificationService(
     ICurrentCustomerAccessor currentCustomer,
     IDefaultCustomerTypeResolver defaultCustomerType,
     IHubContext<StoreNotificationHub> hub,
+    StorePushDeliveryQueue pushQueue,
     ILogger<StoreNotificationService> logger) : IStoreNotificationService
 {
     private const string StockEntityType = "StoreProductStock";
@@ -128,6 +129,20 @@ public sealed class StoreNotificationService(
                     pending.Entity.Id,
                     pending.Group);
             }
+
+            try
+            {
+                pushQueue.Enqueue(new StorePushDelivery(
+                    item,
+                    ResolvePushCustomerTypeId(pending.Entity.EntityType)));
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(
+                    exception,
+                    "Could not queue Web Push delivery for store notification {NotificationId}.",
+                    pending.Entity.Id);
+            }
         }
     }
 
@@ -206,6 +221,19 @@ public sealed class StoreNotificationService(
                 productNames.GetValueOrDefault(row.ProductId, "Product"),
                 $"/products/{row.ProductId}",
                 row.CreatedAt)).ToList());
+    }
+
+    private static long? ResolvePushCustomerTypeId(string? entityType)
+    {
+        if (string.IsNullOrWhiteSpace(entityType) ||
+            !entityType.StartsWith(PriceEntityTypePrefix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return long.TryParse(entityType[PriceEntityTypePrefix.Length..], out var customerTypeId)
+            ? customerTypeId
+            : null;
     }
 
     private static StoreNotificationResponse Map(Notification entity, string productName) =>

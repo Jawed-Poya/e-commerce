@@ -332,6 +332,37 @@ self.addEventListener("message", (event) => {
 });
 
 
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+
+  event.waitUntil((async () => {
+    let payload;
+    try {
+      payload = event.data.json();
+    } catch {
+      payload = {
+        title: "Store update",
+        message: event.data.text(),
+        kind: "Update",
+        link: "/",
+      };
+    }
+
+    const kind = typeof payload.kind === "string"
+      ? payload.kind.toLowerCase()
+      : "update";
+    const id = payload.id ?? Date.now();
+
+    await self.registration.showNotification(payload.title || "Store update", {
+      body: payload.message || "",
+      icon: "/pwa-192.png",
+      badge: "/pwa-192.png",
+      tag: `easycart-${kind}-${id}`,
+      data: { link: payload.link || "/" },
+    });
+  })());
+});
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const link = event.notification.data?.link || "/";
