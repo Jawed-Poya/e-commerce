@@ -86,62 +86,57 @@ class ApiClient {
     }
 
     private async getBlob(url: string, params?: object) {
-        // Some IIS/reverse-proxy paths can occasionally complete a successful document
-        // request before the generated body reaches the browser. Read raw bytes and retry
-        // only an otherwise-successful empty response once. The retry is serial, so a
-        // normal successful download still performs exactly one request.
-        for (let attempt = 0; attempt < 2; attempt += 1) {
-            const requestUrl = createDownloadUrl(url, params, attempt);
-            const headers = new Headers({
-                Accept: "application/pdf, image/png, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/octet-stream, */*",
-                "Cache-Control": "no-cache, no-store",
-                Pragma: "no-cache",
+        // Keep one user action mapped to one document request. Retrying an empty
+        // attachment response can regenerate the same PDF and then surface a late
+        // empty-content error even though the browser already received the file.
+        const requestUrl = createDownloadUrl(url, params);
+        const headers = new Headers({
+            Accept: "application/pdf, image/png, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/octet-stream, */*",
+            "Cache-Control": "no-cache, no-store",
+            Pragma: "no-cache",
+        });
+        const token = getAdminToken();
+        if (token) headers.set("Authorization", `Bearer ${token}`);
+
+        let response: Response;
+        try {
+            response = await fetch(requestUrl, {
+                method: "GET",
+                headers,
+                cache: "no-store",
+                credentials: "same-origin",
             });
-            const token = getAdminToken();
-            if (token) headers.set("Authorization", `Bearer ${token}`);
-
-            let response: Response;
-            try {
-                response = await fetch(requestUrl, {
-                    method: "GET",
-                    headers,
-                    cache: "no-store",
-                    credentials: "same-origin",
-                });
-            } catch (error) {
-                throw error instanceof Error && error.message.trim()
-                    ? error
-                    : new Error("Could not connect to the document service.");
-            }
-
-            const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
-            const bytes = await response.arrayBuffer();
-
-            if (response.status === 401 && token && getAdminToken() === token) {
-                dispatchAdminUnauthorized(token);
-            }
-
-            if (!response.ok || contentType.includes("json") || contentType.includes("problem+json")) {
-                const message = parseBufferMessage(bytes);
-                throw new Error(
-                    message ??
-                        (response.ok
-                            ? "The server returned an unexpected response instead of a document."
-                            : responseStatusMessage(response.status)),
-                );
-            }
-
-            if (bytes.byteLength > 0) {
-                return {
-                    blob: new Blob([bytes], {
-                        type: contentType.split(";")[0] || "application/octet-stream",
-                    }),
-                    filename: resolveFilename(response.headers.get("content-disposition") ?? undefined, contentType),
-                };
-            }
+        } catch (error) {
+            throw error instanceof Error && error.message.trim()
+                ? error
+                : new Error("Could not connect to the document service.");
         }
 
-        throw new Error("The document download completed without file content. Please try again.");
+        const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
+        const blob = await response.blob();
+
+        if (response.status === 401 && token && getAdminToken() === token) {
+            dispatchAdminUnauthorized(token);
+        }
+
+        if (!response.ok || contentType.includes("json") || contentType.includes("problem+json")) {
+            const message = await parseBlobMessage(blob);
+            throw new Error(
+                message ??
+                    (response.ok
+                        ? "The server returned an unexpected response instead of a document."
+                        : responseStatusMessage(response.status)),
+            );
+        }
+
+        if (blob.size === 0) {
+            throw new Error("The server returned an empty document. Please generate it again.");
+        }
+
+        return {
+            blob,
+            filename: resolveFilename(response.headers.get("content-disposition") ?? undefined, contentType),
+        };
     }
 
     async delete<T>(url: string): Promise<ApiResponse<T>> {
@@ -150,7 +145,7 @@ class ApiClient {
     }
 }
 
-function createDownloadUrl(path: string, params?: object, attempt = 0) {
+function createDownloadUrl(path: string, params?: object) {
     const base = new URL(`${apiBaseUrl.replace(/\/+$/, "")}/`, window.location.origin);
     const url = new URL(path.replace(/^\/+/, ""), base);
     const entries = Object.entries((params ?? {}) as Record<string, unknown>);
@@ -162,14 +157,13 @@ function createDownloadUrl(path: string, params?: object, attempt = 0) {
             url.searchParams.set(key, String(value));
         }
     }
-    if (attempt > 0) url.searchParams.set("_download", `${Date.now()}-${attempt}`);
     return url.toString();
 }
 
-function parseBufferMessage(buffer: ArrayBuffer) {
-    if (!buffer.byteLength) return null;
+async function parseBlobMessage(blob: Blob) {
+    if (!blob.size) return null;
     try {
-        const text = new TextDecoder().decode(buffer).trim();
+        const text = (await blob.text()).trim();
         if (!text) return null;
         const body = JSON.parse(text) as unknown;
         return getResponseMessage(body);
