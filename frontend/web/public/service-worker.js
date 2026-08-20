@@ -330,3 +330,26 @@ self.addEventListener("message", (event) => {
     );
   }
 });
+
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const link = event.notification.data?.link || "/";
+
+  event.waitUntil((async () => {
+    const targetUrl = new URL(link, self.location.origin).toString();
+    const clients = await self.clients.matchAll({
+      type: "window",
+      includeUncontrolled: true,
+    });
+
+    for (const client of clients) {
+      if (new URL(client.url).origin !== self.location.origin) continue;
+      await client.focus();
+      if ("navigate" in client) await client.navigate(targetUrl);
+      return;
+    }
+
+    if (self.clients.openWindow) await self.clients.openWindow(targetUrl);
+  })());
+});

@@ -1,5 +1,5 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Bell, BellRing, CheckCheck, PackageOpen, Tag } from "lucide-react";
+import { Bell, BellRing, CheckCheck, PackageOpen, ShoppingBag, Tag } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { Button } from "../../shared/components/ui/button";
@@ -89,11 +89,15 @@ export function NotificationCenter() {
                                             "grid size-10 shrink-0 place-items-center rounded-xl",
                                             item.kind === "Stock"
                                                 ? "bg-emerald-500/10 text-emerald-600"
-                                                : "bg-primary/10 text-primary",
+                                                : item.kind === "Cart"
+                                                  ? "bg-brand-orange/10 text-brand-orange"
+                                                  : "bg-primary/10 text-primary",
                                         )}
                                     >
                                         {item.kind === "Stock" ? (
                                             <PackageOpen className="size-5" />
+                                        ) : item.kind === "Cart" ? (
+                                            <ShoppingBag className="size-5" />
                                         ) : (
                                             <Tag className="size-5" />
                                         )}

@@ -15,6 +15,7 @@ import {
 } from "react";
 
 import { apiUrl, customerTokenKey } from "../../shared/api/api-client";
+import { useI18n } from "../../i18n/i18n-provider";
 import { useAuth } from "../auth/auth-context";
 import { useCart } from "../cart/cart-context";
 import {
@@ -47,6 +48,7 @@ const NotificationContext = createContext<NotificationContextValue | null>(null)
 export function NotificationProvider({ children }: PropsWithChildren) {
     const cart = useCart();
     const auth = useAuth();
+    const { t } = useI18n();
     const [items, setItems] = useState<StoreNotification[]>([]);
     const [trackedIds, setTrackedIds] = useState(getTrackedProductIds);
     const [seenIds, setSeenIds] = useState<number[]>(readSeenIds);
@@ -56,24 +58,49 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     const [realtimeStatus, setRealtimeStatus] =
         useState<RealtimeStatus>("connecting");
     const deliveredIds = useRef(new Set<number>());
+    const previousCartLineKeys = useRef<Set<string> | null>(null);
+    const localNotificationSequence = useRef(0);
     const lastCheck = useRef(
         localStorage.getItem(lastCheckKey) ?? new Date().toISOString(),
     );
 
-    const showBrowserNotification = useCallback((item: StoreNotification) => {
+    const showBrowserNotification = useCallback(async (item: StoreNotification) => {
         if (!("Notification" in window) || Notification.permission !== "granted")
             return;
 
-        const browserNotification = new Notification(item.title, {
+        const options: NotificationOptions = {
             body: item.message,
-            icon: "/favicon.svg",
-            tag: `easycart-${item.id}`,
-        });
-        browserNotification.onclick = () => {
-            window.focus();
-            window.location.assign(item.link);
-            browserNotification.close();
+            icon: "/pwa-192.png",
+            badge: "/pwa-192.png",
+            tag: `easycart-${item.kind.toLowerCase()}-${item.id}`,
+            data: { link: item.link },
         };
+
+        // ServiceWorkerRegistration.showNotification is the reliable path on
+        // mobile/PWA browsers. The Notification constructor is kept only as a
+        // desktop fallback for browsers without an active service worker.
+        if ("serviceWorker" in navigator) {
+            try {
+                const registration = await navigator.serviceWorker.getRegistration();
+                if (registration) {
+                    await registration.showNotification(item.title, options);
+                    return;
+                }
+            } catch {
+                // Fall through to the desktop Notification API.
+            }
+        }
+
+        try {
+            const browserNotification = new Notification(item.title, options);
+            browserNotification.onclick = () => {
+                window.focus();
+                window.location.assign(item.link);
+                browserNotification.close();
+            };
+        } catch {
+            // The in-app notification center still receives the event.
+        }
     }, []);
 
     const receiveNotifications = useCallback(
@@ -99,7 +126,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
                     )
                     .slice(0, 30);
             });
-            newItems.forEach(showBrowserNotification);
+            newItems.forEach((item) => void showBrowserNotification(item));
         },
         [showBrowserNotification],
     );
@@ -122,6 +149,30 @@ export function NotificationProvider({ children }: PropsWithChildren) {
         );
         syncTrackedIds();
     }, [cart.items, cart.wishlist, syncTrackedIds]);
+
+    useEffect(() => {
+        const nextLineKeys = new Set(cart.items.map((item) => item.lineKey));
+        const previous = previousCartLineKeys.current;
+        previousCartLineKeys.current = nextLineKeys;
+
+        // Do not notify for cart contents restored from localStorage on startup.
+        if (previous === null) return;
+
+        const added = cart.items.filter((item) => !previous.has(item.lineKey));
+        if (!added.length) return;
+
+        const now = Date.now();
+        receiveNotifications(added.map((item, index) => ({
+            id: -(now * 1000 + localNotificationSequence.current++ + index),
+            title: t("notifications.cartAddedTitle"),
+            message: t("notifications.cartAddedMessage", { product: item.name }),
+            kind: "Cart" as const,
+            productId: item.id,
+            productName: item.name,
+            link: "/cart",
+            createdAt: new Date().toISOString(),
+        })));
+    }, [cart.items, receiveNotifications, t]);
 
     useEffect(() => {
         window.addEventListener("easycart-tracked-products-changed", syncTrackedIds);
@@ -188,6 +239,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
                 if (disposed) return;
                 await connection.invoke("Subscribe", trackedIds);
                 setRealtimeStatus("live");
+                await poll();
             } catch {
                 if (!disposed) setRealtimeStatus("polling");
             }
@@ -204,8 +256,24 @@ export function NotificationProvider({ children }: PropsWithChildren) {
 
     useEffect(() => {
         void poll();
-        const timer = window.setInterval(() => void poll(), 60_000);
-        return () => window.clearInterval(timer);
+        const timer = window.setInterval(() => void poll(), 30_000);
+        const refresh = () => {
+            if ("Notification" in window) setPermission(Notification.permission);
+            void poll();
+        };
+        const refreshWhenVisible = () => {
+            if (document.visibilityState === "visible") refresh();
+        };
+
+        window.addEventListener("online", refresh);
+        window.addEventListener("focus", refresh);
+        document.addEventListener("visibilitychange", refreshWhenVisible);
+        return () => {
+            window.clearInterval(timer);
+            window.removeEventListener("online", refresh);
+            window.removeEventListener("focus", refresh);
+            document.removeEventListener("visibilitychange", refreshWhenVisible);
+        };
     }, [poll]);
 
     const enableBrowserNotifications = useCallback(async () => {

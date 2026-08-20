@@ -4,7 +4,7 @@ export interface StoreNotification {
     id: number;
     title: string;
     message: string;
-    kind: "Price" | "Stock";
+    kind: "Price" | "Stock" | "Cart";
     productId: number;
     productName: string;
     link: string;

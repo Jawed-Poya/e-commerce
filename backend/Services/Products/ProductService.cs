@@ -10,6 +10,7 @@ using ECommerce.Entities.Products.Requests;
 using ECommerce.Services.Customers;
 using ECommerce.Services.Company;
 using ECommerce.Services.Inventory;
+using ECommerce.Services.Notifications;
 using ECommerce.Shared;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +35,7 @@ public class ProductService : IProductService
     private readonly ICurrentCustomerAccessor _currentCustomer;
     private readonly IDefaultCustomerTypeResolver _defaultCustomerType;
     private readonly IRecordDeletionPolicy _deletionPolicy;
+    private readonly IStoreNotificationService _notifications;
 
     public ProductService(
         ApplicationDbContext context,
@@ -41,7 +43,8 @@ public class ProductService : IProductService
         ILogger<ProductService> logger,
         ICurrentCustomerAccessor currentCustomer,
         IDefaultCustomerTypeResolver defaultCustomerType,
-        IRecordDeletionPolicy deletionPolicy)
+        IRecordDeletionPolicy deletionPolicy,
+        IStoreNotificationService notifications)
     {
         _context = context;
         _imageStorage = imageStorage;
@@ -49,6 +52,7 @@ public class ProductService : IProductService
         _currentCustomer = currentCustomer;
         _defaultCustomerType = defaultCustomerType;
         _deletionPolicy = deletionPolicy;
+        _notifications = notifications;
     }
 
     public async Task<PagedResult<ProductListItemResponse>> GetAsync(ProductFilter filter)
@@ -407,6 +411,8 @@ public class ProductService : IProductService
 
         var storedImages = new List<StoredProductImage>();
         var oldImagePaths = new List<string>();
+        var priceChanges = new List<ProductPriceChange>();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         try
         {
             foreach (var item in request.Products)
@@ -456,7 +462,15 @@ public class ProductService : IProductService
                 product.UpdatedAt = DateTime.UtcNow;
 
                 if (item.Prices.Count > 0)
+                {
+                    priceChanges.AddRange(CollectPriceChanges(
+                        product.Id,
+                        product.Prices,
+                        item.Prices,
+                        defaultCustomerTypeId,
+                        today));
                     ReplacePrices(product, item.Prices);
+                }
 
                 ReplaceUnitConversions(product, item.UnitId, item.UnitConversions);
 
@@ -537,6 +551,38 @@ public class ProductService : IProductService
         {
             try { await _imageStorage.DeleteAsync(path, CancellationToken.None); }
             catch (Exception exception) { _logger.LogWarning(exception, "Failed to remove replaced product image {ImagePath}.", path); }
+        }
+
+        if (priceChanges.Count > 0)
+        {
+            try
+            {
+                var pendingNotifications = new List<PendingStoreNotification?>();
+                foreach (var change in priceChanges)
+                {
+                    pendingNotifications.Add(await _notifications.CreatePriceChangedAsync(
+                        change.ProductId,
+                        change.CustomerTypeId,
+                        change.PreviousPrice,
+                        change.NewPrice,
+                        CancellationToken.None));
+                }
+
+                if (pendingNotifications.Any(item => item is not null))
+                {
+                    await _context.SaveChangesAsync(CancellationToken.None);
+                    await _notifications.PublishAsync(pendingNotifications, CancellationToken.None);
+                }
+            }
+            catch (Exception exception)
+            {
+                // Product changes are already committed. Keep the admin update successful
+                // and let polling/realtime recover from future events instead of causing a
+                // duplicate bulk save when only notification delivery failed.
+                _logger.LogWarning(
+                    exception,
+                    "Products were updated, but one or more storefront price notifications could not be created.");
+            }
         }
 
         return new BulkUpdateProductsResponse(request.Products.Count);
@@ -1317,6 +1363,88 @@ public class ProductService : IProductService
                 throw new ProductValidationException(new Dictionary<string, string[]> { [key] = ["Sale end date must be on or after the start date."] });
         }
     }
+
+
+    private static IReadOnlyCollection<ProductPriceChange> CollectPriceChanges(
+        long productId,
+        IEnumerable<ProductPrice> existingPrices,
+        IEnumerable<ProductPriceItemRequest> requestedPrices,
+        long defaultCustomerTypeId,
+        DateOnly today)
+    {
+        var previousByCustomerType = existingPrices
+            .GroupBy(price => price.CustomerTypeId)
+            .ToDictionary(
+                group => group.Key,
+                group => EffectivePrice(group.First(), today));
+        var requestedByCustomerType = requestedPrices
+            .ToDictionary(price => price.CustomerTypeId);
+        var requestedDefault = requestedByCustomerType[defaultCustomerTypeId];
+        var defaultNewPrice = EffectivePrice(requestedDefault, today);
+        previousByCustomerType.TryGetValue(defaultCustomerTypeId, out var defaultPreviousPrice);
+        var hadDefaultPreviousPrice = previousByCustomerType.ContainsKey(defaultCustomerTypeId);
+        var changes = new List<ProductPriceChange>();
+
+        foreach (var customerTypeId in previousByCustomerType.Keys
+                     .Union(requestedByCustomerType.Keys)
+                     .Distinct())
+        {
+            var hadPrevious = previousByCustomerType.TryGetValue(customerTypeId, out var previousPrice);
+            if (!hadPrevious && customerTypeId != defaultCustomerTypeId && hadDefaultPreviousPrice)
+            {
+                previousPrice = defaultPreviousPrice;
+                hadPrevious = true;
+            }
+
+            decimal newPrice;
+
+            if (requestedByCustomerType.TryGetValue(customerTypeId, out var requestedPrice))
+            {
+                newPrice = EffectivePrice(requestedPrice, today);
+            }
+            else if (customerTypeId != defaultCustomerTypeId)
+            {
+                // Removing a customer-specific tier makes that customer type fall back
+                // to the default storefront price. That is still a real visible change.
+                newPrice = defaultNewPrice;
+            }
+            else
+            {
+                continue;
+            }
+
+            if (!hadPrevious || previousPrice != newPrice)
+            {
+                changes.Add(new ProductPriceChange(
+                    productId,
+                    customerTypeId,
+                    hadPrevious ? previousPrice : null,
+                    newPrice));
+            }
+        }
+
+        return changes;
+    }
+
+    private static decimal EffectivePrice(ProductPriceItemRequest price, DateOnly today) =>
+        price.SalePrice.HasValue &&
+        (!price.StartDate.HasValue || price.StartDate.Value <= today) &&
+        (!price.EndDate.HasValue || price.EndDate.Value >= today)
+            ? price.SalePrice.Value
+            : price.RegularPrice;
+
+    private static decimal EffectivePrice(ProductPrice price, DateOnly today) =>
+        price.SalePrice.HasValue &&
+        (!price.StartDate.HasValue || price.StartDate.Value <= today) &&
+        (!price.EndDate.HasValue || price.EndDate.Value >= today)
+            ? price.SalePrice.Value
+            : price.RegularPrice;
+
+    private sealed record ProductPriceChange(
+        long ProductId,
+        long CustomerTypeId,
+        decimal? PreviousPrice,
+        decimal NewPrice);
 
     private static ProductPrice CreatePrice(ProductPriceItemRequest price) => new()
     {
