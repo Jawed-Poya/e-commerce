@@ -11,7 +11,6 @@ public sealed class AccountVerificationOptions
     public string StorefrontBaseUrl { get; set; } = string.Empty;
     public string HashKey { get; set; } = string.Empty;
     public EmailDeliveryOptions Email { get; set; } = new();
-    public SmsDeliveryOptions Sms { get; set; } = new();
 }
 
 public sealed class EmailDeliveryOptions
@@ -22,10 +21,4 @@ public sealed class EmailDeliveryOptions
     public string Password { get; set; } = string.Empty;
     public string FromEmail { get; set; } = string.Empty;
     public bool EnableSsl { get; set; } = true;
-}
-
-public sealed class SmsDeliveryOptions
-{
-    public string WebhookUrl { get; set; } = string.Empty;
-    public string BearerToken { get; set; } = string.Empty;
 }

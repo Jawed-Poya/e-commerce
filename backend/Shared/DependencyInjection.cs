@@ -99,7 +99,6 @@ public static class DependencyInjection
         services.Configure<WhatsAppOptions>(configuration.GetSection(WhatsAppOptions.SectionName));
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
         services.Configure<DatabaseMaintenanceOptions>(configuration.GetSection(DatabaseMaintenanceOptions.SectionName));
-        services.AddHttpClient();
 
         services.AddDbContext<ApplicationDbContext>(options =>
         {

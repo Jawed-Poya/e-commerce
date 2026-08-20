@@ -735,17 +735,13 @@ public sealed class OrderService(
             throw new UnauthorizedAccessException("Your account is inactive.");
 
         var email = NormalizeEmail(customer.Email);
-        var phone = NormalizePhone(customer.Phone);
         var verifiedEmailMatches = user.EmailConfirmed &&
             !string.IsNullOrWhiteSpace(user.Email) &&
             string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase);
-        var verifiedPhoneMatches = user.PhoneNumberConfirmed &&
-            !string.IsNullOrWhiteSpace(user.PhoneNumber) &&
-            string.Equals(NormalizePhone(user.PhoneNumber), phone, StringComparison.Ordinal);
 
-        if (!verifiedEmailMatches && !verifiedPhoneMatches)
+        if (!verifiedEmailMatches)
             throw new UnauthorizedAccessException(
-                "Verify the email or phone number used for this order before checkout.");
+                "Verify the email address used for this order before checkout.");
         return user;
     }
 

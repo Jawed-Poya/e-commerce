@@ -1,6 +1,4 @@
 using System.Net;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Net.Mail;
 using System.Net.Mime;
 using System.Security.Cryptography;
@@ -21,7 +19,6 @@ public sealed class AccountVerificationService(
     UserManager<User> userManager,
     ICurrentCustomerAccessor currentCustomer,
     IAuthService auth,
-    IHttpClientFactory httpClientFactory,
     IWebHostEnvironment environment,
     ILogger<AccountVerificationService> logger,
     IOptions<AccountVerificationOptions> options) : IAccountVerificationService
@@ -32,6 +29,7 @@ public sealed class AccountVerificationService(
         VerificationChannel channel,
         CancellationToken cancellationToken = default)
     {
+        EnsureEmailChannel(channel);
         var user = await GetUserAsync();
         if (IsVerified(user, channel))
         {
@@ -120,6 +118,7 @@ public sealed class AccountVerificationService(
         string code,
         CancellationToken cancellationToken = default)
     {
+        EnsureEmailChannel(channel);
         var user = await GetUserAsync();
         if (IsVerified(user, channel))
         {
@@ -144,7 +143,7 @@ public sealed class AccountVerificationService(
         if (record.ExpiresAt <= now)
             throw new InvalidOperationException("The verification code has expired. Request a new code.");
         if (!string.Equals(record.Destination, destination, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Your account contact changed. Request a new verification code.");
+            throw new InvalidOperationException("Your email address changed. Request a new verification code.");
 
         var maximumAttempts = Math.Clamp(_options.MaximumAttempts, 3, 10);
         if (record.AttemptCount >= maximumAttempts)
@@ -161,10 +160,7 @@ public sealed class AccountVerificationService(
         }
 
         record.ConsumedAt = now;
-        if (channel == VerificationChannel.Email)
-            user.EmailConfirmed = true;
-        else
-            user.PhoneNumberConfirmed = true;
+        user.EmailConfirmed = true;
 
         var result = await userManager.UpdateAsync(user);
         if (!result.Succeeded)
@@ -182,20 +178,28 @@ public sealed class AccountVerificationService(
             ?? throw new UnauthorizedAccessException("Authentication is required.");
     }
 
-    private static bool IsVerified(User user, VerificationChannel channel) =>
-        channel == VerificationChannel.Email ? user.EmailConfirmed : user.PhoneNumberConfirmed;
+    private static void EnsureEmailChannel(VerificationChannel channel)
+    {
+        if (channel != VerificationChannel.Email)
+        {
+            throw new InvalidOperationException(
+                "Phone verification is disabled. Verify your email instead.");
+        }
+    }
+
+    private static bool IsVerified(User user, VerificationChannel channel)
+    {
+        EnsureEmailChannel(channel);
+        return user.EmailConfirmed;
+    }
 
     private static string GetDestination(User user, VerificationChannel channel)
     {
-        var value = channel == VerificationChannel.Email ? user.Email : user.PhoneNumber;
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            throw new InvalidOperationException(channel == VerificationChannel.Email
-                ? "Add an email address to your profile first."
-                : "Add a phone number to your profile first.");
-        }
+        EnsureEmailChannel(channel);
+        if (string.IsNullOrWhiteSpace(user.Email))
+            throw new InvalidOperationException("Add an email address to your profile first.");
 
-        return value.Trim();
+        return user.Email.Trim();
     }
 
     private string GetHashKey()
@@ -246,45 +250,32 @@ public sealed class AccountVerificationService(
         DateTime expiresAt,
         CancellationToken cancellationToken)
     {
-        if (channel == VerificationChannel.Email)
-        {
-            if (IsEmailProviderConfigured())
-            {
-                await DeliverEmailAsync(
-                    destination,
-                    recipientName,
-                    code,
-                    expiresAt,
-                    cancellationToken);
-                return null;
-            }
+        EnsureEmailChannel(channel);
 
-            EnsureEmailConfigurationIsNotPartial();
-        }
-        else
+        if (IsEmailProviderConfigured())
         {
-            if (IsSmsProviderConfigured())
-            {
-                await DeliverSmsAsync(destination, code, cancellationToken);
-                return null;
-            }
-
-            EnsureSmsConfigurationIsNotPartial();
+            await DeliverEmailAsync(
+                destination,
+                recipientName,
+                code,
+                expiresAt,
+                cancellationToken);
+            return null;
         }
+
+        EnsureEmailConfigurationIsNotPartial();
 
         if (environment.IsDevelopment())
         {
             logger.LogWarning(
-                "No {Channel} delivery provider is configured. Development verification code for {Destination}: {Code}",
-                channel,
+                "No email delivery provider is configured. Development verification code for {Destination}: {Code}",
                 Mask(destination),
                 code);
             return code;
         }
 
-        throw new InvalidOperationException(channel == VerificationChannel.Email
-            ? "Email verification delivery is not configured. Set AccountVerification__Email__Host and sender credentials."
-            : "SMS verification delivery is not configured. Set AccountVerification__Sms__WebhookUrl.");
+        throw new InvalidOperationException(
+            "Email verification delivery is not configured. Set AccountVerification__Email__Host and sender credentials.");
     }
 
     private bool IsEmailProviderConfigured()
@@ -462,64 +453,6 @@ public sealed class AccountVerificationService(
             secondaryColor,
             Clean(company.Email) ?? ResolveSenderEmail(email),
             Clean(company.Phone));
-    }
-
-    private bool IsSmsProviderConfigured() =>
-        !string.IsNullOrWhiteSpace(_options.Sms.WebhookUrl);
-
-    private void EnsureSmsConfigurationIsNotPartial()
-    {
-        if (string.IsNullOrWhiteSpace(_options.Sms.WebhookUrl) &&
-            !string.IsNullOrWhiteSpace(_options.Sms.BearerToken))
-        {
-            throw new InvalidOperationException(
-                "SMS verification configuration is incomplete. WebhookUrl is required when BearerToken is configured.");
-        }
-    }
-
-    private async Task DeliverSmsAsync(
-        string destination,
-        string code,
-        CancellationToken cancellationToken)
-    {
-        var webhook = _options.Sms.WebhookUrl.Trim();
-        if (!Uri.TryCreate(webhook, UriKind.Absolute, out var webhookUri) ||
-            (webhookUri.Scheme != Uri.UriSchemeHttps && webhookUri.Scheme != Uri.UriSchemeHttp))
-        {
-            throw new InvalidOperationException(
-                "AccountVerification:Sms:WebhookUrl must be an absolute HTTP or HTTPS URL.");
-        }
-        if (!environment.IsDevelopment() && webhookUri.Scheme != Uri.UriSchemeHttps)
-            throw new InvalidOperationException("The production SMS webhook must use HTTPS.");
-
-        var client = httpClientFactory.CreateClient(nameof(AccountVerificationService));
-        using var request = new HttpRequestMessage(HttpMethod.Post, webhookUri)
-        {
-            Content = JsonContent.Create(new
-            {
-                to = destination,
-                message = $"Your verification code is {code}."
-            })
-        };
-        if (!string.IsNullOrWhiteSpace(_options.Sms.BearerToken))
-        {
-            request.Headers.Authorization = new AuthenticationHeaderValue(
-                "Bearer",
-                _options.Sms.BearerToken.Trim());
-        }
-
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(_options.DeliveryTimeoutSeconds, 5, 120)));
-        using var response = await client.SendAsync(request, timeout.Token);
-        if (!response.IsSuccessStatusCode)
-        {
-            logger.LogWarning(
-                "SMS verification webhook returned HTTP {StatusCode} for {Destination}.",
-                (int)response.StatusCode,
-                Mask(destination));
-            throw new InvalidOperationException(
-                $"SMS provider rejected the verification request with HTTP {(int)response.StatusCode}.");
-        }
     }
 
     private static string? Clean(string? value)

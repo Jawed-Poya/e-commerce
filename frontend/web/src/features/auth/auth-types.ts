@@ -11,7 +11,6 @@ export interface AuthUser {
     isAdmin: boolean;
     branchId: number | null;
     emailVerified: boolean;
-    phoneVerified: boolean;
     canPlaceOrders: boolean;
     hasPassword: boolean;
 }
@@ -35,7 +34,7 @@ export interface RegisterRequest {
     password: string;
 }
 
-export type VerificationChannel = "Email" | "Phone";
+export type VerificationChannel = "Email";
 
 export interface VerificationDispatch {
     channel: VerificationChannel;

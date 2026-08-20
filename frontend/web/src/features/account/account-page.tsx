@@ -13,7 +13,6 @@ import {
     Pencil,
     Save,
     PackageSearch,
-    Phone,
     ShieldCheck,
     ReceiptText,
     UserRound,
@@ -274,7 +273,7 @@ export function AccountPage() {
                         {user.canPlaceOrders ? t("account.checkoutReady") : t("account.verificationRequired")}
                     </span>
                 </div>
-                <div className="grid gap-3 p-6 lg:grid-cols-2">
+                <div className="grid gap-3 p-6">
                     <VerificationContact
                         icon={<Mail />}
                         label={t("common.email")}
@@ -283,17 +282,6 @@ export function AccountPage() {
                         disabled={verificationBusy}
                         onVerify={() => void requestVerification("Email")}
                         verifyLabel={t("account.verifyEmail")}
-                        verifiedLabel={t("account.verified")}
-                        missingLabel={t("common.notSet")}
-                    />
-                    <VerificationContact
-                        icon={<Phone />}
-                        label={t("common.phone")}
-                        value={user.phone}
-                        verified={user.phoneVerified}
-                        disabled={verificationBusy}
-                        onVerify={() => void requestVerification("Phone")}
-                        verifyLabel={t("account.verifyPhone")}
                         verifiedLabel={t("account.verified")}
                         missingLabel={t("common.notSet")}
                     />

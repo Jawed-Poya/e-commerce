@@ -415,7 +415,7 @@ public sealed class AuthService(
             user.BranchId,
             user.EmailConfirmed,
             user.PhoneNumberConfirmed,
-            user.EmailConfirmed || user.PhoneNumberConfirmed,
+            user.EmailConfirmed,
             await userManager.HasPasswordAsync(user));
     }
 
@@ -479,7 +479,7 @@ public sealed class AuthService(
             user.CreatedAt,
             user.EmailConfirmed,
             user.PhoneNumberConfirmed,
-            user.EmailConfirmed || user.PhoneNumberConfirmed,
+            user.EmailConfirmed,
             hasPassword);
 
     private static (string FirstName, string? LastName) SplitFullName(string fullName)

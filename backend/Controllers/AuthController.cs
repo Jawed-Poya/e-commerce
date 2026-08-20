@@ -172,12 +172,15 @@ public sealed class AuthController(
     {
         if (!Enum.IsDefined(request.Channel))
             return BadRequest(ApiResponse<object>.Fail("Select a valid verification channel."));
+        if (request.Channel != VerificationChannel.Email)
+            return BadRequest(ApiResponse<object>.Fail(
+                "Phone verification is disabled. Verify your email instead."));
 
         try
         {
             var result = await verification.SendAsync(request.Channel, cancellationToken);
             var message = result.AlreadyVerified
-                ? "This contact is already verified."
+                ? "This email is already verified."
                 : result.DevelopmentCode is null
                     ? "Verification code sent."
                     : "Development verification code generated.";
@@ -201,13 +204,16 @@ public sealed class AuthController(
     {
         if (!Enum.IsDefined(request.Channel))
             return BadRequest(ApiResponse<object>.Fail("Select a valid verification channel."));
+        if (request.Channel != VerificationChannel.Email)
+            return BadRequest(ApiResponse<object>.Fail(
+                "Phone verification is disabled. Verify your email instead."));
         if (string.IsNullOrWhiteSpace(request.Code))
             return BadRequest(ApiResponse<object>.Fail("Verification code is required."));
 
         try
         {
             var result = await verification.ConfirmAsync(request.Channel, request.Code, cancellationToken);
-            return Ok(ApiResponse<AuthUserResponse>.Ok(result, "Contact verified successfully."));
+            return Ok(ApiResponse<AuthUserResponse>.Ok(result, "Email verified successfully."));
         }
         catch (UnauthorizedAccessException exception)
         {

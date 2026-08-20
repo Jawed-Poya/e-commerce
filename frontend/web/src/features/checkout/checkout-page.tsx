@@ -283,7 +283,6 @@ export function CheckoutPage() {
                                         }));
                                 }}
                                 placeholder="07xxxxxxxx"
-                                disabled={auth.user.phoneVerified}
                             />
                             <Field
                                 label={t("common.email")}
