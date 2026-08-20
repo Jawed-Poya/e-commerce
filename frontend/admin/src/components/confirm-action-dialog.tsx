@@ -16,28 +16,42 @@ import {
 import { useI18n } from "@/i18n/i18n-provider";
 
 interface ConfirmActionDialogProps {
-    trigger: ReactElement;
+    trigger?: ReactElement;
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
     title: string;
     description: string;
     confirmLabel?: string;
     destructive?: boolean;
     pending?: boolean;
+    elevated?: boolean;
     onConfirm: () => void | Promise<void>;
 }
 
 export function ConfirmActionDialog({
     trigger,
+    open: controlledOpen,
+    onOpenChange,
     title,
     description,
     confirmLabel,
     destructive = false,
     pending = false,
+    elevated = false,
     onConfirm,
 }: ConfirmActionDialogProps) {
-    const [open, setOpen] = useState(false);
+    const [internalOpen, setInternalOpen] = useState(false);
     const { t } = useI18n();
+    const open = controlledOpen ?? internalOpen;
 
-    const confirm = async () => {
+    const setOpen = (nextOpen: boolean) => {
+        if (controlledOpen === undefined) {
+            setInternalOpen(nextOpen);
+        }
+        onOpenChange?.(nextOpen);
+    };
+
+    const handleConfirm = async () => {
         try {
             await onConfirm();
             setOpen(false);
@@ -48,8 +62,11 @@ export function ConfirmActionDialog({
 
     return (
         <AlertDialog open={open} onOpenChange={setOpen}>
-            <AlertDialogTrigger render={trigger} />
-            <AlertDialogContent>
+            {trigger ? <AlertDialogTrigger render={trigger} /> : null}
+            <AlertDialogContent
+                className={elevated ? "z-[120]" : undefined}
+                overlayClassName={elevated ? "z-[120]" : undefined}
+            >
                 <AlertDialogHeader>
                     <AlertDialogMedia
                         className={
@@ -72,7 +89,7 @@ export function ConfirmActionDialog({
                     <AlertDialogAction
                         variant={destructive ? "destructive" : "default"}
                         disabled={pending}
-                        onClick={() => void confirm()}
+                        onClick={() => void handleConfirm()}
                     >
                         {pending ? t("common.working") : confirmLabel || t("common.continue")}
                     </AlertDialogAction>

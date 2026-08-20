@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Eye, ImagePlus, LoaderCircle, PackagePlus, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
+import { ConfirmActionDialog } from "@/components/confirm-action-dialog";
 import { SimpleCombobox } from "@/components/simple-combobox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +41,7 @@ export function ProductEditorPage() {
   const [prices, setPrices] = useState<CustomerPriceDraft[]>([]);
   const [unitConversions, setUnitConversions] = useState<ProductUnitConversionInput[]>([]);
   const [saving, setSaving] = useState(false);
+  const [priceConfirmationOpen, setPriceConfirmationOpen] = useState(false);
 
   useEffect(() => {
     if (!product) return;
@@ -80,25 +82,40 @@ export function ProductEditorPage() {
     setImage(file);
   };
 
-  const save = async () => {
-    if (!form.name.trim() || !form.categoryId) return toast.error("Product name and category are required.");
-    if (form.minimumValue != null && form.minimumValue < 0) return toast.error("Minimum value cannot be negative.");
-    if (form.maximumValue != null && form.maximumValue < 0) return toast.error("Maximum value cannot be negative.");
-    if (!Number.isFinite(form.orderQuantityStep) || form.orderQuantityStep <= 0) return toast.error("Cart quantity step must be greater than zero.");
-    if (!quickQuantitiesMatchStep(form.quickOrderQuantities, form.orderQuantityStep)) return toast.error("Quick quantities must be positive multiples of the cart quantity step.");
-    if (form.minimumStockQuantity < 0) return toast.error("Reorder point cannot be negative.");
-    if (form.minimumValue != null && form.maximumValue != null && form.minimumValue > form.maximumValue) return toast.error("Maximum value must be at least the minimum value.");
-    if (form.usesDisplayStock && form.displayStockQuantity == null) return toast.error("Enter the quantity customers should see.");
-    if (form.displayStockQuantity != null && form.displayStockQuantity < 0) return toast.error("Display quantity cannot be negative.");
+  const validateProduct = () => {
+    if (!form.name.trim() || !form.categoryId) { toast.error("Product name and category are required."); return false; }
+    if (form.minimumValue != null && form.minimumValue < 0) { toast.error("Minimum value cannot be negative."); return false; }
+    if (form.maximumValue != null && form.maximumValue < 0) { toast.error("Maximum value cannot be negative."); return false; }
+    if (!Number.isFinite(form.orderQuantityStep) || form.orderQuantityStep <= 0) { toast.error("Cart quantity step must be greater than zero."); return false; }
+    if (!quickQuantitiesMatchStep(form.quickOrderQuantities, form.orderQuantityStep)) { toast.error("Quick quantities must be positive multiples of the cart quantity step."); return false; }
+    if (form.minimumStockQuantity < 0) { toast.error("Reorder point cannot be negative."); return false; }
+    if (form.minimumValue != null && form.maximumValue != null && form.minimumValue > form.maximumValue) { toast.error("Maximum value must be at least the minimum value."); return false; }
+    if (form.usesDisplayStock && form.displayStockQuantity == null) { toast.error("Enter the quantity customers should see."); return false; }
+    if (form.displayStockQuantity != null && form.displayStockQuantity < 0) { toast.error("Display quantity cannot be negative."); return false; }
     const unitError = validateUnitConversions(form.unitId, unitConversions);
-    if (unitError) return toast.error(t(unitError));
-    const activePrices = activePriceInputs(prices);
+    if (unitError) { toast.error(t(unitError)); return false; }
     const pricingError = canManagePricing ? validatePriceDrafts(prices) : null;
-    if (pricingError) return toast.error(pricingError);
-    if (!editing && !image) return toast.error("A primary product image is required.");
-    const sellingPricesChanged = Boolean(editing && product && canManagePricing &&
-      JSON.stringify(normalizePrices(activePrices)) !== JSON.stringify(normalizePrices(product.prices)));
-    if (sellingPricesChanged && !window.confirm("Confirm selling price change? This immediately affects new storefront and manual-sale pricing.")) return;
+    if (pricingError) { toast.error(pricingError); return false; }
+    if (!editing && !image) { toast.error("A primary product image is required."); return false; }
+    return true;
+  };
+
+  const sellingPricesChanged = () => {
+    if (!editing || !product || !canManagePricing) return false;
+    return JSON.stringify(normalizePrices(activePriceInputs(prices))) !== JSON.stringify(normalizePrices(product.prices));
+  };
+
+  const requestSave = () => {
+    if (!validateProduct()) return;
+    if (sellingPricesChanged()) {
+      setPriceConfirmationOpen(true);
+      return;
+    }
+    void save();
+  };
+
+  async function save() {
+    const activePrices = activePriceInputs(prices);
     setSaving(true);
     try {
       let productId = id;
@@ -118,13 +135,22 @@ export function ProductEditorPage() {
       const message = (error as { response?: { data?: { message?: string; errors?: Record<string, string[]> } }; message?: string }).response?.data;
       toast.error(message?.errors ? Object.values(message.errors).flat()[0] : message?.message ?? (error as Error).message ?? "Could not save product.");
     } finally { setSaving(false); }
-  };
+  }
 
   if (lookupsLoading || productLoading) return <div className="grid min-h-[50vh] place-items-center"><LoaderCircle className="size-7 animate-spin" /></div>;
   if (editing && !product) return <div className="space-y-4"><PageHeader title="Product not found" description="The requested product is unavailable or has been removed." /><Button onClick={() => navigate("/products")}><ArrowLeft className="me-2 size-4" />Back to products</Button></div>;
 
   return <div className="space-y-6">
-    <PageHeader title={editing ? "Edit product" : "Create product"} description="Manage catalog details and every customer-type price in one easy form." actions={<div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"><Button variant="outline" onClick={() => navigate(-1)}>Cancel</Button><Button onClick={save} disabled={saving}>{saving ? <LoaderCircle className="me-2 size-4 animate-spin" /> : <Save className="me-2 size-4" />}{editing ? "Save changes" : "Create product"}</Button></div>} />
+    <ConfirmActionDialog
+      open={priceConfirmationOpen}
+      onOpenChange={setPriceConfirmationOpen}
+      title="Confirm selling price change?"
+      description="The new selling prices will take effect immediately for storefront orders and manual sales."
+      confirmLabel="Update prices"
+      pending={saving}
+      onConfirm={save}
+    />
+    <PageHeader title={editing ? "Edit product" : "Create product"} description="Manage catalog details and every customer-type price in one easy form." actions={<div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"><Button variant="outline" onClick={() => navigate(-1)}>Cancel</Button><Button onClick={requestSave} disabled={saving}>{saving ? <LoaderCircle className="me-2 size-4 animate-spin" /> : <Save className="me-2 size-4" />}{editing ? "Save changes" : "Create product"}</Button></div>} />
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,.65fr)]">
       <div className="space-y-6">
         <Card><CardHeader><CardTitle className="flex items-center gap-2"><PackagePlus className="size-5" />Product information</CardTitle></CardHeader><CardContent className="grid min-w-0 gap-4 lg:grid-cols-2">

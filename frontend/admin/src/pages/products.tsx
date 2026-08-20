@@ -24,6 +24,7 @@ import { ProductSectionNavigation } from "@/features/products/components/product
 import { ProductFiltersDialog, type AppliedProductFilters } from "@/features/products/components/product-filters-dialog";
 import { ProductPagination } from "@/features/products/components/product-pagination";
 import { DeleteButton } from "@/components/delete-button";
+import { ConfirmActionDialog } from "@/components/confirm-action-dialog";
 import { CustomerPricingFields, activePriceInputs, createCustomerPriceDrafts, validatePriceDrafts } from "@/features/products/components/customer-pricing-fields";
 import { ProductUnitConversionsFields, validateUnitConversions } from "@/features/products/components/product-unit-conversions-fields";
 import { QuickQuantityEditor, quickQuantitiesMatchStep } from "@/features/products/components/quick-quantity-editor";
@@ -72,6 +73,7 @@ export default function ProductsPage() {
     const [drafts, setDrafts] = useState<BulkUpdateProduct[]>([]);
     const [open, setOpen] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [saveConfirmationOpen, setSaveConfirmationOpen] = useState(false);
     const [exportingPdf, setExportingPdf] = useState(false);
     const [pinningProductId, setPinningProductId] = useState<number | null>(null);
     const [activeEditor, setActiveEditor] = useState(0);
@@ -151,34 +153,44 @@ export default function ProductsPage() {
         }
     };
     const change = (id: number, values: Partial<BulkUpdateProduct>) => setDrafts(items => items.map(item => item.id === id ? { ...item, ...values } : item));
-    const save = async () => {
-        if (!lookups) return;
+
+    const validateDrafts = () => {
+        if (!lookups) return false;
         for (const draft of drafts) {
             const priceDrafts = createCustomerPriceDrafts(lookups.customerTypes, lookups.defaultCustomerTypeId, draft.prices.map(price => ({ ...price, enabled: true })));
             const error = validatePriceDrafts(priceDrafts);
-            if (error) return toast.error(`${draft.name}: ${error}`);
-            if (!Number.isFinite(draft.orderQuantityStep) || draft.orderQuantityStep <= 0) return toast.error(`${draft.name}: cart quantity step must be greater than zero.`);
-            if (!quickQuantitiesMatchStep(draft.quickOrderQuantities, draft.orderQuantityStep)) return toast.error(`${draft.name}: quick quantities must match the cart quantity step.`);
-            if (draft.minimumStockQuantity < 0) return toast.error(`${draft.name}: reorder point cannot be negative.`);
-            if (draft.usesDisplayStock && draft.displayStockQuantity == null) return toast.error(`${draft.name}: enter the quantity customers should see.`);
-            if (draft.displayStockQuantity != null && draft.displayStockQuantity < 0) return toast.error(`${draft.name}: display quantity cannot be negative.`);
-            const unitError = validateUnitConversions(
-                draft.unitId,
-                draft.unitConversions ?? [],
-            );
-            if (unitError) return toast.error(`${draft.name}: ${t(unitError)}`);
+            if (error) { toast.error(`${draft.name}: ${error}`); return false; }
+            if (!Number.isFinite(draft.orderQuantityStep) || draft.orderQuantityStep <= 0) { toast.error(`${draft.name}: cart quantity step must be greater than zero.`); return false; }
+            if (!quickQuantitiesMatchStep(draft.quickOrderQuantities, draft.orderQuantityStep)) { toast.error(`${draft.name}: quick quantities must match the cart quantity step.`); return false; }
+            if (draft.minimumStockQuantity < 0) { toast.error(`${draft.name}: reorder point cannot be negative.`); return false; }
+            if (draft.usesDisplayStock && draft.displayStockQuantity == null) { toast.error(`${draft.name}: enter the quantity customers should see.`); return false; }
+            if (draft.displayStockQuantity != null && draft.displayStockQuantity < 0) { toast.error(`${draft.name}: display quantity cannot be negative.`); return false; }
+            const unitError = validateUnitConversions(draft.unitId, draft.unitConversions ?? []);
+            if (unitError) { toast.error(`${draft.name}: ${t(unitError)}`); return false; }
         }
-        if (!window.confirm(`Confirm pricing and catalog changes for ${drafts.length} product(s)? Selling-price changes take effect immediately.`)) return;
+        return true;
+    };
+
+    const requestSave = () => {
+        if (!validateDrafts()) return;
+        setSaveConfirmationOpen(true);
+    };
+
+    async function save() {
         setSaving(true);
         try {
             const response = await productService.bulkUpdate(drafts);
             toast.success(response.message ?? t("update.success"));
             await queryClient.invalidateQueries({ queryKey: productKeys.all });
-            setSelected([]); setOpen(false);
+            setSelected([]);
+            setOpen(false);
         } catch (error) {
             toast.error(getUpdateErrorMessage(error, { connection: t("update.connectionError"), endpoint: t("update.endpointError"), failed: t("update.failed") }));
-        } finally { setSaving(false); }
-    };
+            throw error;
+        } finally {
+            setSaving(false);
+        }
+    }
 
     const exportPdf = async () => {
         setExportingPdf(true);
@@ -259,6 +271,16 @@ export default function ProductsPage() {
         {isFetching && !isLoading && <div className="fixed bottom-4 end-4 z-40 flex items-center gap-2 border bg-background px-3 py-2 text-xs shadow-lg"><LoaderCircle className="size-4 animate-spin" />{t("products.refreshing")}</div>}
         <ProductFiltersDialog open={filtersOpen} filters={filters} categories={lookups?.categories ?? []} brands={lookups?.brands ?? []} units={lookups?.units ?? []} onOpenChange={setFiltersOpen} onApply={next => { setFilters(next); setPage(1); setSelected([]); }} />
 
+        <ConfirmActionDialog
+            open={saveConfirmationOpen}
+            onOpenChange={setSaveConfirmationOpen}
+            title="Confirm product changes?"
+            description={`You are about to apply pricing and catalog changes to ${drafts.length} product(s). Selling-price changes take effect immediately.`}
+            confirmLabel="Apply changes"
+            pending={saving}
+            elevated
+            onConfirm={save}
+        />
         {open && createPortal(<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm" onMouseDown={() => !saving && setOpen(false)}>
           <section role="dialog" aria-modal="true" aria-labelledby="product-editor-title" className="relative grid max-h-[94vh] w-full max-w-6xl grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-4 overflow-hidden rounded-xl border bg-background p-5 text-foreground shadow-2xl" onMouseDown={event => event.stopPropagation()}>
             <header className="pe-12"><h2 id="product-editor-title" className="text-xl font-semibold">{drafts.length === 1 ? t("update.title") : t("update.bulkTitle")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("update.subtitle")}</p><Button type="button" variant="ghost" size="icon" className="absolute end-5 top-5 text-2xl font-light" aria-label={t("update.close")} onClick={() => setOpen(false)}>×</Button></header>
@@ -308,7 +330,7 @@ export default function ProductsPage() {
             })}</div>
             <footer className="flex flex-col-reverse items-center justify-between gap-2 border-t pt-4 sm:flex-row">
                 <div className="flex gap-2">{drafts.length > 1 && <><Button type="button" variant="outline" disabled={activeEditor === 0} onClick={() => setActiveEditor(x => x - 1)}>{t("update.previous")}</Button><Button type="button" variant="outline" disabled={activeEditor === drafts.length - 1} onClick={() => setActiveEditor(x => x + 1)}>{t("update.next")}</Button></>}</div>
-                <div className="flex gap-2"><Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>{t("form.cancel")}</Button><Button onClick={save} disabled={saving || drafts.some(x => x.name.trim().length < 2 || x.categoryId < 1 || x.orderQuantityStep <= 0 || (x.usesDisplayStock && x.displayStockQuantity == null))}>{saving && <LoaderCircle className="me-2 size-4 animate-spin" />}{saving ? t("update.submitting") : `${t("update.submit")} (${drafts.length})`}</Button></div>
+                <div className="flex gap-2"><Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>{t("form.cancel")}</Button><Button onClick={requestSave} disabled={saving || drafts.some(x => x.name.trim().length < 2 || x.categoryId < 1 || x.orderQuantityStep <= 0 || (x.usesDisplayStock && x.displayStockQuantity == null))}>{saving && <LoaderCircle className="me-2 size-4 animate-spin" />}{saving ? t("update.submitting") : `${t("update.submit")} (${drafts.length})`}</Button></div>
             </footer>
           </section>
         </div>, document.body)}
