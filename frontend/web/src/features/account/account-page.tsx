@@ -11,6 +11,7 @@ import {
     LoaderCircle,
     Mail,
     Pencil,
+    Phone,
     Save,
     PackageSearch,
     ShieldCheck,
