@@ -1,4 +1,5 @@
 using ECommerce.Entities;
+using ECommerce.Entities.Users;
 using ECommerce.Entities.Users.Contracts;
 using ECommerce.Services.Auth;
 using ECommerce.Services.Auth.Verification;
