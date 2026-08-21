@@ -1,0 +1,84 @@
+{
+  "expo": {
+    "name": "EasyCart",
+    "slug": "easycart-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/easycart-icon.png",
+    "scheme": "easycart",
+    "userInterfaceStyle": "automatic",
+    "description": "Shop products, place orders, and track deliveries from EasyCart.",
+    "ios": {
+      "icon": "./assets/images/easycart-icon.png",
+      "bundleIdentifier": "com.easycart.store",
+      "supportsTablet": false
+    },
+    "android": {
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#0B1F3A",
+        "foregroundImage": "./assets/images/easycart-icon.png"
+      },
+      "predictiveBackGestureEnabled": true,
+      "package": "com.easycart.store",
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/easycart-icon-small.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "color": "#0F766E",
+          "defaultChannel": "store-updates"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0B1F3A",
+          "image": "./assets/images/easycart-icon-small.png",
+          "imageWidth": 76
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true,
+          "faceIDPermission": "Allow EasyCart to securely access your saved account."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": false
+          }
+        }
+      ],
+      "expo-web-browser",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": ["en", "ps", "fa-AF"],
+            "android": ["en", "ps", "fa-AF"]
+          },
+          "supportsRTL": true,
+          "allowDynamicLocaleChangesAndroid": true
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
