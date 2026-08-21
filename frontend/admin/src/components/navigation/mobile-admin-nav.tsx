@@ -36,7 +36,7 @@ export function MobileAdminNav() {
     return (
         <nav
             aria-label={tr("Mobile navigation")}
-            className="fixed inset-x-0 bottom-0 z-50 border-t bg-background/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-8px_30px_rgba(15,23,42,.08)] backdrop-blur-xl md:hidden"
+            className="fixed inset-x-2 bottom-2 z-50 rounded-2xl border border-border/85 bg-background/95 px-2 pb-[max(.45rem,env(safe-area-inset-bottom))] pt-1.5 shadow-none backdrop-blur-xl md:hidden"
         >
             <div className="mx-auto grid max-w-lg grid-flow-col auto-cols-fr gap-1">
                 {items.map((item) => {
@@ -46,8 +46,8 @@ export function MobileAdminNav() {
                             key={item.to}
                             to={item.to}
                             className={({ isActive }) => cn(
-                                "flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 border-t-2 border-transparent px-1 text-[10px] font-medium text-muted-foreground transition-colors",
-                                isActive && "border-primary bg-primary/5 text-primary",
+                                "flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border border-transparent px-1 text-[10px] font-medium text-muted-foreground transition-[background-color,border-color,color,transform]",
+                                isActive && "border-primary/15 bg-primary/10 font-semibold text-primary",
                             )}
                         >
                             <Icon className="size-4.5" />
@@ -58,7 +58,7 @@ export function MobileAdminNav() {
                 <button
                     type="button"
                     onClick={() => setOpenMobile(true)}
-                    className="flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 border-t-2 border-transparent px-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border border-transparent px-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     <Menu className="size-4.5" />
                     <span>{tr("Menu")}</span>

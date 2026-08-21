@@ -22,6 +22,7 @@ import {
     isSupportedImageFile,
     MAXIMUM_IMAGE_FILE_SIZE,
 } from "@/lib/image-files";
+import { createUuid } from "@/lib/create-uuid";
 
 function getFileSignature(file: File) {
     return `${file.name}-${file.size}-${file.lastModified}`;
@@ -39,19 +40,11 @@ function slugify(value: string) {
         .replace(/^-+|-+$/g, "");
 }
 
-function createClientId() {
-    if (typeof crypto !== "undefined" && crypto.randomUUID) {
-        return crypto.randomUUID();
-    }
-
-    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
 function createProductDraft(file: File): ProductBulkItemFormValues {
     const defaultName = getFileNameWithoutExtension(file.name);
 
     return {
-        clientId: createClientId(),
+        clientId: createUuid(),
 
         image: file,
         previewUrl: URL.createObjectURL(file),

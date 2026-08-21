@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { useReplaceProductPrices } from "@/features/products/hooks/use-product-pricing";
 import type { ProductLookupOption } from "@/features/products/types/product-bulk-types";
 import { useI18n } from "@/i18n/i18n-provider";
+import { createUuid } from "@/lib/create-uuid";
 import { cn } from "@/lib/utils";
 import type { ProductPrice } from "@/services/product.service";
 
@@ -121,7 +122,7 @@ export function ProductPricingDialog({
         if (!customerType) return;
         setDrafts((current) => [
             ...current,
-            emptyDraft(customerType.id, crypto.randomUUID()),
+            emptyDraft(customerType.id, createUuid()),
         ]);
     };
 

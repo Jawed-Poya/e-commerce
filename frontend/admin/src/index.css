@@ -72,72 +72,74 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
+    --background: #f7f9f8;
+    --foreground: #14201d;
+    --card: #ffffff;
+    --card-foreground: #14201d;
+    --popover: #ffffff;
+    --popover-foreground: #14201d;
+    --primary: #0f766e;
+    --primary-foreground: #ffffff;
+    --company-secondary: #f59e0b;
+    --secondary: color-mix(in srgb, var(--company-secondary) 9%, #ffffff);
+    --secondary-foreground: #3b3020;
+    --muted: color-mix(in srgb, var(--primary) 5%, #f3f6f5);
+    --muted-foreground: #64736f;
+    --accent: color-mix(in srgb, var(--primary) 9%, #ffffff);
+    --accent-foreground: color-mix(in srgb, var(--primary) 82%, #14201d);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    --border: color-mix(in srgb, var(--primary) 10%, #dce4e1);
+    --input: color-mix(in srgb, var(--primary) 12%, #d9e2df);
+    --ring: var(--primary);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
     --radius: 0rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --surface-radius: 0rem;
+    --surface-border: color-mix(in srgb, var(--border) 88%, var(--primary) 12%);
+    --sidebar: #fbfcfc;
+    --sidebar-foreground: #14201d;
+    --sidebar-primary: var(--primary);
+    --sidebar-primary-foreground: var(--primary-foreground);
+    --sidebar-accent: color-mix(in srgb, var(--primary) 8%, #ffffff);
+    --sidebar-accent-foreground: var(--foreground);
+    --sidebar-border: var(--border);
+    --sidebar-ring: var(--ring);
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
+    --background: #08120f;
+    --foreground: #eef7f4;
+    --card: #0d1b17;
+    --card-foreground: #eef7f4;
+    --popover: #10201b;
+    --popover-foreground: #eef7f4;
+    --secondary: color-mix(in srgb, var(--company-secondary) 14%, #12201c);
+    --secondary-foreground: #f8eee0;
+    --muted: color-mix(in srgb, var(--primary) 10%, #13221d);
+    --muted-foreground: #9fb4ae;
+    --accent: color-mix(in srgb, var(--primary) 16%, #13221d);
+    --accent-foreground: #eef7f4;
     --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --border: color-mix(in srgb, var(--primary) 14%, #25352f);
+    --input: color-mix(in srgb, var(--primary) 16%, #30423b);
+    --ring: color-mix(in srgb, var(--primary) 78%, #ffffff);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --surface-border: color-mix(in srgb, var(--border) 86%, var(--primary) 14%);
+    --sidebar: #0b1713;
+    --sidebar-foreground: #eef7f4;
+    --sidebar-primary: var(--primary);
+    --sidebar-primary-foreground: var(--primary-foreground);
+    --sidebar-accent: color-mix(in srgb, var(--primary) 13%, #12201c);
+    --sidebar-accent-foreground: #eef7f4;
+    --sidebar-border: var(--border);
+    --sidebar-ring: var(--ring);
 }
 
 @layer base {
@@ -178,6 +180,8 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     min-width: 320px;
+    background-image: radial-gradient(circle at 50% -14rem, color-mix(in srgb, var(--primary) 7%, transparent), transparent 36rem);
+    background-attachment: fixed;
     }
   h1, h2, h3, h4 {
     font-family: var(--company-heading-font, var(--company-font));
@@ -185,6 +189,37 @@
   }
   button, input, textarea, select { font-family: inherit; }
   [dir="rtl"] h1, [dir="rtl"] h2, [dir="rtl"] h3, [dir="rtl"] h4 { letter-spacing: 0; }
+}
+
+@layer components {
+  .admin-surface {
+    border: 1px solid var(--surface-border);
+    border-radius: var(--surface-radius);
+    background: var(--card);
+    box-shadow: none;
+  }
+
+  .admin-surface-interactive {
+    transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+  }
+
+  .admin-surface-interactive:hover {
+    border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+    background: color-mix(in srgb, var(--card) 96%, var(--primary) 4%);
+  }
+}
+
+@media (max-width: 767px) {
+  body { background-attachment: scroll; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
 }
 
 @layer utilities {

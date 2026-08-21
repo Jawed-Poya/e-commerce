@@ -21,11 +21,12 @@ import { useCompany } from "@/features/company/company-context";
 import { operationsService } from "@/features/operations/operations-service";
 import type { CreateJournalVoucher, JournalVoucher, JournalVoucherStatus, JournalVoucherType } from "@/features/operations/operations-types";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { createUuid } from "@/lib/create-uuid";
 
 type DraftLine = CreateJournalVoucher["lines"][number] & { key: string };
 type ManualVoucherType = CreateJournalVoucher["voucherType"];
 
-const newLine = (): DraftLine => ({ key: crypto.randomUUID(), accountCode: "", accountName: "", description: null, debit: 0, credit: 0 });
+const newLine = (): DraftLine => ({ key: createUuid(), accountCode: "", accountName: "", description: null, debit: 0, credit: 0 });
 
 const standardAccounts = [
     { code: "1000", name: "Cash on Hand" }, { code: "1010", name: "Bank Account" },
@@ -152,7 +153,7 @@ function AdjustmentDialog({ open, onOpenChange, onSaved }: { open: boolean; onOp
 
 function JournalLine({ id, line, index, onChange, onRemove }: { id: string; line: DraftLine; index: number; onChange: (line: DraftLine) => void; onRemove: () => void }) { const field = <K extends keyof DraftLine>(key: K, value: DraftLine[K]) => onChange({ ...line, [key]: value }); return <div id={id} className="grid scroll-mt-24 grid-cols-[45px_130px_220px_1fr_140px_140px_45px] gap-2 border-b p-2 last:border-b-0"><span className="self-center text-center text-sm font-semibold text-muted-foreground">{index + 1}</span><Input list="journal-account-codes" value={line.accountCode} onChange={(event) => { const accountCode = event.target.value; const standard = standardAccounts.find((account) => account.code === accountCode.trim()); onChange({ ...line, accountCode, accountName: standard?.name ?? line.accountName }); }} placeholder="1000" /><Input value={line.accountName} onChange={(event) => field("accountName", event.target.value)} placeholder="Cash on Hand" /><Input value={line.description ?? ""} onChange={(event) => field("description", event.target.value)} placeholder="Line note" /><Input className="text-end" type="number" min={0} step="0.01" value={line.debit || ""} onChange={(event) => { const debit = Number(event.target.value); onChange({ ...line, debit, credit: debit > 0 ? 0 : line.credit }); }} /><Input className="text-end" type="number" min={0} step="0.01" value={line.credit || ""} onChange={(event) => { const credit = Number(event.target.value); onChange({ ...line, credit, debit: credit > 0 ? 0 : line.debit }); }} /><Button size="icon" variant="ghost" onClick={onRemove}><Trash2 className="size-4 text-destructive" /></Button></div>; }
 function Metric({ icon, label, value, tone }: { icon: ReactNode; label: string; value: ReactNode; tone?: "positive" | "warning" }) { return <Card className="shadow-none"><CardContent className="flex items-center gap-3 p-4"><span className={`grid size-10 place-items-center rounded-xl [&_svg]:size-5 ${tone === "positive" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : tone === "warning" ? "bg-amber-500/10 text-amber-700 dark:text-amber-400" : "bg-primary/10 text-primary"}`}>{icon}</span><div><p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-bold tabular-nums">{value}</p></div></CardContent></Card>; }
-function templateLine(code: string, description: string): DraftLine { const account = standardAccounts.find((item) => item.code === code); return { key: crypto.randomUUID(), accountCode: code, accountName: account?.name ?? "", description, debit: 0, credit: 0 }; }
+function templateLine(code: string, description: string): DraftLine { const account = standardAccounts.find((item) => item.code === code); return { key: createUuid(), accountCode: code, accountName: account?.name ?? "", description, debit: 0, credit: 0 }; }
 function Field({ label, children }: { label: string; children: ReactNode }) { return <div className="space-y-2"><Label>{label}</Label>{children}</div>; }
 function date(value: string | null | undefined) {
     if (!value) return "Date unavailable";

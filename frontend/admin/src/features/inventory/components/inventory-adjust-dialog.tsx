@@ -27,6 +27,7 @@ import type {
     InventoryTransactionType,
 } from "@/features/inventory/types/inventory-types";
 import { useI18n } from "@/i18n/i18n-provider";
+import { createUuid } from "@/lib/create-uuid";
 import { toFiniteNumber } from "@/lib/numbers";
 
 type AdjustmentAction = {
@@ -102,7 +103,7 @@ export function InventoryAdjustDialog({
                     quantity: delta,
                     type: action.type,
                     description: description.trim() || undefined,
-                    idempotencyKey: crypto.randomUUID(),
+                    idempotencyKey: createUuid(),
                     lotId: selectedLot?.id,
                 },
             });

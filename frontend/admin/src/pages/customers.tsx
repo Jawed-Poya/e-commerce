@@ -6,6 +6,8 @@ import {
     Mail,
     Phone,
     Plus,
+    Radio,
+    RefreshCw,
     Rows3,
     Search,
     Trash2,
@@ -49,6 +51,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useCompany } from "@/features/company/company-context";
+import { useCustomerPresenceStream } from "@/features/customers/customer-presence-stream";
 import { customerQueryKeys } from "@/features/customers/customer-query-keys";
 import { customerService } from "@/features/customers/customer-service";
 import type {
@@ -88,7 +91,6 @@ const customerSheetGridClass =
 
 export default function CustomersPage() {
     const queryClient = useQueryClient();
-    const { formatMoney } = useCompany();
     const { locale, t, tf } = useI18n();
     const { data: lookups } = useProductLookupsQuery();
     const [search, setSearch] = useState("");
@@ -102,6 +104,7 @@ export default function CustomersPage() {
     const [selected, setSelected] = useState<number[]>([]);
     const [form, setForm] = useState<CustomerForm>(emptyForm);
     const [rows, setRows] = useState<CustomerForm[]>([]);
+    const realtimeStatus = useCustomerPresenceStream();
 
     const query = useQuery({
         queryKey: customerQueryKeys.list({
@@ -237,17 +240,42 @@ export default function CustomersPage() {
 
             <Card>
                 <CardContent>
-                    <div className="relative max-w-xl">
-                        <Search className="absolute start-2 top-2 size-4 text-muted-foreground" />
-                        <Input
-                            className="ps-8"
-                            value={search}
-                            onChange={(event) => {
-                                setSearch(event.target.value);
-                                setPage(1);
-                            }}
-                            placeholder={t("customers.search")}
-                        />
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        <div className="relative min-w-0 flex-1 sm:max-w-xl">
+                            <Search className="absolute start-2 top-2 size-4 text-muted-foreground" />
+                            <Input
+                                className="ps-8"
+                                value={search}
+                                onChange={(event) => {
+                                    setSearch(event.target.value);
+                                    setPage(1);
+                                }}
+                                placeholder={t("customers.search")}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2 sm:ms-auto">
+                            <Badge
+                                variant="outline"
+                                className={realtimeStatus === "live"
+                                    ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                    : "text-muted-foreground"}
+                            >
+                                <Radio className={realtimeStatus === "live" ? "size-3.5 animate-pulse" : "size-3.5"} />
+                                {realtimeStatus === "live"
+                                    ? t("customers.liveCrm")
+                                    : t("customers.pollingFallback")}
+                            </Badge>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={query.isFetching}
+                                onClick={() => void query.refetch()}
+                            >
+                                <RefreshCw className={query.isFetching ? "animate-spin" : undefined} />
+                                {t("customers.refresh")}
+                            </Button>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

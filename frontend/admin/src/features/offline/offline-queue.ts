@@ -1,5 +1,6 @@
 import type { ApiResponse } from "@/api/api-client";
 import apiClient from "@/api/api-client";
+import { createUuid } from "@/lib/create-uuid";
 
 import { OfflineStores, withOfflineStore } from "./offline-database";
 import { getOfflineOwnerKey } from "./offline-owner";
@@ -73,7 +74,7 @@ function requestId(body: Record<string, unknown>) {
     const existing = body.clientRequestId;
     return typeof existing === "string" && existing.trim()
         ? existing
-        : crypto.randomUUID();
+        : createUuid();
 }
 
 function isNetworkFailure(error: unknown) {

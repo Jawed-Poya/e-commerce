@@ -57,7 +57,7 @@ export default function AdminLoginPage() {
                 </div>
             </section>
             <section className="flex items-center justify-center p-5 sm:p-10">
-                <form onSubmit={submit} className="w-full max-w-md rounded-[30px] border bg-card p-7 shadow-[0_28px_90px_rgba(15,23,42,0.12)] sm:p-10">
+                <form onSubmit={submit} className="w-full max-w-md rounded-2xl border border-border/80 bg-card p-7 shadow-none sm:p-10 dark:border-white/[0.09]">
                     <span className="grid size-14 place-items-center rounded-2xl bg-primary/10 text-primary"><LockKeyhole className="size-7" /></span>
                     <p className="mt-7 text-xs font-black uppercase tracking-[0.2em] text-primary">Administrator access</p>
                     <h2 className="mt-2 text-4xl font-black tracking-[-0.05em]">Welcome back</h2>
