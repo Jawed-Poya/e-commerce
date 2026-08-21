@@ -33,6 +33,20 @@ public sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
     }
 }
 
+public sealed class CustomerCartConfiguration : IEntityTypeConfiguration<CustomerCart>
+{
+    public void Configure(EntityTypeBuilder<CustomerCart> b)
+    {
+        b.Property(x => x.Payload).IsRequired();
+        b.Property(x => x.Revision).IsConcurrencyToken();
+        b.HasIndex(x => x.CustomerId).IsUnique();
+        b.HasOne(x => x.Customer)
+            .WithMany()
+            .HasForeignKey(x => x.CustomerId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
 
 public sealed class ProductPriceConfiguration : IEntityTypeConfiguration<ProductPrice>
 {

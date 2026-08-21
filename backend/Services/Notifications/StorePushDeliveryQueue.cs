@@ -4,8 +4,14 @@ using ECommerce.Entities.Notifications.Contracts;
 namespace ECommerce.Services.Notifications;
 
 public sealed record StorePushDelivery(
-    StoreNotificationResponse Notification,
-    long? CustomerTypeId);
+    StoreNotificationResponse? Notification,
+    long? CustomerTypeId,
+    CustomerOrderPush? Order = null);
+
+public sealed record CustomerOrderPush(
+    long CustomerId,
+    string OrderNumber,
+    string Status);
 
 public sealed class StorePushDeliveryQueue
 {
@@ -41,10 +47,21 @@ public sealed class StorePushDeliveryHostedService(
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var push = scope.ServiceProvider.GetRequiredService<IStorePushService>();
-                await push.PublishAsync(
-                    delivery.Notification,
-                    delivery.CustomerTypeId,
-                    stoppingToken);
+                if (delivery.Notification is not null)
+                {
+                    await push.PublishAsync(
+                        delivery.Notification,
+                        delivery.CustomerTypeId,
+                        stoppingToken);
+                }
+                else if (delivery.Order is not null)
+                {
+                    await push.PublishOrderAsync(
+                        delivery.Order.CustomerId,
+                        delivery.Order.OrderNumber,
+                        delivery.Order.Status,
+                        stoppingToken);
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -54,8 +71,9 @@ public sealed class StorePushDeliveryHostedService(
             {
                 logger.LogWarning(
                     exception,
-                    "Could not process storefront Web Push notification {NotificationId}.",
-                    delivery.Notification.Id);
+                    "Could not process storefront push delivery {NotificationId} for order {OrderNumber}.",
+                    delivery.Notification?.Id,
+                    delivery.Order?.OrderNumber);
             }
         }
     }

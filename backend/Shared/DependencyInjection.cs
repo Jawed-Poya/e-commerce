@@ -55,6 +55,7 @@ public static class DependencyInjection
         services.AddScoped<IOrderInventoryService, OrderInventoryService>();
         services.AddScoped<IOrderService, OrderService>();
         services.AddScoped<ICustomerService, CustomerService>();
+        services.AddScoped<ICustomerCartService, CustomerCartService>();
         services.AddScoped<ICurrentCustomerAccessor, CurrentCustomerAccessor>();
         services.AddScoped<IDefaultCustomerTypeResolver, DefaultCustomerTypeResolver>();
         services.AddScoped<IAuthService, AuthService>();
@@ -64,6 +65,7 @@ public static class DependencyInjection
         services.AddScoped<IStorePushService, StorePushService>();
         services.AddSingleton<StorePushKeyStore>();
         services.AddSingleton<StorePushSubscriptionStore>();
+        services.AddSingleton<StoreMobilePushSubscriptionStore>();
         services.AddSingleton<StorePushDeliveryQueue>();
         services.AddHostedService<StorePushDeliveryHostedService>();
         services.AddScoped<IAdminNotificationService, AdminNotificationService>();

@@ -54,7 +54,8 @@ public class ApplicationDbContext
         nameof(ActivityLog),
         nameof(CustomerVisitLog),
         nameof(TrashRecord),
-        nameof(AccountVerificationCode)
+        nameof(AccountVerificationCode),
+        nameof(CustomerCart)
     };
 
     private static readonly HashSet<string> IgnoredAuditProperties = new(StringComparer.OrdinalIgnoreCase)
@@ -123,6 +124,7 @@ public class ApplicationDbContext
 
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
+    public DbSet<CustomerCart> CustomerCarts => Set<CustomerCart>();
 
     #endregion
 
@@ -242,6 +244,7 @@ public class ApplicationDbContext
         builder.Entity<InventoryLot>().HasQueryFilter(x => !x.IsDeleted && !x.Product.IsDeleted && !x.Warehouse.IsDeleted);
         builder.Entity<Warehouse>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<CustomerAddress>().HasQueryFilter(x => !x.IsDeleted && !x.Customer.IsDeleted);
+        builder.Entity<CustomerCart>().HasQueryFilter(x => !x.IsDeleted && !x.Customer.IsDeleted);
         builder.Entity<OrderItem>().HasQueryFilter(x => !x.IsDeleted && !x.Order.IsDeleted);
         builder.Entity<Payment>().HasQueryFilter(x => !x.IsDeleted && !x.Order.IsDeleted);
         builder.Entity<OrderStatusHistory>().HasQueryFilter(x => !x.IsDeleted && !x.Order.IsDeleted);

@@ -28,11 +28,11 @@ public sealed class CheckoutController(IOrderService orders) : ApiControllerBase
     [HttpGet("track")]
     public async Task<ActionResult<ApiResponse<OrderTrackingResponse>>> Track(
         [FromQuery] string orderNumber,
-        [FromQuery] string phone,
+        [FromQuery] string? phone,
         CancellationToken cancellationToken)
     {
         var result = await orders.TrackAsync(orderNumber, phone, cancellationToken)
-            ?? throw new KeyNotFoundException("Order not found for this phone number.");
+            ?? throw new KeyNotFoundException("Order not found for this account or phone number.");
 
         return Success(result);
     }

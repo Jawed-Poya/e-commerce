@@ -35,7 +35,7 @@ public interface IOrderService
 
     Task<OrderTrackingResponse?> TrackAsync(
         string orderNumber,
-        string phone,
+        string? phone,
         CancellationToken cancellationToken = default);
 
     Task<PagedResult<OrderListItemResponse>> GetMyOrdersAsync(

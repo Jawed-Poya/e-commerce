@@ -33,6 +33,7 @@ public sealed class OrderService(
     UserManager<User> userManager,
     IDefaultCustomerTypeResolver defaultCustomerType,
     IStoreNotificationService notifications,
+    StorePushDeliveryQueue pushQueue,
     IAdminNotificationService adminNotifications,
     IStorefrontContentService storefrontContent,
     IInventoryCostService inventoryCosts,
@@ -511,6 +512,10 @@ public sealed class OrderService(
             await transaction.CommitAsync(cancellationToken);
             await notifications.PublishAsync(pendingNotifications, CancellationToken.None);
             await adminNotifications.PublishAsync(adminNotification, CancellationToken.None);
+            pushQueue.Enqueue(new StorePushDelivery(
+                null,
+                null,
+                new CustomerOrderPush(order.CustomerId, order.OrderNumber, request.Status.ToString())));
 
             return await MapDetailsWithLotsAsync(order, cancellationToken);
         }
@@ -598,23 +603,41 @@ public sealed class OrderService(
 
     public async Task<OrderTrackingResponse?> TrackAsync(
         string orderNumber,
-        string phone,
+        string? phone,
         CancellationToken cancellationToken = default)
     {
         var normalizedOrderNumber = orderNumber.Trim();
-        var normalizedPhone = NormalizePhone(phone);
-
-        if (normalizedOrderNumber.Length == 0 || normalizedPhone.Length == 0)
+        if (normalizedOrderNumber.Length == 0)
             return null;
 
-        var order = await context.Orders
+        var query = context.Orders
             .AsNoTracking()
             .Include(item => item.StatusHistory)
-            .Include(item => item.Customer)
-            .FirstOrDefaultAsync(item =>
+            .Include(item => item.Customer);
+
+        OrderEntity? order;
+        if (currentCustomer.IsAuthenticated)
+        {
+            var customerId = await ResolveCurrentCustomerIdAsync(cancellationToken);
+            if (!customerId.HasValue)
+                return null;
+
+            order = await query.FirstOrDefaultAsync(item =>
+                item.OrderNumber == normalizedOrderNumber &&
+                item.CustomerId == customerId.Value,
+                cancellationToken);
+        }
+        else
+        {
+            var normalizedPhone = NormalizePhone(phone ?? string.Empty);
+            if (normalizedPhone.Length == 0)
+                return null;
+
+            order = await query.FirstOrDefaultAsync(item =>
                 item.OrderNumber == normalizedOrderNumber &&
                 item.Customer.Phone == normalizedPhone,
                 cancellationToken);
+        }
 
         if (order is null)
             return null;

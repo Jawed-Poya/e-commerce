@@ -49,4 +49,22 @@ public sealed class StoreNotificationsController(
         await push.RemoveSubscriptionAsync(request.Endpoint, cancellationToken);
         return Ok(ApiResponse<object>.Ok(new { subscribed = false }));
     }
+
+    [HttpPost("push/mobile/subscription")]
+    public async Task<ActionResult<ApiResponse<object>>> SaveMobilePushSubscription(
+        [FromBody] MobilePushSubscriptionRequest request,
+        CancellationToken cancellationToken)
+    {
+        await push.SaveMobileSubscriptionAsync(request, cancellationToken);
+        return Ok(ApiResponse<object>.Ok(new { subscribed = true }));
+    }
+
+    [HttpPost("push/mobile/unsubscribe")]
+    public async Task<ActionResult<ApiResponse<object>>> RemoveMobilePushSubscription(
+        [FromBody] RemoveMobilePushSubscriptionRequest request,
+        CancellationToken cancellationToken)
+    {
+        await push.RemoveMobileSubscriptionAsync(request.Token, request.DeviceId, cancellationToken);
+        return Ok(ApiResponse<object>.Ok(new { subscribed = false }));
+    }
 }

@@ -17,10 +17,16 @@ public sealed class StoreNotificationHub(
     private const string SubscriptionKey = "store-notification-groups";
 
 
-    public override Task OnConnectedAsync()
+    public override async Task OnConnectedAsync()
     {
         metrics.Connected(Context.ConnectionId);
-        return base.OnConnectedAsync();
+        if (long.TryParse(Context.User?.FindFirstValue(AuthClaims.CustomerId), out var customerId))
+        {
+            await Groups.AddToGroupAsync(
+                Context.ConnectionId,
+                StoreNotificationGroups.Cart(customerId));
+        }
+        await base.OnConnectedAsync();
     }
 
     public override Task OnDisconnectedAsync(Exception? exception)
