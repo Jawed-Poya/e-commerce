@@ -27,6 +27,11 @@ function readToken(key: string) {
 }
 
 export function getAdminToken() {
+    if (window.easyCartDesktop) {
+        const desktopToken = window.easyCartDesktop.getAdminToken();
+        return isUsableAdminToken(desktopToken) ? desktopToken : null;
+    }
+
     const token = readToken(adminTokenKey);
     if (token) return token;
 
@@ -43,7 +48,12 @@ export function saveAdminSession(token: string, user: unknown) {
         throw new Error("The server returned an invalid administrator token.");
     }
 
-    localStorage.setItem(adminTokenKey, token.trim());
+    if (window.easyCartDesktop) {
+        window.easyCartDesktop.setAdminToken(token.trim());
+        localStorage.removeItem(adminTokenKey);
+    } else {
+        localStorage.setItem(adminTokenKey, token.trim());
+    }
     localStorage.setItem(adminSessionKey, JSON.stringify(user));
     localStorage.removeItem(legacyAdminTokenKey);
 }
@@ -58,6 +68,7 @@ export function clearAdminSession(expectedToken?: string) {
         return false;
     }
 
+    if (window.easyCartDesktop) window.easyCartDesktop.clearAdminToken();
     localStorage.removeItem(adminTokenKey);
     localStorage.removeItem(adminSessionKey);
     localStorage.removeItem(legacyAdminTokenKey);

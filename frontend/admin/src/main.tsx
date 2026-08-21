@@ -21,4 +21,4 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 );
 
 
-registerAdminServiceWorker();
+if (!window.easyCartDesktop) registerAdminServiceWorker();
