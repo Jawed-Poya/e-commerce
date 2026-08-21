@@ -42,7 +42,9 @@ type NotificationContextValue = {
     realtimeStatus: RealtimeStatus;
     trackProduct: (productId: number) => void;
     enableBrowserNotifications: () => Promise<boolean>;
+    markRead: (id: number) => void;
     markAllRead: () => void;
+    clearAll: () => void;
 };
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
@@ -355,6 +357,22 @@ export function NotificationProvider({ children }: PropsWithChildren) {
         setSeenIds(ids);
     }, [items]);
 
+    const markRead = useCallback((id: number) => {
+        setSeenIds((current) => {
+            if (current.includes(id)) return current;
+            const next = [...current, id];
+            localStorage.setItem(seenKey, JSON.stringify(next));
+            return next;
+        });
+    }, []);
+
+    const clearAll = useCallback(() => {
+        const nextSeenIds = [...new Set([...seenIds, ...items.map((item) => item.id)])];
+        localStorage.setItem(seenKey, JSON.stringify(nextSeenIds));
+        setSeenIds(nextSeenIds);
+        setItems([]);
+    }, [items, seenIds]);
+
     const unreadCount = items.filter((item) => !seenIds.includes(item.id)).length;
     const value = useMemo<NotificationContextValue>(
         () => ({
@@ -364,11 +382,15 @@ export function NotificationProvider({ children }: PropsWithChildren) {
             realtimeStatus,
             trackProduct,
             enableBrowserNotifications,
+            markRead,
             markAllRead,
+            clearAll,
         }),
         [
             enableBrowserNotifications,
+            clearAll,
             items,
+            markRead,
             markAllRead,
             permission,
             realtimeStatus,

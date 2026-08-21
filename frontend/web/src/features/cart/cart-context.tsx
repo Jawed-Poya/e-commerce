@@ -1,11 +1,21 @@
 import {
+  HubConnectionBuilder,
+  LogLevel,
+} from "@microsoft/signalr";
+import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+
+import { useAuth } from "../auth/auth-context";
+import { ApiError, apiUrl, customerTokenKey } from "../../shared/api/api-client";
+import { getSyncedCart, updateSyncedCart, type SyncedCart, type SyncedCartItem } from "./cart-sync-api";
 
 export interface CartProduct {
   id: number;
@@ -38,6 +48,7 @@ interface CartValue {
   clear: () => void;
   toggleWishlist: (id: number) => void;
   clearWishlist: () => void;
+  syncStatus: "local" | "syncing" | "synced" | "offline";
 }
 
 const CartContext = createContext<CartValue | null>(null);
@@ -126,28 +137,240 @@ function sameNumberArray(left: number[], right: number[]) {
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>(() =>
-    readStorage<CartItem[]>("store-cart", [])
-      .map(normalizeStoredItem)
-      .filter((item) => item.quantity > 0),
-  );
+  const auth = useAuth();
+  const [items, setItems] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<number[]>(() =>
     readStorage("store-wishlist", []),
   );
+  const [syncStatus, setSyncStatus] = useState<CartValue["syncStatus"]>("local");
+  const [syncAttempt, setSyncAttempt] = useState(0);
+  const itemsRef = useRef(items);
+  const ownerRef = useRef<number | null>(null);
+  const revisionRef = useRef(0);
+  const syncedFingerprintRef = useRef("");
+  const syncBusyRef = useRef(false);
+  const syncQueuedRef = useRef(false);
+  const cartEventTimerRef = useRef<number | null>(null);
 
-  useEffect(
-    () => localStorage.setItem("store-cart", JSON.stringify(items)),
-    [items],
-  );
+  const requestCartSync = useCallback(() => {
+    syncQueuedRef.current = true;
+    setSyncAttempt((current) => current + 1);
+  }, []);
+
+  const finishCartSync = useCallback(() => {
+    syncBusyRef.current = false;
+    if (!syncQueuedRef.current) return;
+    syncQueuedRef.current = false;
+    setSyncAttempt((current) => current + 1);
+  }, []);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
   useEffect(
     () => localStorage.setItem("store-wishlist", JSON.stringify(wishlist)),
     [wishlist],
   );
 
+  useEffect(() => {
+    if (auth.loading) return;
+    const customerId = auth.user?.customerId ?? null;
+    if (!customerId) {
+      const wasAccountCart = ownerRef.current !== null;
+      ownerRef.current = null;
+      revisionRef.current = 0;
+      syncedFingerprintRef.current = "";
+      syncQueuedRef.current = false;
+      if (wasAccountCart) {
+        itemsRef.current = [];
+        setItems([]);
+      }
+      setSyncStatus("local");
+      return;
+    }
+    if (ownerRef.current === customerId) return;
+    if (syncBusyRef.current) {
+      syncQueuedRef.current = true;
+      return;
+    }
+
+    let active = true;
+    syncQueuedRef.current = false;
+    syncBusyRef.current = true;
+    setSyncStatus("syncing");
+    void getSyncedCart()
+      .then(async (remote) => {
+        const serverItems = fromSyncedCart(remote);
+        const localItems = ownerRef.current === null ? itemsRef.current : [];
+        const merged = mergeCartItems(serverItems, localItems);
+        const resolved = cartFingerprint(merged) === cartFingerprint(serverItems)
+          ? remote
+          : await updateSyncedCart({
+              baseRevision: remote.revision,
+              merge: true,
+              items: toSyncedItems(merged),
+            });
+        if (!active) return;
+        const resolvedItems = fromSyncedCart(resolved);
+        ownerRef.current = customerId;
+        revisionRef.current = resolved.revision;
+        syncedFingerprintRef.current = cartFingerprint(resolvedItems);
+        setItems(resolvedItems);
+        setSyncStatus("synced");
+      })
+      .catch(() => {
+        if (!active) return;
+        setSyncStatus("offline");
+      })
+      .finally(finishCartSync);
+
+    return () => { active = false; };
+  }, [auth.loading, auth.user?.customerId, finishCartSync, syncAttempt]);
+
+  useEffect(() => {
+    const customerId = auth.user?.customerId ?? null;
+    if (!customerId || ownerRef.current !== customerId) return;
+    if (syncBusyRef.current) {
+      syncQueuedRef.current = true;
+      return;
+    }
+    const targetFingerprint = cartFingerprint(items);
+    if (targetFingerprint === syncedFingerprintRef.current) return;
+
+    const timer = window.setTimeout(() => {
+      if (syncBusyRef.current) {
+        syncQueuedRef.current = true;
+        return;
+      }
+      const target = itemsRef.current;
+      const fingerprint = cartFingerprint(target);
+      syncBusyRef.current = true;
+      setSyncStatus("syncing");
+
+      const push = async () => {
+        try {
+          return await updateSyncedCart({
+            baseRevision: revisionRef.current,
+            merge: false,
+            items: toSyncedItems(target),
+          });
+        } catch (error) {
+          if (!(error instanceof ApiError) || error.status !== 409) throw error;
+          const latest = await getSyncedCart();
+          revisionRef.current = latest.revision;
+          return updateSyncedCart({
+            baseRevision: latest.revision,
+            merge: false,
+            items: toSyncedItems(target),
+          });
+        }
+      };
+
+      void push()
+        .then((response) => {
+          revisionRef.current = response.revision;
+          syncedFingerprintRef.current = fingerprint;
+          setSyncStatus(cartFingerprint(itemsRef.current) === fingerprint ? "synced" : "syncing");
+        })
+        .catch(() => setSyncStatus("offline"))
+        .finally(finishCartSync);
+    }, 650);
+
+    return () => window.clearTimeout(timer);
+  }, [auth.user?.customerId, finishCartSync, items, syncAttempt]);
+
+  useEffect(() => {
+    if (!auth.user?.customerId) return;
+    const interval = window.setInterval(requestCartSync, 10_000);
+    const onVisible = () => { if (document.visibilityState === "visible") requestCartSync(); };
+    window.addEventListener("focus", requestCartSync);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", requestCartSync);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [auth.user?.customerId, requestCartSync]);
+
+  useEffect(() => {
+    if (!auth.user?.customerId) return;
+
+    let disposed = false;
+    const connection = new HubConnectionBuilder()
+      .withUrl(apiUrl("/hubs/store-notifications"), {
+        accessTokenFactory: () => localStorage.getItem(customerTokenKey) ?? "",
+      })
+      .withAutomaticReconnect([0, 2_000, 5_000, 10_000])
+      .configureLogging(LogLevel.Warning)
+      .build();
+
+    connection.on("cartUpdated", () => {
+      if (cartEventTimerRef.current !== null) {
+        window.clearTimeout(cartEventTimerRef.current);
+      }
+      cartEventTimerRef.current = window.setTimeout(() => {
+        if (!disposed) requestCartSync();
+      }, 450);
+    });
+    connection.onreconnected(() => requestCartSync());
+    void connection.start().catch(() => undefined);
+
+    return () => {
+      disposed = true;
+      if (cartEventTimerRef.current !== null) {
+        window.clearTimeout(cartEventTimerRef.current);
+        cartEventTimerRef.current = null;
+      }
+      void connection.stop();
+    };
+  }, [auth.user?.customerId, requestCartSync]);
+
+  useEffect(() => {
+    const customerId = auth.user?.customerId ?? null;
+    if (!customerId || ownerRef.current !== customerId) return;
+    if (syncBusyRef.current) {
+      syncQueuedRef.current = true;
+      return;
+    }
+    if (cartFingerprint(itemsRef.current) !== syncedFingerprintRef.current) {
+      syncQueuedRef.current = true;
+      return;
+    }
+
+    let active = true;
+    let retryDirtyCart = false;
+    const startingFingerprint = cartFingerprint(itemsRef.current);
+    syncQueuedRef.current = false;
+    syncBusyRef.current = true;
+    void getSyncedCart()
+      .then((remote) => {
+        if (!active) return;
+        if (cartFingerprint(itemsRef.current) !== startingFingerprint) {
+          retryDirtyCart = true;
+          setSyncStatus("syncing");
+          return;
+        }
+        if (remote.revision > revisionRef.current) {
+          const remoteItems = fromSyncedCart(remote);
+          revisionRef.current = remote.revision;
+          syncedFingerprintRef.current = cartFingerprint(remoteItems);
+          setItems(remoteItems);
+        }
+        setSyncStatus("synced");
+      })
+      .catch(() => { if (active) setSyncStatus("offline"); })
+      .finally(() => {
+        if (active && retryDirtyCart) syncQueuedRef.current = true;
+        finishCartSync();
+      });
+    return () => { active = false; };
+  }, [auth.user?.customerId, finishCartSync, syncAttempt]);
+
   const value = useMemo<CartValue>(
     () => ({
       items,
       wishlist,
+      syncStatus,
       count: items.reduce((sum, item) => sum + item.quantity, 0),
       addItem: (product) =>
         setItems((current) => {
@@ -194,10 +417,64 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }),
       clearWishlist: () => setWishlist([]),
     }),
-    [items, wishlist],
+    [items, syncStatus, wishlist],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+}
+
+function toSyncedItems(items: CartItem[]): SyncedCartItem[] {
+  return [...items]
+    .sort((left, right) => left.lineKey.localeCompare(right.lineKey))
+    .map((item) => ({
+      productId: item.id,
+      name: item.name,
+      image: item.image ?? null,
+      price: item.price,
+      stock: item.stock,
+      unitId: item.unitId ?? null,
+      unitName: item.unitName ?? null,
+      quantityStep: item.quantityStep ?? 1,
+      quickOrderQuantities: item.quickOrderQuantities ?? [],
+      quantity: item.quantity,
+    }));
+}
+
+function fromSyncedCart(cart: SyncedCart): CartItem[] {
+  return cart.items.map((item) => normalizeStoredItem({
+    id: item.productId,
+    name: item.name,
+    image: item.image,
+    price: item.price,
+    stock: item.stock,
+    unitId: item.unitId,
+    unitName: item.unitName,
+    conversionFactor: 1,
+    quantityStep: item.quantityStep,
+    quickOrderQuantities: item.quickOrderQuantities,
+    quantity: item.quantity,
+  })).filter((item) => item.quantity > 0);
+}
+
+function cartFingerprint(items: CartItem[]) {
+  return JSON.stringify(toSyncedItems(items));
+}
+
+function mergeCartItems(serverItems: CartItem[], localItems: CartItem[]) {
+  const merged = new Map(serverItems.map((item) => [item.lineKey, item]));
+  localItems.forEach((local) => {
+    const server = merged.get(local.lineKey);
+    if (!server) {
+      merged.set(local.lineKey, local);
+      return;
+    }
+    const live = { ...server, ...local, stock: Math.max(server.stock, local.stock) };
+    merged.set(local.lineKey, {
+      ...live,
+      quantity: normalizeCartQuantity(live, Math.max(server.quantity, local.quantity)),
+    });
+  });
+  return [...merged.values()].filter((item) => item.quantity > 0);
 }
 
 export function useCart() {

@@ -105,7 +105,7 @@ export function ProductCard({
     const description = product.strength || product.shortDescription;
 
     return (
-        <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border/75 bg-card shadow-[0_14px_38px_-32px_rgba(15,23,42,.5)] transition duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_24px_52px_-30px_rgba(15,23,42,.46)] focus-within:border-primary/25 dark:border-white/[0.07]">
+        <article className="group flex min-w-0 self-start flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-none transition-[border-color,background-color] duration-200 hover:border-primary/30 focus-within:border-primary/35 dark:border-white/[0.09]">
             <div
                 className={cn(
                     "relative aspect-[5/4] overflow-hidden border-b border-border/65 bg-muted/25 sm:aspect-[4/3] dark:border-white/[0.06]",
@@ -131,19 +131,19 @@ export function ProductCard({
 
                 <div className="absolute start-2.5 top-2.5 z-20 flex max-w-[70%] flex-wrap gap-1.5">
                     {hasDiscount ? (
-                        <Badge className="rounded-lg border-0 bg-brand-orange px-2 py-1 text-[10px] font-black text-white shadow-sm">
+                        <Badge className="rounded-lg border-0 bg-brand-orange px-2 py-1 text-[10px] font-black text-white shadow-none">
                             -{discount}%
                         </Badge>
                     ) : null}
                     {product.isFeatured ? (
-                        <Badge className="rounded-lg bg-card/95 px-2 py-1 text-[10px] font-bold text-foreground shadow-sm ring-1 ring-black/[0.06] backdrop-blur dark:ring-white/[0.08]">
+                        <Badge className="rounded-lg border border-border/80 bg-card/95 px-2 py-1 text-[10px] font-bold text-foreground shadow-none backdrop-blur dark:border-white/[0.10]">
                             {t("product.featured")}
                         </Badge>
                     ) : null}
                 </div>
 
                 {!hasOrderableStock ? (
-                    <Badge className="absolute end-2.5 top-2.5 z-20 rounded-lg border-0 bg-slate-950/85 px-2 py-1 text-[10px] font-black text-white shadow-sm backdrop-blur">
+                    <Badge className="absolute end-2.5 top-2.5 z-20 rounded-lg border-0 bg-slate-950/85 px-2 py-1 text-[10px] font-black text-white shadow-none backdrop-blur">
                         {t("product.unavailable")}
                     </Badge>
                 ) : null}
@@ -153,7 +153,7 @@ export function ProductCard({
                         type="button"
                         onClick={() => cart.toggleWishlist(product.id)}
                         className={cn(
-                            "grid size-8 place-items-center rounded-full bg-card/95 text-foreground shadow-md ring-1 ring-black/[0.08] backdrop-blur",
+                            "grid size-8 place-items-center rounded-full border border-border/80 bg-card/95 text-foreground shadow-none backdrop-blur",
                             liked && "bg-brand-orange text-white",
                         )}
                         aria-label={liked ? t("wishlist.remove") : t("wishlist.add")}
@@ -164,7 +164,7 @@ export function ProductCard({
                         type="button"
                         onClick={() => pins.togglePinned(product)}
                         className={cn(
-                            "grid size-8 place-items-center rounded-full bg-card/95 text-foreground shadow-md ring-1 ring-black/[0.08] backdrop-blur",
+                            "grid size-8 place-items-center rounded-full border border-border/80 bg-card/95 text-foreground shadow-none backdrop-blur",
                             pinned && "bg-primary text-primary-foreground",
                         )}
                         aria-label={pinned ? t("product.unpin") : t("product.pin")}
@@ -224,7 +224,7 @@ export function ProductCard({
                     ) : null}
                 </div>
 
-                <div className="mt-auto pt-4">
+                <div className="mt-auto pt-3">
                     <div className="min-w-0">
                         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                             <span className="text-xl font-black tracking-[-0.04em] text-primary">
@@ -248,7 +248,7 @@ export function ProductCard({
                     </div>
 
                     {cartItem && canAddToCart ? (
-                        <div className="mt-3 rounded-2xl border border-primary/15 bg-gradient-to-b from-primary/[0.07] to-primary/[0.025] p-3 shadow-[0_10px_26px_-22px_rgba(15,23,42,.55)]">
+                        <div className="mt-2 rounded-xl border border-primary/12 bg-primary/[0.035] p-2">
                             <CartQuantityControl
                                 item={liveCartItem!}
                                 compact
@@ -256,12 +256,12 @@ export function ProductCard({
                                 variant="productCard"
                                 showStepBadge
                                 showQuickQuantities
-                                quickQuantityLimit={5}
+                                quickQuantityLimit={4}
                             />
                         </div>
                     ) : null}
 
-                    <div className="mt-3 flex items-center gap-2">
+                    <div className="mt-2 flex items-center gap-2">
                         <Button
                             type="button"
                             variant="outline"
@@ -304,7 +304,7 @@ export function ProductCard({
                             <Button
                                 asChild
                                 variant="outline"
-                                className="h-11 min-w-0 flex-1 rounded-xl px-2 text-xs font-bold sm:px-4 sm:text-sm"
+                                className="h-10 min-w-0 flex-1 rounded-xl px-2 text-xs font-bold sm:px-4 sm:text-sm"
                             >
                                 <Link viewTransition to={productPath(product)}>
                                     {t("product.details")}
@@ -314,7 +314,7 @@ export function ProductCard({
                         ) : (
                             <Button
                                 type="button"
-                                className="h-12 min-w-0 flex-1 rounded-xl px-2 text-xs font-black shadow-md shadow-primary/15 sm:h-12 sm:px-4 sm:text-sm"
+                                className="h-12 min-w-0 flex-1 rounded-xl px-2 text-xs font-black shadow-none sm:h-12 sm:px-4 sm:text-sm"
                                 disabled={!canAddToCart}
                                 onClick={addToCart}
                             >

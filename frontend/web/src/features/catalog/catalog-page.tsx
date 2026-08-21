@@ -592,7 +592,7 @@ export function CatalogPage() {
                                 ) : null}
                             </div>
 
-                            <div className="grid auto-rows-fr grid-cols-2 items-stretch gap-2.5 sm:gap-4">
+                            <div className="grid grid-cols-2 items-start gap-2.5 sm:gap-4">
                                 {displayedProducts.map((product) => (
                                     <ProductCard
                                         key={product.id}

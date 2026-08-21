@@ -83,7 +83,9 @@ export function OrderSuccessPage() {
 
                         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                             <Button asChild size="lg" className="rounded-xl">
-                                <Link viewTransition to={`/track-order?orderNumber=${encodeURIComponent(confirmation.orderNumber)}&phone=${encodeURIComponent(state.phone)}`}>
+                                <Link viewTransition to={auth.isAuthenticated
+                                    ? `/track-order?orderNumber=${encodeURIComponent(confirmation.orderNumber)}`
+                                    : `/track-order?orderNumber=${encodeURIComponent(confirmation.orderNumber)}&phone=${encodeURIComponent(state.phone)}`}>
                                     {t("orders.trackThis")} <ArrowRight className={arrowClass} />
                                 </Link>
                             </Button>

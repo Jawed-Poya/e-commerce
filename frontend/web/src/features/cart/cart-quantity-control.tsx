@@ -62,21 +62,15 @@ export function CartQuantityControl({
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-col",
-        isProductCard ? "gap-2.5" : "gap-1.5",
+        "flex min-w-0 flex-col gap-1.5",
         className,
       )}
     >
       {isProductCard ? (
-        <div className="flex min-w-0 items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-primary">
-              {t("product.inCart")}
-            </p>
-            <p className="truncate text-[10px] text-muted-foreground">
-              {t("cart.currentQuantity", { count: formatNumber(item.quantity) })}
-            </p>
-          </div>
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <p className="truncate text-[9px] font-black uppercase tracking-[0.12em] text-primary">
+            {t("product.inCart")}
+          </p>
           {showStepBadge && step > 1 ? (
             <Badge className="shrink-0 border border-primary/15 bg-primary/[0.06] px-2 text-[9px] font-black text-primary shadow-none">
               {t("cart.quantityStep", { count: formatNumber(step) })}
@@ -88,9 +82,9 @@ export function CartQuantityControl({
       <div className={cn("flex min-w-0 items-center", isProductCard ? "w-full" : "gap-1.5")}>
         <div
           className={cn(
-            "min-w-0 overflow-hidden border border-primary/20 bg-background shadow-sm",
+            "min-w-0 overflow-hidden border border-primary/20 bg-background",
             isProductCard
-              ? "grid h-11 w-full grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] rounded-xl"
+              ? "grid h-9 w-full grid-cols-[2.25rem_minmax(0,1fr)_2.25rem] rounded-lg"
               : cn("inline-flex items-center rounded-lg", compact ? "h-8" : "h-11"),
           )}
         >
@@ -101,7 +95,7 @@ export function CartQuantityControl({
             onClick={decrease}
             className={cn(
               "shrink-0 rounded-none text-primary hover:bg-primary/10 hover:text-primary",
-              isProductCard ? "size-11" : compact ? "size-8" : "size-11",
+              isProductCard ? "size-9" : compact ? "size-8" : "size-11",
             )}
             aria-label={t("cart.decreaseQuantity")}
           >
@@ -123,7 +117,7 @@ export function CartQuantityControl({
             onClick={increase}
             className={cn(
               "shrink-0 rounded-none text-primary hover:bg-primary/10 hover:text-primary disabled:text-muted-foreground",
-              isProductCard ? "size-11" : compact ? "size-8" : "size-11",
+              isProductCard ? "size-9" : compact ? "size-8" : "size-11",
             )}
             aria-label={t("cart.increaseQuantity")}
           >
@@ -148,7 +142,7 @@ export function CartQuantityControl({
           className={cn(
             "max-w-full items-center gap-1",
             isProductCard
-              ? "grid grid-cols-4 sm:grid-cols-5"
+              ? "grid grid-cols-4"
               : "flex flex-nowrap overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           )}
         >
@@ -163,7 +157,7 @@ export function CartQuantityControl({
                 className={cn(
                   "inline-flex shrink-0 items-center justify-center border font-black tabular-nums transition",
                   isProductCard
-                    ? "h-7 min-w-0 rounded-lg px-1.5 text-[10px]"
+                    ? "h-6 min-w-0 rounded-md px-1 text-[9px]"
                     : "h-6 min-w-8 rounded-full px-2 text-[10px]",
                   selected
                     ? "border-primary bg-primary text-primary-foreground shadow-sm"
@@ -235,7 +229,7 @@ function QuantityInput({
       className={cn(
         "min-w-0 border-x border-primary/15 bg-primary/[0.035] text-center font-black tabular-nums text-foreground outline-none transition [appearance:textfield] focus:bg-primary/[0.08] focus:ring-2 focus:ring-inset focus:ring-primary/25 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
         stretch
-          ? "h-11 w-full px-2 text-sm"
+          ? "h-9 w-full px-2 text-xs"
           : compact
             ? "h-8 w-14 px-1 text-[11px]"
             : "h-11 w-20 px-2 text-sm",

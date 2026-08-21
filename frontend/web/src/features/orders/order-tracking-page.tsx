@@ -6,17 +6,19 @@ import {
     PackageSearch,
     Search,
 } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { ApiError } from "../../shared/api/api-client";
 import { Button } from "../../shared/components/ui/button";
 import { formatMoney } from "../../shared/lib/money";
 import { useI18n } from "../../i18n/i18n-provider";
+import { useAuth } from "../auth/auth-context";
 import { trackOrder } from "./order-api";
 import { readRecentOrders } from "./recent-orders";
 
 export function OrderTrackingPage() {
+    const auth = useAuth();
     const { t, language } = useI18n();
     const locale = language === "dr" ? "fa-AF" : language === "ps" ? "ps-AF" : "en-US";
     const [searchParams, setSearchParams] = useSearchParams();
@@ -24,18 +26,30 @@ export function OrderTrackingPage() {
     const [orderNumber, setOrderNumber] = useState(searchParams.get("orderNumber") ?? "");
     const [phone, setPhone] = useState(searchParams.get("phone") ?? "");
     const submittedOrderNumber = searchParams.get("orderNumber") ?? "";
-    const submittedPhone = searchParams.get("phone") ?? "";
+    const submittedPhone = auth.isAuthenticated ? undefined : searchParams.get("phone") ?? "";
+
+    useEffect(() => {
+        if (auth.loading || !auth.isAuthenticated || !searchParams.has("phone")) return;
+        const next = new URLSearchParams(searchParams);
+        next.delete("phone");
+        setSearchParams(next, { replace: true });
+    }, [auth.isAuthenticated, auth.loading, searchParams, setSearchParams]);
 
     const query = useQuery({
-        queryKey: ["track-order", submittedOrderNumber, submittedPhone],
+        queryKey: ["track-order", submittedOrderNumber, auth.isAuthenticated ? "account" : submittedPhone],
         queryFn: () => trackOrder(submittedOrderNumber, submittedPhone),
-        enabled: Boolean(submittedOrderNumber && submittedPhone),
+        enabled: !auth.loading && Boolean(submittedOrderNumber && (auth.isAuthenticated || submittedPhone)),
         retry: false,
     });
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        setSearchParams({ orderNumber: orderNumber.trim(), phone: phone.trim() });
+        const normalizedOrderNumber = orderNumber.trim();
+        const normalizedPhone = phone.trim();
+        if (!normalizedOrderNumber || (!auth.isAuthenticated && !normalizedPhone)) return;
+        setSearchParams(auth.isAuthenticated
+            ? { orderNumber: normalizedOrderNumber }
+            : { orderNumber: normalizedOrderNumber, phone: normalizedPhone });
     };
 
     return (
@@ -51,17 +65,17 @@ export function OrderTrackingPage() {
                     {t("orders.trackingTitle")}
                 </h1>
                 <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-                    {t("orders.trackingDescription")}
+                    {t(auth.isAuthenticated ? "orders.accountTrackingDescription" : "orders.trackingDescription")}
                 </p>
             </div>
 
             <form
                 onSubmit={submit}
-                className="mx-auto mt-6 grid max-w-3xl gap-3 rounded-2xl border bg-card p-4 shadow-[0_16px_50px_rgba(15,23,42,0.07)] sm:grid-cols-[1fr_1fr_auto] sm:p-5"
+                className={`mx-auto mt-6 grid max-w-3xl gap-3 rounded-2xl border bg-card p-4 shadow-[0_16px_50px_rgba(15,23,42,0.07)] sm:p-5 ${auth.isAuthenticated ? "sm:grid-cols-[1fr_auto]" : "sm:grid-cols-[1fr_1fr_auto]"}`}
             >
                 <TrackingField label={t("orders.orderNumber")} value={orderNumber} onChange={setOrderNumber} placeholder="ORD-20260719-123456" />
-                <TrackingField label={t("orders.phoneNumber")} value={phone} onChange={setPhone} placeholder="07xxxxxxxx" />
-                <Button type="submit" className="h-11 self-end rounded-lg px-5" disabled={!orderNumber.trim() || !phone.trim()}>
+                {!auth.isAuthenticated && <TrackingField label={t("orders.phoneNumber")} value={phone} onChange={setPhone} placeholder="07xxxxxxxx" />}
+                <Button type="submit" className="h-11 self-end rounded-lg px-5" disabled={auth.loading || !orderNumber.trim() || (!auth.isAuthenticated && !phone.trim())}>
                     <Search /> {t("orders.trackAction")}
                 </Button>
             </form>
@@ -83,7 +97,9 @@ export function OrderTrackingPage() {
                                 onClick={() => {
                                     setOrderNumber(order.orderNumber);
                                     setPhone(order.phone);
-                                    setSearchParams({ orderNumber: order.orderNumber, phone: order.phone });
+                                    setSearchParams(auth.isAuthenticated
+                                        ? { orderNumber: order.orderNumber }
+                                        : { orderNumber: order.orderNumber, phone: order.phone });
                                 }}
                                 className="group flex w-full items-center justify-between gap-4 rounded-xl border bg-background p-3 text-start transition hover:border-primary/35 hover:bg-primary/[0.06]"
                             >

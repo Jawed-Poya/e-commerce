@@ -1,6 +1,7 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Bell, BellRing, CheckCheck, PackageOpen, ShoppingBag, Tag } from "lucide-react";
+import { Bell, BellRing, CheckCheck, PackageOpen, ShoppingBag, Tag, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useState } from "react";
 
 import { Button } from "../../shared/components/ui/button";
 import { cn } from "../../shared/lib/utils";
@@ -12,10 +13,20 @@ export function NotificationCenter() {
     const notifications = useStoreNotifications();
     const { company } = useCompany();
     const { language, t } = useI18n();
+    const [confirmClear, setConfirmClear] = useState(false);
     const locale = language === "en" ? "en-US" : "fa-AF";
 
+    const clearNotifications = () => {
+        if (!confirmClear) {
+            setConfirmClear(true);
+            return;
+        }
+        notifications.clearAll();
+        setConfirmClear(false);
+    };
+
     return (
-        <DropdownMenu.Root onOpenChange={(open) => open && notifications.markAllRead()}>
+        <DropdownMenu.Root onOpenChange={(open) => !open && setConfirmClear(false)}>
             <DropdownMenu.Trigger asChild>
                 <Button
                     variant="ghost"
@@ -57,7 +68,32 @@ export function NotificationCenter() {
                                 {t("notifications.description")}
                             </p>
                         </div>
-                        <CheckCheck className="size-4 text-primary" />
+                        <div className="flex shrink-0 items-center gap-1">
+                            {notifications.unreadCount > 0 ? (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 rounded-lg px-2 text-[10px] font-bold"
+                                    onClick={notifications.markAllRead}
+                                    title={t("notifications.markRead")}
+                                >
+                                    <CheckCheck className="size-3.5" />
+                                    <span className="hidden sm:inline">{t("notifications.markRead")}</span>
+                                </Button>
+                            ) : null}
+                            {notifications.items.length > 0 ? (
+                                <Button
+                                    variant={confirmClear ? "destructive" : "ghost"}
+                                    size="sm"
+                                    className="h-8 rounded-lg px-2 text-[10px] font-bold"
+                                    onClick={clearNotifications}
+                                    title={t(confirmClear ? "notifications.clearConfirm" : "notifications.clear")}
+                                >
+                                    <Trash2 className="size-3.5" />
+                                    <span>{t(confirmClear ? "notifications.clearConfirm" : "notifications.clear")}</span>
+                                </Button>
+                            ) : null}
+                        </div>
                     </div>
 
                     {notifications.permission !== "granted" && (
@@ -82,6 +118,7 @@ export function NotificationCenter() {
                             <DropdownMenu.Item key={item.id} asChild>
                                 <Link viewTransition
                                     to={item.link}
+                                    onClick={() => notifications.markRead(item.id)}
                                     className="flex gap-3 rounded-xl p-3 outline-none transition hover:bg-muted focus:bg-muted"
                                 >
                                     <span

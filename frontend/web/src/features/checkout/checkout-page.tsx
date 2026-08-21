@@ -124,7 +124,7 @@ export function CheckoutPage() {
     if (!auth.user?.canPlaceOrders) {
         return (
             <main className="mx-auto grid min-h-[60vh] max-w-xl place-items-center px-4 py-10">
-                <section className="w-full rounded-2xl border bg-card p-6 text-center shadow-md sm:p-8">
+                <section className="w-full rounded-2xl border border-border/80 bg-card p-6 text-center shadow-none sm:p-8 dark:border-white/[0.09]">
                     <BadgeCheck className="mx-auto size-12 text-primary" />
                     <h1 className="mt-4 text-2xl font-black tracking-tight">{t("checkout.verifyBeforeOrder")}</h1>
                     <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-muted-foreground">{t("checkout.verifyBeforeOrderDescription")}</p>
@@ -593,7 +593,7 @@ export function CheckoutPage() {
                         <Button
                             type="submit"
                             size="lg"
-                            className="h-11 min-w-40 rounded-xl font-black shadow-md shadow-primary/15"
+                            className="h-11 min-w-40 rounded-xl font-black shadow-none"
                             disabled={submitting || configQuery.isError}
                         >
                             {submitting ? (
@@ -624,7 +624,7 @@ function CheckoutSection({
     children: React.ReactNode;
 }) {
     return (
-        <section className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
+        <section className="rounded-2xl border border-border/80 bg-card p-4 shadow-none sm:p-5 dark:border-white/[0.09]">
             <div className="mb-4 flex items-start gap-3">
                 <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary [&_svg]:size-5">
                     {icon}

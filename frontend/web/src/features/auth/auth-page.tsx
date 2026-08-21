@@ -116,7 +116,7 @@ export function AuthPage() {
             <div className="pointer-events-none absolute -start-32 top-16 -z-10 size-[28rem] rounded-full bg-primary/[0.08] blur-3xl" />
             <div className="pointer-events-none absolute -end-32 bottom-0 -z-10 size-[30rem] rounded-full bg-brand-orange/[0.07] blur-3xl" />
 
-            <div className="mx-auto grid w-full max-w-[1240px] overflow-hidden rounded-[28px] bg-card shadow-[0_28px_80px_-52px_rgba(15,23,42,.55)] lg:grid-cols-[1.03fr_.97fr]">
+            <div className="mx-auto grid w-full max-w-[1240px] overflow-hidden rounded-2xl border border-border/80 bg-card shadow-none lg:grid-cols-[1.03fr_.97fr] dark:border-white/[0.09]">
                 <section className="relative hidden min-h-[650px] bg-muted/[0.32] p-5 lg:block xl:p-6">
                     <div className="relative flex h-full min-h-[610px] flex-col overflow-hidden rounded-[22px] bg-[var(--brand-surface-strong)] shadow-[0_28px_70px_-42px_rgba(15,23,42,.8)]">
                         <div className="absolute -end-24 -top-24 size-80 rounded-full bg-white/[0.10] blur-3xl" />
@@ -480,7 +480,7 @@ export function AuthPage() {
                                 <Button
                                     type="submit"
                                     size="lg"
-                                    className="mt-1 h-11 rounded-xl font-black shadow-md shadow-primary/15"
+                                    className="mt-1 h-11 rounded-xl font-black shadow-none"
                                     disabled={submitting}
                                 >
                                     {submitting

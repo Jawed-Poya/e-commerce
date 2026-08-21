@@ -1,6 +1,10 @@
 import {
     AlertTriangle,
     ArrowRight,
+    CircleCheck,
+    CloudOff,
+    LoaderCircle,
+    LogIn,
     ShoppingBag,
     Trash2,
     Truck,
@@ -22,6 +26,7 @@ import {
 } from "./cart-context";
 import { useI18n } from "../../i18n/i18n-provider";
 import { useCompany } from "../company/company-context";
+import { useAuth } from "../auth/auth-context";
 import { CartQuantityControl } from "./cart-quantity-control";
 
 export function CartPage() {
@@ -114,6 +119,8 @@ export function CartPage() {
                         {t("cart.emptyDescription")}
                     </p>
 
+                    <CartSyncStatus status={cart.syncStatus} className="mx-auto mt-4" />
+
                     <Button
                         asChild
                         size="lg"
@@ -145,6 +152,7 @@ export function CartPage() {
                         <p className="mt-2 text-sm text-muted-foreground">
                             {t("cart.itemsInCart", { count: cart.items.length })}
                         </p>
+                        <CartSyncStatus status={cart.syncStatus} className="mt-3" />
                     </div>
 
                     <Button
@@ -165,7 +173,7 @@ export function CartPage() {
                             {cart.items.map((item) => (
                                 <article
                                     key={item.lineKey}
-                                    className="grid min-w-0 grid-cols-[92px_minmax(0,1fr)] gap-3 rounded-xl border bg-card p-2.5 shadow-[0_6px_22px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-md sm:grid-cols-[112px_minmax(0,1fr)_auto] sm:gap-4 sm:p-3.5"
+                                    className="grid min-w-0 grid-cols-[92px_minmax(0,1fr)] gap-3 rounded-2xl border border-border/80 bg-card p-2.5 shadow-none transition-colors hover:border-primary/25 sm:grid-cols-[112px_minmax(0,1fr)_auto] sm:gap-4 sm:p-3.5 dark:border-white/[0.09]"
                                 >
                                     <Link viewTransition
                                         to={productPath(item)}
@@ -358,7 +366,7 @@ export function CartPage() {
                             ) : (
                                 <Button
                                     asChild
-                                    className="mt-4 h-11 w-full rounded-lg font-bold shadow-md shadow-primary/15"
+                                    className="mt-4 h-11 w-full rounded-xl font-bold shadow-none"
                                     size="lg"
                                 >
                                     <Link viewTransition to="/checkout">
@@ -400,7 +408,7 @@ export function CartPage() {
                             {t("cart.resolveAvailability")}
                         </Button>
                     ) : (
-                        <Button asChild className="ms-auto h-11 min-w-40 rounded-lg px-4 font-bold shadow-md shadow-primary/15">
+                        <Button asChild className="ms-auto h-11 min-w-40 rounded-xl px-4 font-bold shadow-none">
                             <Link viewTransition to="/checkout">
                                 {t("checkout.title")}
                                 <ArrowRight className="size-4 rtl:rotate-180" />
@@ -410,5 +418,39 @@ export function CartPage() {
                 </div>
             </div>
         </>
+    );
+}
+
+function CartSyncStatus({ status, className = "" }: { status: "local" | "syncing" | "synced" | "offline"; className?: string }) {
+    const auth = useAuth();
+    const { t } = useI18n();
+
+    if (!auth.isAuthenticated) {
+        return (
+            <Link
+                viewTransition
+                to="/account/login"
+                className={`inline-flex w-fit items-center gap-1.5 rounded-full border border-primary/15 bg-primary/5 px-3 py-1.5 text-[11px] font-bold text-primary transition-colors hover:bg-primary/10 ${className}`}
+            >
+                <LogIn className="size-3.5" />
+                {t("cart.syncAccountRequired")}
+            </Link>
+        );
+    }
+
+    const content = status === "synced"
+        ? { icon: <CircleCheck className="size-3.5" />, label: t("cart.synced"), tone: "text-emerald-700 dark:text-emerald-400" }
+        : status === "offline"
+          ? { icon: <CloudOff className="size-3.5" />, label: t("cart.syncOffline"), tone: "text-amber-700 dark:text-amber-400" }
+          : { icon: <LoaderCircle className="size-3.5 animate-spin" />, label: t("cart.syncing"), tone: "text-muted-foreground" };
+
+    return (
+        <span
+            aria-live="polite"
+            className={`inline-flex w-fit items-center gap-1.5 text-[11px] font-bold ${content.tone} ${className}`}
+        >
+            {content.icon}
+            {content.label}
+        </span>
     );
 }

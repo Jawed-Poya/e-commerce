@@ -53,7 +53,7 @@ export function ProductReviews({ productId }: { productId: number }) {
 
     return (
         <section className="mx-auto w-full max-w-[1500px] px-4 pb-20 sm:px-6 lg:px-8">
-            <div className="rounded-2xl border bg-card p-4 shadow-sm sm:p-6 lg:p-7">
+            <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-none sm:p-6 lg:p-7 dark:border-white/[0.09]">
                 <div className="grid gap-5 lg:grid-cols-[0.38fr_0.62fr]">
                     <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">{t("reviews.title")}</p>

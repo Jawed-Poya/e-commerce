@@ -55,7 +55,7 @@ export function ResetPasswordPage() {
     return (
         <main className="relative isolate grid min-h-[70vh] place-items-center overflow-hidden bg-[radial-gradient(circle_at_top,color-mix(in_srgb,var(--primary)_10%,transparent),transparent_42%),linear-gradient(to_bottom,var(--background),color-mix(in_srgb,var(--muted)_55%,var(--background)))] px-4 py-10 sm:px-6">
             <div className="pointer-events-none absolute -start-20 top-12 -z-10 size-72 rounded-full bg-primary/[0.08] blur-3xl" />
-            <section className="w-full max-w-lg overflow-hidden rounded-[24px] border border-border/75 bg-card shadow-[0_28px_80px_-52px_rgba(15,23,42,.6)] dark:border-white/[0.09]">
+            <section className="w-full max-w-lg overflow-hidden rounded-2xl border border-border/80 bg-card shadow-none dark:border-white/[0.09]">
                 <div className="border-b bg-muted/30 p-5 sm:p-6">
                     <div className="flex items-center gap-3">
                         <span className="grid size-11 place-items-center overflow-hidden rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">

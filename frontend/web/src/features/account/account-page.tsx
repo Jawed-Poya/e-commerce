@@ -329,7 +329,7 @@ export function AccountPage() {
                     {orders.isLoading && <div className="rounded-xl border bg-card p-6 text-center text-muted-foreground">{t("account.loadingOrders")}</div>}
                     {orders.isError && <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 text-center text-destructive">{t("account.ordersError")}</div>}
                     {orders.data?.items.map((order) => (
-                        <article key={order.id} className="grid gap-5 rounded-xl border bg-card p-4 transition hover:border-primary/30 hover:shadow-md sm:grid-cols-[1fr_auto] sm:items-center">
+                        <article key={order.id} className="grid gap-5 rounded-2xl border border-border/80 bg-card p-4 shadow-none transition-colors hover:border-primary/30 sm:grid-cols-[1fr_auto] sm:items-center dark:border-white/[0.09]">
                             <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <h3 className="break-all text-lg font-black text-primary">{order.orderNumber}</h3>
@@ -344,7 +344,7 @@ export function AccountPage() {
                             </div>
                             <div className="flex items-center justify-between gap-3 sm:justify-end">
                                 <p className="text-lg font-black">{formatMoney(order.total, order.currency)}</p>
-                                <Button asChild variant="outline" size="icon" className="rounded-lg"><Link viewTransition to={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&phone=${encodeURIComponent(order.customerPhone)}`} aria-label={`Track ${order.orderNumber}`}><ArrowRight className="rtl:rotate-180" /></Link></Button>
+                                <Button asChild variant="outline" size="icon" className="rounded-lg"><Link viewTransition to={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}`} aria-label={`Track ${order.orderNumber}`}><ArrowRight className="rtl:rotate-180" /></Link></Button>
                             </div>
                         </article>
                     ))}
