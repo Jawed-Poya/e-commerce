@@ -91,22 +91,20 @@ export function NavMain({ groups }: { groups: NavigationGroup[] }) {
 
                             return (
                                 <Collapsible
-                                    key={item.titleKey}
+                                    key={`${item.titleKey}-${active ? "active" : "idle"}`}
                                     defaultOpen={active}
                                     className="group/collapsible"
                                 >
                                     <SidebarMenuItem>
-                                        <CollapsibleTrigger className="w-full">
-                                            <SidebarMenuButton
-                                                tooltip={t(item.titleKey)}
-                                                isActive={active}
-                                            >
-                                                {item.icon}
-                                                <span>{t(item.titleKey)}</span>
-                                                <CaretRightIcon
-                                                    className={`ms-auto size-4 transition-transform group-data-open/collapsible:rotate-90 ${language === "en" ? "" : "rotate-180 group-data-open/collapsible:rotate-90"}`}
-                                                />
-                                            </SidebarMenuButton>
+                                        <CollapsibleTrigger
+                                            className="w-full"
+                                            render={<SidebarMenuButton tooltip={t(item.titleKey)} isActive={active} />}
+                                        >
+                                            {item.icon}
+                                            <span>{t(item.titleKey)}</span>
+                                            <CaretRightIcon
+                                                className={`ms-auto size-4 transition-transform group-data-open/collapsible:rotate-90 ${language === "en" ? "" : "rotate-180 group-data-open/collapsible:rotate-90"}`}
+                                            />
                                         </CollapsibleTrigger>
                                         <CollapsibleContent>
                                             <SidebarMenuSub>
