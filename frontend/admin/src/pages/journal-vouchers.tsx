@@ -260,6 +260,7 @@ export default function JournalVouchersPage() {
 
             <AdjustmentDialog
                 open={adjustmentOpen}
+                accounts={accountBalances.data ?? []}
                 currencies={currencies}
                 onOpenChange={setAdjustmentOpen}
                 onSaved={refreshAccounting}
@@ -714,7 +715,7 @@ function VoucherDetailDialog({ voucher, canManage, onOpenChange, onReverse }: { 
     );
 }
 
-function AdjustmentDialog({ open, currencies, onOpenChange, onSaved }: { open: boolean; currencies: string[]; onOpenChange: (open: boolean) => void; onSaved: () => Promise<void> }) {
+function AdjustmentDialog({ open, accounts, currencies, onOpenChange, onSaved }: { open: boolean; accounts: JournalAccountBalance[]; currencies: string[]; onOpenChange: (open: boolean) => void; onSaved: () => Promise<void> }) {
     const { formatMoney, company } = useCompany();
     const [voucherDate, setVoucherDate] = useState(() => localDate(new Date()));
     const [currencyCode, setCurrencyCode] = useState(company?.settings.mainCurrencyCode ?? currencies[0] ?? "AFN");
@@ -722,6 +723,15 @@ function AdjustmentDialog({ open, currencies, onOpenChange, onSaved }: { open: b
     const [referenceNumber, setReferenceNumber] = useState("");
     const [memo, setMemo] = useState("");
     const [lines, setLines] = useState<DraftLine[]>([newLine(), newLine()]);
+    const accountOptions = useMemo(() => {
+        const available = new Map<string, { code: string; name: string }>(
+            standardAccounts.map((account) => [account.code, account]),
+        );
+        accounts
+            .filter((account) => account.currencyCode === currencyCode)
+            .forEach((account) => available.set(account.accountCode, { code: account.accountCode, name: account.accountName }));
+        return Array.from(available.values()).sort((left, right) => left.code.localeCompare(right.code));
+    }, [accounts, currencyCode]);
     const totals = useMemo(() => ({ debit: lines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0), credit: lines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0) }), [lines]);
     const difference = Math.abs(totals.debit - totals.credit);
     const balanced = totals.debit > 0 && difference < 0.01;
@@ -750,10 +760,9 @@ function AdjustmentDialog({ open, currencies, onOpenChange, onSaved }: { open: b
                 </div>
                 <p className="text-xs text-muted-foreground">{manualTypes.find((item) => item.value === voucherType)?.description}</p>
                 <div className="overflow-x-auto border">
-                    <datalist id="journal-account-codes">{standardAccounts.map((account) => <option key={account.code} value={account.code}>{account.name}</option>)}</datalist>
                     <div className="md:min-w-[950px]">
-                        <div className="hidden grid-cols-[45px_130px_220px_1fr_140px_140px_45px] gap-2 border-b bg-muted/50 p-2 text-xs font-bold md:grid"><span>#</span><span>Account code</span><span>Account name</span><span>Line description</span><span className="text-end">Debit</span><span className="text-end">Credit</span><span /></div>
-                        {lines.map((line, index) => <JournalLine key={line.key} id={`journal-line-${index}`} line={line} index={index} onChange={(next) => setLines((current) => current.map((item) => item.key === line.key ? next : item))} onRemove={() => setLines((current) => current.length > 2 ? current.filter((item) => item.key !== line.key) : current)} />)}
+                        <div className="hidden grid-cols-[45px_170px_180px_1fr_140px_140px_45px] gap-2 border-b bg-muted/50 p-2 text-xs font-bold md:grid"><span>#</span><span>Account code</span><span>Account name</span><span>Line description</span><span className="text-end">Debit</span><span className="text-end">Credit</span><span /></div>
+                        {lines.map((line, index) => <JournalLine key={line.key} id={`journal-line-${index}`} line={line} index={index} accounts={accountOptions} onChange={(next) => setLines((current) => current.map((item) => item.key === line.key ? next : item))} onRemove={() => setLines((current) => current.length > 2 ? current.filter((item) => item.key !== line.key) : current)} />)}
                         <div className="grid grid-cols-2 gap-2 bg-muted/30 p-3 text-sm font-bold md:grid-cols-[1fr_140px_140px_45px]"><span className="col-span-2 md:col-span-1 md:text-end">Totals · {currencyCode}</span><span className="tabular-nums md:text-end"><span className="block text-[10px] font-medium text-muted-foreground md:hidden">Debit</span>{money(totals.debit)}</span><span className="text-end tabular-nums"><span className="block text-[10px] font-medium text-muted-foreground md:hidden">Credit</span>{money(totals.credit)}</span><span className="hidden md:block" /></div>
                     </div>
                 </div>
@@ -766,9 +775,9 @@ function AdjustmentDialog({ open, currencies, onOpenChange, onSaved }: { open: b
     );
 }
 
-function JournalLine({ id, line, index, onChange, onRemove }: { id: string; line: DraftLine; index: number; onChange: (line: DraftLine) => void; onRemove: () => void }) {
+function JournalLine({ id, line, index, accounts, onChange, onRemove }: { id: string; line: DraftLine; index: number; accounts: { code: string; name: string }[]; onChange: (line: DraftLine) => void; onRemove: () => void }) {
     const field = <K extends keyof DraftLine>(key: K, value: DraftLine[K]) => onChange({ ...line, [key]: value });
-    return <div id={id} className="grid scroll-mt-24 grid-cols-2 gap-3 border-b p-3 last:border-b-0 md:grid-cols-[45px_130px_220px_1fr_140px_140px_45px] md:gap-2 md:p-2"><span className="col-span-2 self-center text-sm font-semibold text-muted-foreground md:col-span-1 md:text-center">Line {index + 1}</span><JournalInput label="Account code"><Input aria-label={`Line ${index + 1} account code`} list="journal-account-codes" value={line.accountCode} onChange={(event) => { const accountCode = event.target.value; const standard = standardAccounts.find((account) => account.code === accountCode.trim()); onChange({ ...line, accountCode, accountName: standard?.name ?? line.accountName }); }} placeholder="1000" /></JournalInput><JournalInput label="Account name"><Input aria-label={`Line ${index + 1} account name`} value={line.accountName} onChange={(event) => field("accountName", event.target.value)} placeholder="Cash on Hand" /></JournalInput><JournalInput label="Description" className="col-span-2 md:col-span-1"><Input aria-label={`Line ${index + 1} description`} value={line.description ?? ""} onChange={(event) => field("description", event.target.value)} placeholder="What this line represents" /></JournalInput><JournalInput label="Debit"><Input aria-label={`Line ${index + 1} debit`} className="text-end" type="number" min={0} step="0.01" value={line.debit || ""} onChange={(event) => { const debit = Number(event.target.value); onChange({ ...line, debit, credit: debit > 0 ? 0 : line.credit }); }} /></JournalInput><JournalInput label="Credit"><Input aria-label={`Line ${index + 1} credit`} className="text-end" type="number" min={0} step="0.01" value={line.credit || ""} onChange={(event) => { const credit = Number(event.target.value); onChange({ ...line, credit, debit: credit > 0 ? 0 : line.debit }); }} /></JournalInput><Button className="col-span-2 justify-self-end md:col-span-1" size="icon" variant="ghost" title={`Remove line ${index + 1}`} onClick={onRemove}><Trash2 className="size-4 text-destructive" /></Button></div>;
+    return <div id={id} className="grid scroll-mt-24 grid-cols-2 gap-3 border-b p-3 last:border-b-0 md:grid-cols-[45px_170px_180px_1fr_140px_140px_45px] md:gap-2 md:p-2"><span className="col-span-2 self-center text-sm font-semibold text-muted-foreground md:col-span-1 md:text-center">Line {index + 1}</span><JournalInput label="Account code"><SimpleCombobox<string> value={line.accountCode || null} onValueChange={(accountCode) => { const account = accounts.find((item) => item.code === accountCode); onChange({ ...line, accountCode: account?.code ?? "", accountName: account?.name ?? "" }); }} options={accounts.map((account) => ({ value: account.code, label: account.code, description: account.name }))} placeholder="Select account…" emptyText="No matching account found." /></JournalInput><JournalInput label="Account name"><Input aria-label={`Line ${index + 1} account name`} value={line.accountName} onChange={(event) => field("accountName", event.target.value)} placeholder="Cash on Hand" /></JournalInput><JournalInput label="Description" className="col-span-2 md:col-span-1"><Input aria-label={`Line ${index + 1} description`} value={line.description ?? ""} onChange={(event) => field("description", event.target.value)} placeholder="What this line represents" /></JournalInput><JournalInput label="Debit"><Input aria-label={`Line ${index + 1} debit`} className="text-end" type="number" min={0} step="0.01" value={line.debit || ""} onChange={(event) => { const debit = Number(event.target.value); onChange({ ...line, debit, credit: debit > 0 ? 0 : line.credit }); }} /></JournalInput><JournalInput label="Credit"><Input aria-label={`Line ${index + 1} credit`} className="text-end" type="number" min={0} step="0.01" value={line.credit || ""} onChange={(event) => { const credit = Number(event.target.value); onChange({ ...line, credit, debit: credit > 0 ? 0 : line.debit }); }} /></JournalInput><Button className="col-span-2 justify-self-end md:col-span-1" size="icon" variant="ghost" title={`Remove line ${index + 1}`} onClick={onRemove}><Trash2 className="size-4 text-destructive" /></Button></div>;
 }
 
 function JournalInput({ label, className, children }: { label: string; className?: string; children: ReactNode }) { return <div className={cn("space-y-1", className)}><Label className="text-[11px] text-muted-foreground md:hidden">{label}</Label>{children}</div>; }
