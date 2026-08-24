@@ -8,7 +8,7 @@ import {
   readReferenceItems,
   writeCachedValue,
 } from "@/features/offline/offline-reference-cache";
-import type { CreateJournalVoucher, DocumentPayment, Expense, ExpenseCategory, JournalAccountBalance, JournalVoucher, JournalVoucherStatus, JournalVoucherSummary, JournalVoucherType, ManualSale, ManualSaleLotMovement, OperationCustomer, OperationPolicy, OperationProduct, OperationSummary, PagedResult, Purchase, PurchaseDetails, QuickCreateProduct, SalaryPayment, Staff, Supplier, SupplierLedger } from "./operations-types";
+import type { CreateJournalVoucher, DocumentPayment, Expense, ExpenseCategory, JournalAccountBalance, JournalAccountLedger, JournalVoucher, JournalVoucherStatus, JournalVoucherSummary, JournalVoucherType, ManualSale, ManualSaleLotMovement, OperationCustomer, OperationPolicy, OperationProduct, OperationSummary, PagedResult, Purchase, PurchaseDetails, QuickCreateProduct, SalaryPayment, Staff, Supplier, SupplierLedger } from "./operations-types";
 
 const base = "/admin/operations";
 
@@ -164,9 +164,13 @@ export const operationsService = {
   saveExpenseCategory: (id: number | null, body: Omit<ExpenseCategory, "id">) => id ? apiClient.put<ExpenseCategory>(`${base}/expense-categories/${id}`, body) : apiClient.post<ExpenseCategory>(`${base}/expense-categories`, body),
   expenses: (page = 1, pageSize = 20) => apiClient.get<PagedResult<Expense>>(`${base}/expenses`, { page, pageSize }),
   createExpense: (body: unknown) => apiClient.post<Expense>(`${base}/expenses`, body),
-  journalVouchers: (params: { search?: string; type?: JournalVoucherType; status?: JournalVoucherStatus; systemGenerated?: boolean; page?: number; pageSize?: number } = {}) => apiClient.get<PagedResult<JournalVoucher>>(`${base}/journal-vouchers`, params),
+  journalVouchers: (params: { search?: string; type?: JournalVoucherType; status?: JournalVoucherStatus; systemGenerated?: boolean; startDate?: string; endDate?: string; currencyCode?: string; page?: number; pageSize?: number } = {}) => apiClient.get<PagedResult<JournalVoucher>>(`${base}/journal-vouchers`, params),
   journalVoucherSummary: () => apiClient.get<JournalVoucherSummary>(`${base}/journal-vouchers/summary`),
   journalAccountBalances: () => apiClient.get<JournalAccountBalance[]>(`${base}/journal-vouchers/accounts`),
+  journalAccountLedger: (params: { accountCode: string; startDate?: string; endDate?: string; currencyCode?: string }) => apiClient.get<JournalAccountLedger>(`${base}/journal-vouchers/ledger`, params),
+  journalVoucher: (id: number) => apiClient.get<JournalVoucher>(`${base}/journal-vouchers/${id}`),
+  downloadJournalVoucher: (id: number) => apiClient.download(`${base}/journal-vouchers/${id}/pdf`),
+  downloadJournalAccountLedger: (params: { accountCode: string; startDate?: string; endDate?: string; currencyCode?: string }) => apiClient.download(`${base}/journal-vouchers/ledger/pdf`, params),
   createJournalVoucher: (body: CreateJournalVoucher) => apiClient.post<JournalVoucher>(`${base}/journal-vouchers`, body),
   reverseJournalVoucher: (id: number, reason: string) => apiClient.post<JournalVoucher>(`${base}/journal-vouchers/${id}/reverse`, { reason }),
   syncJournalVouchers: () => apiClient.post<{ createdVouchers: number }>(`${base}/journal-vouchers/sync`),

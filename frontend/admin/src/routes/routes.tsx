@@ -180,6 +180,12 @@ const routes: RouteObject[] = [
                         ],
                     },
                     {
+                        path: "accounting",
+                        lazy: lazyAllowed(Permissions.ExpensesView, () =>
+                            import("@/pages/journal-vouchers").then((module) => module.default),
+                        ),
+                    },
+                    {
                         path: "customers",
                         children: [
                             {

@@ -58,11 +58,22 @@ const navigation: ProtectedGroup[] = [
                 icon: <LayoutDashboard />,
                 permission: Permissions.DashboardView,
             },
+        ],
+    },
+    {
+        labelKey: "nav.finance",
+        items: [
             {
                 titleKey: "nav.financialReports",
                 url: "/reports",
                 icon: <BarChart3 />,
                 permission: Permissions.FinancialReportsView,
+            },
+            {
+                titleKey: "nav.journalVouchers",
+                url: "/accounting",
+                icon: <BookOpen />,
+                permission: Permissions.ExpensesView,
             },
         ],
     },
@@ -132,12 +143,6 @@ const navigation: ProtectedGroup[] = [
                     {
                         titleKey: "nav.expenses",
                         url: "/operations/expenses",
-                        permission: Permissions.ExpensesView,
-                    },
-                    {
-                        titleKey: "nav.journalVouchers",
-                        url: "/operations/journal",
-                        icon: <BookOpen />,
                         permission: Permissions.ExpensesView,
                     },
                 ],
