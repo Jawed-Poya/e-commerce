@@ -1,9 +1,4 @@
 import {
-    HubConnectionBuilder,
-    HubConnectionState,
-    LogLevel,
-} from "@microsoft/signalr";
-import {
     createContext,
     useCallback,
     useContext,
@@ -256,49 +251,54 @@ export function NotificationProvider({ children }: PropsWithChildren) {
         }
 
         let disposed = false;
-        const connection = new HubConnectionBuilder()
-            .withUrl(hubUrl, {
-                accessTokenFactory: () =>
-                    localStorage.getItem(customerTokenKey) ?? "",
-            })
-            .withAutomaticReconnect([0, 2_000, 5_000, 10_000, 30_000])
-            .configureLogging(LogLevel.Warning)
-            .build();
+        let connection: import("@microsoft/signalr").HubConnection | null = null;
+        setRealtimeStatus("connecting");
 
-        connection.on("storeNotification", (item: StoreNotification) => {
-            receiveNotifications([item]);
-            // Keep the polling cursor based on server time. A customer device clock
-            // can be ahead of the API server and must not cause persisted events to be skipped.
-        });
-        connection.onreconnecting(() => setRealtimeStatus("reconnecting"));
-        connection.onreconnected(async () => {
-            if (connection.state === HubConnectionState.Connected) {
-                await connection.invoke("Subscribe", trackedIds);
-                setRealtimeStatus("live");
-                await poll();
-            }
-        });
-        connection.onclose(() => {
+        void import("@microsoft/signalr").then(({ HubConnectionBuilder, HubConnectionState, LogLevel }) => {
+            if (disposed) return;
+            connection = new HubConnectionBuilder()
+                .withUrl(hubUrl, {
+                    accessTokenFactory: () =>
+                        localStorage.getItem(customerTokenKey) ?? "",
+                })
+                .withAutomaticReconnect([0, 2_000, 5_000, 10_000, 30_000])
+                .configureLogging(LogLevel.Warning)
+                .build();
+
+            connection.on("storeNotification", (item: StoreNotification) => {
+                receiveNotifications([item]);
+                // Keep the polling cursor based on server time. A customer device clock
+                // can be ahead of the API server and must not cause persisted events to be skipped.
+            });
+            connection.onreconnecting(() => setRealtimeStatus("reconnecting"));
+            connection.onreconnected(async () => {
+                if (connection?.state === HubConnectionState.Connected) {
+                    await connection.invoke("Subscribe", trackedIds);
+                    setRealtimeStatus("live");
+                    await poll();
+                }
+            });
+            connection.onclose(() => {
+                if (!disposed) setRealtimeStatus("polling");
+            });
+
+            void connection.start()
+                .then(async () => {
+                    if (disposed || !connection) return;
+                    await connection.invoke("Subscribe", trackedIds);
+                    setRealtimeStatus("live");
+                    await poll();
+                })
+                .catch(() => {
+                    if (!disposed) setRealtimeStatus("polling");
+                });
+        }).catch(() => {
             if (!disposed) setRealtimeStatus("polling");
         });
 
-        const connect = async () => {
-            setRealtimeStatus("connecting");
-            try {
-                await connection.start();
-                if (disposed) return;
-                await connection.invoke("Subscribe", trackedIds);
-                setRealtimeStatus("live");
-                await poll();
-            } catch {
-                if (!disposed) setRealtimeStatus("polling");
-            }
-        };
-
-        void connect();
         return () => {
             disposed = true;
-            void connection.stop();
+            void connection?.stop();
         };
         // trackedKey and customer identity intentionally rebuild subscriptions.
         // eslint-disable-next-line react-hooks/exhaustive-deps

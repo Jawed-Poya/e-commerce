@@ -1,8 +1,4 @@
 import {
-  HubConnectionBuilder,
-  LogLevel,
-} from "@microsoft/signalr";
-import {
   createContext,
   useCallback,
   useContext,
@@ -296,24 +292,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (!auth.user?.customerId) return;
 
     let disposed = false;
-    const connection = new HubConnectionBuilder()
-      .withUrl(apiUrl("/hubs/store-notifications"), {
-        accessTokenFactory: () => localStorage.getItem(customerTokenKey) ?? "",
-      })
-      .withAutomaticReconnect([0, 2_000, 5_000, 10_000])
-      .configureLogging(LogLevel.Warning)
-      .build();
+    let connection: import("@microsoft/signalr").HubConnection | null = null;
 
-    connection.on("cartUpdated", () => {
-      if (cartEventTimerRef.current !== null) {
-        window.clearTimeout(cartEventTimerRef.current);
-      }
-      cartEventTimerRef.current = window.setTimeout(() => {
-        if (!disposed) requestCartSync();
-      }, 450);
-    });
-    connection.onreconnected(() => requestCartSync());
-    void connection.start().catch(() => undefined);
+    void import("@microsoft/signalr").then(({ HubConnectionBuilder, LogLevel }) => {
+      if (disposed) return;
+      connection = new HubConnectionBuilder()
+        .withUrl(apiUrl("/hubs/store-notifications"), {
+          accessTokenFactory: () => localStorage.getItem(customerTokenKey) ?? "",
+        })
+        .withAutomaticReconnect([0, 2_000, 5_000, 10_000])
+        .configureLogging(LogLevel.Warning)
+        .build();
+
+      connection.on("cartUpdated", () => {
+        if (cartEventTimerRef.current !== null) {
+          window.clearTimeout(cartEventTimerRef.current);
+        }
+        cartEventTimerRef.current = window.setTimeout(() => {
+          if (!disposed) requestCartSync();
+        }, 450);
+      });
+      connection.onreconnected(() => requestCartSync());
+      void connection.start().catch(() => undefined);
+    }).catch(() => undefined);
 
     return () => {
       disposed = true;
@@ -321,7 +322,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         window.clearTimeout(cartEventTimerRef.current);
         cartEventTimerRef.current = null;
       }
-      void connection.stop();
+      void connection?.stop();
     };
   }, [auth.user?.customerId, requestCartSync]);
 

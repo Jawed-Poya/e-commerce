@@ -73,7 +73,7 @@ export function HomePage() {
 
     const products = useProducts({
         page: 1,
-        pageSize: 30,
+        pageSize: 20,
         isActive: true,
         inStock: true,
         sortBy: "createdAt",
