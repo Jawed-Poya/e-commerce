@@ -4,6 +4,7 @@ using ECommerce.Entities.Common;
 using ECommerce.Entities.Operations;
 using ECommerce.Entities.Operations.Contracts;
 using ECommerce.Services.Operations;
+using ECommerce.Services.Documents;
 using ECommerce.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,7 +15,7 @@ namespace ECommerce.Controllers;
 [ApiController]
 [Route("api/admin/operations")]
 [Authorize]
-public sealed class AdminOperationsController(IOperationsService service) : ControllerBase
+public sealed class AdminOperationsController(IOperationsService service, IFinancialDocumentService documents) : ControllerBase
 {
     [Authorize(Policy = AppPermissions.OperationsView)]
     [HttpGet("summary")]
@@ -197,11 +198,14 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
         [FromQuery] JournalVoucherType? type,
         [FromQuery] JournalVoucherStatus? status,
         [FromQuery] bool? systemGenerated,
+        [FromQuery] DateOnly? startDate,
+        [FromQuery] DateOnly? endDate,
+        [FromQuery] string? currencyCode,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken ct = default) =>
         Ok(ApiResponse<PagedResult<JournalVoucherResponse>>.Ok(
-            await service.GetJournalVouchersAsync(search, type, status, systemGenerated, page, pageSize, ct)));
+            await service.GetJournalVouchersAsync(search, type, status, systemGenerated, startDate, endDate, currencyCode, page, pageSize, ct)));
 
     [Authorize(Policy = AppPermissions.ExpensesView)]
     [HttpGet("journal-vouchers/summary")]
@@ -212,6 +216,49 @@ public sealed class AdminOperationsController(IOperationsService service) : Cont
     [HttpGet("journal-vouchers/accounts")]
     public async Task<IActionResult> JournalAccountBalances(CancellationToken ct = default) =>
         Ok(ApiResponse<IReadOnlyList<JournalAccountBalanceResponse>>.Ok(await service.GetJournalAccountBalancesAsync(ct)));
+
+    [Authorize(Policy = AppPermissions.ExpensesView)]
+    [HttpGet("journal-vouchers/ledger")]
+    public Task<IActionResult> JournalAccountLedger(
+        [FromQuery] string accountCode,
+        [FromQuery] DateOnly? startDate,
+        [FromQuery] DateOnly? endDate,
+        [FromQuery] string? currencyCode,
+        CancellationToken ct) =>
+        Handle(async () => ApiResponse<JournalAccountLedgerResponse>.Ok(
+            await service.GetJournalAccountLedgerAsync(accountCode, startDate, endDate, currencyCode, ct)));
+
+    [Authorize(Policy = AppPermissions.ExpensesView)]
+    [HttpGet("journal-vouchers/ledger/pdf")]
+    public async Task<IActionResult> JournalAccountLedgerPdf(
+        [FromQuery] string accountCode,
+        [FromQuery] DateOnly? startDate,
+        [FromQuery] DateOnly? endDate,
+        [FromQuery] string? currencyCode,
+        CancellationToken ct)
+    {
+        var ledger = await service.GetJournalAccountLedgerAsync(accountCode, startDate, endDate, currencyCode, ct);
+        var companyName = await documents.GetCompanyNameAsync(ct);
+        var fileName = $"general-ledger-{ledger.AccountCode}-{ledger.StartDate:yyyyMMdd}-{ledger.EndDate:yyyyMMdd}.pdf";
+        return File(documents.CreateJournalAccountLedgerPdf(ledger, companyName), "application/pdf", fileName);
+    }
+
+    [Authorize(Policy = AppPermissions.ExpensesView)]
+    [HttpGet("journal-vouchers/{id:long}")]
+    public Task<IActionResult> JournalVoucher(long id, CancellationToken ct) =>
+        Handle(async () => ApiResponse<JournalVoucherResponse>.Ok(await service.GetJournalVoucherAsync(id, ct)));
+
+    [Authorize(Policy = AppPermissions.ExpensesView)]
+    [HttpGet("journal-vouchers/{id:long}/pdf")]
+    public async Task<IActionResult> JournalVoucherPdf(long id, CancellationToken ct)
+    {
+        var voucher = await service.GetJournalVoucherAsync(id, ct);
+        var companyName = await documents.GetCompanyNameAsync(ct);
+        return File(
+            documents.CreateJournalVoucherPdf(voucher, companyName),
+            "application/pdf",
+            $"voucher-{voucher.VoucherNumber}.pdf");
+    }
 
     [Authorize(Policy = AppPermissions.ExpensesManage)]
     [HttpPost("journal-vouchers")]

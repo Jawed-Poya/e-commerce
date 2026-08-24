@@ -1,5 +1,6 @@
 using ECommerce.Dtos.Documents;
 using ECommerce.Dtos.Reports;
+using ECommerce.Entities.Operations.Contracts;
 
 namespace ECommerce.Services.Documents;
 
@@ -9,6 +10,8 @@ public interface IFinancialDocumentService
     byte[] CreateFinancialReportPdf(FinancialReportSummaryResponse report, string companyName);
     byte[] CreateCustomerLedgerExcel(CustomerLedgerResponse ledger, string companyName);
     byte[] CreateCustomerLedgerPdf(CustomerLedgerResponse ledger, string companyName);
+    byte[] CreateJournalVoucherPdf(JournalVoucherResponse voucher, string companyName);
+    byte[] CreateJournalAccountLedgerPdf(JournalAccountLedgerResponse ledger, string companyName);
     Task<byte[]> CreateProductsPdfAsync(OperationalDocumentFilter filter, CancellationToken cancellationToken = default);
     Task<byte[]> CreateSalesPdfAsync(OperationalDocumentFilter filter, CancellationToken cancellationToken = default);
     Task<byte[]> CreatePurchasesPdfAsync(OperationalDocumentFilter filter, CancellationToken cancellationToken = default);

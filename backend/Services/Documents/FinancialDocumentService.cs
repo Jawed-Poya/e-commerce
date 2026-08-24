@@ -4,6 +4,7 @@ using ECommerce.Data;
 using ECommerce.Dtos.Documents;
 using ECommerce.Dtos.Reports;
 using ECommerce.Entities.Operations;
+using ECommerce.Entities.Operations.Contracts;
 using ECommerce.Services.Company;
 using ECommerce.Shared;
 using Microsoft.EntityFrameworkCore;
@@ -245,6 +246,122 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
                         text.Span(" / ");
                         text.TotalPages();
                     });
+            });
+        }).GeneratePdf();
+
+    public byte[] CreateJournalVoucherPdf(JournalVoucherResponse voucher, string companyName) =>
+        Document.Create(document =>
+        {
+            document.Page(page =>
+            {
+                ConfigurePage(page);
+                page.Header().Row(row =>
+                {
+                    row.RelativeItem().Column(column =>
+                    {
+                        column.Item().Text(companyName).FontSize(18).Bold().FontColor(Navy);
+                        column.Item().Text("Journal voucher").FontSize(11).FontColor(Slate);
+                    });
+                    row.AutoItem().AlignRight().Column(column =>
+                    {
+                        column.Item().AlignRight().Text(voucher.VoucherNumber).FontSize(13).Bold().FontColor(Navy);
+                        column.Item().AlignRight().Text($"{voucher.VoucherDate:yyyy-MM-dd} · {voucher.CurrencyCode} · {voucher.Status}").FontSize(8).FontColor(Slate);
+                    });
+                });
+                page.Content().PaddingVertical(18).Column(column =>
+                {
+                    column.Spacing(14);
+                    column.Item().Element(container => MetricGrid(container,
+                    [
+                        ("Total debit", voucher.TotalDebit, Navy),
+                        ("Total credit", voucher.TotalCredit, Green),
+                        ("Difference", Math.Abs(voucher.TotalDebit - voucher.TotalCredit), voucher.TotalDebit == voucher.TotalCredit ? Green : Red)
+                    ], voucher.CurrencyCode));
+                    column.Item().Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.RelativeColumn(); columns.RelativeColumn(); columns.RelativeColumn();
+                        });
+                        VoucherInfoCell(table.Cell(), "Voucher type", SplitEnum(voucher.VoucherType.ToString()));
+                        VoucherInfoCell(table.Cell(), "Origin", voucher.IsSystemGenerated ? "Workflow generated" : "Controlled adjustment");
+                        VoucherInfoCell(table.Cell(), "External reference", voucher.ReferenceNumber ?? "—");
+                        VoucherInfoCell(table.Cell(), "Source document", voucher.SourceNumber ?? "—");
+                        VoucherInfoCell(table.Cell(), "Counterparty", voucher.CounterpartyName ?? "—");
+                        VoucherInfoCell(table.Cell(), "Posted by", voucher.OperatorName ?? "System");
+                    });
+                    column.Item().Column(details =>
+                    {
+                        details.Spacing(4);
+                        details.Item().Text("Business narration").FontSize(8).SemiBold().FontColor(Slate);
+                        details.Item().Background(Light).Border(1).BorderColor(Border).Padding(10).Text(voucher.Memo).FontSize(10);
+                    });
+                    column.Item().Text("Double-entry posting").FontSize(14).SemiBold().FontColor(Navy);
+                    column.Item().Element(container => VoucherLinesTable(container, voucher.Lines, voucher.CurrencyCode));
+                    if (!string.IsNullOrWhiteSpace(voucher.ReversalReason))
+                        column.Item().Background("#FEF2F2").Border(1).BorderColor("#FECACA").Padding(10)
+                            .Text($"Reversal reason: {voucher.ReversalReason}").FontColor(Red);
+                    column.Item().PaddingTop(22).Row(row =>
+                    {
+                        SignatureLine(row.RelativeItem(), "Prepared by");
+                        row.ConstantItem(18);
+                        SignatureLine(row.RelativeItem(), "Checked by");
+                        row.ConstantItem(18);
+                        SignatureLine(row.RelativeItem(), "Approved by");
+                    });
+                });
+                page.Footer().AlignCenter().Text(text =>
+                {
+                    text.DefaultTextStyle(style => style.FontSize(8).FontColor(Slate));
+                    text.Span("Immutable accounting record · Generated ");
+                    text.Span($"{DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC · ");
+                    text.CurrentPageNumber();
+                    text.Span(" / ");
+                    text.TotalPages();
+                });
+            });
+        }).GeneratePdf();
+
+    public byte[] CreateJournalAccountLedgerPdf(JournalAccountLedgerResponse ledger, string companyName) =>
+        Document.Create(document =>
+        {
+            document.Page(page =>
+            {
+                ConfigurePage(page);
+                page.Header().Element(container => ReportHeader(
+                    container,
+                    companyName,
+                    $"General ledger · {ledger.AccountCode} · {ledger.AccountName}",
+                    ledger.StartDate.ToDateTime(TimeOnly.MinValue),
+                    ledger.EndDate.ToDateTime(TimeOnly.MinValue)));
+                page.Content().PaddingVertical(16).Column(column =>
+                {
+                    column.Spacing(12);
+                    column.Item().Element(container => MetricGrid(container,
+                    [
+                        ("Opening balance", ledger.OpeningBalance, Slate),
+                        ("Period debit", ledger.PeriodDebit, Navy),
+                        ("Period credit", ledger.PeriodCredit, Green),
+                        ("Closing balance", ledger.ClosingBalance, ledger.ClosingBalance >= 0 ? Navy : Red)
+                    ], ledger.CurrencyCode));
+                    column.Item().Text($"{ledger.AccountCode} · {ledger.AccountName} · {ledger.CurrencyCode}")
+                        .FontSize(10).SemiBold().FontColor(Slate);
+                    column.Item().Element(container => JournalLedgerTable(container, ledger.Entries, ledger.CurrencyCode));
+                    column.Item().PaddingTop(18).Row(row =>
+                    {
+                        SignatureLine(row.RelativeItem(), "Prepared by");
+                        row.ConstantItem(22);
+                        SignatureLine(row.RelativeItem(), "Checked by");
+                    });
+                });
+                page.Footer().AlignCenter().Text(text =>
+                {
+                    text.DefaultTextStyle(style => style.FontSize(8).FontColor(Slate));
+                    text.Span("General ledger statement · ");
+                    text.CurrentPageNumber();
+                    text.Span(" / ");
+                    text.TotalPages();
+                });
             });
         }).GeneratePdf();
 
@@ -1376,6 +1493,73 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
             }
         });
     }
+
+    private static void VoucherLinesTable(IContainer container, IReadOnlyCollection<JournalVoucherLineResponse> lines, string currency)
+    {
+        container.Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.ConstantColumn(54); columns.RelativeColumn(1.4f); columns.RelativeColumn(2);
+                columns.ConstantColumn(78); columns.ConstantColumn(78);
+            });
+            table.Header(header =>
+            {
+                HeaderCell(header.Cell(), "Account"); HeaderCell(header.Cell(), "Account name");
+                HeaderCell(header.Cell(), "Description"); HeaderCell(header.Cell().AlignRight(), "Debit");
+                HeaderCell(header.Cell().AlignRight(), "Credit");
+            });
+            foreach (var line in lines)
+            {
+                BodyCell(table.Cell(), line.AccountCode); BodyCell(table.Cell(), line.AccountName);
+                BodyCell(table.Cell(), line.Description ?? "—");
+                BodyCell(table.Cell().AlignRight(), line.Debit > 0 ? Money(line.Debit, currency) : "—");
+                BodyCell(table.Cell().AlignRight(), line.Credit > 0 ? Money(line.Credit, currency) : "—");
+            }
+        });
+    }
+
+    private static void JournalLedgerTable(IContainer container, IReadOnlyCollection<JournalAccountLedgerEntryResponse> entries, string currency)
+    {
+        container.Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.ConstantColumn(58); columns.ConstantColumn(76); columns.RelativeColumn(2);
+                columns.ConstantColumn(66); columns.ConstantColumn(66); columns.ConstantColumn(76);
+            });
+            table.Header(header =>
+            {
+                HeaderCell(header.Cell(), "Date"); HeaderCell(header.Cell(), "Voucher");
+                HeaderCell(header.Cell(), "Narration"); HeaderCell(header.Cell().AlignRight(), "Debit");
+                HeaderCell(header.Cell().AlignRight(), "Credit"); HeaderCell(header.Cell().AlignRight(), "Balance");
+            });
+            foreach (var entry in entries)
+            {
+                BodyCell(table.Cell(), entry.VoucherDate.ToString("yyyy-MM-dd"));
+                BodyCell(table.Cell(), entry.VoucherNumber);
+                BodyCell(table.Cell(), entry.CounterpartyName is null ? entry.Memo : $"{entry.CounterpartyName} · {entry.Memo}");
+                BodyCell(table.Cell().AlignRight(), entry.Debit > 0 ? Money(entry.Debit, currency) : "—");
+                BodyCell(table.Cell().AlignRight(), entry.Credit > 0 ? Money(entry.Credit, currency) : "—");
+                BodyCell(table.Cell().AlignRight(), Money(entry.Balance, currency));
+            }
+            if (entries.Count == 0)
+                BodyCell(table.Cell().ColumnSpan(6).AlignCenter(), "No account activity in this period.");
+        });
+    }
+
+    private static void VoucherInfoCell(IContainer container, string label, string value) =>
+        container.Padding(4).Background(Light).Border(1).BorderColor(Border).Padding(9).Column(column =>
+        {
+            column.Item().Text(label).FontSize(7.5f).FontColor(Slate);
+            column.Item().Text(value).FontSize(9).SemiBold().FontColor(Navy);
+        });
+
+    private static void SignatureLine(IContainer container, string label) =>
+        container.PaddingTop(22).BorderTop(1).BorderColor(Slate).PaddingTop(5).Text(label).FontSize(8).FontColor(Slate);
+
+    private static string SplitEnum(string value) => string.Concat(value.Select((character, index) =>
+        index > 0 && char.IsUpper(character) ? $" {character}" : character.ToString()));
 
     private static void HeaderCell(IContainer container, string text) =>
         container.Background(Navy).PaddingVertical(6).PaddingHorizontal(5).Text(text).FontSize(8).SemiBold().FontColor(Colors.White);

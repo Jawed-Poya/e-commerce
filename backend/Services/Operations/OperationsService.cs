@@ -1228,6 +1228,9 @@ public sealed class OperationsService(
         JournalVoucherType? type,
         JournalVoucherStatus? status,
         bool? systemGenerated,
+        DateOnly? startDate,
+        DateOnly? endDate,
+        string? currencyCode,
         int page,
         int pageSize,
         CancellationToken ct)
@@ -1247,6 +1250,10 @@ public sealed class OperationsService(
         if (type.HasValue) query = query.Where(item => item.VoucherType == type.Value);
         if (status.HasValue) query = query.Where(item => item.Status == status.Value);
         if (systemGenerated.HasValue) query = query.Where(item => item.IsSystemGenerated == systemGenerated.Value);
+        if (startDate.HasValue) query = query.Where(item => item.VoucherDate >= startDate.Value);
+        if (endDate.HasValue) query = query.Where(item => item.VoucherDate <= endDate.Value);
+        var cleanCurrency = CleanCurrency(currencyCode);
+        if (cleanCurrency is not null) query = query.Where(item => item.CurrencyCode == cleanCurrency);
         var totalCount = await query.CountAsync(ct);
         var items = await query.OrderByDescending(x => x.VoucherDate).ThenByDescending(x => x.Id)
             .Skip((page - 1) * pageSize).Take(pageSize)
@@ -1342,6 +1349,85 @@ public sealed class OperationsService(
             .ToArray();
     }
 
+    public async Task<JournalAccountLedgerResponse> GetJournalAccountLedgerAsync(
+        string accountCode,
+        DateOnly? startDate,
+        DateOnly? endDate,
+        string? currencyCode,
+        CancellationToken ct)
+    {
+        var cleanCode = Clean(accountCode) ?? throw new ArgumentException("Select a ledger account.");
+        var currency = CleanCurrency(currencyCode) ?? await GetCurrencyCodeAsync(ct);
+        var effectiveEnd = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var effectiveStart = startDate ?? new DateOnly(effectiveEnd.Year, 1, 1);
+        if (effectiveStart > effectiveEnd) throw new ArgumentException("The ledger start date must be on or before the end date.");
+
+        var baseQuery = context.JournalVoucherLines.AsNoTracking()
+            .Where(line => line.AccountCode == cleanCode &&
+                line.JournalVoucher.CurrencyCode == currency &&
+                (!branchContext.BranchId.HasValue || line.JournalVoucher.BranchId == branchContext.BranchId.Value));
+        var accountName = await baseQuery
+            .OrderByDescending(line => line.JournalVoucher.VoucherDate)
+            .ThenByDescending(line => line.Id)
+            .Select(line => line.AccountName)
+            .FirstOrDefaultAsync(ct)
+            ?? throw new KeyNotFoundException($"Account {cleanCode} was not found in the {currency} ledger.");
+        var openingBalance = await baseQuery
+            .Where(line => line.JournalVoucher.VoucherDate < effectiveStart)
+            .SumAsync(line => line.Debit - line.Credit, ct);
+        var periodLines = await baseQuery
+            .Where(line => line.JournalVoucher.VoucherDate >= effectiveStart && line.JournalVoucher.VoucherDate <= effectiveEnd)
+            .OrderBy(line => line.JournalVoucher.VoucherDate)
+            .ThenBy(line => line.JournalVoucher.Id)
+            .ThenBy(line => line.Id)
+            .Select(line => new
+            {
+                VoucherId = line.JournalVoucherId,
+                line.JournalVoucher.VoucherNumber,
+                line.JournalVoucher.VoucherDate,
+                line.JournalVoucher.VoucherType,
+                line.JournalVoucher.Memo,
+                line.JournalVoucher.ReferenceNumber,
+                line.JournalVoucher.CounterpartyName,
+                line.Debit,
+                line.Credit,
+                line.JournalVoucher.Status,
+                IsReversal = line.JournalVoucher.VoucherType == JournalVoucherType.Reversal
+            })
+            .ToListAsync(ct);
+
+        var balance = openingBalance;
+        var entries = periodLines.Select(line =>
+        {
+            balance += line.Debit - line.Credit;
+            return new JournalAccountLedgerEntryResponse(
+                line.VoucherId,
+                line.VoucherNumber,
+                line.VoucherDate,
+                line.VoucherType,
+                line.Memo,
+                line.ReferenceNumber,
+                line.CounterpartyName,
+                line.Debit,
+                line.Credit,
+                balance,
+                line.Status,
+                line.IsReversal);
+        }).ToList();
+
+        return new JournalAccountLedgerResponse(
+            cleanCode,
+            accountName,
+            currency,
+            effectiveStart,
+            effectiveEnd,
+            openingBalance,
+            periodLines.Sum(line => line.Debit),
+            periodLines.Sum(line => line.Credit),
+            balance,
+            entries);
+    }
+
     public async Task<JournalVoucherResponse> CreateJournalVoucherAsync(CreateJournalVoucherRequest request, string? userId, CancellationToken ct)
     {
         RequireText(request.Memo, "Voucher memo");
@@ -1410,7 +1496,7 @@ public sealed class OperationsService(
         {
             VoucherNumber = voucherNumber,
             VoucherDate = request.VoucherDate == default ? DateOnly.FromDateTime(DateTime.UtcNow) : request.VoucherDate,
-            CurrencyCode = await GetCurrencyCodeAsync(ct),
+            CurrencyCode = CleanCurrency(request.CurrencyCode) ?? await GetCurrencyCodeAsync(ct),
             VoucherType = request.VoucherType,
             Status = JournalVoucherStatus.Posted,
             IsSystemGenerated = false,
@@ -1440,6 +1526,9 @@ public sealed class OperationsService(
         var reversal = await accounting.ReverseManualVoucherAsync(id, reason, userId, ct);
         return await GetJournalVoucherByIdAsync(reversal.Id, ct);
     }
+
+    public Task<JournalVoucherResponse> GetJournalVoucherAsync(long id, CancellationToken ct) =>
+        GetJournalVoucherByIdAsync(id, ct);
 
     public async Task<JournalVoucherSyncResponse> SyncJournalVouchersAsync(string? userId, CancellationToken ct)
     {
@@ -1903,5 +1992,13 @@ public sealed class OperationsService(
         return $"{normalized}-{Guid.NewGuid():N}"[..(normalized.Length + 9)];
     }
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string? CleanCurrency(string? value)
+    {
+        var currency = Clean(value)?.ToUpperInvariant();
+        if (currency is null) return null;
+        if (currency.Length != 3 || !currency.All(char.IsLetter))
+            throw new ArgumentException("Currency code must contain exactly three letters.");
+        return currency;
+    }
     private static void RequireText(string? value, string field) { if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException($"{field} is required."); }
 }

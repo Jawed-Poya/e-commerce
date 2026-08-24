@@ -234,6 +234,7 @@ public sealed record ExpenseResponse(long Id, DateOnly ExpenseDate, long Categor
 public sealed class CreateJournalVoucherRequest
 {
     public DateOnly VoucherDate { get; set; }
+    public string? CurrencyCode { get; set; }
     public JournalVoucherType VoucherType { get; set; } = JournalVoucherType.ManualAdjustment;
     public string Memo { get; set; } = null!;
     public string? ReferenceNumber { get; set; }
@@ -277,6 +278,30 @@ public sealed record JournalVoucherResponse(
     DateTime CreatedAt,
     IReadOnlyList<JournalVoucherLineResponse> Lines);
 public sealed record JournalAccountBalanceResponse(string AccountCode, string AccountName, string CurrencyCode, decimal TotalDebit, decimal TotalCredit, decimal Balance, int EntryCount);
+public sealed record JournalAccountLedgerEntryResponse(
+    long VoucherId,
+    string VoucherNumber,
+    DateOnly VoucherDate,
+    JournalVoucherType VoucherType,
+    string Memo,
+    string? ReferenceNumber,
+    string? CounterpartyName,
+    decimal Debit,
+    decimal Credit,
+    decimal Balance,
+    JournalVoucherStatus Status,
+    bool IsReversal);
+public sealed record JournalAccountLedgerResponse(
+    string AccountCode,
+    string AccountName,
+    string CurrencyCode,
+    DateOnly StartDate,
+    DateOnly EndDate,
+    decimal OpeningBalance,
+    decimal PeriodDebit,
+    decimal PeriodCredit,
+    decimal ClosingBalance,
+    IReadOnlyList<JournalAccountLedgerEntryResponse> Entries);
 public sealed record JournalVoucherSummaryResponse(int TotalVouchers, int SystemGeneratedVouchers, int ManualVouchers, int ReversedVouchers, decimal TotalPostedDebits, string CurrencyCode, DateOnly? LastPostingDate);
 public sealed record JournalVoucherSyncResponse(int CreatedVouchers);
 public sealed class ReverseJournalVoucherRequest { public string Reason { get; set; } = null!; }
