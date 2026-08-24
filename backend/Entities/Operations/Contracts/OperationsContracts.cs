@@ -58,6 +58,15 @@ public sealed class CreateSupplierRequest
 public sealed record SupplierResponse(long Id, string Name, string? ContactPerson, string? Phone, string? Email, string? Address, string? TaxNumber, bool IsActive, decimal OutstandingBalance);
 public sealed record SupplierLedgerEntryResponse(DateOnly Date, string Type, string Reference, string Description, decimal Debit, decimal Credit, decimal Balance, long SourceId);
 public sealed record SupplierLedgerResponse(long SupplierId, string SupplierName, string CurrencyCode, decimal TotalPurchases, decimal TotalPayments, decimal ClosingBalance, IReadOnlyList<SupplierLedgerEntryResponse> Entries);
+public sealed record PartySettlementDocumentResponse(
+    long Id,
+    string DocumentNumber,
+    DateOnly DocumentDate,
+    string CurrencyCode,
+    decimal Total,
+    decimal PaidAmount,
+    decimal RemainingAmount,
+    DocumentPaymentStatus PaymentStatus);
 
 public sealed class CreatePurchaseRequest
 {

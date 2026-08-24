@@ -57,6 +57,10 @@ import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
 import { CustomerLedgerCard } from "@/features/company/customer-ledger-card";
 import { useCompany } from "@/features/company/company-context";
+import {
+    PartySettlementDialog,
+    type PartySettlementKind,
+} from "@/features/operations/components/party-settlement-dialog";
 import { operationsService } from "@/features/operations/operations-service";
 import type {
     CreateJournalVoucher,
@@ -615,9 +619,15 @@ function PartyLedgersWorkspace() {
     const { user } = useAdminAuth();
     const canViewCustomers = hasPermission(user, Permissions.ManualSalesView) && hasPermission(user, Permissions.FinancialReportsView);
     const canViewSuppliers = hasPermission(user, Permissions.PurchasesView);
+    const canReceiveCustomerPayment = hasPermission(user, Permissions.ManualSalesManage);
+    const canPaySupplier = hasPermission(user, Permissions.PurchasesManage);
     const [partyType, setPartyType] = useState<"customer" | "supplier">(canViewCustomers ? "customer" : "supplier");
     const [customer, setCustomer] = useState<OperationCustomer | null>(null);
     const [supplier, setSupplier] = useState<Supplier | null>(null);
+    const [settlement, setSettlement] = useState<{
+        kind: PartySettlementKind;
+        party: { id: number; name: string };
+    } | null>(null);
     const supplierLedger = useQuery({
         queryKey: ["operations", "supplier-ledger", supplier?.id],
         queryFn: async () => (await operationsService.supplierLedger(supplier!.id)).data,
@@ -637,9 +647,17 @@ function PartyLedgersWorkspace() {
                 </div>
             </div>
 
+            <div className="flex items-start gap-3 border border-primary/20 bg-primary/5 p-4">
+                <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
+                <div><p className="text-sm font-semibold">Settle the source document—not the balance directly</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Use Receive payment for customer money and Pay supplier for outgoing money. Each action updates the selected sale or purchase and creates its balanced voucher automatically; debit and credit account lines remain controlled by the system.</p></div>
+            </div>
+
             {partyType === "customer" && canViewCustomers ? (
                 <div className="space-y-5">
-                    <div className="max-w-xl space-y-2"><Label>Customer account</Label><ServerSearchCombobox<OperationCustomer> value={customer} onValueChange={setCustomer} queryKey={["accounting", "customer-search"]} search={(term) => operationsService.customers(term, 30)} getLabel={(item) => item.name} getDescription={(item) => `${item.phone || "No phone"} · Outstanding ${item.outstandingDebt.toLocaleString()}`} placeholder="Search customer name or phone…" /></div>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div className="w-full max-w-xl space-y-2"><Label>Customer account</Label><ServerSearchCombobox<OperationCustomer> value={customer} onValueChange={setCustomer} queryKey={["accounting", "customer-search"]} search={(term) => operationsService.customers(term, 30)} getLabel={(item) => item.name} getDescription={(item) => `${item.phone || "No phone"} · Outstanding ${item.outstandingDebt.toLocaleString()}`} placeholder="Search customer name or phone…" /></div>
+                        {canReceiveCustomerPayment ? <Button disabled={!customer} onClick={() => customer && setSettlement({ kind: "customer-receipt", party: { id: customer.id, name: customer.name } })}><ReceiptText />Receive payment</Button> : null}
+                    </div>
                     {customer ? <CustomerLedgerCard customerId={customer.id} customerName={customer.name} whatsAppUrl={customer.whatsAppUrl} /> : <PartyEmpty icon={<UsersRound />} title="Select a customer" text="Their sales, receipts, opening balance, closing balance, profit, PDF, and Excel statement will appear here." />}
                 </div>
             ) : null}
@@ -648,13 +666,25 @@ function PartyLedgersWorkspace() {
                 <div className="space-y-5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                         <div className="w-full max-w-xl space-y-2"><Label>Supplier account</Label><ServerSearchCombobox<Supplier> value={supplier} onValueChange={setSupplier} queryKey={["accounting", "supplier-search"]} search={(term) => operationsService.suppliers(term, 30)} getLabel={(item) => item.name} getDescription={(item) => [item.contactPerson, item.phone].filter(Boolean).join(" · ") || "Supplier account"} placeholder="Search supplier or company…" /></div>
-                        <Button variant="outline" render={<Link to="/operations/purchases" />}><ArrowRight />Open purchases</Button>
+                        <div className="flex flex-wrap gap-2">
+                            <Button variant="outline" render={<Link to="/operations/purchases" />}><ArrowRight />Open purchases</Button>
+                            {canPaySupplier ? <Button disabled={!supplier} onClick={() => supplier && setSettlement({ kind: "supplier-payment", party: { id: supplier.id, name: supplier.name } })}><Landmark />Pay supplier</Button> : null}
+                        </div>
                     </div>
                     {supplierLedger.isLoading ? <div className="grid h-64 place-items-center"><LoaderCircle className="size-6 animate-spin" /></div> : supplierLedger.data ? <SupplierStatement ledger={supplierLedger.data} /> : supplierLedger.isError ? <div className="border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{getApiErrorMessage(supplierLedger.error, "The supplier ledger could not be loaded.")}</div> : <PartyEmpty icon={<Building2 />} title="Select a supplier" text="Purchases, payments, and the running payable balance will appear here." />}
                 </div>
             ) : null}
 
             {!canViewCustomers && !canViewSuppliers ? <PartyEmpty icon={<ShieldCheck />} title="Ledger access is restricted" text="Financial reports or purchase-view permission is required to open party ledgers." /> : null}
+
+            {settlement ? (
+                <PartySettlementDialog
+                    open
+                    kind={settlement.kind}
+                    party={settlement.party}
+                    onOpenChange={(open) => !open && setSettlement(null)}
+                />
+            ) : null}
         </div>
     );
 }

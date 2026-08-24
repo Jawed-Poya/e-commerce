@@ -11,10 +11,12 @@ public interface IOperationsService
     Task<IReadOnlyList<OperationProductLookup>> GetProductLookupsAsync(string? search, int take, bool includeCurrentUnitCost, CancellationToken ct);
     Task<OperationProductLookup> QuickCreateProductAsync(QuickCreateProductRequest request, CancellationToken ct);
     Task<IReadOnlyList<OperationCustomerLookup>> GetCustomerLookupsAsync(string? search, int take, CancellationToken ct);
+    Task<IReadOnlyList<PartySettlementDocumentResponse>> GetCustomerSettlementDocumentsAsync(long customerId, CancellationToken ct);
     Task<IReadOnlyList<SupplierResponse>> GetSuppliersAsync(string? search, int take, CancellationToken ct);
     Task<PagedResult<SupplierResponse>> GetSupplierPageAsync(string? search, int page, int pageSize, CancellationToken ct);
     Task<SupplierResponse> SaveSupplierAsync(long? id, CreateSupplierRequest request, CancellationToken ct);
     Task<SupplierLedgerResponse> GetSupplierLedgerAsync(long id, CancellationToken ct);
+    Task<IReadOnlyList<PartySettlementDocumentResponse>> GetSupplierSettlementDocumentsAsync(long supplierId, CancellationToken ct);
     Task<PagedResult<PurchaseListItem>> GetPurchasesAsync(string? search, int page, int pageSize, CancellationToken ct);
     Task<PurchaseDetailsResponse> GetPurchaseAsync(long id, CancellationToken ct);
     Task<PurchaseListItem> CreatePurchaseAsync(CreatePurchaseRequest request, string? userId, bool canOverrideLineLimits, CancellationToken ct);

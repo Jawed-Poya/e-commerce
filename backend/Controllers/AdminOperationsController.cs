@@ -64,6 +64,12 @@ public sealed class AdminOperationsController(IOperationsService service, IFinan
     public async Task<IActionResult> Customers([FromQuery] string? search, [FromQuery] int take = 20, CancellationToken ct = default) =>
         Ok(ApiResponse<IReadOnlyList<OperationCustomerLookup>>.Ok(await service.GetCustomerLookupsAsync(search, take, ct)));
 
+    [Authorize(Policy = AppPermissions.ManualSalesView)]
+    [HttpGet("customers/{id:long}/settlement-documents")]
+    public Task<IActionResult> CustomerSettlementDocuments(long id, CancellationToken ct) =>
+        Handle(async () => ApiResponse<IReadOnlyList<PartySettlementDocumentResponse>>.Ok(
+            await service.GetCustomerSettlementDocumentsAsync(id, ct)));
+
     [Authorize(Policy = AppPermissions.PurchasesView)]
     [HttpGet("suppliers")]
     public async Task<IActionResult> Suppliers([FromQuery] string? search, [FromQuery] int take = 50, CancellationToken ct = default) =>
@@ -86,6 +92,12 @@ public sealed class AdminOperationsController(IOperationsService service, IFinan
     [HttpGet("suppliers/{id:long}/ledger")]
     public Task<IActionResult> SupplierLedger(long id, CancellationToken ct) =>
         Handle(async () => ApiResponse<SupplierLedgerResponse>.Ok(await service.GetSupplierLedgerAsync(id, ct)));
+
+    [Authorize(Policy = AppPermissions.PurchasesView)]
+    [HttpGet("suppliers/{id:long}/settlement-documents")]
+    public Task<IActionResult> SupplierSettlementDocuments(long id, CancellationToken ct) =>
+        Handle(async () => ApiResponse<IReadOnlyList<PartySettlementDocumentResponse>>.Ok(
+            await service.GetSupplierSettlementDocumentsAsync(id, ct)));
 
     [Authorize(Policy = AppPermissions.PurchasesView)]
     [HttpGet("purchases")]

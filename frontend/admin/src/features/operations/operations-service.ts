@@ -8,7 +8,7 @@ import {
   readReferenceItems,
   writeCachedValue,
 } from "@/features/offline/offline-reference-cache";
-import type { CreateJournalVoucher, DocumentPayment, Expense, ExpenseCategory, JournalAccountBalance, JournalAccountLedger, JournalVoucher, JournalVoucherStatus, JournalVoucherSummary, JournalVoucherType, ManualSale, ManualSaleLotMovement, OperationCustomer, OperationPolicy, OperationProduct, OperationSummary, PagedResult, Purchase, PurchaseDetails, QuickCreateProduct, SalaryPayment, Staff, Supplier, SupplierLedger } from "./operations-types";
+import type { CreateJournalVoucher, DocumentPayment, Expense, ExpenseCategory, JournalAccountBalance, JournalAccountLedger, JournalVoucher, JournalVoucherStatus, JournalVoucherSummary, JournalVoucherType, ManualSale, ManualSaleLotMovement, OperationCustomer, OperationPolicy, OperationProduct, OperationSummary, PagedResult, PartySettlementDocument, Purchase, PurchaseDetails, QuickCreateProduct, RecordDocumentPayment, SalaryPayment, Staff, Supplier, SupplierLedger } from "./operations-types";
 
 const base = "/admin/operations";
 
@@ -122,12 +122,16 @@ export const operationsService = {
     async () => (await apiClient.get<OperationCustomer[]>(`${base}/customers`, { search: search || undefined, take })).data,
     (item, clean) => [item.name, item.phone, item.email, item.customerTypeName].some((value) => normalize(value ?? "").includes(clean)),
   ),
+  customerSettlementDocuments: (id: number) =>
+    apiClient.get<PartySettlementDocument[]>(`${base}/customers/${id}/settlement-documents`),
   suppliers: getSuppliers,
   suppliersResponse: async (search = "", take = 50) => ({ success: true, data: await getSuppliers(search, take), message: "" }),
   supplierPage: (search = "", page = 1, pageSize = 20) =>
     apiClient.get<PagedResult<Supplier>>(`${base}/suppliers/page`, { search: search || undefined, page, pageSize }),
   saveSupplier: (id: number | null, body: Omit<Supplier, "id" | "outstandingBalance">) => id ? apiClient.put<Supplier>(`${base}/suppliers/${id}`, body) : apiClient.post<Supplier>(`${base}/suppliers`, body),
   supplierLedger: (id: number) => apiClient.get<SupplierLedger>(`${base}/suppliers/${id}/ledger`),
+  supplierSettlementDocuments: (id: number) =>
+    apiClient.get<PartySettlementDocument[]>(`${base}/suppliers/${id}/settlement-documents`),
   purchases: (search = "", page = 1, pageSize = 20) => cachedDocumentPage(
     "purchases",
     search,
@@ -139,7 +143,7 @@ export const operationsService = {
   purchase: (id: number) => apiClient.get<PurchaseDetails>(`${base}/purchases/${id}`),
   createPurchase: (body: Record<string, unknown>) => postQueueable<Purchase>(`${base}/purchases`, body, "Purchase"),
   purchasePayments: (id: number) => apiClient.get<DocumentPayment[]>(`${base}/purchases/${id}/payments`),
-  addPurchasePayment: (id: number, body: unknown) => apiClient.post<Purchase>(`${base}/purchases/${id}/payments`, body),
+  addPurchasePayment: (id: number, body: RecordDocumentPayment) => apiClient.post<Purchase>(`${base}/purchases/${id}/payments`, body),
   sales: (search = "", page = 1, pageSize = 20) => cachedDocumentPage(
     "sales",
     search,
@@ -151,7 +155,7 @@ export const operationsService = {
   createSale: (body: Record<string, unknown>) => postQueueable<ManualSale>(`${base}/sales`, body, "Manual sale"),
   saleLots: (id: number) => apiClient.get<ManualSaleLotMovement[]>(`${base}/sales/${id}/lots`),
   salePayments: (id: number) => apiClient.get<DocumentPayment[]>(`${base}/sales/${id}/payments`),
-  addSalePayment: (id: number, body: unknown) => apiClient.post<ManualSale>(`${base}/sales/${id}/payments`, body),
+  addSalePayment: (id: number, body: RecordDocumentPayment) => apiClient.post<ManualSale>(`${base}/sales/${id}/payments`, body),
   staff: () => apiClient.get<Staff[]>(`${base}/staff`),
   staffPage: (search = "", page = 1, pageSize = 20) => apiClient.get<PagedResult<Staff>>(`${base}/staff/page`, { search: search || undefined, page, pageSize }),
   saveStaff: (id: number | null, body: Omit<Staff, "id" | "isSystemUser">) => id ? apiClient.put<Staff>(`${base}/staff/${id}`, body) : apiClient.post<Staff>(`${base}/staff`, body),

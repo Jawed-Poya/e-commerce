@@ -288,6 +288,33 @@ public sealed class OperationsService(
             x.HasOverdueDebt)).ToList();
     }
 
+    public async Task<IReadOnlyList<PartySettlementDocumentResponse>> GetCustomerSettlementDocumentsAsync(
+        long customerId,
+        CancellationToken ct)
+    {
+        var customerExists = await context.Customers.AsNoTracking().AnyAsync(x =>
+            x.Id == customerId &&
+            (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value), ct);
+        if (!customerExists) throw new KeyNotFoundException("Customer not found.");
+
+        return await context.InventorySales.AsNoTracking()
+            .Where(x => x.CustomerId == customerId && x.Total > x.PaidAmount &&
+                (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value))
+            .OrderBy(x => x.SaleDate)
+            .ThenBy(x => x.Id)
+            .Take(100)
+            .Select(x => new PartySettlementDocumentResponse(
+                x.Id,
+                x.SaleNumber,
+                x.SaleDate,
+                x.CurrencyCode,
+                x.Total,
+                x.PaidAmount,
+                x.Total - x.PaidAmount,
+                x.PaymentStatus))
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<SupplierResponse>> GetSuppliersAsync(string? search, int take, CancellationToken ct)
     {
         var query = context.Suppliers.AsNoTracking()
@@ -389,6 +416,35 @@ public sealed class OperationsService(
             payments.Sum(x => x.Amount),
             balance,
             entries);
+    }
+
+    public async Task<IReadOnlyList<PartySettlementDocumentResponse>> GetSupplierSettlementDocumentsAsync(
+        long supplierId,
+        CancellationToken ct)
+    {
+        var supplierExists = await context.Suppliers.AsNoTracking().AnyAsync(x =>
+            x.Id == supplierId &&
+            (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value), ct);
+        if (!supplierExists) throw new KeyNotFoundException("Supplier not found.");
+
+        return await context.Purchases.AsNoTracking()
+            .Where(x => x.SupplierId == supplierId &&
+                x.Status != PurchaseStatus.Cancelled &&
+                x.Total > x.PaidAmount &&
+                (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value))
+            .OrderBy(x => x.PurchaseDate)
+            .ThenBy(x => x.Id)
+            .Take(100)
+            .Select(x => new PartySettlementDocumentResponse(
+                x.Id,
+                x.PurchaseNumber,
+                x.PurchaseDate,
+                x.CurrencyCode,
+                x.Total,
+                x.PaidAmount,
+                x.Total - x.PaidAmount,
+                x.PaymentStatus))
+            .ToListAsync(ct);
     }
 
     public async Task<PagedResult<PurchaseListItem>> GetPurchasesAsync(string? search, int page, int pageSize, CancellationToken ct)

@@ -30,6 +30,7 @@ import { useCompany } from "@/features/company/company-context";
 import type {
     DocumentPayment,
     PaymentStatus,
+    RecordDocumentPayment,
 } from "@/features/operations/operations-types";
 import { useI18n } from "@/i18n/i18n-provider";
 
@@ -54,7 +55,7 @@ interface PaymentLedgerDialogProps<TDocument extends SettledDocument> {
     paymentStatus: PaymentStatus;
     queryKey: readonly unknown[];
     loadPayments: () => Promise<{ data: DocumentPayment[] }>;
-    addPayment: (body: unknown) => Promise<{ data: TDocument }>;
+    addPayment: (body: RecordDocumentPayment) => Promise<{ data: TDocument }>;
     onDocumentUpdated: (document: TDocument) => void;
     invalidate: readonly (readonly unknown[])[];
     canManage: boolean;
