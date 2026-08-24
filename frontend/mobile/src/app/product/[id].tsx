@@ -81,7 +81,7 @@ export default function ProductDetailsScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.imageCard}>
           {imageUrl(productImage)
-            ? <Image source={{ uri: imageUrl(productImage)! }} style={styles.image} contentFit="contain" transition={200} />
+            ? <Image source={{ uri: imageUrl(productImage)! }} style={styles.image} contentFit="contain" transition={160} cachePolicy="memory-disk" priority="high" />
             : <View style={styles.placeholder}><Ionicons name="cube-outline" size={58} color={palette.primary} /></View>}
           <View style={styles.badges}>
             {product.isFeatured ? <StatusChip label="Featured" tone="warning" /> : null}

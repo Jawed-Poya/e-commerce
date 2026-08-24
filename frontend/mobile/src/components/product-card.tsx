@@ -45,7 +45,7 @@ function ProductCardComponent({ product }: { product: Product }) {
     <View style={styles.card}>
       <Pressable accessibilityRole="button" accessibilityLabel={t(`View ${product.name}`)} onPress={openDetails} style={({ pressed }) => [styles.imageWrap, pressed && styles.pressed]}>
         {source
-          ? <Image source={{ uri: source }} style={styles.image} contentFit="contain" transition={160} cachePolicy="memory-disk" />
+          ? <Image source={{ uri: source }} style={styles.image} contentFit="contain" transition={120} cachePolicy="memory-disk" priority="low" recyclingKey={String(product.id)} />
           : <View style={styles.placeholder}><Ionicons name="cube-outline" size={34} color={palette.primary} /></View>}
         <View style={styles.badges}>
           {hasDiscount ? <View style={styles.discount}><Text style={styles.discountText}>-{discount}%</Text></View> : null}

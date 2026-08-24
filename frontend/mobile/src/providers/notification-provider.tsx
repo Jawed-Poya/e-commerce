@@ -1,5 +1,4 @@
 import type Ionicons from '@expo/vector-icons/Ionicons';
-import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
 import { useQuery } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
@@ -484,44 +483,49 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     }
 
     let disposed = false;
-    const connection = new HubConnectionBuilder()
-      .withUrl(`${getApiOrigin()}/hubs/store-notifications`, {
-        accessTokenFactory: async () => (await getToken()) ?? '',
-      })
-      .withAutomaticReconnect([0, 2_000, 5_000, 10_000, 30_000])
-      .configureLogging(LogLevel.Warning)
-      .build();
+    let connection: import('@microsoft/signalr').HubConnection | null = null;
+    setRealtimeStatus('connecting');
 
-    connection.on('storeNotification', (item: StoreNotification) => receiveStoreItems([item], true));
-    connection.onreconnecting(() => setRealtimeStatus('reconnecting'));
-    connection.onreconnected(async () => {
-      if (connection.state === HubConnectionState.Connected) {
-        await connection.invoke('Subscribe', trackedProductIds);
-        setRealtimeStatus('live');
-        await pollStore();
-      }
-    });
-    connection.onclose(() => {
+    void import('@microsoft/signalr').then(({ HubConnectionBuilder, HubConnectionState, LogLevel }) => {
+      if (disposed) return;
+      connection = new HubConnectionBuilder()
+        .withUrl(`${getApiOrigin()}/hubs/store-notifications`, {
+          accessTokenFactory: async () => (await getToken()) ?? '',
+        })
+        .withAutomaticReconnect([0, 2_000, 5_000, 10_000, 30_000])
+        .configureLogging(LogLevel.Warning)
+        .build();
+
+      connection.on('storeNotification', (item: StoreNotification) => receiveStoreItems([item], true));
+      connection.onreconnecting(() => setRealtimeStatus('reconnecting'));
+      connection.onreconnected(async () => {
+        if (connection?.state === HubConnectionState.Connected) {
+          await connection.invoke('Subscribe', trackedProductIds);
+          setRealtimeStatus('live');
+          await pollStore();
+        }
+      });
+      connection.onclose(() => {
+        if (!disposed) setRealtimeStatus('polling');
+      });
+
+      void connection.start()
+        .then(async () => {
+          if (disposed || !connection) return;
+          await connection.invoke('Subscribe', trackedProductIds);
+          setRealtimeStatus('live');
+          await pollStore();
+        })
+        .catch(() => {
+          if (!disposed) setRealtimeStatus('polling');
+        });
+    }).catch(() => {
       if (!disposed) setRealtimeStatus('polling');
     });
 
-    const connect = async () => {
-      setRealtimeStatus('connecting');
-      try {
-        await connection.start();
-        if (disposed) return;
-        await connection.invoke('Subscribe', trackedProductIds);
-        setRealtimeStatus('live');
-        await pollStore();
-      } catch {
-        if (!disposed) setRealtimeStatus('polling');
-      }
-    };
-
-    void connect();
     return () => {
       disposed = true;
-      void connection.stop();
+      void connection?.stop();
     };
     // The joined key intentionally rebuilds the exact product subscription.
     // eslint-disable-next-line react-hooks/exhaustive-deps

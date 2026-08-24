@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import { AppState } from 'react-native';
 
@@ -254,23 +253,27 @@ export function CartProvider({ children }: PropsWithChildren) {
     if (!auth.user?.customerId) return;
 
     let disposed = false;
-    const storeHubUrl = `${getApiOrigin()}/hubs/store-notifications`;
-    const connection = new HubConnectionBuilder()
-      .withUrl(storeHubUrl, {
-        accessTokenFactory: async () => (await getToken()) ?? '',
-      })
-      .withAutomaticReconnect([0, 2_000, 5_000, 10_000])
-      .configureLogging(LogLevel.Warning)
-      .build();
+    let connection: import('@microsoft/signalr').HubConnection | null = null;
 
-    connection.on('cartUpdated', () => {
-      if (cartEventTimerRef.current) clearTimeout(cartEventTimerRef.current);
-      cartEventTimerRef.current = setTimeout(() => {
-        if (!disposed) requestCartSync();
-      }, 450);
-    });
-    connection.onreconnected(() => requestCartSync());
-    void connection.start().catch(() => undefined);
+    void import('@microsoft/signalr').then(({ HubConnectionBuilder, LogLevel }) => {
+      if (disposed) return;
+      connection = new HubConnectionBuilder()
+        .withUrl(`${getApiOrigin()}/hubs/store-notifications`, {
+          accessTokenFactory: async () => (await getToken()) ?? '',
+        })
+        .withAutomaticReconnect([0, 2_000, 5_000, 10_000])
+        .configureLogging(LogLevel.Warning)
+        .build();
+
+      connection.on('cartUpdated', () => {
+        if (cartEventTimerRef.current) clearTimeout(cartEventTimerRef.current);
+        cartEventTimerRef.current = setTimeout(() => {
+          if (!disposed) requestCartSync();
+        }, 450);
+      });
+      connection.onreconnected(() => requestCartSync());
+      void connection.start().catch(() => undefined);
+    }).catch(() => undefined);
 
     return () => {
       disposed = true;
@@ -278,7 +281,7 @@ export function CartProvider({ children }: PropsWithChildren) {
         clearTimeout(cartEventTimerRef.current);
         cartEventTimerRef.current = null;
       }
-      void connection.stop();
+      void connection?.stop();
     };
   }, [auth.user?.customerId, requestCartSync]);
 

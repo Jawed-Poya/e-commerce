@@ -3,8 +3,8 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { ActivityIndicator, InteractionManager, Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProductCard } from '@/components/product-card';
@@ -33,6 +33,7 @@ export default function ShopScreen() {
   const [cachedContent, setCachedContent] = useState<StorefrontContent | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const listRef = useRef<FlashListRef<Product>>(null);
+  const showScrollTopRef = useRef(false);
   const connectivity = useSyncExternalStore(subscribeConnectivity, getConnectivitySnapshot, getConnectivitySnapshot);
 
   useEffect(() => {
@@ -118,13 +119,23 @@ export default function ShopScreen() {
   }, [storefrontContent.data]);
 
   useEffect(() => {
-    trackProducts(items.map((item) => item.id));
+    const task = InteractionManager.runAfterInteractions(() => {
+      trackProducts(items.map((item) => item.id));
+    });
+    return () => task.cancel();
   }, [items, trackProducts]);
+
+  const handleScroll = useCallback((offset: number) => {
+    const next = offset > 720;
+    if (showScrollTopRef.current === next) return;
+    showScrollTopRef.current = next;
+    setShowScrollTop(next);
+  }, []);
 
   const header = (
     <View>
       <LinearGradient colors={[palette.darkSurface, palette.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
-        {imageUrl(content?.heroImageUrl) ? <Image source={{ uri: imageUrl(content?.heroImageUrl)! }} style={styles.heroImage} contentFit="cover" transition={240} /> : null}
+        {imageUrl(content?.heroImageUrl) ? <Image source={{ uri: imageUrl(content?.heroImageUrl)! }} style={styles.heroImage} contentFit="cover" transition={180} cachePolicy="memory-disk" priority="high" /> : null}
         {imageUrl(content?.heroImageUrl) ? <View style={styles.heroOverlay} /> : null}
         <View style={styles.heroGlow} />
         <View style={styles.heroTop}><View style={styles.heroCopy}><Text style={styles.eyebrow}>{hero?.eyebrow ?? 'MOBILE SHOPPING'}</Text><Text style={styles.heroTitle}>{hero?.title ?? 'Find it. Order it. We’ll handle the rest.'}</Text></View><View style={styles.heroIcon}><Ionicons name="bag-check" size={27} color={palette.amber} /></View></View>
@@ -210,7 +221,7 @@ export default function ShopScreen() {
           if (products.hasNextPage && !products.isFetchingNextPage) void products.fetchNextPage();
         }}
         onEndReachedThreshold={0.55}
-        onScroll={(event) => setShowScrollTop(event.nativeEvent.contentOffset.y > 720)}
+        onScroll={(event) => handleScroll(event.nativeEvent.contentOffset.y)}
         scrollEventThrottle={32}
         refreshing={products.isRefetching && !products.isFetchingNextPage}
         onRefresh={() => void products.refetch()}

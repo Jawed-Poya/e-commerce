@@ -103,7 +103,7 @@ function CartLine({ item, currency }: { item: CartItem; currency: string }) {
     <View style={styles.line}>
       <View style={styles.lineImageWrap}>
         {imageUrl(item.image)
-          ? <Image source={{ uri: imageUrl(item.image)! }} style={styles.lineImage} contentFit="contain" />
+          ? <Image source={{ uri: imageUrl(item.image)! }} style={styles.lineImage} contentFit="contain" cachePolicy="memory-disk" recyclingKey={item.lineKey} />
           : <Ionicons name="cube-outline" size={28} color={palette.primary} />}
       </View>
       <View style={styles.lineBody}>
