@@ -9,8 +9,11 @@ export interface ApiResponse<T> {
 }
 
 type DownloadResult = { filename: string; size: number };
+type BlobResult =
+    | { blob: Blob; filename: string; handledExternally: false }
+    | { blob: null; filename: string; handledExternally: true };
 
-const downloadDeduplicationWindowMs = 1_500;
+const downloadDeduplicationWindowMs = 10_000;
 
 function normalizeApiResponse<T>(response: ApiResponse<T>): ApiResponse<T> {
     if (!response || typeof response !== "object") {
@@ -67,7 +70,8 @@ class ApiClient {
     }
 
     private async downloadOnce(url: string, params?: object): Promise<DownloadResult> {
-        const { blob, filename } = await this.getBlob(url, params);
+        const { blob, filename, handledExternally } = await this.getBlob(url, params, true);
+        if (handledExternally || !blob) return { filename, size: 0 };
         const href = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = href;
@@ -82,10 +86,11 @@ class ApiClient {
 
     async createObjectUrl(url: string, params?: object): Promise<string> {
         const { blob } = await this.getBlob(url, params);
+        if (!blob) throw new Error("The document preview did not include file content.");
         return URL.createObjectURL(blob);
     }
 
-    private async getBlob(url: string, params?: object) {
+    private async getBlob(url: string, params?: object, allowExternalAttachment = false): Promise<BlobResult> {
         // Keep one user action mapped to one document request. Retrying an empty
         // attachment response can regenerate the same PDF and then surface a late
         // empty-content error even though the browser already received the file.
@@ -113,6 +118,7 @@ class ApiClient {
         }
 
         const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
+        const contentDisposition = response.headers.get("content-disposition") ?? "";
         const blob = await response.blob();
 
         if (response.status === 401 && token && getAdminToken() === token) {
@@ -130,12 +136,23 @@ class ApiClient {
         }
 
         if (blob.size === 0) {
-            throw new Error("The server returned an empty document. Please generate it again.");
+            // Electron can hand an attachment to its native download manager before
+            // renderer fetch exposes the body. In that case the file is already saved,
+            // so reporting an empty-document failure is both false and confusing.
+            if (allowExternalAttachment && window.easyCartDesktop && /attachment/i.test(contentDisposition)) {
+                return {
+                    blob: null,
+                    filename: resolveFilename(contentDisposition, contentType),
+                    handledExternally: true,
+                };
+            }
+            throw new Error("The document service returned no file content.");
         }
 
         return {
             blob,
-            filename: resolveFilename(response.headers.get("content-disposition") ?? undefined, contentType),
+            filename: resolveFilename(contentDisposition, contentType),
+            handledExternally: false,
         };
     }
 
