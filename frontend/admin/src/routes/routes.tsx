@@ -6,7 +6,6 @@ import { Permissions } from "@/features/auth/permissions";
 import { ProtectedRoute } from "@/features/auth/protected-route";
 import { OfflineBanner } from "@/components/navigation/offline-banner";
 import { RouteProgress } from "@/components/navigation/route-progress";
-import AppLayout from "@/layouts/app-layout";
 
 function lazyPage(load: () => Promise<ComponentType>) {
     return async () => ({ Component: await load() });
@@ -53,12 +52,14 @@ const routes: RouteObject[] = [
         children: [
             {
                 path: "/",
-                element: <AppLayout />,
+                lazy: lazyPage(() =>
+                    import("@/layouts/app-layout").then((module) => module.default),
+                ),
                 children: [
                     {
                         index: true,
-                        lazy: lazyAllowed(Permissions.DashboardView, () =>
-                            import("@/pages/dashboard").then((module) => module.default),
+                        lazy: lazyPage(() =>
+                            import("@/pages/admin-home").then((module) => module.default),
                         ),
                     },
                     {

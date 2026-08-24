@@ -560,6 +560,8 @@ function ProductImage({ src, name }: { src: string | null; name: string }) {
         <img
             src={url}
             alt=""
+            loading="lazy"
+            decoding="async"
             className="size-10 rounded-lg border object-cover"
         />
     ) : (

@@ -75,36 +75,8 @@ export function hasPermission(
 }
 
 export function getDefaultAdminRoute(
-    permissions: string[],
-    roles: string[] = [],
+    _permissions: string[],
+    _roles: string[] = [],
 ) {
-    if (roles.some((role) => role.toLowerCase() === "admin")) return "/dashboard";
-    const set = new Set(permissions);
-    if (set.has(Permissions.DashboardView)) return "/dashboard";
-    if (set.has(Permissions.ProductsView)) return "/products";
-    if (set.has(Permissions.ReviewsView) || set.has(Permissions.ProductsManage)) return "/reviews";
-    if (set.has(Permissions.InventoryView)) return "/inventory";
-    if (set.has(Permissions.OperationsView)) return "/operations";
-    if (set.has(Permissions.PurchasesView)) return "/operations/purchases";
-    if (set.has(Permissions.ManualSalesView)) return "/operations/sales";
-    if (set.has(Permissions.StaffView)) return "/operations/staff";
-    if (set.has(Permissions.ExpensesView)) return "/operations/expenses";
-    if (set.has(Permissions.OrdersView)) return "/orders";
-    if (set.has(Permissions.CustomersView)) return "/customers";
-    if (set.has(Permissions.UsersView)) return "/system/users";
-    if (set.has(Permissions.RolesManage)) return "/system/roles";
-    if (set.has(Permissions.FinancialReportsView)) return "/reports";
-    if (set.has(Permissions.CompanyProfileManage)) return "/company";
-    if (set.has(Permissions.AuditLogsView)) return "/audit";
-    if (set.has(Permissions.GeneralTypesManage) || set.has(Permissions.SystemManage)) return "/system/general-types";
-    if (set.has(Permissions.StorefrontManage)) return "/system/storefront";
-    if (
-        set.has(Permissions.DatabaseMaintenanceView) ||
-        set.has(Permissions.DatabaseBackup) ||
-        set.has(Permissions.DatabaseRestore) ||
-        set.has(Permissions.BranchDataClear) ||
-        set.has(Permissions.AllBusinessDataClear) ||
-        set.has(Permissions.DemoDataSeed)
-    ) return "/system/maintenance";
-    return "/dashboard";
+    return "/";
 }
