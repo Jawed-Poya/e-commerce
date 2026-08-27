@@ -55,13 +55,25 @@ END;
 -- migration is intentionally left to EF Core; this block only runs when the
 -- migration history says it was applied but one of its physical columns is
 -- missing.
+DECLARE @costSnapshotMigrationApplied bit = 0;
 IF OBJECT_ID(N'[dbo].[__EFMigrationsHistory]', N'U') IS NOT NULL
-   AND EXISTS
-   (
-       SELECT 1
-       FROM [dbo].[__EFMigrationsHistory]
-       WHERE [MigrationId] = N'20260727110000_AddCostSnapshotsForProfitReporting'
-   )
+BEGIN
+    -- Keep the history lookup dynamic. SQL Server compiles static table
+    -- references before evaluating IF, so a genuinely new database would fail
+    -- here before EF had a chance to create __EFMigrationsHistory.
+    EXEC sys.sp_executesql
+        N'IF EXISTS
+          (
+              SELECT 1
+              FROM [dbo].[__EFMigrationsHistory]
+              WHERE [MigrationId] = N''20260727110000_AddCostSnapshotsForProfitReporting''
+          )
+          SET @applied = 1;',
+        N'@applied bit OUTPUT',
+        @applied = @costSnapshotMigrationApplied OUTPUT;
+END;
+
+IF @costSnapshotMigrationApplied = 1
 BEGIN
     IF OBJECT_ID(N'[dbo].[OrderItems]', N'U') IS NOT NULL
        AND COL_LENGTH(N'dbo.OrderItems', N'UnitCost') IS NULL

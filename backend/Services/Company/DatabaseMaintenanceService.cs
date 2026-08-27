@@ -234,6 +234,10 @@ ALTER DATABASE {QuoteIdentifier(databaseName)} SET MULTI_USER;
         // Dependents are deleted before their parents. ExecuteDelete intentionally
         // bypasses normal trash creation because this is an explicitly confirmed
         // maintenance operation with its own permission and audit boundary.
+        var clearedAccounting = await ClearJournalVoucherDataAsync(branchId, cancellationToken);
+        if (clearedAccounting > 0)
+            counts["accounting"] = clearedAccounting;
+
         await DeleteAsync("order history", context.OrderStatusHistories);
         await DeleteAsync("order history", context.Payments);
         await DeleteAsync("orders", context.OrderItems);
@@ -263,13 +267,19 @@ ALTER DATABASE {QuoteIdentifier(databaseName)} SET MULTI_USER;
         await DeleteAsync("inventory", context.ProductInventories);
         await DeleteAsync("catalog", context.Products);
 
+        // ActivityLogs has a restrictive customer foreign key and older audit
+        // rows may not carry BranchId. Delete by both branch and customer link
+        // immediately before the customer records so branch resets remain safe.
+        var clearedAudit = await ClearCustomerAuditDataAsync(branchId, cancellationToken);
+        if (clearedAudit > 0)
+            counts["audit"] = clearedAudit;
+
+        await DeleteAsync("customers", context.CustomerCarts);
         await DeleteAsync("customers", context.CustomerAddresses);
         await DeleteAsync("customers", context.Customers);
         await DeleteAsync("suppliers", context.Suppliers);
         await DeleteAsync("storefront", context.StorefrontContents);
         await DeleteAsync("notifications", context.Notifications);
-        await DeleteAsync("audit", context.CustomerVisitLogs);
-        await DeleteAsync("audit", context.ActivityLogs);
         await DeleteAsync("trash", context.TrashRecords);
 
         await transaction.CommitAsync(cancellationToken);
@@ -287,6 +297,60 @@ ALTER DATABASE {QuoteIdentifier(databaseName)} SET MULTI_USER;
             branchId,
             total,
             counts);
+    }
+
+    private async Task<int> ClearJournalVoucherDataAsync(
+        long? branchId,
+        CancellationToken cancellationToken)
+    {
+        var vouchers = context.JournalVouchers.IgnoreQueryFilters().AsQueryable();
+        var lines = context.JournalVoucherLines.IgnoreQueryFilters().AsQueryable();
+        if (branchId.HasValue)
+        {
+            var scopedVoucherIds = vouchers
+                .Where(item => item.BranchId == branchId.Value)
+                .Select(item => item.Id);
+            lines = lines.Where(item =>
+                item.BranchId == branchId.Value || scopedVoucherIds.Contains(item.JournalVoucherId));
+            vouchers = vouchers.Where(item => item.BranchId == branchId.Value);
+        }
+
+        var deleted = await lines.ExecuteDeleteAsync(cancellationToken);
+
+        // ReversalOfVoucherId is a restrictive self-reference. It has no value
+        // once every voucher in the selected maintenance scope is being removed.
+        await vouchers
+            .Where(item => item.ReversalOfVoucherId != null)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(item => item.ReversalOfVoucherId, (long?)null),
+                cancellationToken);
+        deleted += await vouchers.ExecuteDeleteAsync(cancellationToken);
+        return deleted;
+    }
+
+    private async Task<int> ClearCustomerAuditDataAsync(
+        long? branchId,
+        CancellationToken cancellationToken)
+    {
+        var activityLogs = context.ActivityLogs.IgnoreQueryFilters().AsQueryable();
+        var visitLogs = context.CustomerVisitLogs.IgnoreQueryFilters().AsQueryable();
+
+        if (branchId.HasValue)
+        {
+            var customerIds = context.Customers.IgnoreQueryFilters()
+                .Where(item => item.BranchId == branchId.Value)
+                .Select(item => item.Id);
+            activityLogs = activityLogs.Where(item =>
+                item.BranchId == branchId.Value ||
+                (item.CustomerId.HasValue && customerIds.Contains(item.CustomerId.Value)));
+            visitLogs = visitLogs.Where(item =>
+                item.BranchId == branchId.Value ||
+                (item.CustomerId.HasValue && customerIds.Contains(item.CustomerId.Value)));
+        }
+
+        var deleted = await visitLogs.ExecuteDeleteAsync(cancellationToken);
+        deleted += await activityLogs.ExecuteDeleteAsync(cancellationToken);
+        return deleted;
     }
 
     private string DatabaseName()
