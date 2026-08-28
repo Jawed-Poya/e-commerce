@@ -241,7 +241,9 @@ function isFileDownloadRequest(url) {
   const path = url.pathname.toLowerCase();
   return path.startsWith("/api/admin/documents/") ||
     path.startsWith("/api/admin/receipts/") ||
-    path.includes("/export/");
+    path.includes("/export/") ||
+    path.endsWith("/pdf") ||
+    path.endsWith("/image");
 }
 
 function isRealtimeRequest(url) {

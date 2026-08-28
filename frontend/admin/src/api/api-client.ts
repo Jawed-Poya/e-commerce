@@ -136,10 +136,11 @@ class ApiClient {
         }
 
         if (blob.size === 0) {
-            // Electron can hand an attachment to its native download manager before
-            // renderer fetch exposes the body. In that case the file is already saved,
-            // so reporting an empty-document failure is both false and confusing.
-            if (allowExternalAttachment && window.easyCartDesktop && /attachment/i.test(contentDisposition)) {
+            // A browser or desktop shell can hand an attachment to its download
+            // manager before the renderer exposes the response body. The successful
+            // attachment response is authoritative in that case; previews remain
+            // strict because they never opt into externally handled attachments.
+            if (allowExternalAttachment && /attachment/i.test(contentDisposition)) {
                 return {
                     blob: null,
                     filename: resolveFilename(contentDisposition, contentType),
