@@ -244,8 +244,8 @@ export default function JournalVouchersPage() {
                 <div className="flex flex-col border-b bg-muted/20 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex overflow-x-auto p-2">
                         <WorkspaceTab active={view === "vouchers"} icon={<ReceiptText />} label="Voucher register" onClick={() => setView("vouchers")} />
-                        <WorkspaceTab active={view === "ledger"} icon={<BookOpenCheck />} label="General ledger" onClick={() => setView("ledger")} />
-                        <WorkspaceTab active={view === "parties"} icon={<UsersRound />} label="Party ledgers" onClick={() => setView("parties")} />
+                        <WorkspaceTab active={view === "ledger"} icon={<BookOpenCheck />} label={tr("General ledger")} onClick={() => setView("ledger")} />
+                        <WorkspaceTab active={view === "parties"} icon={<UsersRound />} label={tr("Party ledgers")} onClick={() => setView("parties")} />
                     </div>
                     <p className="px-4 pb-3 text-xs text-muted-foreground lg:pb-0">Accounting records are separated by currency—no hidden conversion.</p>
                 </div>
@@ -499,6 +499,7 @@ function VoucherRow({
 
 function GeneralLedgerWorkspace({ accounts, currencies }: { accounts: JournalAccountBalance[]; currencies: string[] }) {
     const { formatMoney, company } = useCompany();
+    const { tr } = useI18n();
     const [currency, setCurrency] = useState(company?.settings.mainCurrencyCode ?? currencies[0] ?? "AFN");
     const [selectedCode, setSelectedCode] = useState("");
     const [search, setSearch] = useState("");
@@ -525,9 +526,9 @@ function GeneralLedgerWorkspace({ accounts, currencies }: { accounts: JournalAcc
         setExporting(true);
         try {
             await operationsService.downloadJournalAccountLedger(params);
-            toast.success("General ledger PDF generated.");
+            toast.success(tr("General ledger PDF generated."));
         } catch (error) {
-            toast.error(getApiErrorMessage(error, "The general ledger PDF could not be generated."));
+            toast.error(getApiErrorMessage(error, tr("The general ledger PDF could not be generated.")));
         } finally {
             setExporting(false);
         }
@@ -538,11 +539,11 @@ function GeneralLedgerWorkspace({ accounts, currencies }: { accounts: JournalAcc
             <aside className="border-b bg-muted/10 lg:border-b-0 lg:border-e">
                 <div className="space-y-3 border-b p-4">
                     <div>
-                        <h2 className="font-heading text-base font-bold">Chart of accounts</h2>
-                        <p className="mt-1 text-xs text-muted-foreground">Select an account to inspect its running balance.</p>
+                        <h2 className="font-heading text-base font-bold">{tr("Chart of accounts")}</h2>
+                        <p className="mt-1 text-xs text-muted-foreground">{tr("Select an account to inspect its running balance.")}</p>
                     </div>
                     <SimpleCombobox<string> value={currency} onValueChange={(value) => setCurrency(value ?? currencies[0] ?? "AFN")} options={currencies.map((code) => ({ value: code, label: code }))} />
-                    <div className="relative"><Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input className="ps-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find an account…" /></div>
+                    <div className="relative"><Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input className="ps-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tr("Find an account…")} /></div>
                 </div>
                 <div className="max-h-[490px] overflow-y-auto">
                     {currencyAccounts.map((account) => (
@@ -553,32 +554,32 @@ function GeneralLedgerWorkspace({ accounts, currencies }: { accounts: JournalAcc
                             onClick={() => setSelectedCode(account.accountCode)}
                         >
                             <span className="grid size-9 shrink-0 place-items-center bg-muted font-mono text-xs font-bold">{account.accountCode}</span>
-                            <span className="min-w-0 flex-1"><span className="block truncate font-medium">{account.accountName}</span><span className="block text-[11px] text-muted-foreground">{account.entryCount} entries</span></span>
+                            <span className="min-w-0 flex-1"><span className="block truncate font-medium">{tr(account.accountName)}</span><span className="block text-[11px] text-muted-foreground">{account.entryCount} {tr("entries")}</span></span>
                             <span className="text-end text-xs font-semibold tabular-nums">{compactBalance(account.balance, (value) => formatMoney(value, account.currencyCode))}</span>
                         </button>
                     ))}
-                    {!currencyAccounts.length ? <p className="p-6 text-center text-sm text-muted-foreground">No accounts found for {currency}.</p> : null}
+                    {!currencyAccounts.length ? <p className="p-6 text-center text-sm text-muted-foreground">{tr("No accounts found for")} {currency}.</p> : null}
                 </div>
             </aside>
             <section className="min-w-0">
                 <div className="space-y-4 border-b p-4 sm:p-5">
                     <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                         <div>
-                            <h2 className="font-heading text-lg font-bold">{ledger.data ? `${ledger.data.accountCode} · ${ledger.data.accountName}` : "General ledger statement"}</h2>
-                            <p className="mt-1 text-sm text-muted-foreground">Opening balance, period movements, and a chronological balance after every posting.</p>
+                            <h2 className="font-heading text-lg font-bold">{ledger.data ? `${ledger.data.accountCode} · ${tr(ledger.data.accountName)}` : tr("General ledger statement")}</h2>
+                            <p className="mt-1 text-sm text-muted-foreground">{tr("Opening balance, period movements, and a chronological balance after every posting.")}</p>
                         </div>
                         <Button variant="outline" disabled={!ledger.data || exporting} onClick={() => void exportPdf()}>
                             {exporting ? <LoaderCircle className="animate-spin" /> : <Download />}
-                            Download PDF
+                            {tr("Download PDF")}
                         </Button>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end xl:max-w-2xl">
-                        <Field label="From"><Input type="date" value={dates.startDate} onChange={(event) => setDates((current) => ({ ...current, startDate: event.target.value }))} /></Field>
-                        <Field label="To"><Input type="date" value={dates.endDate} onChange={(event) => setDates((current) => ({ ...current, endDate: event.target.value }))} /></Field>
-                        <Button variant="outline" onClick={() => setDates(yearToDate())}>Year to date</Button>
+                        <Field label={tr("From")}><Input type="date" value={dates.startDate} onChange={(event) => setDates((current) => ({ ...current, startDate: event.target.value }))} /></Field>
+                        <Field label={tr("To")}><Input type="date" value={dates.endDate} onChange={(event) => setDates((current) => ({ ...current, endDate: event.target.value }))} /></Field>
+                        <Button variant="outline" onClick={() => setDates(yearToDate())}>{tr("Year to date")}</Button>
                     </div>
                 </div>
-                {ledger.isLoading ? <div className="grid h-72 place-items-center"><LoaderCircle className="size-6 animate-spin" /></div> : ledger.isError ? <div className="m-5 border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{getApiErrorMessage(ledger.error, "The account ledger could not be loaded.")}</div> : ledger.data ? <AccountStatement ledger={ledger.data} /> : <div className="grid h-72 place-items-center p-8 text-center text-muted-foreground"><div><BookOpenCheck className="mx-auto mb-3 size-9" /><p className="font-medium">Select an account to open its ledger.</p></div></div>}
+                {ledger.isLoading ? <div className="grid h-72 place-items-center"><LoaderCircle className="size-6 animate-spin" /></div> : ledger.isError ? <div className="m-5 border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{getApiErrorMessage(ledger.error, tr("The account ledger could not be loaded."))}</div> : ledger.data ? <AccountStatement ledger={ledger.data} /> : <div className="grid h-72 place-items-center p-8 text-center text-muted-foreground"><div><BookOpenCheck className="mx-auto mb-3 size-9" /><p className="font-medium">{tr("Select an account to open its ledger.")}</p></div></div>}
             </section>
         </div>
     );
@@ -586,31 +587,32 @@ function GeneralLedgerWorkspace({ accounts, currencies }: { accounts: JournalAcc
 
 function AccountStatement({ ledger }: { ledger: JournalAccountLedger }) {
     const { formatMoney } = useCompany();
+    const { locale, tr } = useI18n();
     const money = (value: number) => formatMoney(value, ledger.currencyCode);
     return (
         <div>
             <div className="grid gap-px border-b bg-border sm:grid-cols-2 xl:grid-cols-4">
-                <StatementMetric label="Opening balance" value={balanceLabel(ledger.openingBalance, money)} />
-                <StatementMetric label="Period debit" value={money(ledger.periodDebit)} tone="debit" />
-                <StatementMetric label="Period credit" value={money(ledger.periodCredit)} tone="credit" />
-                <StatementMetric label="Closing balance" value={balanceLabel(ledger.closingBalance, money)} strong />
+                <StatementMetric label={tr("Opening balance")} value={balanceLabel(ledger.openingBalance, money)} />
+                <StatementMetric label={tr("Period debit")} value={money(ledger.periodDebit)} tone="debit" />
+                <StatementMetric label={tr("Period credit")} value={money(ledger.periodCredit)} tone="credit" />
+                <StatementMetric label={tr("Closing balance")} value={balanceLabel(ledger.closingBalance, money)} strong />
             </div>
             <div className="overflow-x-auto">
                 <Table className="min-w-[900px]">
-                    <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Voucher</TableHead><TableHead>Narration / party</TableHead><TableHead className="text-end">Debit</TableHead><TableHead className="text-end">Credit</TableHead><TableHead className="text-end">Balance</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>{tr("Date")}</TableHead><TableHead>{tr("Voucher")}</TableHead><TableHead>{tr("Narration / party")}</TableHead><TableHead className="text-end">{tr("Debit")}</TableHead><TableHead className="text-end">{tr("Credit")}</TableHead><TableHead className="text-end">{tr("Balance")}</TableHead></TableRow></TableHeader>
                     <TableBody>
-                        <TableRow className="bg-muted/30"><TableCell>{shortDate(ledger.startDate)}</TableCell><TableCell className="font-medium">Opening</TableCell><TableCell className="text-muted-foreground">Balance brought forward</TableCell><TableCell /><TableCell /><TableCell className="text-end font-bold tabular-nums">{balanceLabel(ledger.openingBalance, money)}</TableCell></TableRow>
+                        <TableRow className="bg-muted/30"><TableCell>{shortDate(ledger.startDate, locale)}</TableCell><TableCell className="font-medium">{tr("Opening")}</TableCell><TableCell className="text-muted-foreground">{tr("Balance brought forward")}</TableCell><TableCell /><TableCell /><TableCell className="text-end font-bold tabular-nums">{balanceLabel(ledger.openingBalance, money)}</TableCell></TableRow>
                         {ledger.entries.map((entry) => (
                             <TableRow key={`${entry.voucherId}-${entry.voucherNumber}`} className={entry.status === "Reversed" ? "bg-muted/20 text-muted-foreground" : undefined}>
-                                <TableCell className="whitespace-nowrap">{shortDate(entry.voucherDate)}</TableCell>
-                                <TableCell><p className="font-mono text-xs font-bold text-primary">{entry.voucherNumber}</p><p className="text-[11px] text-muted-foreground">{voucherLabel(entry.voucherType)}</p></TableCell>
+                                <TableCell className="whitespace-nowrap">{shortDate(entry.voucherDate, locale)}</TableCell>
+                                <TableCell><p className="font-mono text-xs font-bold text-primary">{entry.voucherNumber}</p><p className="text-[11px] text-muted-foreground">{tr(voucherLabel(entry.voucherType))}</p></TableCell>
                                 <TableCell className="max-w-96"><p className="font-medium">{entry.counterpartyName ?? entry.memo}</p>{entry.counterpartyName ? <p className="truncate text-xs text-muted-foreground">{entry.memo}</p> : null}</TableCell>
                                 <TableCell className="text-end tabular-nums">{entry.debit ? money(entry.debit) : "—"}</TableCell>
                                 <TableCell className="text-end tabular-nums">{entry.credit ? money(entry.credit) : "—"}</TableCell>
                                 <TableCell className="text-end font-semibold tabular-nums">{balanceLabel(entry.balance, money)}</TableCell>
                             </TableRow>
                         ))}
-                        {!ledger.entries.length ? <TableRow><TableCell colSpan={6} className="h-28 text-center text-muted-foreground">No account movement in this period.</TableCell></TableRow> : null}
+                        {!ledger.entries.length ? <TableRow><TableCell colSpan={6} className="h-28 text-center text-muted-foreground">{tr("No account movement in this period.")}</TableCell></TableRow> : null}
                     </TableBody>
                 </Table>
             </div>
@@ -620,6 +622,7 @@ function AccountStatement({ ledger }: { ledger: JournalAccountLedger }) {
 
 function PartyLedgersWorkspace() {
     const { user } = useAdminAuth();
+    const { tr } = useI18n();
     const canViewCustomers = hasPermission(user, Permissions.ManualSalesView) && hasPermission(user, Permissions.FinancialReportsView);
     const canViewSuppliers = hasPermission(user, Permissions.PurchasesView);
     const canReceiveCustomerPayment = hasPermission(user, Permissions.ManualSalesManage);
@@ -641,44 +644,44 @@ function PartyLedgersWorkspace() {
         <div className="space-y-5 p-4 sm:p-5">
             <div className="flex flex-col gap-4 border-b pb-5 xl:flex-row xl:items-end xl:justify-between">
                 <div>
-                    <h2 className="font-heading text-lg font-bold">Customer & supplier ledgers</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">Choose a business party to review invoices, payments, and the amount receivable or payable.</p>
+                    <h2 className="font-heading text-lg font-bold">{tr("Customer & supplier ledgers")}</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">{tr("Choose a business party to review invoices, payments, and the amount receivable or payable.")}</p>
                 </div>
                 <div className="flex border p-1">
-                    {canViewCustomers ? <Button variant={partyType === "customer" ? "default" : "ghost"} size="sm" onClick={() => setPartyType("customer")}><UsersRound />Customer</Button> : null}
-                    {canViewSuppliers ? <Button variant={partyType === "supplier" ? "default" : "ghost"} size="sm" onClick={() => setPartyType("supplier")}><Building2 />Supplier</Button> : null}
+                    {canViewCustomers ? <Button variant={partyType === "customer" ? "default" : "ghost"} size="sm" onClick={() => setPartyType("customer")}><UsersRound />{tr("Customer")}</Button> : null}
+                    {canViewSuppliers ? <Button variant={partyType === "supplier" ? "default" : "ghost"} size="sm" onClick={() => setPartyType("supplier")}><Building2 />{tr("Supplier")}</Button> : null}
                 </div>
             </div>
 
             <div className="flex items-start gap-3 border border-primary/20 bg-primary/5 p-4">
                 <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
-                <div><p className="text-sm font-semibold">Settle the source document—not the balance directly</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Use Receive payment for customer money and Pay supplier for outgoing money. Each action updates the selected sale or purchase and creates its balanced voucher automatically; debit and credit account lines remain controlled by the system.</p></div>
+                <div><p className="text-sm font-semibold">{tr("Settle the source document—not the balance directly")}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{tr("Use Receive payment for customer money and Pay supplier for outgoing money. Each action updates the selected sale or purchase and creates its balanced voucher automatically; debit and credit account lines remain controlled by the system.")}</p></div>
             </div>
 
             {partyType === "customer" && canViewCustomers ? (
                 <div className="space-y-5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                        <div className="w-full max-w-xl space-y-2"><Label>Customer account</Label><ServerSearchCombobox<OperationCustomer> value={customer} onValueChange={setCustomer} queryKey={["accounting", "customer-search"]} search={(term) => operationsService.customers(term, 30)} getLabel={(item) => item.name} getDescription={(item) => `${item.phone || "No phone"} · Outstanding ${item.outstandingDebt.toLocaleString()}`} placeholder="Search customer name or phone…" /></div>
-                        {canReceiveCustomerPayment ? <Button disabled={!customer} onClick={() => customer && setSettlement({ kind: "customer-receipt", party: { id: customer.id, name: customer.name } })}><ReceiptText />Receive payment</Button> : null}
+                        <div className="w-full max-w-xl space-y-2"><Label>{tr("Customer account")}</Label><ServerSearchCombobox<OperationCustomer> value={customer} onValueChange={setCustomer} queryKey={["accounting", "customer-search"]} search={(term) => operationsService.customers(term, 30)} getLabel={(item) => item.name} getDescription={(item) => `${item.phone || tr("No phone")} · ${tr("Outstanding")} ${item.outstandingDebt.toLocaleString()}`} placeholder={tr("Search customer name or phone…")} /></div>
+                        {canReceiveCustomerPayment ? <Button disabled={!customer} onClick={() => customer && setSettlement({ kind: "customer-receipt", party: { id: customer.id, name: customer.name } })}><ReceiptText />{tr("Receive payment")}</Button> : null}
                     </div>
-                    {customer ? <CustomerLedgerCard customerId={customer.id} customerName={customer.name} whatsAppUrl={customer.whatsAppUrl} /> : <PartyEmpty icon={<UsersRound />} title="Select a customer" text="Their sales, receipts, opening balance, closing balance, profit, PDF, and Excel statement will appear here." />}
+                    {customer ? <CustomerLedgerCard customerId={customer.id} customerName={customer.name} whatsAppUrl={customer.whatsAppUrl} /> : <PartyEmpty icon={<UsersRound />} title={tr("Select a customer")} text={tr("Their sales, receipts, opening balance, closing balance, profit, PDF, and Excel statement will appear here.")} />}
                 </div>
             ) : null}
 
             {partyType === "supplier" && canViewSuppliers ? (
                 <div className="space-y-5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                        <div className="w-full max-w-xl space-y-2"><Label>Supplier account</Label><ServerSearchCombobox<Supplier> value={supplier} onValueChange={setSupplier} queryKey={["accounting", "supplier-search"]} search={(term) => operationsService.suppliers(term, 30)} getLabel={(item) => item.name} getDescription={(item) => [item.contactPerson, item.phone].filter(Boolean).join(" · ") || "Supplier account"} placeholder="Search supplier or company…" /></div>
+                        <div className="w-full max-w-xl space-y-2"><Label>{tr("Supplier account")}</Label><ServerSearchCombobox<Supplier> value={supplier} onValueChange={setSupplier} queryKey={["accounting", "supplier-search"]} search={(term) => operationsService.suppliers(term, 30)} getLabel={(item) => item.name} getDescription={(item) => [item.contactPerson, item.phone].filter(Boolean).join(" · ") || tr("Supplier account")} placeholder={tr("Search supplier or company…")} /></div>
                         <div className="flex flex-wrap gap-2">
-                            <Button variant="outline" render={<Link to="/operations/purchases" />}><ArrowRight />Open purchases</Button>
-                            {canPaySupplier ? <Button disabled={!supplier} onClick={() => supplier && setSettlement({ kind: "supplier-payment", party: { id: supplier.id, name: supplier.name } })}><Landmark />Pay supplier</Button> : null}
+                            <Button nativeButton={false} variant="outline" render={<Link to="/operations/purchases" />}><ArrowRight />{tr("Open purchases")}</Button>
+                            {canPaySupplier ? <Button disabled={!supplier} onClick={() => supplier && setSettlement({ kind: "supplier-payment", party: { id: supplier.id, name: supplier.name } })}><Landmark />{tr("Pay supplier")}</Button> : null}
                         </div>
                     </div>
-                    {supplierLedger.isLoading ? <div className="grid h-64 place-items-center"><LoaderCircle className="size-6 animate-spin" /></div> : supplierLedger.data ? <SupplierStatement ledger={supplierLedger.data} /> : supplierLedger.isError ? <div className="border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{getApiErrorMessage(supplierLedger.error, "The supplier ledger could not be loaded.")}</div> : <PartyEmpty icon={<Building2 />} title="Select a supplier" text="Purchases, payments, and the running payable balance will appear here." />}
+                    {supplierLedger.isLoading ? <div className="grid h-64 place-items-center"><LoaderCircle className="size-6 animate-spin" /></div> : supplierLedger.data ? <SupplierStatement ledger={supplierLedger.data} /> : supplierLedger.isError ? <div className="border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{getApiErrorMessage(supplierLedger.error, tr("The supplier ledger could not be loaded."))}</div> : <PartyEmpty icon={<Building2 />} title={tr("Select a supplier")} text={tr("Purchases, payments, and the running payable balance will appear here.")} />}
                 </div>
             ) : null}
 
-            {!canViewCustomers && !canViewSuppliers ? <PartyEmpty icon={<ShieldCheck />} title="Ledger access is restricted" text="Financial reports or purchase-view permission is required to open party ledgers." /> : null}
+            {!canViewCustomers && !canViewSuppliers ? <PartyEmpty icon={<ShieldCheck />} title={tr("Ledger access is restricted")} text={tr("Financial reports or purchase-view permission is required to open party ledgers.")} /> : null}
 
             {settlement ? (
                 <PartySettlementDialog
@@ -694,12 +697,13 @@ function PartyLedgersWorkspace() {
 
 function SupplierStatement({ ledger }: { ledger: SupplierLedger }) {
     const { formatMoney } = useCompany();
+    const { locale, tr } = useI18n();
     const money = (value: number) => formatMoney(value, ledger.currencyCode);
     return (
         <div className="overflow-hidden border">
-            <div className="flex flex-col gap-3 border-b bg-muted/20 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Supplier statement</p><h3 className="mt-1 font-heading text-xl font-bold">{ledger.supplierName}</h3></div><Badge variant="outline">{ledger.currencyCode}</Badge></div>
-            <div className="grid gap-px bg-border sm:grid-cols-3"><StatementMetric label="Purchases" value={money(ledger.totalPurchases)} tone="debit" /><StatementMetric label="Payments" value={money(ledger.totalPayments)} tone="credit" /><StatementMetric label="Balance payable" value={money(ledger.closingBalance)} strong /></div>
-            <div className="overflow-x-auto"><Table className="min-w-[780px]"><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Reference</TableHead><TableHead>Description</TableHead><TableHead className="text-end">Debit</TableHead><TableHead className="text-end">Credit</TableHead><TableHead className="text-end">Balance</TableHead></TableRow></TableHeader><TableBody>{ledger.entries.map((entry, index) => <TableRow key={`${entry.type}-${entry.sourceId}-${index}`}><TableCell>{shortDate(entry.date)}</TableCell><TableCell><Badge variant="outline">{entry.type}</Badge></TableCell><TableCell className="font-medium">{entry.reference}</TableCell><TableCell className="text-muted-foreground">{entry.description}</TableCell><TableCell className="text-end tabular-nums">{entry.debit ? money(entry.debit) : "—"}</TableCell><TableCell className="text-end tabular-nums">{entry.credit ? money(entry.credit) : "—"}</TableCell><TableCell className="text-end font-semibold tabular-nums">{money(entry.balance)}</TableCell></TableRow>)}{!ledger.entries.length ? <TableRow><TableCell colSpan={7} className="h-28 text-center text-muted-foreground">No supplier activity yet.</TableCell></TableRow> : null}</TableBody></Table></div>
+            <div className="flex flex-col gap-3 border-b bg-muted/20 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{tr("Supplier statement")}</p><h3 className="mt-1 font-heading text-xl font-bold">{ledger.supplierName}</h3></div><Badge variant="outline">{ledger.currencyCode}</Badge></div>
+            <div className="grid gap-px bg-border sm:grid-cols-3"><StatementMetric label={tr("Purchases")} value={money(ledger.totalPurchases)} tone="debit" /><StatementMetric label={tr("Payments")} value={money(ledger.totalPayments)} tone="credit" /><StatementMetric label={tr("Balance payable")} value={money(ledger.closingBalance)} strong /></div>
+            <div className="overflow-x-auto"><Table className="min-w-[780px]"><TableHeader><TableRow><TableHead>{tr("Date")}</TableHead><TableHead>{tr("Type")}</TableHead><TableHead>{tr("Reference")}</TableHead><TableHead>{tr("Description")}</TableHead><TableHead className="text-end">{tr("Debit")}</TableHead><TableHead className="text-end">{tr("Credit")}</TableHead><TableHead className="text-end">{tr("Balance")}</TableHead></TableRow></TableHeader><TableBody>{ledger.entries.map((entry, index) => <TableRow key={`${entry.type}-${entry.sourceId}-${index}`}><TableCell>{shortDate(entry.date, locale)}</TableCell><TableCell><Badge variant="outline">{tr(entry.type)}</Badge></TableCell><TableCell className="font-medium">{entry.reference}</TableCell><TableCell className="text-muted-foreground">{tr(entry.description)}</TableCell><TableCell className="text-end tabular-nums">{entry.debit ? money(entry.debit) : "—"}</TableCell><TableCell className="text-end tabular-nums">{entry.credit ? money(entry.credit) : "—"}</TableCell><TableCell className="text-end font-semibold tabular-nums">{money(entry.balance)}</TableCell></TableRow>)}{!ledger.entries.length ? <TableRow><TableCell colSpan={7} className="h-28 text-center text-muted-foreground">{tr("No supplier activity yet.")}</TableCell></TableRow> : null}</TableBody></Table></div>
         </div>
     );
 }
@@ -828,7 +832,7 @@ function DocumentInfo({ label, value }: { label: string; value: string }) { retu
 function PartyEmpty({ icon, title, text }: { icon: ReactNode; title: string; text: string }) { return <div className="grid min-h-72 place-items-center border border-dashed bg-muted/10 p-8 text-center"><div><span className="mx-auto grid size-12 place-items-center bg-muted text-muted-foreground [&_svg]:size-6">{icon}</span><p className="mt-4 font-heading text-base font-bold">{title}</p><p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-muted-foreground">{text}</p></div></div>; }
 function templateLine(code: string, description: string): DraftLine { const account = standardAccounts.find((item) => item.code === code); return { key: createUuid(), accountCode: code, accountName: account?.name ?? "", description, debit: 0, credit: 0 }; }
 function Field({ label, children }: { label: string; children: ReactNode }) { return <div className="space-y-2"><Label>{label}</Label>{children}</div>; }
-function shortDate(value: string | null | undefined) { if (!value) return "Date unavailable"; const parsed = new Date(`${value.slice(0, 10)}T00:00:00Z`); return Number.isNaN(parsed.getTime()) ? "Date unavailable" : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "UTC" }).format(parsed); }
+function shortDate(value: string | null | undefined, locale?: string) { if (!value) return "Date unavailable"; const parsed = new Date(`${value.slice(0, 10)}T00:00:00Z`); const language = locale === "dr" ? "fa-AF" : locale === "ps" ? "ps-AF" : locale === "en" ? "en" : undefined; return Number.isNaN(parsed.getTime()) ? "Date unavailable" : new Intl.DateTimeFormat(language, { dateStyle: "medium", timeZone: "UTC" }).format(parsed); }
 function dateTime(value: string | null | undefined) { if (!value) return "Not recorded"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? "Not recorded" : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(parsed); }
 function invalid(id: string, text: string) { toast.error(text); document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" }); document.getElementById(id)?.querySelector<HTMLElement>("input,textarea")?.focus(); }
 function voucherLabel(type: JournalVoucherType) { return voucherTypes.find((item) => item.value === type)?.label ?? type; }

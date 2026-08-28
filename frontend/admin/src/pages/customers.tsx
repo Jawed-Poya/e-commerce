@@ -87,7 +87,7 @@ const emptyForm = (): CustomerForm => ({
 });
 
 const customerSheetGridClass =
-    "grid grid-cols-[48px_150px_150px_160px_190px_150px_140px_130px_320px_48px] gap-2";
+    "grid grid-cols-[48px_150px_150px_160px_190px_150px_140px_130px_320px_56px] gap-2";
 
 export default function CustomersPage() {
     const queryClient = useQueryClient();
@@ -422,7 +422,7 @@ export default function CustomersPage() {
                                 <LoaderCircle className="size-6 animate-spin" />
                             </div>
                         ) : (
-                            <div className="w-full min-w-[1460px] overflow-hidden rounded-xl border">
+                            <div className="w-full min-w-[1468px] rounded-xl border">
                                 <div
                                     className={`${customerSheetGridClass} sticky top-0 z-10 border-b bg-muted p-2 text-xs font-bold shadow-sm`}
                                 >
@@ -435,7 +435,10 @@ export default function CustomersPage() {
                                     <span>{t("customers.creditLimit")}</span>
                                     <span>{t("customers.debtDueDays")}</span>
                                     <span>{t("customers.address")}</span>
-                                    <span />
+                                    <span className="sticky end-0 z-20 flex items-center justify-center self-stretch border-s bg-muted">
+                                        <Trash2 className="size-3.5 text-muted-foreground" />
+                                        <span className="sr-only">{t("customers.rowActions")}</span>
+                                    </span>
                                 </div>
                                 {rows.map((row, index) => (
                                     <BulkCustomerRow
@@ -929,15 +932,18 @@ function BulkCustomerRow({
                 value={row.address}
                 onChange={(event) => field("address", event.target.value)}
             />
-            <Button
-                type="button"
-                aria-label={tf("customers.removeRow", { count: index + 1 })}
-                size="icon"
-                variant="ghost"
-                onClick={onRemove}
-            >
-                <Trash2 className="size-4 text-destructive" />
-            </Button>
+            <div className="sticky end-0 z-10 flex items-center justify-center self-stretch border-s bg-background shadow-[-8px_0_12px_-12px_rgb(0_0_0/0.45)] rtl:shadow-[8px_0_12px_-12px_rgb(0_0_0/0.45)]">
+                <Button
+                    type="button"
+                    aria-label={tf("customers.removeRow", { count: index + 1 })}
+                    title={tf("customers.removeRow", { count: index + 1 })}
+                    size="icon"
+                    variant="ghost"
+                    onClick={onRemove}
+                >
+                    <Trash2 className="size-4 text-destructive" />
+                </Button>
+            </div>
         </div>
     );
 }
