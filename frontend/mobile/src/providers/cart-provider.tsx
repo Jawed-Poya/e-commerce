@@ -42,6 +42,10 @@ export function roundCartQuantity(value: number) {
   return Math.round((value + Number.EPSILON) * 1000) / 1000;
 }
 
+export function roundCartCurrency(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 export function cartQuantityStep(item: { quantityStep?: number; orderQuantityStep?: number }) {
   const value = item.quantityStep ?? item.orderQuantityStep;
   return Number.isFinite(value) && Number(value) > 0 ? roundCartQuantity(Number(value)) : 1;
@@ -336,7 +340,7 @@ export function CartProvider({ children }: PropsWithChildren) {
     syncStatus,
     lastSyncedAt,
     itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
-    subtotal: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    subtotal: roundCartCurrency(items.reduce((sum, item) => sum + item.price * item.quantity, 0)),
     addProduct: (product, requestedQuantity) => {
       if (product.price == null || product.stock <= 0) return;
       const unitId = product.unitId ?? null;

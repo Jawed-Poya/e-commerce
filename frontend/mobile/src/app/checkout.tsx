@@ -13,7 +13,7 @@ import { ApiError } from '@/lib/api';
 import { commerceApi } from '@/lib/commerce-api';
 import { storageKeys } from '@/lib/storage';
 import { useAuth } from '@/providers/auth-provider';
-import { useCart } from '@/providers/cart-provider';
+import { roundCartCurrency, useCart } from '@/providers/cart-provider';
 import { useI18n } from '@/providers/i18n-provider';
 import { useThemedStyles } from '@/providers/theme-provider';
 import type { PaymentMethod } from '@/types/domain';
@@ -53,10 +53,10 @@ export default function CheckoutScreen() {
     return config.data.flatShippingFee;
   }, [cart.subtotal, config.data]);
   const currency = config.data?.currency ?? 'AFN';
-  const total = cart.subtotal + shipping;
+  const total = roundCartCurrency(cart.subtotal + shipping);
   const bankOption = config.data?.paymentMethods.find((option) => option.method === 'BankTransfer');
 
-  if (!cart.hydrated || auth.loading) return <LoadingBlock label="Preparing secure checkout…" />;
+  if (!cart.hydrated || auth.loading) return <LoadingBlock label={t('Preparing secure checkout…')} />;
   if (!cart.items.length) return <Redirect href="/cart" />;
 
   if (!auth.user) {
@@ -64,11 +64,11 @@ export default function CheckoutScreen() {
       <SafeAreaView edges={['bottom']} style={styles.safeArea}>
         <View style={styles.gate}>
           <View style={styles.gateIcon}><Ionicons name="lock-closed" size={31} color={palette.primary} /></View>
-          <Text style={styles.gateEyebrow}>SECURE CHECKOUT</Text>
-          <Text style={styles.gateTitle}>Sign in to place your order.</Text>
-          <Text style={styles.gateText}>Your customer account connects this checkout to order history and delivery tracking.</Text>
-          <PrimaryButton title="Sign in" icon="log-in" onPress={() => router.push({ pathname: '/auth', params: { returnTo: 'checkout' } })} style={styles.fullWidth} />
-          <PrimaryButton title="Create account" icon="person-add" variant="outline" onPress={() => router.push({ pathname: '/auth', params: { mode: 'register', returnTo: 'checkout' } })} style={styles.fullWidth} />
+          <Text style={styles.gateEyebrow}>{t('SECURE CHECKOUT')}</Text>
+          <Text style={styles.gateTitle}>{t('Sign in to place your order.')}</Text>
+          <Text style={styles.gateText}>{t('Your customer account connects this checkout to order history and delivery tracking.')}</Text>
+          <PrimaryButton title={t('Sign in')} icon="log-in" onPress={() => router.push({ pathname: '/auth', params: { returnTo: 'checkout' } })} style={styles.fullWidth} />
+          <PrimaryButton title={t('Create account')} icon="person-add" variant="outline" onPress={() => router.push({ pathname: '/auth', params: { mode: 'register', returnTo: 'checkout' } })} style={styles.fullWidth} />
         </View>
       </SafeAreaView>
     );
@@ -79,10 +79,10 @@ export default function CheckoutScreen() {
       <SafeAreaView edges={['bottom']} style={styles.safeArea}>
         <View style={styles.gate}>
           <View style={styles.gateIcon}><Ionicons name="mail-unread" size={31} color={palette.primary} /></View>
-          <Text style={styles.gateEyebrow}>ONE MORE STEP</Text>
-          <Text style={styles.gateTitle}>Verify your email first.</Text>
-          <Text style={styles.gateText}>Email verification protects your account and is required by the backend before an order can be placed.</Text>
-          <PrimaryButton title="Verify my account" icon="shield-checkmark" onPress={() => router.push('/account')} style={styles.fullWidth} />
+          <Text style={styles.gateEyebrow}>{t('ONE MORE STEP')}</Text>
+          <Text style={styles.gateTitle}>{t('Verify your email first.')}</Text>
+          <Text style={styles.gateText}>{t('Email verification protects your account and is required by the backend before an order can be placed.')}</Text>
+          <PrimaryButton title={t('Verify my account')} icon="shield-checkmark" onPress={() => router.push('/account')} style={styles.fullWidth} />
         </View>
       </SafeAreaView>
     );
@@ -105,11 +105,11 @@ export default function CheckoutScreen() {
 
   const submit = async () => {
     if (!resolvedForm.firstName.trim() || !resolvedForm.phone.trim() || !resolvedForm.recipientName.trim() || !resolvedForm.addressLine1.trim() || !resolvedForm.city.trim() || !resolvedForm.country.trim()) {
-      setError('Complete all required contact and delivery fields.');
+      setError(t('Complete all required contact and delivery fields.'));
       return;
     }
     if (resolvedForm.paymentMethod === 'BankTransfer' && !resolvedForm.bankTransferReference.trim()) {
-      setError('Enter the bank transfer reference number.');
+      setError(t('Enter the bank transfer reference number.'));
       return;
     }
 
@@ -155,7 +155,7 @@ export default function CheckoutScreen() {
         },
       });
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : 'The order could not be created. Please try again.');
+      setError(requestError instanceof ApiError ? requestError.message : t('The order could not be created. Please try again.'));
     } finally {
       setSubmitting(false);
     }
@@ -167,60 +167,60 @@ export default function CheckoutScreen() {
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.intro}>
             <View style={styles.introIcon}><Ionicons name="shield-checkmark" size={23} color={palette.success} /></View>
-            <View style={styles.flex}><Text style={styles.introEyebrow}>SECURE CHECKOUT</Text><Text style={styles.introTitle}>Complete your order</Text><Text style={styles.introText}>{t('Signed in as {name} · {group} pricing', { name: auth.user.fullName, group: auth.user.customerTypeName ?? t('General') })}</Text></View>
+            <View style={styles.flex}><Text style={styles.introEyebrow}>{t('SECURE CHECKOUT')}</Text><Text style={styles.introTitle}>{t('Complete your order')}</Text><Text style={styles.introText}>{t('Signed in as {name} · {group} pricing', { name: auth.user.fullName, group: auth.user.customerTypeName ?? t('General') })}</Text></View>
           </View>
 
           {config.isError ? <ErrorState message={config.error.message} onRetry={() => void config.refetch()} /> : null}
 
-          <CheckoutSection icon="person-outline" title="Contact information" subtitle="Used for delivery updates and order tracking.">
-            <View style={styles.row}><View style={styles.flex}><Field label="First name *" value={resolvedForm.firstName} onChangeText={(value) => update('firstName', value)} /></View><View style={styles.flex}><Field label="Last name" value={resolvedForm.lastName} onChangeText={(value) => update('lastName', value)} /></View></View>
-            <Field label="Phone number *" value={resolvedForm.phone} onChangeText={(value) => update('phone', value)} keyboardType="phone-pad" />
-            <Field label="Email" value={resolvedForm.email} onChangeText={(value) => update('email', value)} keyboardType="email-address" autoCapitalize="none" editable={!auth.user.emailVerified} />
+          <CheckoutSection icon="person-outline" title={t('Contact information')} subtitle={t('Used for delivery updates and order tracking.')}>
+            <View style={styles.row}><View style={styles.flex}><Field label={t('First name *')} value={resolvedForm.firstName} onChangeText={(value) => update('firstName', value)} /></View><View style={styles.flex}><Field label={t('Last name')} value={resolvedForm.lastName} onChangeText={(value) => update('lastName', value)} /></View></View>
+            <Field label={t('Phone number *')} value={resolvedForm.phone} onChangeText={(value) => update('phone', value)} keyboardType="phone-pad" />
+            <Field label={t('Email')} value={resolvedForm.email} onChangeText={(value) => update('email', value)} keyboardType="email-address" autoCapitalize="none" editable={!auth.user.emailVerified} />
           </CheckoutSection>
 
-          <CheckoutSection icon="location-outline" title="Delivery address" subtitle="A copy of this address is saved with the order.">
-            <Field label="Recipient name *" value={resolvedForm.recipientName} onChangeText={(value) => update('recipientName', value)} />
-            <Field label="Address line 1 *" value={form.addressLine1} onChangeText={(value) => update('addressLine1', value)} placeholder="Street, district, building, house number" />
-            <Field label="Address line 2" value={form.addressLine2} onChangeText={(value) => update('addressLine2', value)} placeholder="Landmark or apartment (optional)" />
-            <View style={styles.row}><View style={styles.flex}><Field label="City *" value={form.city} onChangeText={(value) => update('city', value)} /></View><View style={styles.flex}><Field label="Province" value={form.state} onChangeText={(value) => update('state', value)} /></View></View>
-            <View style={styles.row}><View style={styles.flex}><Field label="Country *" value={form.country} onChangeText={(value) => update('country', value)} /></View><View style={styles.flex}><Field label="Postal code" value={form.postalCode} onChangeText={(value) => update('postalCode', value)} /></View></View>
+          <CheckoutSection icon="location-outline" title={t('Delivery address')} subtitle={t('A copy of this address is saved with the order.')}>
+            <Field label={t('Recipient name *')} value={resolvedForm.recipientName} onChangeText={(value) => update('recipientName', value)} />
+            <Field label={t('Address line 1 *')} value={form.addressLine1} onChangeText={(value) => update('addressLine1', value)} placeholder={t('Street, district, building, house number')} />
+            <Field label={t('Address line 2')} value={form.addressLine2} onChangeText={(value) => update('addressLine2', value)} placeholder={t('Landmark or apartment (optional)')} />
+            <View style={styles.row}><View style={styles.flex}><Field label={t('City *')} value={form.city} onChangeText={(value) => update('city', value)} /></View><View style={styles.flex}><Field label={t('Province')} value={form.state} onChangeText={(value) => update('state', value)} /></View></View>
+            <View style={styles.row}><View style={styles.flex}><Field label={t('Country *')} value={form.country} onChangeText={(value) => update('country', value)} /></View><View style={styles.flex}><Field label={t('Postal code')} value={form.postalCode} onChangeText={(value) => update('postalCode', value)} /></View></View>
           </CheckoutSection>
 
-          <CheckoutSection icon="card-outline" title="Payment method" subtitle="Choose one of the methods configured by the store.">
+          <CheckoutSection icon="card-outline" title={t('Payment method')} subtitle={t('Choose one of the methods configured by the store.')}>
             {(config.data?.paymentMethods ?? []).map((option) => (
-              <PaymentOption key={option.method} method={option.method} title={option.name} description={option.description} active={form.paymentMethod === option.method} onPress={() => update('paymentMethod', option.method)} />
+              <PaymentOption key={option.method} method={option.method} title={t(option.name)} description={t(option.description)} active={form.paymentMethod === option.method} onPress={() => update('paymentMethod', option.method)} />
             ))}
             {!config.isLoading && !config.data?.paymentMethods.length ? (
-              <PaymentOption method="CashOnDelivery" title="Cash on delivery" description="Pay when your order arrives." active={form.paymentMethod === 'CashOnDelivery'} onPress={() => update('paymentMethod', 'CashOnDelivery')} />
+              <PaymentOption method="CashOnDelivery" title={t('Cash on delivery')} description={t('Pay when your order arrives.')} active={form.paymentMethod === 'CashOnDelivery'} onPress={() => update('paymentMethod', 'CashOnDelivery')} />
             ) : null}
             {form.paymentMethod === 'BankTransfer' ? (
               <View style={styles.bankBox}>
                 {bankOption?.bankDetails ? (
                   <>
-                    <BankLine label="Bank" value={bankOption.bankDetails.bankName} />
-                    <BankLine label="Account name" value={bankOption.bankDetails.accountName} />
-                    <BankLine label="Account number" value={bankOption.bankDetails.accountNumber} />
-                    {bankOption.bankDetails.iban ? <BankLine label="IBAN" value={bankOption.bankDetails.iban} /> : null}
+                    <BankLine label={t('Bank')} value={bankOption.bankDetails.bankName} />
+                    <BankLine label={t('Account name')} value={bankOption.bankDetails.accountName} />
+                    <BankLine label={t('Account number')} value={bankOption.bankDetails.accountNumber} />
+                    {bankOption.bankDetails.iban ? <BankLine label={t('IBAN')} value={bankOption.bankDetails.iban} /> : null}
                     <Text style={styles.bankInstructions}>{bankOption.bankDetails.instructions}</Text>
                   </>
-                ) : <Text style={styles.bankInstructions}>Bank account details have not been configured.</Text>}
-                <Field label="Transfer reference *" value={form.bankTransferReference} onChangeText={(value) => update('bankTransferReference', value)} placeholder="Example: TRX-984725" />
+                ) : <Text style={styles.bankInstructions}>{t('Bank account details have not been configured.')}</Text>}
+                <Field label={t('Transfer reference *')} value={form.bankTransferReference} onChangeText={(value) => update('bankTransferReference', value)} placeholder={t('Example: TRX-984725')} />
               </View>
             ) : null}
           </CheckoutSection>
 
-          <CheckoutSection icon="document-text-outline" title="Order notes" subtitle="Optional instructions for the store or delivery team.">
-            <Field label="Notes" value={form.notes} onChangeText={(value) => update('notes', value)} multiline numberOfLines={4} placeholder="Call before delivery, preferred time, landmark…" />
+          <CheckoutSection icon="document-text-outline" title={t('Order notes')} subtitle={t('Optional instructions for the store or delivery team.')}>
+            <Field label={t('Notes')} value={form.notes} onChangeText={(value) => update('notes', value)} multiline numberOfLines={4} placeholder={t('Call before delivery, preferred time, landmark…')} />
           </CheckoutSection>
 
           <View style={styles.summary}>
-            <Text style={styles.summaryTitle}>Order summary</Text>
+            <Text style={styles.summaryTitle}>{t('Order summary')}</Text>
             <SummaryRow label={t('{count} items', { count: cart.itemCount })} value={formatMoney(cart.subtotal, currency)} />
-            <SummaryRow label="Delivery" value={shipping ? formatMoney(shipping, currency) : 'Free'} />
-            <View style={styles.totalRow}><Text style={styles.totalLabel}>Estimated total</Text><Text style={styles.totalValue}>{formatMoney(total, currency)}</Text></View>
-            <View style={styles.serverNote}><Ionicons name="lock-closed" size={16} color={palette.success} /><Text style={styles.serverText}>The backend rechecks price and reserves stock atomically when you place the order.</Text></View>
+            <SummaryRow label={t('Delivery')} value={shipping ? formatMoney(shipping, currency) : t('Free')} />
+            <View style={styles.totalRow}><Text style={styles.totalLabel}>{t('Estimated total')}</Text><Text style={styles.totalValue}>{formatMoney(total, currency)}</Text></View>
+            <View style={styles.serverNote}><Ionicons name="lock-closed" size={16} color={palette.success} /><Text style={styles.serverText}>{t('The backend rechecks price and reserves stock atomically when you place the order.')}</Text></View>
             {error ? <View style={styles.error}><Ionicons name="alert-circle" size={18} color={palette.danger} /><Text style={styles.errorText}>{error}</Text></View> : null}
-            <PrimaryButton title="Place order securely" icon="checkmark-circle" onPress={() => void submit()} loading={submitting} disabled={config.isError} />
+            <PrimaryButton title={t('Place order securely')} icon="checkmark-circle" onPress={() => void submit()} loading={submitting} disabled={config.isError} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

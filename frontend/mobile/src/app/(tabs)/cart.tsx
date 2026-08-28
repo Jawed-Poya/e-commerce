@@ -30,26 +30,26 @@ export default function CartScreen() {
       {!cart.items.length ? (
         <EmptyState
           icon="bag-handle-outline"
-          title="Your cart is empty"
-          message="Browse the catalog and add the products you want to order."
-          action={<PrimaryButton title="Start shopping" icon="storefront" onPress={() => router.push('/shop')} />}
+          title={t('Your cart is empty')}
+          message={t('Browse the catalog and add the products you want to order.')}
+          action={<PrimaryButton title={t('Start shopping')} icon="storefront" onPress={() => router.push('/shop')} />}
         />
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.screenTitleRow}>
             <View style={styles.titleCopy}>
-              <Text style={styles.screenEyebrow}>YOUR BASKET</Text>
+              <Text style={styles.screenEyebrow}>{t('YOUR BASKET')}</Text>
               <Text style={styles.screenTitle}>{t(cart.itemCount === 1 ? '1 item ready' : '{count} items ready', { count: cart.itemCount })}</Text>
               <View style={styles.syncRow}>
                 <View style={[styles.syncDot, cart.syncStatus === 'synced' && styles.syncDotReady, cart.syncStatus === 'offline' && styles.syncDotOffline]} />
-                <Text style={styles.syncText}>{cart.syncStatus === 'synced' ? 'Synced with web and mobile' : cart.syncStatus === 'syncing' ? 'Syncing your cart…' : cart.syncStatus === 'offline' ? 'Cart saved on this device' : 'Sign in to sync across devices'}</Text>
+                <Text style={styles.syncText}>{t(cart.syncStatus === 'synced' ? 'Synced with web and mobile' : cart.syncStatus === 'syncing' ? 'Syncing your cart…' : cart.syncStatus === 'offline' ? 'Cart saved on this device' : 'Sign in to sync across devices')}</Text>
               </View>
             </View>
             <Pressable
               hitSlop={10}
               onPress={() => setShowClearConfirmation(true)}
               style={styles.clearButton}>
-              <Ionicons name="trash-outline" size={15} color={palette.danger} /><Text style={styles.clear}>Clear</Text>
+              <Ionicons name="trash-outline" size={15} color={palette.danger} /><Text style={styles.clear}>{t('Clear')}</Text>
             </Pressable>
           </View>
           <View style={styles.items}>
@@ -59,26 +59,26 @@ export default function CartScreen() {
           <View style={styles.summary}>
             <View style={styles.summaryHeader}>
               <View style={styles.summaryIcon}><Ionicons name="receipt-outline" size={21} color={palette.primary} /></View>
-              <View><Text style={styles.summaryTitle}>Order summary</Text><Text style={styles.summarySub}>Shipping is calculated at checkout</Text></View>
+              <View><Text style={styles.summaryTitle}>{t('Order summary')}</Text><Text style={styles.summarySub}>{t('Shipping is calculated at checkout')}</Text></View>
             </View>
-            <SummaryRow label="Items" value={String(cart.itemCount)} />
-            <SummaryRow label="Subtotal" value={formatMoney(cart.subtotal, currency)} strong />
-            <View style={styles.secureNote}><Ionicons name="shield-checkmark" size={17} color={palette.success} /><Text style={styles.secureText}>Prices and inventory are securely revalidated by the server before your order is placed.</Text></View>
-            <PrimaryButton title="Continue to checkout" icon={isRtl ? 'arrow-back' : 'arrow-forward'} onPress={() => router.push('/checkout')} />
+            <SummaryRow label={t('Items')} value={String(cart.itemCount)} />
+            <SummaryRow label={t('Subtotal')} value={formatMoney(cart.subtotal, currency)} strong />
+            <View style={styles.secureNote}><Ionicons name="shield-checkmark" size={17} color={palette.success} /><Text style={styles.secureText}>{t('Prices and inventory are securely revalidated by the server before your order is placed.')}</Text></View>
+            <PrimaryButton title={t('Continue to checkout')} icon={isRtl ? 'arrow-back' : 'arrow-forward'} onPress={() => router.push('/checkout')} />
           </View>
 
           <Pressable onPress={() => router.push('/shop')} style={styles.continueButton}>
             <Ionicons name={isRtl ? 'arrow-forward' : 'arrow-back'} size={16} color={palette.primary} />
-            <Text style={styles.continueText}>Continue shopping</Text>
+            <Text style={styles.continueText}>{t('Continue shopping')}</Text>
           </Pressable>
         </ScrollView>
       )}
       </SafeAreaView>
       <ConfirmationDialog
         visible={showClearConfirmation}
-        title="Clear cart?"
-        message="All items will be removed from your cart."
-        confirmLabel="Clear cart"
+        title={t('Clear cart?')}
+        message={t('All items will be removed from your cart.')}
+        confirmLabel={t('Clear cart')}
         icon="trash-outline"
         tone="danger"
         onCancel={() => setShowClearConfirmation(false)}
@@ -113,7 +113,7 @@ function CartLine({ item, currency }: { item: CartItem; currency: string }) {
         </View>
         <View style={styles.lineBottom}>
           <View style={styles.lineTotalRow}>
-            <Text style={styles.lineTotalLabel}>ITEM TOTAL</Text>
+            <Text style={styles.lineTotalLabel}>{t('ITEM TOTAL')}</Text>
             <Text numberOfLines={1} adjustsFontSizeToFit style={styles.lineTotal}>{formatMoney(item.price * item.quantity, currency)}</Text>
           </View>
           <QuantitySelector

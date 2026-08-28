@@ -10,6 +10,10 @@
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://ecommerce.awsaan.com/api",
+        "EXPO_PUBLIC_ASSET_URL": "https://ecommerce.awsaan.com"
+      },
       "android": {
         "buildType": "apk"
       }
@@ -24,6 +28,10 @@
     "production": {
       "autoIncrement": true,
       "distribution": "store",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://ecommerce.awsaan.com/api",
+        "EXPO_PUBLIC_ASSET_URL": "https://ecommerce.awsaan.com"
+      },
       "android": {
         "buildType": "app-bundle"
       }

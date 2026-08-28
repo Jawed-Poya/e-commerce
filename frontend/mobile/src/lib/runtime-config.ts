@@ -4,10 +4,12 @@ import { Platform } from 'react-native';
 const manualConfigKey = 'easycart-mobile-runtime-config-v1';
 const remoteConfigCacheKey = 'easycart-mobile-remote-config-cache-v1';
 const remoteConfigUrl = process.env.EXPO_PUBLIC_RUNTIME_CONFIG_URL?.trim() ?? '';
+const productionDefault = 'https://ecommerce.awsaan.com/api';
 const developmentDefault = Platform.select({
   android: 'http://10.0.2.2:5188/api',
   default: 'http://localhost:5188/api',
 })!;
+const bundledDefault = __DEV__ ? developmentDefault : productionDefault;
 
 export type RuntimeConfigSource = 'bundled' | 'remote' | 'manual';
 export type RuntimeConfig = {
@@ -22,7 +24,7 @@ type StoredRuntimeConfig = {
 };
 
 const bundledConfig = createConfig(
-  process.env.EXPO_PUBLIC_API_URL?.trim() || developmentDefault,
+  process.env.EXPO_PUBLIC_API_URL?.trim() || bundledDefault,
   process.env.EXPO_PUBLIC_ASSET_URL?.trim(),
   'bundled',
 );

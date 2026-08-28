@@ -51,7 +51,9 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "start:clear": "expo start --clear"
+    "start:clear": "expo start --clear",
+    "build:android:apk": "npx --yes eas-cli@latest build --platform android --profile production-apk",
+    "build:android:bundle": "npx --yes eas-cli@latest build --platform android --profile production"
   },
   "private": true
 }
