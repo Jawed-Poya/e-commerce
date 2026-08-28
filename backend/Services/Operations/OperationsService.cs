@@ -31,9 +31,9 @@ public sealed class OperationsService(
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var first = new DateOnly(today.Year, today.Month, 1);
         var purchases = await context.Purchases.Where(x => (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value) && x.PurchaseDate >= first && x.Status != PurchaseStatus.Cancelled).SumAsync(x => (decimal?)x.Total, ct) ?? 0;
-        var sales = await context.InventorySales.Where(x => (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value) && x.SaleDate >= first).SumAsync(x => (decimal?)x.Total, ct) ?? 0;
+        var sales = await context.InventorySales.Where(x => (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value) && x.SaleDate >= first).SumAsync(x => (decimal?)(x.Total - x.Tax), ct) ?? 0;
         var expenses = await context.Expenses.Where(x => (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value) && x.ExpenseDate >= first).SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
-        var salaries = await context.StaffSalaryPayments.Where(x => (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value) && x.PaidDate >= first).SumAsync(x => (decimal?)x.PaidAmount, ct) ?? 0;
+        var salaries = await context.StaffSalaryPayments.Where(x => (!branchContext.BranchId.HasValue || x.BranchId == branchContext.BranchId.Value) && x.PaidDate >= first).SumAsync(x => (decimal?)x.NetAmount, ct) ?? 0;
         var low = await context.Products.AsNoTracking().CountAsync(product =>
             product.IsActive &&
             !product.UsesDisplayStock &&
@@ -45,7 +45,7 @@ public sealed class OperationsService(
                      lot.Quantity - lot.ReservedQuantity > 0)
                  .Sum(lot => (decimal?)(lot.Quantity - lot.ReservedQuantity)) ?? 0) <=
              product.Inventory.MinimumQuantity), ct);
-        return new OperationSummary(purchases, sales, expenses, salaries, low);
+        return new OperationSummary(purchases, sales, expenses, salaries, low, await GetCurrencyCodeAsync(ct));
     }
 
     public async Task<OperationPolicyResponse> GetPolicyAsync(
@@ -558,10 +558,10 @@ public sealed class OperationsService(
             var selectedUnit = ResolveOperationUnit(product, item.UnitId);
             var receivedQuantity = item.Quantity + item.BonusQuantity;
             var baseQuantity = decimal.Round(receivedQuantity * selectedUnit.ConversionFactor, 3, MidpointRounding.AwayFromZero);
-            var lineTotal = PercentageNet(item.Quantity * item.UnitCost, item.DiscountPercent);
-            var baseUnitCost = decimal.Round(lineTotal / baseQuantity, 4, MidpointRounding.AwayFromZero);
             if (baseQuantity <= 0)
                 throw new ArgumentException($"The quantity for '{product.Name}' is too small for base-unit precision.");
+            var lineTotal = PercentageNet(item.Quantity * item.UnitCost, item.DiscountPercent);
+            var baseUnitCost = decimal.Round(lineTotal / baseQuantity, 4, MidpointRounding.AwayFromZero);
             return new NormalizedPurchaseLine(item, product, selectedUnit, baseQuantity, baseUnitCost);
         }).ToList();
 
@@ -576,13 +576,20 @@ public sealed class OperationsService(
             if (supplierName is null) throw new ArgumentException("Selected supplier does not exist or is inactive.");
         }
 
-        var subtotal = normalizedItems.Sum(line => line.Request.Quantity * line.Request.UnitCost);
+        var subtotal = decimal.Round(
+            normalizedItems.Sum(line => line.Request.Quantity * line.Request.UnitCost),
+            2,
+            MidpointRounding.AwayFromZero);
         var linesNet = normalizedItems.Sum(line => PercentageNet(
             line.Request.Quantity * line.Request.UnitCost,
             line.Request.DiscountPercent));
         var documentNet = StackedNet(linesNet, request.DiscountPercent, request.SecondaryDiscountPercent);
         var effectiveDiscount = Math.Min(subtotal, subtotal - documentNet + request.Discount);
-        var total = Math.Max(0, subtotal - effectiveDiscount + request.Tax + request.OtherCost);
+        var total = decimal.Round(
+            Math.Max(0, subtotal - effectiveDiscount + request.Tax + request.OtherCost),
+            2,
+            MidpointRounding.AwayFromZero);
+        normalizedItems = AllocatePurchaseLandedCosts(normalizedItems, total, linesNet);
         ValidateInitialPayment(request.PaidAmount, total);
         var purchaseDate = request.PurchaseDate == default ? DateOnly.FromDateTime(DateTime.UtcNow) : request.PurchaseDate;
         var currencyCode = await GetCurrencyCodeAsync(ct);
@@ -887,7 +894,10 @@ public sealed class OperationsService(
             registeredCustomerPhone = registeredCustomer.Phone;
         }
 
-        var subtotal = normalizedItems.Sum(line => line.Request.Quantity * line.Request.UnitPrice);
+        var subtotal = decimal.Round(
+            normalizedItems.Sum(line => line.Request.Quantity * line.Request.UnitPrice),
+            2,
+            MidpointRounding.AwayFromZero);
         var linesNet = normalizedItems.Sum(line => PercentageNet(
             line.Request.Quantity * line.Request.UnitPrice,
             line.Request.DiscountPercent));
@@ -896,7 +906,10 @@ public sealed class OperationsService(
             : salesSettings.GeneralSalesDiscountPercent;
         var documentNet = StackedNet(linesNet, primaryDiscountPercent, request.SecondaryDiscountPercent);
         var effectiveDiscount = Math.Min(subtotal, subtotal - documentNet + request.Discount);
-        var total = Math.Max(0, subtotal - effectiveDiscount + request.Tax);
+        var total = decimal.Round(
+            Math.Max(0, subtotal - effectiveDiscount + request.Tax),
+            2,
+            MidpointRounding.AwayFromZero);
         if (request.PaidAmount < 0)
             throw new ArgumentException("Paid amount cannot be negative.");
         if (registeredCustomer is null && request.PaidAmount > total)
@@ -1965,6 +1978,40 @@ public sealed class OperationsService(
     {
         ValidatePercentage(discountPercent, "Line discount");
         return decimal.Round(amount * (1 - discountPercent / 100m), 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static List<NormalizedPurchaseLine> AllocatePurchaseLandedCosts(
+        IReadOnlyList<NormalizedPurchaseLine> lines,
+        decimal documentTotal,
+        decimal linesNet)
+    {
+        if (documentTotal <= 0)
+            return lines.Select(line => line with { BaseUnitCost = 0 }).ToList();
+
+        var useLineValue = linesNet > 0;
+        var weightTotal = useLineValue ? linesNet : lines.Sum(line => line.BaseQuantity);
+        var allocated = 0m;
+        var result = new List<NormalizedPurchaseLine>(lines.Count);
+
+        for (var index = 0; index < lines.Count; index++)
+        {
+            var line = lines[index];
+            var weight = useLineValue
+                ? PercentageNet(line.Request.Quantity * line.Request.UnitCost, line.Request.DiscountPercent)
+                : line.BaseQuantity;
+            var target = index == lines.Count - 1
+                ? Math.Max(0, documentTotal - allocated)
+                : Math.Min(
+                    Math.Max(0, documentTotal - allocated),
+                    decimal.Round(documentTotal * weight / weightTotal, 2, MidpointRounding.AwayFromZero));
+            allocated += target;
+            result.Add(line with
+            {
+                BaseUnitCost = decimal.Round(target / line.BaseQuantity, 4, MidpointRounding.AwayFromZero)
+            });
+        }
+
+        return result;
     }
 
     private static void ValidateInitialPayment(decimal paid, decimal total)

@@ -28,6 +28,7 @@ import { useI18n } from "../../i18n/i18n-provider";
 import { useCompany } from "../company/company-context";
 import { useAuth } from "../auth/auth-context";
 import { CartQuantityControl } from "./cart-quantity-control";
+import { calculateCartSubtotal, roundCurrency } from "./cart-calculations";
 
 export function CartPage() {
     const cart = useCart();
@@ -83,10 +84,7 @@ export function CartPage() {
     };
     const hasAvailabilityIssue = cart.items.some((item) => availabilityIssue(item) !== null);
 
-    const subtotal = cart.items.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0,
-    );
+    const subtotal = calculateCartSubtotal(cart.items);
 
     const rules = configuration.data;
     const threshold = rules?.freeShippingThreshold ?? 0;
@@ -95,7 +93,7 @@ export function CartPage() {
         !subtotal || !rules?.shippingEnabled || qualifiesForFreeShipping
             ? 0
             : rules.flatShippingFee;
-    const total = subtotal + shipping;
+    const total = roundCurrency(subtotal + shipping);
 
     if (!cart.items.length) {
         return (

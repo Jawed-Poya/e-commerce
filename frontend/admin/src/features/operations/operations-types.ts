@@ -1,6 +1,6 @@
 export interface PagedResult<T> { items: T[]; page: number; pageSize: number; totalCount: number; totalPages: number; hasPreviousPage: boolean; hasNextPage: boolean }
 export type PaymentStatus = "Unpaid" | "Partial" | "Paid";
-export interface OperationSummary { purchasesThisMonth: number; salesThisMonth: number; expensesThisMonth: number; salariesThisMonth: number; lowStockProducts: number }
+export interface OperationSummary { purchasesThisMonth: number; salesThisMonth: number; expensesThisMonth: number; salariesThisMonth: number; lowStockProducts: number; currencyCode: string }
 export interface OperationPolicy { maximumPurchaseLines: number; maximumManualSaleLines: number; canOverrideLineLimits: boolean; generalSalesDiscountPercent: number; maximumCustomerDebt: number; defaultDebtDueDays: number; allowNegativeStockSales: boolean }
 export interface OperationProductUnit { unitId: number; unitName: string; conversionFactor: number; barcode: string | null; defaultPrice: number | null; availableQuantity: number; isBase: boolean; isDefault: boolean }
 export interface OperationProduct { id: number; name: string; strength: string | null; genericName: string | null; formula: string | null; barcode: string | null; availableQuantity: number; defaultPrice: number | null; minimumValue: number | null; maximumValue: number | null; usesDisplayStock: boolean; baseUnitId: number | null; baseUnitName: string | null; currentUnitCost: number | null; units: OperationProductUnit[] }

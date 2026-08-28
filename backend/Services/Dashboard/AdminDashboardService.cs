@@ -51,11 +51,15 @@ public sealed class AdminDashboardService(
                 PendingOrders = context.Orders.Count(order => order.Status == OrderStatus.Pending),
                 PendingPayments = context.Orders.Count(order => order.PaymentStatus == PaymentStatus.Pending),
                 PaidRevenue = context.Orders
-                    .Where(order => order.PaymentStatus == PaymentStatus.Paid)
-                    .Sum(order => (decimal?)order.Total) ?? 0m,
+                    .Where(order => order.Status == OrderStatus.Delivered && order.PaymentStatus == PaymentStatus.Paid)
+                    .Sum(order => (decimal?)(order.Total - order.TaxTotal)) ?? 0m,
                 RevenueLast30Days = context.Orders
-                    .Where(order => order.PaymentStatus == PaymentStatus.Paid && order.CreatedAt >= from30Days)
-                    .Sum(order => (decimal?)order.Total) ?? 0m,
+                    .Where(order => order.Status == OrderStatus.Delivered && order.PaymentStatus == PaymentStatus.Paid &&
+                        (order.StatusHistory
+                            .Where(history => history.ToStatus == OrderStatus.Delivered)
+                            .Select(history => (DateTime?)history.CreatedAt)
+                            .Min() ?? order.UpdatedAt ?? order.CreatedAt) >= from30Days)
+                    .Sum(order => (decimal?)(order.Total - order.TaxTotal)) ?? 0m,
                 Currency = context.Orders
                     .OrderByDescending(order => order.Id)
                     .Select(order => order.Currency)
@@ -113,20 +117,35 @@ public sealed class AdminDashboardService(
             .Select(group => new
             {
                 Date = group.Key,
-                Orders = group.Count(),
-                Revenue = group.Sum(order => order.PaymentStatus == PaymentStatus.Paid ? order.Total : 0m)
+                Orders = group.Count()
             })
             .ToListAsync(cancellationToken);
 
+        var revenueRows = await DeliveredDuring(
+                context.Orders.AsNoTracking().Where(order => order.PaymentStatus == PaymentStatus.Paid),
+                from30Days,
+                now)
+            .GroupBy(order => (order.StatusHistory
+                .Where(history => history.ToStatus == OrderStatus.Delivered)
+                .Select(history => (DateTime?)history.CreatedAt)
+                .Min() ?? order.UpdatedAt ?? order.CreatedAt).Date)
+            .Select(group => new
+            {
+                Date = group.Key,
+                Revenue = group.Sum(order => order.Total - order.TaxTotal)
+            })
+            .ToDictionaryAsync(row => DateOnly.FromDateTime(row.Date), row => row.Revenue, cancellationToken);
+
         var trendByDate = salesRows.ToDictionary(
             row => DateOnly.FromDateTime(row.Date),
-            row => new { row.Orders, row.Revenue });
+            row => row.Orders);
 
         var salesTrend = Enumerable.Range(0, 30)
             .Select(offset => DateOnly.FromDateTime(from30Days.AddDays(offset)))
-            .Select(date => trendByDate.TryGetValue(date, out var point)
-                ? new SalesTrendPoint(date, point.Orders, point.Revenue)
-                : new SalesTrendPoint(date, 0, 0))
+            .Select(date => new SalesTrendPoint(
+                date,
+                trendByDate.GetValueOrDefault(date),
+                revenueRows.GetValueOrDefault(date)))
             .ToArray();
 
         var topViewed = await context.Products
@@ -152,7 +171,7 @@ public sealed class AdminDashboardService(
                 group.Key.ProductId,
                 Name = group.Key.ProductName,
                 Quantity = group.Sum(item => item.Quantity),
-                Revenue = group.Sum(item => ((item.OrderedQuantity > 0 ? item.OrderedQuantity * item.SellingUnitPrice : item.Quantity * item.UnitPrice) - item.Discount + item.Tax))
+                Revenue = group.Sum(item => (item.OrderedQuantity > 0 ? item.OrderedQuantity * item.SellingUnitPrice : item.Quantity * item.UnitPrice) - item.Discount)
             })
             .OrderByDescending(item => item.Quantity)
             .Take(6)
@@ -265,4 +284,15 @@ public sealed class AdminDashboardService(
         cache.Set(DashboardCacheKey, response, DashboardCacheDuration);
         return response;
     }
+
+    private static IQueryable<Order> DeliveredDuring(IQueryable<Order> orders, DateTime start, DateTime end) =>
+        orders.Where(order => order.Status == OrderStatus.Delivered &&
+            (order.StatusHistory
+                .Where(history => history.ToStatus == OrderStatus.Delivered)
+                .Select(history => (DateTime?)history.CreatedAt)
+                .Min() ?? order.UpdatedAt ?? order.CreatedAt) >= start &&
+            (order.StatusHistory
+                .Where(history => history.ToStatus == OrderStatus.Delivered)
+                .Select(history => (DateTime?)history.CreatedAt)
+                .Min() ?? order.UpdatedAt ?? order.CreatedAt) <= end);
 }

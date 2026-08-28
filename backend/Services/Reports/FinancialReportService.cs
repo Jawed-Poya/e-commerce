@@ -65,6 +65,10 @@ public sealed class FinancialReportService(
         var ordersQuery = context.Orders.AsNoTracking()
             .Where(item => item.CreatedAt >= start && item.CreatedAt <= end &&
                 item.Status != OrderStatus.Cancelled && item.Currency == selectedCurrency);
+        var recognizedOrdersQuery = DeliveredDuring(
+            context.Orders.AsNoTracking().Where(item => item.Currency == selectedCurrency),
+            start,
+            end);
         var salesQuery = context.InventorySales.AsNoTracking()
             .Where(item => item.SaleDate >= startOnly && item.SaleDate <= endOnly &&
                 item.CurrencyCode == selectedCurrency);
@@ -81,30 +85,33 @@ public sealed class FinancialReportService(
         if (request.BranchId.HasValue)
         {
             ordersQuery = ordersQuery.Where(item => item.BranchId == request.BranchId.Value);
+            recognizedOrdersQuery = recognizedOrdersQuery.Where(item => item.BranchId == request.BranchId.Value);
             salesQuery = salesQuery.Where(item => item.BranchId == request.BranchId.Value);
             purchasesQuery = purchasesQuery.Where(item => item.BranchId == request.BranchId.Value);
             expensesQuery = expensesQuery.Where(item => item.BranchId == request.BranchId.Value);
             payrollQuery = payrollQuery.Where(item => item.BranchId == request.BranchId.Value);
         }
 
-        var onlineRevenue = await ordersQuery.Where(item => item.Status != OrderStatus.Returned)
-            .SumAsync(item => (decimal?)item.Total, cancellationToken) ?? 0;
-        var manualRevenue = await salesQuery.SumAsync(item => (decimal?)item.Total, cancellationToken) ?? 0;
+        // Revenue is recognized when an online order is delivered. Sales tax is a
+        // liability owed to the tax authority, not business income.
+        var onlineRevenue = await recognizedOrdersQuery
+            .SumAsync(item => (decimal?)(item.Total - item.TaxTotal), cancellationToken) ?? 0;
+        var manualRevenue = await salesQuery
+            .SumAsync(item => (decimal?)(item.Total - item.Tax), cancellationToken) ?? 0;
         var purchaseTotal = await purchasesQuery.SumAsync(item => (decimal?)item.Total, cancellationToken) ?? 0;
         var expenseTotal = await expensesQuery.SumAsync(item => (decimal?)item.Amount, cancellationToken) ?? 0;
         var payrollObligation = await payrollQuery.SumAsync(item => (decimal?)item.NetAmount, cancellationToken) ?? 0;
         var payrollPaidForDocuments = await payrollQuery.SumAsync(item => (decimal?)item.PaidAmount, cancellationToken) ?? 0;
-        var orderCount = await ordersQuery.CountAsync(item => item.Status != OrderStatus.Returned, cancellationToken);
+        var orderCount = await recognizedOrdersQuery.CountAsync(cancellationToken);
         var returnedOrderCount = await ordersQuery.CountAsync(item => item.Status == OrderStatus.Returned, cancellationToken);
         var returnedOrderAmount = await ordersQuery.Where(item => item.Status == OrderStatus.Returned)
             .SumAsync(item => (decimal?)item.Total, cancellationToken) ?? 0;
         var saleCount = await salesQuery.CountAsync(cancellationToken);
         var purchaseCount = await purchasesQuery.CountAsync(cancellationToken);
 
+        var recognizedOrderIds = recognizedOrdersQuery.Select(item => item.Id);
         var onlineCost = await context.OrderItems.AsNoTracking()
-            .Where(item => item.Order.CreatedAt >= start && item.Order.CreatedAt <= end &&
-                item.Order.Status != OrderStatus.Cancelled && item.Order.Status != OrderStatus.Returned && item.Order.Currency == selectedCurrency &&
-                (!request.BranchId.HasValue || item.Order.BranchId == request.BranchId.Value))
+            .Where(item => recognizedOrderIds.Contains(item.OrderId))
             .SumAsync(item => (decimal?)(item.Quantity * item.UnitCost), cancellationToken) ?? 0;
         var manualCost = await context.InventorySaleItems.AsNoTracking()
             .Where(item => item.InventorySale.SaleDate >= startOnly && item.InventorySale.SaleDate <= endOnly &&
@@ -119,7 +126,8 @@ public sealed class FinancialReportService(
             (item.Status == PaymentStatus.Paid || item.Status == PaymentStatus.PartiallyRefunded));
         var manualCashQuery = context.InventorySalePayments.AsNoTracking().Where(item =>
             item.PaymentDate >= startOnly && item.PaymentDate <= endOnly &&
-            item.InventorySale.CurrencyCode == selectedCurrency);
+            item.InventorySale.CurrencyCode == selectedCurrency &&
+            item.PaymentMethod != "Account credit");
         var purchaseCashQuery = context.PurchasePayments.AsNoTracking().Where(item =>
             item.PaymentDate >= startOnly && item.PaymentDate <= endOnly &&
             item.Purchase.Status != PurchaseStatus.Cancelled && item.Purchase.CurrencyCode == selectedCurrency);
@@ -245,7 +253,7 @@ public sealed class FinancialReportService(
             request.BranchId,
             selectedCurrency,
             cancellationToken);
-        var topCustomers = await GetTopCustomersAsync(ordersQuery, salesQuery, cancellationToken);
+        var topCustomers = await GetTopCustomersAsync(recognizedOrdersQuery, salesQuery, cancellationToken);
         var topSuppliers = await GetTopSuppliersAsync(purchasesQuery, cancellationToken);
 
         var totalRevenue = onlineRevenue + manualRevenue;
@@ -392,23 +400,32 @@ public sealed class FinancialReportService(
             .SingleOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException("Product not found.");
 
-        var onlineRows = await context.OrderItems.AsNoTracking()
+        var onlineRowsQuery = context.OrderItems.AsNoTracking()
             .Where(item => item.ProductId == productId &&
-                item.Order.CreatedAt >= start && item.Order.CreatedAt <= end &&
-                item.Order.Status != OrderStatus.Cancelled && item.Order.Currency == currency &&
+                (item.Order.Status == OrderStatus.Delivered || item.Order.Status == OrderStatus.Returned) && item.Order.Currency == currency &&
                 (!branchId.HasValue || item.Order.BranchId == branchId.Value))
             .Select(item => new
             {
                 item.OrderId,
-                Date = item.Order.CreatedAt,
+                Date = item.Order.Status == OrderStatus.Returned
+                    ? item.Order.StatusHistory
+                        .Where(history => history.ToStatus == OrderStatus.Returned)
+                        .Select(history => (DateTime?)history.CreatedAt)
+                        .Min() ?? item.Order.UpdatedAt ?? item.Order.CreatedAt
+                    : item.Order.StatusHistory
+                        .Where(history => history.ToStatus == OrderStatus.Delivered)
+                        .Select(history => (DateTime?)history.CreatedAt)
+                        .Min() ?? item.Order.UpdatedAt ?? item.Order.CreatedAt,
                 Reference = item.Order.OrderNumber,
                 IsReturn = item.Order.Status == OrderStatus.Returned,
                 item.Quantity,
                 Amount = (item.OrderedQuantity > 0
                     ? item.OrderedQuantity * item.SellingUnitPrice
-                    : item.Quantity * item.UnitPrice) - item.Discount + item.Tax,
+                    : item.Quantity * item.UnitPrice) - item.Discount,
                 Cost = item.Quantity * item.UnitCost
-            })
+            });
+        var onlineRows = await onlineRowsQuery
+            .Where(item => item.Date >= start && item.Date <= end)
             .ToListAsync(cancellationToken);
 
         var manualRows = await context.InventorySaleItems.AsNoTracking()
@@ -422,7 +439,9 @@ public sealed class FinancialReportService(
                 item.InventorySale.SaleDate,
                 Reference = item.InventorySale.SaleNumber,
                 item.Quantity,
-                Amount = item.LineTotal,
+                item.LineTotal,
+                SaleNetRevenue = item.InventorySale.Total - item.InventorySale.Tax,
+                SaleLinesNet = item.InventorySale.Items.Sum(line => line.LineTotal),
                 Cost = item.Quantity * item.UnitCost
             })
             .ToListAsync(cancellationToken);
@@ -438,7 +457,7 @@ public sealed class FinancialReportService(
                 item.Purchase.PurchaseDate,
                 Reference = item.Purchase.PurchaseNumber,
                 item.Quantity,
-                Amount = item.LineTotal
+                Amount = item.Quantity * item.UnitCost
             })
             .ToListAsync(cancellationToken);
 
@@ -460,7 +479,7 @@ public sealed class FinancialReportService(
             item.Reference,
             item.InventorySaleId,
             item.Quantity,
-            item.Amount,
+            AllocateLineRevenue(item.LineTotal, item.SaleNetRevenue, item.SaleLinesNet),
             item.Cost,
             false,
             false)));
@@ -602,16 +621,21 @@ public sealed class FinancialReportService(
         var currency = NormalizeCurrency(currencyCode, await GetMainCurrencyAsync(cancellationToken));
 
         var onlineInvoices = await context.Orders.AsNoTracking()
-            .Where(item => item.CustomerId == customerId && item.Status != OrderStatus.Cancelled && item.Status != OrderStatus.Returned &&
-                item.Currency == currency && item.CreatedAt <= end)
+            .Where(item => item.CustomerId == customerId && item.Status == OrderStatus.Delivered &&
+                item.Currency == currency)
             .Select(item => new
             {
                 item.Id,
-                Date = item.CreatedAt,
+                Date = item.StatusHistory
+                    .Where(history => history.ToStatus == OrderStatus.Delivered)
+                    .Select(history => (DateTime?)history.CreatedAt)
+                    .Min() ?? item.UpdatedAt ?? item.CreatedAt,
                 item.OrderNumber,
                 item.Total,
+                item.TaxTotal,
                 Cost = item.Items.Sum(line => line.Quantity * line.UnitCost)
             })
+            .Where(item => item.Date <= end)
             .ToListAsync(cancellationToken);
         var manualInvoices = await context.InventorySales.AsNoTracking()
             .Where(item => item.CustomerId == customerId && item.CurrencyCode == currency &&
@@ -622,6 +646,7 @@ public sealed class FinancialReportService(
                 Date = item.SaleDate,
                 item.SaleNumber,
                 item.Total,
+                item.Tax,
                 Cost = item.Items.Sum(line => line.Quantity * line.UnitCost)
             })
             .ToListAsync(cancellationToken);
@@ -639,7 +664,8 @@ public sealed class FinancialReportService(
             .ToListAsync(cancellationToken);
         var manualPayments = await context.InventorySalePayments.AsNoTracking()
             .Where(item => item.InventorySale.CustomerId == customerId &&
-                item.InventorySale.CurrencyCode == currency && item.PaymentDate <= endOnly)
+                item.InventorySale.CurrencyCode == currency && item.PaymentDate <= endOnly &&
+                item.PaymentMethod != "Account credit")
             .Select(item => new
             {
                 item.Id,
@@ -713,7 +739,8 @@ public sealed class FinancialReportService(
         var periodOnline = onlineInvoices.Where(item => item.Date >= start && item.Date <= end).ToArray();
         var periodManual = manualInvoices.Where(item =>
             item.Date >= startOnly && item.Date <= endOnly).ToArray();
-        var revenue = periodOnline.Sum(item => item.Total) + periodManual.Sum(item => item.Total);
+        var revenue = periodOnline.Sum(item => item.Total - item.TaxTotal) +
+            periodManual.Sum(item => item.Total - item.Tax);
         var cogs = periodOnline.Sum(item => item.Cost) + periodManual.Sum(item => item.Cost);
 
         return new CustomerLedgerResponse(
@@ -763,9 +790,10 @@ public sealed class FinancialReportService(
         string currency,
         CancellationToken cancellationToken)
     {
-        var onlineRows = await context.Orders.AsNoTracking()
-            .Where(item => item.CreatedAt <= end && item.Status != OrderStatus.Cancelled && item.Status != OrderStatus.Returned &&
-                item.Currency == currency && (!branchId.HasValue || item.BranchId == branchId.Value))
+        var onlineRows = await DeliveredBy(
+                context.Orders.AsNoTracking().Where(item => item.Currency == currency &&
+                    (!branchId.HasValue || item.BranchId == branchId.Value)),
+                end)
             .Select(item => new
             {
                 item.Total,
@@ -1005,15 +1033,18 @@ public sealed class FinancialReportService(
         string currency,
         CancellationToken cancellationToken)
     {
-        var online = await context.Orders.AsNoTracking()
-            .Where(item => item.Status != OrderStatus.Cancelled && item.Status != OrderStatus.Returned && item.Currency == currency &&
-                item.CreatedAt >= start.ToDateTime(TimeOnly.MinValue) &&
-                item.CreatedAt < end.AddDays(1).ToDateTime(TimeOnly.MinValue) &&
-                (!branchId.HasValue || item.BranchId == branchId.Value))
+        var online = await DeliveredDuring(
+                context.Orders.AsNoTracking().Where(item => item.Currency == currency &&
+                    (!branchId.HasValue || item.BranchId == branchId.Value)),
+                start.ToDateTime(TimeOnly.MinValue),
+                end.AddDays(1).ToDateTime(TimeOnly.MinValue).AddTicks(-1))
             .Select(item => new
             {
-                Date = item.CreatedAt.Date,
-                Revenue = item.Total,
+                Date = (item.StatusHistory
+                    .Where(history => history.ToStatus == OrderStatus.Delivered)
+                    .Select(history => (DateTime?)history.CreatedAt)
+                    .Min() ?? item.UpdatedAt ?? item.CreatedAt).Date,
+                Revenue = item.Total - item.TaxTotal,
                 Cost = item.Items.Sum(line => line.Quantity * line.UnitCost)
             })
             .ToListAsync(cancellationToken);
@@ -1023,7 +1054,7 @@ public sealed class FinancialReportService(
             .Select(item => new
             {
                 Date = item.SaleDate,
-                Revenue = item.Total,
+                Revenue = item.Total - item.Tax,
                 Cost = item.Items.Sum(line => line.Quantity * line.UnitCost)
             })
             .ToListAsync(cancellationToken);
@@ -1074,34 +1105,49 @@ public sealed class FinancialReportService(
         string currency,
         CancellationToken cancellationToken)
     {
+        var deliveredOrderIds = DeliveredDuring(
+            context.Orders.AsNoTracking().Where(item => item.Currency == currency &&
+                (!branchId.HasValue || item.BranchId == branchId.Value)),
+            start,
+            end).Select(item => item.Id);
         var topOnline = await context.OrderItems.AsNoTracking()
-            .Where(item => item.Order.CreatedAt >= start && item.Order.CreatedAt <= end &&
-                item.Order.Status != OrderStatus.Cancelled && item.Order.Status != OrderStatus.Returned && item.Order.Currency == currency &&
-                (!branchId.HasValue || item.Order.BranchId == branchId.Value))
+            .Where(item => deliveredOrderIds.Contains(item.OrderId))
             .GroupBy(item => new { item.ProductId, item.Product.Name })
             .Select(group => new TopProductResponse(
                 group.Key.ProductId,
                 group.Key.Name,
                 group.Sum(item => item.Quantity),
-                group.Sum(item => (item.OrderedQuantity > 0 ? item.OrderedQuantity * item.SellingUnitPrice : item.Quantity * item.UnitPrice) - item.Discount + item.Tax),
+                group.Sum(item => (item.OrderedQuantity > 0 ? item.OrderedQuantity * item.SellingUnitPrice : item.Quantity * item.UnitPrice) - item.Discount),
                 group.Sum(item => item.Quantity * item.UnitCost),
                 0,
                 0))
             .ToListAsync(cancellationToken);
-        var topManual = await context.InventorySaleItems.AsNoTracking()
+        var topManualRows = await context.InventorySaleItems.AsNoTracking()
             .Where(item => item.InventorySale.SaleDate >= startOnly && item.InventorySale.SaleDate <= endOnly &&
                 item.InventorySale.CurrencyCode == currency &&
                 (!branchId.HasValue || item.InventorySale.BranchId == branchId.Value))
-            .GroupBy(item => new { item.ProductId, item.Product.Name })
+            .Select(item => new
+            {
+                item.ProductId,
+                item.Product.Name,
+                item.Quantity,
+                item.LineTotal,
+                SaleNetRevenue = item.InventorySale.Total - item.InventorySale.Tax,
+                SaleLinesNet = item.InventorySale.Items.Sum(line => line.LineTotal),
+                Cost = item.Quantity * item.UnitCost
+            })
+            .ToListAsync(cancellationToken);
+        var topManual = topManualRows
+            .GroupBy(item => new { item.ProductId, item.Name })
             .Select(group => new TopProductResponse(
                 group.Key.ProductId,
                 group.Key.Name,
                 group.Sum(item => item.Quantity),
-                group.Sum(item => item.LineTotal),
-                group.Sum(item => item.Quantity * item.UnitCost),
+                group.Sum(item => AllocateLineRevenue(item.LineTotal, item.SaleNetRevenue, item.SaleLinesNet)),
+                group.Sum(item => item.Cost),
                 0,
                 0))
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         return topOnline
             .Concat(topManual)
@@ -1130,12 +1176,13 @@ public sealed class FinancialReportService(
         IQueryable<InventorySale> sales,
         CancellationToken cancellationToken)
     {
-        var onlineRows = await orders.Where(item => item.Status != OrderStatus.Returned)
+        var onlineRows = await orders.Where(item => item.Status == OrderStatus.Delivered)
             .Select(item => new
             {
                 Id = (long?)item.CustomerId,
                 Name = item.Customer.FirstName + " " + (item.Customer.LastName ?? ""),
                 item.Total,
+                item.TaxTotal,
                 item.PaymentStatus,
                 Paid = item.Payments
                     .Where(payment => payment.Status == PaymentStatus.Paid ||
@@ -1149,7 +1196,7 @@ public sealed class FinancialReportService(
                 group.Key.Id,
                 group.Key.Name,
                 group.Count(),
-                group.Sum(item => item.Total),
+                group.Sum(item => item.Total - item.TaxTotal),
                 group.Sum(item => Math.Max(
                     0,
                     item.Total - (item.Paid > 0
@@ -1162,7 +1209,7 @@ public sealed class FinancialReportService(
                 group.Key.CustomerId,
                 group.Key.Name,
                 group.Count(),
-                group.Sum(item => item.Total),
+                group.Sum(item => item.Total - item.Tax),
                 group.Sum(item => item.Total > item.PaidAmount ? item.Total - item.PaidAmount : 0)))
             .ToListAsync(cancellationToken);
 
@@ -1214,6 +1261,7 @@ public sealed class FinancialReportService(
             .SumAsync(item => (decimal?)item.Amount, cancellationToken) ?? 0;
         var manual = await context.InventorySalePayments.AsNoTracking()
             .Where(item => item.PaymentDate <= asOfOnly && item.InventorySale.CurrencyCode == currency &&
+                item.PaymentMethod != "Account credit" &&
                 (!branchId.HasValue || item.InventorySale.BranchId == branchId.Value))
             .SumAsync(item => (decimal?)item.Amount, cancellationToken) ?? 0;
         return online + manual;
@@ -1270,10 +1318,12 @@ public sealed class FinancialReportService(
                 Cost = group.Sum(item => item.Quantity * item.UnitCost)
             })
             .ToListAsync(cancellationToken);
+        var deliveredOrderIds = DeliveredBy(
+            context.Orders.AsNoTracking().Where(item =>
+                !branchId.HasValue || item.BranchId == branchId.Value),
+            asOf).Select(item => item.Id);
         var onlineSold = await context.OrderItems.AsNoTracking()
-            .Where(item => item.AffectsInventory &&
-                item.Order.CreatedAt <= asOf && item.Order.Status != OrderStatus.Cancelled && item.Order.Status != OrderStatus.Returned &&
-                (!branchId.HasValue || item.Order.BranchId == branchId.Value))
+            .Where(item => item.AffectsInventory && deliveredOrderIds.Contains(item.OrderId))
             .GroupBy(item => item.ProductId)
             .Select(group => new { ProductId = group.Key, Quantity = group.Sum(item => item.Quantity) })
             .ToDictionaryAsync(item => item.ProductId, item => item.Quantity, cancellationToken);
@@ -1373,6 +1423,23 @@ public sealed class FinancialReportService(
 
     private static decimal Percentage(decimal value, decimal total) =>
         total == 0 ? 0 : decimal.Round(value / total * 100, 2);
+
+    private static decimal AllocateLineRevenue(decimal lineNet, decimal saleNetRevenue, decimal saleLinesNet) =>
+        saleLinesNet <= 0 ? 0 : lineNet / saleLinesNet * saleNetRevenue;
+
+    private static IQueryable<Order> DeliveredDuring(IQueryable<Order> orders, DateTime start, DateTime end) =>
+        DeliveredBy(orders, end).Where(item =>
+            (item.StatusHistory
+                .Where(history => history.ToStatus == OrderStatus.Delivered)
+                .Select(history => (DateTime?)history.CreatedAt)
+                .Min() ?? item.UpdatedAt ?? item.CreatedAt) >= start);
+
+    private static IQueryable<Order> DeliveredBy(IQueryable<Order> orders, DateTime end) =>
+        orders.Where(item => item.Status == OrderStatus.Delivered &&
+            (item.StatusHistory
+                .Where(history => history.ToStatus == OrderStatus.Delivered)
+                .Select(history => (DateTime?)history.CreatedAt)
+                .Min() ?? item.UpdatedAt ?? item.CreatedAt) <= end);
 
     private static string? Clean(string? value)
     {

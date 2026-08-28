@@ -42,7 +42,7 @@ public sealed class QuickCreateProductRequest
 }
 
 public sealed record OperationCustomerLookup(long Id, string Name, string Phone, string? WhatsAppUrl, string? Email, string? CustomerTypeName, decimal AccountCredit, decimal OutstandingDebt, decimal CreditLimit, bool HasOverdueDebt);
-public sealed record OperationSummary(decimal PurchasesThisMonth, decimal SalesThisMonth, decimal ExpensesThisMonth, decimal SalariesThisMonth, int LowStockProducts);
+public sealed record OperationSummary(decimal PurchasesThisMonth, decimal SalesThisMonth, decimal ExpensesThisMonth, decimal SalariesThisMonth, int LowStockProducts, string CurrencyCode);
 public sealed record OperationPolicyResponse(int MaximumPurchaseLines, int MaximumManualSaleLines, bool CanOverrideLineLimits, decimal GeneralSalesDiscountPercent, decimal MaximumCustomerDebt, int DefaultDebtDueDays, bool AllowNegativeStockSales);
 
 public sealed class CreateSupplierRequest

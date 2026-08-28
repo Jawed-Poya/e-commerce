@@ -12,50 +12,54 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAdminAuth } from "@/features/auth/auth-context";
 import { hasPermission, Permissions } from "@/features/auth/permissions";
+import { useCompany } from "@/features/company/company-context";
 import {
     operationKeys,
     useOperationQuery,
 } from "@/features/operations/operations-hooks";
 import { operationsService } from "@/features/operations/operations-service";
+import { useI18n } from "@/i18n/i18n-provider";
 
 export default function OperationsDashboardPage() {
     const navigate = useNavigate();
     const { user } = useAdminAuth();
+    const { formatMoney } = useCompany();
+    const { tr } = useI18n();
     const { data } = useOperationQuery(
         operationKeys.summary,
         operationsService.summary,
     );
     const metrics = [
-        ["Purchases this month", data?.purchasesThisMonth, ShoppingBasket],
-        ["Manual sales this month", data?.salesThisMonth, CircleDollarSign],
-        ["Expenses this month", data?.expensesThisMonth, ReceiptText],
-        ["Salaries this month", data?.salariesThisMonth, Banknote],
+        [tr("Purchases this month"), data?.purchasesThisMonth, ShoppingBasket],
+        [tr("Net manual sales this month"), data?.salesThisMonth, CircleDollarSign],
+        [tr("Expenses this month"), data?.expensesThisMonth, ReceiptText],
+        [tr("Payroll accrued this month"), data?.salariesThisMonth, Banknote],
     ] as const;
     const actions = [
         {
-            title: "Receive purchase",
-            description: "Add supplier stock and costs.",
+            title: tr("Receive purchase"),
+            description: tr("Add supplier stock and costs."),
             icon: ShoppingBasket,
             route: "/operations/purchases",
             permission: Permissions.PurchasesView,
         },
         {
-            title: "Record sale",
-            description: "Create a counter sale and reduce stock.",
+            title: tr("Record sale"),
+            description: tr("Create a counter sale and reduce stock."),
             icon: CircleDollarSign,
             route: "/operations/sales",
             permission: Permissions.ManualSalesView,
         },
         {
-            title: "Manage staff",
-            description: "Employee records and salary payments.",
+            title: tr("Manage staff"),
+            description: tr("Employee records and salary payments."),
             icon: UsersRound,
             route: "/operations/staff",
             permission: Permissions.StaffView,
         },
         {
-            title: "Record expense",
-            description: "Categorize operating expenses.",
+            title: tr("Record expense"),
+            description: tr("Categorize operating expenses."),
             icon: ReceiptText,
             route: "/operations/expenses",
             permission: Permissions.ExpensesView,
@@ -65,8 +69,8 @@ export default function OperationsDashboardPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Business operations"
-                description="Purchasing, manual sales, staff payroll, expenses, and stock control in one admin workspace."
+                title={tr("Business operations")}
+                description={tr("Purchasing, manual sales, staff payroll, expenses, and stock control in one admin workspace.")}
             />
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {metrics.map(([label, value, Icon]) => (
@@ -74,7 +78,7 @@ export default function OperationsDashboardPage() {
                         <CardContent className="flex items-center justify-between p-5">
                             <div>
                                 <p className="text-sm text-muted-foreground">{label}</p>
-                                <p className="mt-2 text-2xl font-bold">{money(value ?? 0)}</p>
+                                <p className="mt-2 text-2xl font-bold">{formatMoney(value ?? 0, data?.currencyCode)}</p>
                             </div>
                             <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary">
                                 <Icon className="size-5" />
@@ -86,7 +90,7 @@ export default function OperationsDashboardPage() {
             {actions.length > 0 && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>Quick actions</CardTitle>
+                        <CardTitle>{tr("Quick actions")}</CardTitle>
                     </CardHeader>
                     <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         {actions.map((action) => (
@@ -108,9 +112,9 @@ export default function OperationsDashboardPage() {
                             <TrendingDown className="size-5" />
                         </span>
                         <div>
-                            <p className="font-semibold">Low-stock attention</p>
+                            <p className="font-semibold">{tr("Low-stock attention")}</p>
                             <p className="text-sm text-muted-foreground">
-                                Active products with no inventory or at/below minimum quantity.
+                                {tr("Active products with no inventory or at/below minimum quantity.")}
                             </p>
                         </div>
                     </div>
@@ -118,7 +122,7 @@ export default function OperationsDashboardPage() {
                         <strong className="text-2xl">{data?.lowStockProducts ?? 0}</strong>
                         {hasPermission(user, Permissions.InventoryView) && (
                             <Button variant="outline" onClick={() => navigate("/inventory")}>
-                                Open inventory
+                                {tr("Open inventory")}
                             </Button>
                         )}
                     </div>
@@ -156,10 +160,4 @@ function Action({
             </span>
         </button>
     );
-}
-function money(value: number) {
-    return new Intl.NumberFormat(undefined, {
-        style: "currency",
-        currency: "USD",
-    }).format(value);
 }

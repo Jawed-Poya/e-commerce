@@ -57,6 +57,7 @@ import {
 import {
     calculateLineNet,
     calculateStackedDiscountNet,
+    roundCurrency,
 } from "@/features/operations/discount-calculations";
 import {
     AmountInputRow,
@@ -136,7 +137,7 @@ export default function ManualSalesPage() {
     });
 
     const subtotal = useMemo(
-        () => items.reduce((sum, item) => sum + item.quantity * item.amount, 0),
+        () => roundCurrency(items.reduce((sum, item) => sum + item.quantity * item.amount, 0)),
         [items],
     );
     const linesNet = useMemo(
@@ -147,11 +148,11 @@ export default function ManualSalesPage() {
         ? form.discountPercent
         : operationPolicy?.generalSalesDiscountPercent ?? 0;
     const discountedSubtotal = calculateStackedDiscountNet(linesNet, effectiveDiscountPercent, form.secondaryDiscountPercent);
-    const total = Math.max(0, discountedSubtotal - form.discount + form.tax);
+    const total = roundCurrency(Math.max(0, discountedSubtotal - form.discount + form.tax));
     const creditApplied = selectedCustomer && form.useCustomerCredit
         ? Math.min(selectedCustomer.accountCredit, Math.max(0, total - form.paidAmount))
         : 0;
-    const remaining = Math.max(0, total - form.paidAmount - creditApplied);
+    const remaining = roundCurrency(Math.max(0, total - form.paidAmount - creditApplied));
     const profitPreview = useMemo(() => {
         const saleItems = getSubmittableDocumentLines(items);
         if (!saleItems.length || saleItems.some((item) => !isDocumentLineComplete(item))) {

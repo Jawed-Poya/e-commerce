@@ -18,6 +18,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/auth-context";
 import { useCart } from "../cart/cart-context";
+import { calculateCartSubtotal, roundCurrency } from "../cart/cart-calculations";
 import { saveRecentOrder } from "../orders/recent-orders";
 import { imageUrl, ApiError } from "../../shared/api/api-client";
 import { Button } from "../../shared/components/ui/button";
@@ -92,11 +93,7 @@ export function CheckoutPage() {
     });
 
     const subtotal = useMemo(
-        () =>
-            cart.items.reduce(
-                (sum, item) => sum + item.price * item.quantity,
-                0,
-            ),
+        () => calculateCartSubtotal(cart.items),
         [cart.items],
     );
 
@@ -109,7 +106,7 @@ export function CheckoutPage() {
         config?.shippingEnabled && !qualifiesForFreeShipping
             ? config.flatShippingFee
             : 0;
-    const estimatedTotal = subtotal + shipping;
+    const estimatedTotal = roundCurrency(subtotal + shipping);
     const bankOption = config?.paymentMethods.find(
         (option) => option.method === "BankTransfer",
     );

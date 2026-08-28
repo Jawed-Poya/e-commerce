@@ -204,14 +204,17 @@ public sealed class OrderService(
                 }
             }
 
-            var subtotal = orderItems.Sum(item => item.OrderedQuantity * item.SellingUnitPrice);
+            var subtotal = decimal.Round(
+                orderItems.Sum(item => item.OrderedQuantity * item.SellingUnitPrice),
+                2,
+                MidpointRounding.AwayFromZero);
             var shippingRules = await storefrontContent.GetAsync(cancellationToken);
             var freeThreshold = Math.Max(0, shippingRules.FreeShippingThreshold);
             var qualifiesForFreeShipping = freeThreshold > 0 && subtotal >= freeThreshold;
             var shippingTotal = !shippingRules.ShippingEnabled || qualifiesForFreeShipping
                 ? 0
-                : Math.Max(0, shippingRules.FlatShippingFee);
-            var total = subtotal + shippingTotal;
+                : decimal.Round(Math.Max(0, shippingRules.FlatShippingFee), 2, MidpointRounding.AwayFromZero);
+            var total = decimal.Round(subtotal + shippingTotal, 2, MidpointRounding.AwayFromZero);
             var now = DateTime.UtcNow;
 
             var order = new OrderEntity
