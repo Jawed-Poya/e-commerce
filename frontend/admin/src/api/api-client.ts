@@ -136,18 +136,19 @@ class ApiClient {
         }
 
         if (blob.size === 0) {
-            // A browser or desktop shell can hand an attachment to its download
-            // manager before the renderer exposes the response body. The successful
-            // attachment response is authoritative in that case; previews remain
-            // strict because they never opt into externally handled attachments.
-            if (allowExternalAttachment && /attachment/i.test(contentDisposition)) {
+            // Some browser and desktop download managers consume both the attachment
+            // body and its disposition header before fetch exposes the response to
+            // the renderer. For an explicit download, the successful non-JSON HTTP
+            // response is therefore authoritative. Preview requests do not opt into
+            // this behavior and still require a readable body.
+            if (allowExternalAttachment) {
                 return {
                     blob: null,
                     filename: resolveFilename(contentDisposition, contentType),
                     handledExternally: true,
                 };
             }
-            throw new Error("The document service returned no file content.");
+            throw new Error("The document preview did not include file content.");
         }
 
         return {
