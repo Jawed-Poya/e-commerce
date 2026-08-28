@@ -59,9 +59,9 @@ export function CustomerLedgerCard({
             <CardHeader className="gap-4 border-b">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                     <div>
-                        <CardTitle>Customer ledger</CardTitle>
+                        <CardTitle>{tr("Customer ledger")}</CardTitle>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Sales, payments, outstanding balance, and profit for the selected period.
+                            {tr("Sales, payments, outstanding balance, and profit for the selected period.")}
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -71,11 +71,11 @@ export function CustomerLedgerCard({
                         />
                         <Button variant="outline" size="sm" disabled={Boolean(exporting)} onClick={() => void exportLedger("excel")}>
                             {exporting === "excel" ? <LoaderCircle className="animate-spin" /> : <FileSpreadsheet />}
-                            Excel
+                            {tr("Excel")}
                         </Button>
                         <Button variant="outline" size="sm" disabled={Boolean(exporting)} onClick={() => void exportLedger("pdf")}>
                             {exporting === "pdf" ? <LoaderCircle className="animate-spin" /> : <FileText />}
-                            PDF
+                            {tr("PDF")}
                         </Button>
                     </div>
                 </div>
@@ -83,17 +83,17 @@ export function CustomerLedgerCard({
                     <div className="flex flex-wrap gap-2">
                         {(["month", "quarter", "year", "all"] as Preset[]).map((preset) => (
                             <Button key={preset} variant="outline" size="sm" onClick={() => setPreset(preset)}>
-                                {preset === "all" ? "All time" : `This ${preset}`}
+                                {tr(preset === "all" ? "All time" : `This ${preset}`)}
                             </Button>
                         ))}
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2">
                         <label className="space-y-1 text-xs text-muted-foreground">
-                            From
+                            {tr("From")}
                             <Input type="date" value={range.startDate} onChange={(event) => setRange((current) => ({ ...current, startDate: event.target.value }))} />
                         </label>
                         <label className="space-y-1 text-xs text-muted-foreground">
-                            To
+                            {tr("To")}
                             <Input type="date" value={range.endDate} onChange={(event) => setRange((current) => ({ ...current, endDate: event.target.value }))} />
                         </label>
                     </div>
@@ -109,37 +109,37 @@ export function CustomerLedgerCard({
                 ) : (
                     <>
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                            <LedgerMetric icon={<TrendingUp />} label="Sales" value={formatMoney(ledger.data.totalSales, ledger.data.currencyCode)} hint="Customer debits" />
-                            <LedgerMetric icon={<WalletCards />} label="Payments" value={formatMoney(ledger.data.totalPayments, ledger.data.currencyCode)} hint="Customer credits" />
-                            <LedgerMetric icon={<TrendingDown />} label="Outstanding" value={formatMoney(ledger.data.closingBalance, ledger.data.currencyCode)} hint={`Opening: ${formatMoney(ledger.data.openingBalance, ledger.data.currencyCode)}`} danger={ledger.data.closingBalance > 0} />
-                            <LedgerMetric icon={<CalendarRange />} label="Gross profit" value={formatMoney(ledger.data.grossProfit, ledger.data.currencyCode)} hint={`COGS: ${formatMoney(ledger.data.costOfGoodsSold, ledger.data.currencyCode)}`} />
+                            <LedgerMetric icon={<TrendingUp />} label={tr("Sales")} value={formatMoney(ledger.data.totalSales, ledger.data.currencyCode)} hint={tr("Customer debits")} />
+                            <LedgerMetric icon={<WalletCards />} label={tr("Payments")} value={formatMoney(ledger.data.totalPayments, ledger.data.currencyCode)} hint={tr("Customer credits")} />
+                            <LedgerMetric icon={<TrendingDown />} label={tr("Outstanding")} value={formatMoney(ledger.data.closingBalance, ledger.data.currencyCode)} hint={`${tr("Opening")}: ${formatMoney(ledger.data.openingBalance, ledger.data.currencyCode)}`} danger={ledger.data.closingBalance > 0} />
+                            <LedgerMetric icon={<CalendarRange />} label={tr("Gross profit")} value={formatMoney(ledger.data.grossProfit, ledger.data.currencyCode)} hint={`${tr("COGS")}: ${formatMoney(ledger.data.costOfGoodsSold, ledger.data.currencyCode)}`} />
                         </div>
 
                         <div className="overflow-hidden border">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Reference</TableHead>
-                                        <TableHead>Description</TableHead>
-                                        <TableHead className="text-end">Debit</TableHead>
-                                        <TableHead className="text-end">Credit</TableHead>
-                                        <TableHead className="text-end">Balance</TableHead>
+                                        <TableHead>{tr("Date")}</TableHead>
+                                        <TableHead>{tr("Reference")}</TableHead>
+                                        <TableHead>{tr("Description")}</TableHead>
+                                        <TableHead className="text-end">{tr("Debit")}</TableHead>
+                                        <TableHead className="text-end">{tr("Credit")}</TableHead>
+                                        <TableHead className="text-end">{tr("Balance")}</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {ledger.data.entries.map((entry, index) => (
                                         <TableRow key={`${entry.type}-${entry.sourceId ?? index}-${entry.date}`}>
                                             <TableCell className="whitespace-nowrap">{new Date(entry.date).toLocaleDateString()}</TableCell>
-                                            <TableCell><div className="font-medium">{entry.reference}</div><div className="text-xs text-muted-foreground">{entry.type}</div></TableCell>
-                                            <TableCell className="max-w-80 text-muted-foreground">{entry.description}</TableCell>
+                                            <TableCell><div className="font-medium">{entry.reference}</div><div className="text-xs text-muted-foreground">{tr(entry.type)}</div></TableCell>
+                                            <TableCell className="max-w-80 text-muted-foreground">{tr(entry.description)}</TableCell>
                                             <TableCell className="text-end">{entry.debit ? formatMoney(entry.debit, entry.currencyCode) : "—"}</TableCell>
                                             <TableCell className="text-end">{entry.credit ? formatMoney(entry.credit, entry.currencyCode) : "—"}</TableCell>
                                             <TableCell className="text-end font-semibold">{formatMoney(entry.balance, entry.currencyCode)}</TableCell>
                                         </TableRow>
                                     ))}
                                     {!ledger.data.entries.length && (
-                                        <TableRow><TableCell colSpan={6} className="h-28 text-center text-muted-foreground">No ledger activity in this period.</TableCell></TableRow>
+                                        <TableRow><TableCell colSpan={6} className="h-28 text-center text-muted-foreground">{tr("No ledger activity in this period.")}</TableCell></TableRow>
                                     )}
                                 </TableBody>
                             </Table>

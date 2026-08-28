@@ -19,12 +19,14 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCompany } from "@/features/company/company-context";
 import { formatPercent } from "@/lib/numbers";
+import { useI18n } from "@/i18n/i18n-provider";
 import { financeService } from "../finance-service";
 
 type Preset = "month" | "quarter" | "year";
 
 export function ProductPerformanceCard({ productId }: { productId: number }) {
     const { company, formatMoney } = useCompany();
+    const { tr } = useI18n();
     const [searchParams] = useSearchParams();
     const reportCurrency = searchParams.get("reportCurrency") || company?.settings.mainCurrencyCode;
     const reportBranch = positiveInteger(searchParams.get("reportBranch"));
@@ -66,27 +68,27 @@ export function ProductPerformanceCard({ productId }: { productId: number }) {
                     <div>
                         <CardTitle className="flex items-center gap-2">
                             <BarChart3 className="size-5 text-primary" />
-                            Product performance report
+                            {tr("Product performance report")}
                         </CardTitle>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Individual sales, purchases, returns, stock value, and gross profit from one calculation source.
+                            {tr("Individual sales, purchases, returns, stock value, and gross profit from one calculation source.")}
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {(["month", "quarter", "year"] as Preset[]).map(preset => (
                             <Button key={preset} type="button" size="sm" variant="outline" onClick={() => setRange(presetDates(preset))}>
-                                This {preset}
+                                {tr(`This ${preset}`)}
                             </Button>
                         ))}
                     </div>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 sm:justify-self-end">
                     <label className="space-y-1 text-xs text-muted-foreground">
-                        From
+                        {tr("From")}
                         <Input type="date" value={range.startDate} onChange={event => setRange(current => ({ ...current, startDate: event.target.value }))} />
                     </label>
                     <label className="space-y-1 text-xs text-muted-foreground">
-                        To
+                        {tr("To")}
                         <Input type="date" value={range.endDate} onChange={event => setRange(current => ({ ...current, endDate: event.target.value }))} />
                     </label>
                 </div>
@@ -101,39 +103,39 @@ export function ProductPerformanceCard({ productId }: { productId: number }) {
                 ) : (
                     <>
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                            <ReportMetric icon={<ShoppingCart />} label="Quantity sold" value={data.quantitySold.toLocaleString()} hint={`${data.salesTransactionCount.toLocaleString()} sales`} />
-                            <ReportMetric icon={<TrendingUp />} label="Revenue" value={money(data.revenue)} hint={`COGS ${money(data.costOfGoodsSold)}`} />
-                            <ReportMetric icon={<BarChart3 />} label="Gross profit" value={money(data.grossProfit)} hint={`Margin ${formatPercent(data.marginPercent)}`} tone={data.grossProfit < 0 ? "danger" : "success"} />
-                            <ReportMetric icon={<PackageCheck />} label="Available stock" value={data.currentStockQuantity.toLocaleString()} hint={`Value ${money(data.currentStockValue)}`} />
-                            <ReportMetric icon={<Truck />} label="Quantity purchased" value={data.quantityPurchased.toLocaleString()} hint={`${data.purchaseTransactionCount.toLocaleString()} purchases`} />
-                            <ReportMetric icon={<CalendarRange />} label="Purchase cost" value={money(data.purchaseCost)} hint="Selected period" />
-                            <ReportMetric icon={<RotateCcw />} label="Returned quantity" value={data.returnedQuantity.toLocaleString()} hint={`Value ${money(data.returnedAmount)}`} tone={data.returnedQuantity > 0 ? "warning" : "normal"} />
-                            <ReportMetric icon={<CalendarRange />} label="Reporting period" value={`${shortDate(data.startDate)} – ${shortDate(data.endDate)}`} hint={data.currencyCode} />
+                            <ReportMetric icon={<ShoppingCart />} label={tr("Quantity sold")} value={data.quantitySold.toLocaleString()} hint={`${data.salesTransactionCount.toLocaleString()} ${tr("sales")}`} />
+                            <ReportMetric icon={<TrendingUp />} label={tr("Revenue")} value={money(data.revenue)} hint={`${tr("COGS")} ${money(data.costOfGoodsSold)}`} />
+                            <ReportMetric icon={<BarChart3 />} label={tr("Gross profit")} value={money(data.grossProfit)} hint={`${tr("Margin")} ${formatPercent(data.marginPercent)}`} tone={data.grossProfit < 0 ? "danger" : "success"} />
+                            <ReportMetric icon={<PackageCheck />} label={tr("Available stock")} value={data.currentStockQuantity.toLocaleString()} hint={`${tr("Value")} ${money(data.currentStockValue)}`} />
+                            <ReportMetric icon={<Truck />} label={tr("Quantity purchased")} value={data.quantityPurchased.toLocaleString()} hint={`${data.purchaseTransactionCount.toLocaleString()} ${tr("purchases")}`} />
+                            <ReportMetric icon={<CalendarRange />} label={tr("Purchase cost")} value={money(data.purchaseCost)} hint={tr("Selected period")} />
+                            <ReportMetric icon={<RotateCcw />} label={tr("Returned quantity")} value={data.returnedQuantity.toLocaleString()} hint={`${tr("Value")} ${money(data.returnedAmount)}`} tone={data.returnedQuantity > 0 ? "warning" : "normal"} />
+                            <ReportMetric icon={<CalendarRange />} label={tr("Reporting period")} value={`${shortDate(data.startDate)} – ${shortDate(data.endDate)}`} hint={data.currencyCode} />
                         </div>
 
                         <section className="rounded-xl border p-4">
-                            <h3 className="font-semibold">Sales and profit trend</h3>
+                            <h3 className="font-semibold">{tr("Sales and profit trend")}</h3>
                             {activeTrend.length ? (
                                 <div className="mt-4 flex h-52 items-end gap-1 overflow-x-auto border-b pb-2">
                                     {activeTrend.map(point => (
-                                        <div key={point.date} className="group flex min-w-4 flex-1 flex-col items-center justify-end gap-1" title={`${shortDate(point.date)} · Revenue ${money(point.revenue)} · Profit ${money(point.profit)}`}>
+                                        <div key={point.date} className="group flex min-w-4 flex-1 flex-col items-center justify-end gap-1" title={`${shortDate(point.date)} · ${tr("Revenue")} ${money(point.revenue)} · ${tr("Profit")} ${money(point.profit)}`}>
                                             <div className={point.profit >= 0 ? "w-full rounded-t bg-emerald-500/75" : "w-full rounded-t bg-destructive/75"} style={{ height: `${Math.max(3, Math.abs(point.profit) / chartMaximum * 165)}px` }} />
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <p className="py-16 text-center text-sm text-muted-foreground">No product sales in this period.</p>
+                                <p className="py-16 text-center text-sm text-muted-foreground">{tr("No product sales in this period.")}</p>
                             )}
                         </section>
 
                         <div className="overflow-x-auto rounded-xl border">
                             <Table className="min-w-[900px]">
-                                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Reference</TableHead><TableHead className="text-end">Quantity</TableHead><TableHead className="text-end">Amount</TableHead><TableHead className="text-end">Cost</TableHead><TableHead className="text-end">Profit</TableHead></TableRow></TableHeader>
+                                <TableHeader><TableRow><TableHead>{tr("Date")}</TableHead><TableHead>{tr("Type")}</TableHead><TableHead>{tr("Reference")}</TableHead><TableHead className="text-end">{tr("Quantity")}</TableHead><TableHead className="text-end">{tr("Amount")}</TableHead><TableHead className="text-end">{tr("Cost")}</TableHead><TableHead className="text-end">{tr("Profit")}</TableHead></TableRow></TableHeader>
                                 <TableBody>
                                     {data.transactions.map((transaction, index) => (
                                         <TableRow key={`${transaction.type}-${transaction.reference}-${index}`}>
                                             <TableCell className="whitespace-nowrap">{shortDate(transaction.date)}</TableCell>
-                                            <TableCell><Badge variant="outline">{transaction.type}</Badge></TableCell>
+                                            <TableCell><Badge variant="outline">{tr(transaction.type)}</Badge></TableCell>
                                             <TableCell className="font-medium">{transaction.reference}</TableCell>
                                             <TableCell className="text-end">{transaction.quantity.toLocaleString()}</TableCell>
                                             <TableCell className="text-end">{money(transaction.amount)}</TableCell>
@@ -141,7 +143,7 @@ export function ProductPerformanceCard({ productId }: { productId: number }) {
                                             <TableCell className={transaction.profit < 0 ? "text-end font-semibold text-destructive" : "text-end font-semibold"}>{transaction.type === "Purchase" || transaction.type.includes("return") ? "—" : money(transaction.profit)}</TableCell>
                                         </TableRow>
                                     ))}
-                                    {!data.transactions.length ? <TableRow><TableCell colSpan={7} className="h-28 text-center text-muted-foreground">No product transactions in this period.</TableCell></TableRow> : null}
+                                    {!data.transactions.length ? <TableRow><TableCell colSpan={7} className="h-28 text-center text-muted-foreground">{tr("No product transactions in this period.")}</TableCell></TableRow> : null}
                                 </TableBody>
                             </Table>
                         </div>

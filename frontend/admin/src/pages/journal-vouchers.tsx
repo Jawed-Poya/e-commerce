@@ -76,6 +76,7 @@ import type {
 import { getApiErrorMessage } from "@/lib/api-error";
 import { createUuid } from "@/lib/create-uuid";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/i18n-provider";
 
 type DraftLine = CreateJournalVoucher["lines"][number] & { key: string };
 type ManualVoucherType = CreateJournalVoucher["voucherType"];
@@ -151,6 +152,7 @@ const commonCurrencies = ["AFN", "USD", "PKR"];
 export default function JournalVouchersPage() {
     const queryClient = useQueryClient();
     const { formatMoney, company } = useCompany();
+    const { tr } = useI18n();
     const { user } = useAdminAuth();
     const canManage = hasPermission(user, Permissions.ExpensesManage);
     const [view, setView] = useState<WorkspaceView>("vouchers");
@@ -234,8 +236,8 @@ export default function JournalVouchersPage() {
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <Metric icon={<ReceiptText />} label="Total vouchers" value={summary.data?.totalVouchers ?? 0} help="All posted and reversed records" />
                 <Metric icon={<Bot />} label="Workflow generated" value={summary.data?.systemGeneratedVouchers ?? 0} help="Created from business activity" tone="positive" />
-                <Metric icon={<Scale />} label="Posted value" value={formatMoney(summary.data?.totalPostedDebits ?? 0, summary.data?.currencyCode)} help={`${summary.data?.currencyCode ?? "Base currency"} debit total`} />
-                <Metric icon={<CalendarDays />} label="Last posting" value={summary.data?.lastPostingDate ? shortDate(summary.data.lastPostingDate) : "No postings"} help={`${summary.data?.manualVouchers ?? 0} controlled adjustments`} />
+                <Metric icon={<Scale />} label="Posted value" value={formatMoney(summary.data?.totalPostedDebits ?? 0, summary.data?.currencyCode)} help={`${summary.data?.currencyCode ?? tr("Base currency")} ${tr("debit total")}`} />
+                <Metric icon={<CalendarDays />} label="Last posting" value={summary.data?.lastPostingDate ? shortDate(summary.data.lastPostingDate) : tr("No postings")} help={`${summary.data?.manualVouchers ?? 0} ${tr("controlled adjustments")}`} />
             </div>
 
             <Card className="overflow-hidden shadow-none">
@@ -327,6 +329,7 @@ function VoucherRegister({
     onReverse: (voucher: JournalVoucher) => void;
 }) {
     const { formatMoney } = useCompany();
+    const { tr } = useI18n();
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const [search, setSearch] = useState("");
@@ -385,16 +388,16 @@ function VoucherRegister({
                 <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-[minmax(250px,1fr)_180px_190px_170px]">
                     <div className="relative">
                         <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input className="ps-9" value={search} onChange={(event) => { setSearch(event.target.value); resetPage(); }} placeholder="Voucher, party, source, reference…" />
+                        <Input className="ps-9" value={search} onChange={(event) => { setSearch(event.target.value); resetPage(); }} placeholder={tr("Voucher, party, source, reference…")} />
                     </div>
-                    <SimpleCombobox<string> value={type} onValueChange={(value) => { setType((value ?? "all") as JournalVoucherType | "all"); resetPage(); }} options={[{ value: "all", label: "All voucher types" }, ...voucherTypes]} placeholder="All voucher types" />
-                    <SimpleCombobox<string> value={origin} onValueChange={(value) => { setOrigin((value ?? "all") as typeof origin); resetPage(); }} options={[{ value: "all", label: "All origins" }, { value: "system", label: "Workflow generated" }, { value: "manual", label: "Manual / controlled" }]} placeholder="All origins" />
-                    <SimpleCombobox<string> value={status} onValueChange={(value) => { setStatus((value ?? "all") as JournalVoucherStatus | "all"); resetPage(); }} options={[{ value: "all", label: "All statuses" }, { value: "Posted", label: "Posted" }, { value: "Reversed", label: "Reversed" }]} placeholder="All statuses" />
+                    <SimpleCombobox<string> value={type} onValueChange={(value) => { setType((value ?? "all") as JournalVoucherType | "all"); resetPage(); }} options={[{ value: "all", label: tr("All voucher types") }, ...voucherTypes.map((item) => ({ ...item, label: tr(item.label) }))]} placeholder={tr("All voucher types")} />
+                    <SimpleCombobox<string> value={origin} onValueChange={(value) => { setOrigin((value ?? "all") as typeof origin); resetPage(); }} options={[{ value: "all", label: tr("All origins") }, { value: "system", label: tr("Workflow generated") }, { value: "manual", label: tr("Manual / controlled") }]} placeholder={tr("All origins")} />
+                    <SimpleCombobox<string> value={status} onValueChange={(value) => { setStatus((value ?? "all") as JournalVoucherStatus | "all"); resetPage(); }} options={[{ value: "all", label: tr("All statuses") }, { value: "Posted", label: tr("Posted") }, { value: "Reversed", label: tr("Reversed") }]} placeholder={tr("All statuses")} />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3 xl:max-w-3xl">
                     <Field label="From date"><Input type="date" value={startDate} onChange={(event) => { setStartDate(event.target.value); resetPage(); }} /></Field>
                     <Field label="To date"><Input type="date" value={endDate} onChange={(event) => { setEndDate(event.target.value); resetPage(); }} /></Field>
-                    <Field label="Currency"><SimpleCombobox<string> value={currency} onValueChange={(value) => { setCurrency(value ?? "all"); resetPage(); }} options={[{ value: "all", label: "All currencies" }, ...currencies.map((code) => ({ value: code, label: code }))]} /></Field>
+                    <Field label="Currency"><SimpleCombobox<string> value={currency} onValueChange={(value) => { setCurrency(value ?? "all"); resetPage(); }} options={[{ value: "all", label: tr("All currencies") }, ...currencies.map((code) => ({ value: code, label: code }))]} /></Field>
                 </div>
             </div>
 
@@ -747,6 +750,7 @@ function VoucherDetailDialog({ voucher, canManage, onOpenChange, onReverse }: { 
 
 function AdjustmentDialog({ open, accounts, currencies, onOpenChange, onSaved }: { open: boolean; accounts: JournalAccountBalance[]; currencies: string[]; onOpenChange: (open: boolean) => void; onSaved: () => Promise<void> }) {
     const { formatMoney, company } = useCompany();
+    const { tr } = useI18n();
     const [voucherDate, setVoucherDate] = useState(() => localDate(new Date()));
     const [currencyCode, setCurrencyCode] = useState(company?.settings.mainCurrencyCode ?? currencies[0] ?? "AFN");
     const [voucherType, setVoucherType] = useState<ManualVoucherType>("ManualAdjustment");
@@ -768,7 +772,7 @@ function AdjustmentDialog({ open, accounts, currencies, onOpenChange, onSaved }:
     const money = (value: number) => formatMoney(value, currencyCode);
     const reset = () => { setVoucherDate(localDate(new Date())); setCurrencyCode(company?.settings.mainCurrencyCode ?? currencies[0] ?? "AFN"); setVoucherType("ManualAdjustment"); setReferenceNumber(""); setMemo(""); setLines([newLine(), newLine()]); };
     const create = useMutation({ mutationFn: (body: CreateJournalVoucher) => operationsService.createJournalVoucher(body), onSuccess: async (response) => { await onSaved(); toast.success(`Voucher ${response.data.voucherNumber} posted.`); reset(); onOpenChange(false); }, onError: (error) => toast.error(getApiErrorMessage(error, "The adjustment voucher could not be posted.")) });
-    const applyTemplate = (template: typeof voucherTemplates[number]) => { setVoucherType(template.type); setMemo(template.memo); setLines([templateLine(template.debit, "Debit entry"), templateLine(template.credit, "Matching credit entry")]); };
+    const applyTemplate = (template: typeof voucherTemplates[number]) => { setVoucherType(template.type); setMemo(tr(template.memo)); setLines([templateLine(template.debit, tr("Debit entry")), templateLine(template.credit, tr("Matching credit entry"))]); };
     const submit = () => {
         if (!memo.trim()) return invalid("voucher-memo", "A clear business narration is required.");
         const invalidIndex = lines.findIndex((line) => !line.accountCode.trim() || !line.accountName.trim() || line.debit < 0 || line.credit < 0 || (line.debit > 0) === (line.credit > 0));
@@ -780,20 +784,20 @@ function AdjustmentDialog({ open, accounts, currencies, onOpenChange, onSaved }:
         <Dialog open={open} onOpenChange={(next) => !create.isPending && onOpenChange(next)}>
             <DialogContent className="sm:max-w-6xl">
                 <DialogHeader><DialogTitle>New controlled voucher</DialogTitle><DialogDescription>Use this for opening balances, internal transfers, equity, accruals, and documented corrections. Sales, purchases, payments, expenses, and payroll should be recorded in their source screens.</DialogDescription></DialogHeader>
-                <div className="border border-primary/20 bg-primary/5 p-3"><p className="text-xs font-semibold text-primary">Quick templates</p><div className="mt-2 flex flex-wrap gap-2">{voucherTemplates.map((template) => <Button key={template.title} type="button" size="sm" variant="outline" onClick={() => applyTemplate(template)}>{template.title}</Button>)}</div></div>
+                <div className="border border-primary/20 bg-primary/5 p-3"><p className="text-xs font-semibold text-primary">Quick templates</p><div className="mt-2 flex flex-wrap gap-2">{voucherTemplates.map((template) => <Button key={template.title} type="button" size="sm" variant="outline" onClick={() => applyTemplate(template)}>{tr(template.title)}</Button>)}</div></div>
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[230px_170px_140px_210px_1fr]">
-                    <Field label="Purpose *"><SimpleCombobox<string> value={voucherType} onValueChange={(value) => setVoucherType((value ?? "ManualAdjustment") as ManualVoucherType)} options={manualTypes.map((item) => ({ value: item.value, label: item.label, description: item.description }))} placeholder="Select purpose" /></Field>
+                    <Field label="Purpose *"><SimpleCombobox<string> value={voucherType} onValueChange={(value) => setVoucherType((value ?? "ManualAdjustment") as ManualVoucherType)} options={manualTypes.map((item) => ({ value: item.value, label: tr(item.label), description: tr(item.description) }))} placeholder={tr("Select purpose")} /></Field>
                     <Field label="Voucher date"><Input type="date" value={voucherDate} onChange={(event) => setVoucherDate(event.target.value)} /></Field>
                     <Field label="Currency"><SimpleCombobox<string> value={currencyCode} onValueChange={(value) => setCurrencyCode(value ?? currencies[0] ?? "AFN")} options={currencies.map((code) => ({ value: code, label: code }))} /></Field>
                     <Field label="External reference"><Input value={referenceNumber} onChange={(event) => setReferenceNumber(event.target.value)} placeholder="Optional document ref" /></Field>
                     <Field label="Business narration *"><Textarea id="voucher-memo" className="min-h-9" value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="Purpose and supporting document" /></Field>
                 </div>
-                <p className="text-xs text-muted-foreground">{manualTypes.find((item) => item.value === voucherType)?.description}</p>
+                <p className="text-xs text-muted-foreground">{tr(manualTypes.find((item) => item.value === voucherType)?.description ?? "")}</p>
                 <div className="overflow-x-auto border">
                     <div className="md:min-w-[950px]">
                         <div className="hidden grid-cols-[45px_170px_180px_1fr_140px_140px_45px] gap-2 border-b bg-muted/50 p-2 text-xs font-bold md:grid"><span>#</span><span>Account code</span><span>Account name</span><span>Line description</span><span className="text-end">Debit</span><span className="text-end">Credit</span><span /></div>
                         {lines.map((line, index) => <JournalLine key={line.key} id={`journal-line-${index}`} line={line} index={index} accounts={accountOptions} onChange={(next) => setLines((current) => current.map((item) => item.key === line.key ? next : item))} onRemove={() => setLines((current) => current.length > 2 ? current.filter((item) => item.key !== line.key) : current)} />)}
-                        <div className="grid grid-cols-2 gap-2 bg-muted/30 p-3 text-sm font-bold md:grid-cols-[1fr_140px_140px_45px]"><span className="col-span-2 md:col-span-1 md:text-end">Totals · {currencyCode}</span><span className="tabular-nums md:text-end"><span className="block text-[10px] font-medium text-muted-foreground md:hidden">Debit</span>{money(totals.debit)}</span><span className="text-end tabular-nums"><span className="block text-[10px] font-medium text-muted-foreground md:hidden">Credit</span>{money(totals.credit)}</span><span className="hidden md:block" /></div>
+                        <div className="grid grid-cols-2 gap-2 bg-muted/30 p-3 text-sm font-bold md:grid-cols-[1fr_140px_140px_45px]"><span className="col-span-2 md:col-span-1 md:text-end">{tr("Totals")} · {currencyCode}</span><span className="tabular-nums md:text-end"><span className="block text-[10px] font-medium text-muted-foreground md:hidden">Debit</span>{money(totals.debit)}</span><span className="text-end tabular-nums"><span className="block text-[10px] font-medium text-muted-foreground md:hidden">Credit</span>{money(totals.credit)}</span><span className="hidden md:block" /></div>
                     </div>
                 </div>
                 <DialogFooter className="sm:justify-between">
@@ -806,8 +810,9 @@ function AdjustmentDialog({ open, accounts, currencies, onOpenChange, onSaved }:
 }
 
 function JournalLine({ id, line, index, accounts, onChange, onRemove }: { id: string; line: DraftLine; index: number; accounts: { code: string; name: string }[]; onChange: (line: DraftLine) => void; onRemove: () => void }) {
+    const { tr } = useI18n();
     const field = <K extends keyof DraftLine>(key: K, value: DraftLine[K]) => onChange({ ...line, [key]: value });
-    return <div id={id} className="grid scroll-mt-24 grid-cols-2 gap-3 border-b p-3 last:border-b-0 md:grid-cols-[45px_170px_180px_1fr_140px_140px_45px] md:gap-2 md:p-2"><span className="col-span-2 self-center text-sm font-semibold text-muted-foreground md:col-span-1 md:text-center">Line {index + 1}</span><JournalInput label="Account code"><SimpleCombobox<string> value={line.accountCode || null} onValueChange={(accountCode) => { const account = accounts.find((item) => item.code === accountCode); onChange({ ...line, accountCode: account?.code ?? "", accountName: account?.name ?? "" }); }} options={accounts.map((account) => ({ value: account.code, label: account.code, description: account.name }))} placeholder="Select account…" emptyText="No matching account found." /></JournalInput><JournalInput label="Account name"><Input aria-label={`Line ${index + 1} account name`} value={line.accountName} onChange={(event) => field("accountName", event.target.value)} placeholder="Cash on Hand" /></JournalInput><JournalInput label="Description" className="col-span-2 md:col-span-1"><Input aria-label={`Line ${index + 1} description`} value={line.description ?? ""} onChange={(event) => field("description", event.target.value)} placeholder="What this line represents" /></JournalInput><JournalInput label="Debit"><Input aria-label={`Line ${index + 1} debit`} className="text-end" type="number" min={0} step="0.01" value={line.debit || ""} onChange={(event) => { const debit = Number(event.target.value); onChange({ ...line, debit, credit: debit > 0 ? 0 : line.credit }); }} /></JournalInput><JournalInput label="Credit"><Input aria-label={`Line ${index + 1} credit`} className="text-end" type="number" min={0} step="0.01" value={line.credit || ""} onChange={(event) => { const credit = Number(event.target.value); onChange({ ...line, credit, debit: credit > 0 ? 0 : line.debit }); }} /></JournalInput><Button className="col-span-2 justify-self-end md:col-span-1" size="icon" variant="ghost" title={`Remove line ${index + 1}`} onClick={onRemove}><Trash2 className="size-4 text-destructive" /></Button></div>;
+    return <div id={id} className="grid scroll-mt-24 grid-cols-2 gap-3 border-b p-3 last:border-b-0 md:grid-cols-[45px_170px_180px_1fr_140px_140px_45px] md:gap-2 md:p-2"><span className="col-span-2 self-center text-sm font-semibold text-muted-foreground md:col-span-1 md:text-center">{tr("Line")} {index + 1}</span><JournalInput label={tr("Account code")}><SimpleCombobox<string> value={line.accountCode || null} onValueChange={(accountCode) => { const account = accounts.find((item) => item.code === accountCode); onChange({ ...line, accountCode: account?.code ?? "", accountName: account?.name ?? "" }); }} options={accounts.map((account) => ({ value: account.code, label: account.code, description: tr(account.name) }))} placeholder={tr("Select account…")} emptyText={tr("No matching account found.")} /></JournalInput><JournalInput label={tr("Account name")}><Input aria-label={`${tr("Line")} ${index + 1} ${tr("Account name")}`} value={line.accountName} onChange={(event) => field("accountName", event.target.value)} placeholder={tr("Cash on Hand")} /></JournalInput><JournalInput label={tr("Description")} className="col-span-2 md:col-span-1"><Input aria-label={`${tr("Line")} ${index + 1} ${tr("Description")}`} value={line.description ?? ""} onChange={(event) => field("description", event.target.value)} placeholder={tr("What this line represents")} /></JournalInput><JournalInput label={tr("Debit")}><Input aria-label={`${tr("Line")} ${index + 1} ${tr("Debit")}`} className="text-end" type="number" min={0} step="0.01" value={line.debit || ""} onChange={(event) => { const debit = Number(event.target.value); onChange({ ...line, debit, credit: debit > 0 ? 0 : line.credit }); }} /></JournalInput><JournalInput label={tr("Credit")}><Input aria-label={`${tr("Line")} ${index + 1} ${tr("Credit")}`} className="text-end" type="number" min={0} step="0.01" value={line.credit || ""} onChange={(event) => { const credit = Number(event.target.value); onChange({ ...line, credit, debit: credit > 0 ? 0 : line.debit }); }} /></JournalInput><Button className="col-span-2 justify-self-end md:col-span-1" size="icon" variant="ghost" title={`${tr("Remove line")} ${index + 1}`} onClick={onRemove}><Trash2 className="size-4 text-destructive" /></Button></div>;
 }
 
 function JournalInput({ label, className, children }: { label: string; className?: string; children: ReactNode }) { return <div className={cn("space-y-1", className)}><Label className="text-[11px] text-muted-foreground md:hidden">{label}</Label>{children}</div>; }
