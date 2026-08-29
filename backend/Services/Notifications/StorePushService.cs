@@ -188,7 +188,10 @@ public sealed class StorePushService(
                 destination = $"/product/{notification.ProductId}",
                 notificationId = notification.Id,
                 kind = notification.Kind,
-                productId = notification.ProductId
+                productId = notification.ProductId,
+                productName = notification.ProductName,
+                link = notification.Link,
+                createdAt = notification.CreatedAt
             }
         }, cancellationToken);
 

@@ -75,12 +75,15 @@ type NotificationContextValue = {
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 const readOwnerId = 'device';
 const nativeNotificationChannelId = 'store-updates';
+const reconnectDelays = [2_000, 5_000, 10_000, 30_000] as const;
 type Translate = (value: string, params?: Record<string, string | number>) => string;
 
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
+    handleNotification: async (notification) => ({
+      // Product pushes are rendered by the in-app live banner while EasyCart is
+      // foregrounded. Keep them in the system list without showing a duplicate banner.
+      shouldShowBanner: !isStorePushNotification(notification),
       shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
@@ -232,15 +235,16 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     }
 
     const permission = await Notifications.getPermissionsAsync();
-    const status: NativeNotificationPermission = permission.granted
+    const granted = hasNotificationPermission(permission);
+    const status: NativeNotificationPermission = granted
       ? 'granted'
       : permission.status === 'denied'
         ? 'denied'
         : 'undetermined';
-    nativePermissionGrantedRef.current = permission.granted;
+    nativePermissionGrantedRef.current = granted;
     setNativePermission(status);
     setNativePermissionCanAskAgain(permission.canAskAgain);
-    return permission.granted;
+    return granted;
   }, [t]);
 
   const presentNativeNotification = useCallback(async (item: AppNotification) => {
@@ -265,21 +269,23 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     if (Platform.OS === 'web') return false;
     await refreshNativePermission();
     let permission = await Notifications.getPermissionsAsync();
+    let granted = hasNotificationPermission(permission);
 
-    if (!permission.granted && permission.canAskAgain) {
+    if (!granted && permission.canAskAgain) {
       permission = await Notifications.requestPermissionsAsync({
         ios: { allowAlert: true, allowBadge: true, allowSound: true },
       });
-    } else if (!permission.granted && !permission.canAskAgain) {
+      granted = hasNotificationPermission(permission);
+    } else if (!granted && !permission.canAskAgain) {
       await Linking.openSettings();
       return false;
     }
 
-    nativePermissionGrantedRef.current = permission.granted;
-    setNativePermission(permission.granted ? 'granted' : permission.status === 'denied' ? 'denied' : 'undetermined');
+    nativePermissionGrantedRef.current = granted;
+    setNativePermission(granted ? 'granted' : permission.status === 'denied' ? 'denied' : 'undetermined');
     setNativePermissionCanAskAgain(permission.canAskAgain);
 
-    if (permission.granted) {
+    if (granted) {
       await Notifications.scheduleNotificationAsync({
         content: {
           title: t('Device alerts enabled'),
@@ -290,7 +296,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
         trigger: Platform.OS === 'android' ? { channelId: nativeNotificationChannelId } : null,
       });
     }
-    return permission.granted;
+    return granted;
   }, [refreshNativePermission, t]);
 
   useEffect(() => {
@@ -368,44 +374,77 @@ export function NotificationProvider({ children }: PropsWithChildren) {
   }, [storeStateReady, trackedProductIds]);
 
   const trackedKey = trackedProductIds.join(',');
+  const registerRemotePush = useCallback(async (): Promise<RemotePushStatus> => {
+    const projectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID?.trim()
+      || Constants.expoConfig?.extra?.eas?.projectId
+      || Constants.easConfig?.projectId;
+    if (!projectId || Constants.appOwnership === 'expo') return 'unconfigured';
+
+    try {
+      const [token, deviceId] = await Promise.all([
+        Notifications.getExpoPushTokenAsync({ projectId }).then((result) => result.data),
+        getOrCreatePushDeviceId(),
+      ]);
+      await commerceApi.saveMobilePushSubscription({
+        token,
+        deviceId,
+        platform: Platform.OS,
+        locale,
+        productIds: trackedProductIds,
+      });
+      return 'ready';
+    } catch {
+      return 'error';
+    }
+  }, [locale, trackedProductIds]);
+
   useEffect(() => {
     if (Platform.OS === 'web' || nativePermission !== 'granted' || !storeStateReady) return;
     let active = true;
-    const timer = setTimeout(() => {
-      void (async () => {
-        const projectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID?.trim()
-          || Constants.expoConfig?.extra?.eas?.projectId
-          || Constants.easConfig?.projectId;
-        if (!projectId || Constants.appOwnership === 'expo') {
-          if (active) setRemotePushStatus('unconfigured');
-          return;
-        }
+    let syncing = false;
+    let retryAttempt = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-        if (active) setRemotePushStatus('registering');
-        try {
-          const [token, deviceId] = await Promise.all([
-            Notifications.getExpoPushTokenAsync({ projectId }).then((result) => result.data),
-            getOrCreatePushDeviceId(),
-          ]);
-          await commerceApi.saveMobilePushSubscription({
-            token,
-            deviceId,
-            platform: Platform.OS,
-            locale,
-            productIds: trackedProductIds,
-          });
-          if (active) setRemotePushStatus('ready');
-        } catch {
-          if (active) setRemotePushStatus('error');
-        }
-      })();
+    const sync = async () => {
+      if (!active || syncing) return;
+      syncing = true;
+      setRemotePushStatus('registering');
+      const status = await registerRemotePush();
+      syncing = false;
+      if (!active) return;
+      setRemotePushStatus(status);
+      if (status === 'ready') retryAttempt = 0;
+      if (status === 'error') scheduleRetry();
+    };
+
+    const scheduleRetry = () => {
+      if (!active || retryTimer !== null) return;
+      const delay = reconnectDelays[Math.min(retryAttempt, reconnectDelays.length - 1)];
+      retryAttempt += 1;
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        void sync();
+      }, delay);
+    };
+
+    const reconnectWhenActive = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      if (retryTimer !== null) clearTimeout(retryTimer);
+      retryTimer = null;
+      retryAttempt = 0;
+      void sync();
+    });
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      void sync();
     }, 700);
 
     return () => {
       active = false;
-      clearTimeout(timer);
+      if (retryTimer !== null) clearTimeout(retryTimer);
+      reconnectWhenActive.remove();
     };
-  }, [auth.user?.customerId, auth.user?.customerTypeId, locale, nativePermission, storeStateReady, trackedKey, trackedProductIds]);
+  }, [auth.user?.customerId, auth.user?.customerTypeId, nativePermission, registerRemotePush, storeStateReady, trackedKey]);
 
   const trackProducts = useCallback((productIds: number[]) => {
     setTrackedProductIds((current) => mergeProductIds(current, productIds));
@@ -432,6 +471,15 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     }
     void setStoredNotificationActivity({ lastCheck: lastStoreCheck.current, items: nextItems }).catch(() => undefined);
   }, [locale, presentNativeNotification, t]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const subscription = Notifications.addNotificationReceivedListener((notification) => {
+      const storeItem = storeNotificationFromNative(notification);
+      if (storeItem) receiveStoreItems([storeItem], true);
+    });
+    return () => subscription.remove();
+  }, [receiveStoreItems]);
 
   useEffect(() => {
     const current = auth.user
@@ -484,6 +532,9 @@ export function NotificationProvider({ children }: PropsWithChildren) {
 
     let disposed = false;
     let connection: import('@microsoft/signalr').HubConnection | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryAttempt = 0;
+    let appStateSubscription: ReturnType<typeof AppState.addEventListener> | null = null;
     setRealtimeStatus('connecting');
 
     void import('@microsoft/signalr').then(({ HubConnectionBuilder, HubConnectionState, LogLevel }) => {
@@ -500,31 +551,76 @@ export function NotificationProvider({ children }: PropsWithChildren) {
       connection.onreconnecting(() => setRealtimeStatus('reconnecting'));
       connection.onreconnected(async () => {
         if (connection?.state === HubConnectionState.Connected) {
-          await connection.invoke('Subscribe', trackedProductIds);
-          setRealtimeStatus('live');
-          await pollStore();
+          try {
+            await connection.invoke('Subscribe', trackedProductIds);
+            retryAttempt = 0;
+            setRealtimeStatus('live');
+            await pollStore();
+          } catch {
+            setRealtimeStatus('polling');
+            await connection.stop();
+          }
         }
       });
-      connection.onclose(() => {
-        if (!disposed) setRealtimeStatus('polling');
-      });
 
-      void connection.start()
-        .then(async () => {
-          if (disposed || !connection) return;
+      const connect = async () => {
+        if (disposed || !connection || connection.state !== HubConnectionState.Disconnected) return;
+        setRealtimeStatus(retryAttempt === 0 ? 'connecting' : 'reconnecting');
+        try {
+          await connection.start();
+          if (disposed) {
+            await connection.stop();
+            return;
+          }
           await connection.invoke('Subscribe', trackedProductIds);
+          retryAttempt = 0;
           setRealtimeStatus('live');
           await pollStore();
-        })
-        .catch(() => {
-          if (!disposed) setRealtimeStatus('polling');
-        });
+        } catch {
+          if (!disposed) {
+            try {
+              await connection.stop();
+            } finally {
+              scheduleRetry();
+            }
+          }
+        }
+      };
+
+      function scheduleRetry() {
+        if (disposed || retryTimer !== null) return;
+        setRealtimeStatus('polling');
+        const delay = reconnectDelays[Math.min(retryAttempt, reconnectDelays.length - 1)];
+        retryAttempt += 1;
+        retryTimer = setTimeout(() => {
+          retryTimer = null;
+          void connect();
+        }, delay);
+      }
+
+      const reconnectNow = () => {
+        if (disposed || connection?.state !== HubConnectionState.Disconnected) return;
+        if (retryTimer !== null) clearTimeout(retryTimer);
+        retryTimer = null;
+        retryAttempt = 0;
+        void connect();
+      };
+
+      appStateSubscription = AppState.addEventListener('change', (state) => {
+        if (state === 'active') reconnectNow();
+      });
+      connection.onclose(() => {
+        if (!disposed) scheduleRetry();
+      });
+      void connect();
     }).catch(() => {
       if (!disposed) setRealtimeStatus('polling');
     });
 
     return () => {
       disposed = true;
+      if (retryTimer !== null) clearTimeout(retryTimer);
+      appStateSubscription?.remove();
       void connection?.stop();
     };
     // The joined key intentionally rebuilds the exact product subscription.
@@ -609,6 +705,55 @@ export function useNotifications() {
   const context = useContext(NotificationContext);
   if (!context) throw new Error('useNotifications must be used inside NotificationProvider.');
   return context;
+}
+
+function hasNotificationPermission(permission: Notifications.NotificationPermissionsStatus) {
+  if (permission.granted) return true;
+  if (Platform.OS !== 'ios') return false;
+  return permission.ios?.status === Notifications.IosAuthorizationStatus.AUTHORIZED
+    || permission.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
+    || permission.ios?.status === Notifications.IosAuthorizationStatus.EPHEMERAL;
+}
+
+function isStorePushNotification(notification: Notifications.Notification) {
+  const kind = notification.request.content.data?.kind;
+  return kind === 'Price' || kind === 'Stock' || kind === 'Cart';
+}
+
+function storeNotificationFromNative(notification: Notifications.Notification): StoreNotification | null {
+  const content = notification.request.content;
+  const data = content.data ?? {};
+  const kind = data.kind;
+  if (kind !== 'Price' && kind !== 'Stock' && kind !== 'Cart') return null;
+
+  const id = toFiniteNumber(data.notificationId ?? data.id);
+  const productId = toFiniteNumber(data.productId);
+  if (id === null || productId === null) return null;
+
+  const createdAt = typeof data.createdAt === 'string' && Number.isFinite(Date.parse(data.createdAt))
+    ? data.createdAt
+    : new Date(notification.date).toISOString();
+  const productName = typeof data.productName === 'string' && data.productName.trim()
+    ? data.productName.trim()
+    : 'Product';
+
+  return {
+    id,
+    title: content.title?.trim() || (kind === 'Stock' ? 'Back in stock' : kind === 'Cart' ? 'Cart updated' : 'Price updated'),
+    message: content.body?.trim() || '',
+    kind,
+    productId,
+    productName,
+    link: typeof data.link === 'string' ? data.link : `/products/${productId}`,
+    createdAt,
+  };
+}
+
+function toFiniteNumber(value: unknown) {
+  const number = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && value.trim() ? Number(value) : Number.NaN;
+  return Number.isSafeInteger(number) && number > 0 ? number : null;
 }
 
 function mergeProductIds(current: number[], incoming: number[]) {
