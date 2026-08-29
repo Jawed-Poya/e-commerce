@@ -1,5 +1,5 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Bell, BellRing, CheckCheck, PackageOpen, ShoppingBag, Tag, Trash2 } from "lucide-react";
+import { Bell, BellRing, CheckCheck, CircleAlert, LoaderCircle, PackageOpen, RotateCw, ShoppingBag, Tag, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 
@@ -96,7 +96,7 @@ export function NotificationCenter() {
                         </div>
                     </div>
 
-                    {notifications.permission !== "granted" && (
+                    {notifications.permission === "default" && (
                         <div className="border-b bg-primary/5 p-4">
                             <p className="text-xs leading-5 text-muted-foreground">
                                 {t("notifications.enableDescription", { company: company?.name ?? "" })}
@@ -109,6 +109,44 @@ export function NotificationCenter() {
                                 }
                             >
                                 <BellRing /> {t("notifications.enable")}
+                            </Button>
+                        </div>
+                    )}
+
+                    {notifications.permission === "denied" && (
+                        <div className="flex items-start gap-3 border-b bg-amber-500/10 p-4 text-amber-800 dark:text-amber-300">
+                            <CircleAlert className="mt-0.5 size-4 shrink-0" />
+                            <p className="text-xs leading-5">
+                                {t("notifications.blocked")}
+                            </p>
+                        </div>
+                    )}
+
+                    {notifications.permission === "granted" &&
+                    notifications.browserPushStatus === "registering" && (
+                        <div className="flex items-center gap-3 border-b bg-primary/5 p-4">
+                            <LoaderCircle className="size-4 animate-spin text-primary" />
+                            <p className="text-xs text-muted-foreground">
+                                {t("notifications.pushConnecting")}
+                            </p>
+                        </div>
+                    )}
+
+                    {notifications.permission === "granted" &&
+                    notifications.browserPushStatus === "error" && (
+                        <div className="flex items-center gap-3 border-b bg-amber-500/10 p-4">
+                            <CircleAlert className="size-4 shrink-0 text-amber-600" />
+                            <p className="min-w-0 flex-1 text-xs leading-5 text-muted-foreground">
+                                {t("notifications.pushError")}
+                            </p>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 shrink-0 rounded-lg px-2 text-[10px] font-bold"
+                                onClick={() => void notifications.enableBrowserNotifications()}
+                            >
+                                <RotateCw className="size-3.5" />
+                                {t("notifications.retry")}
                             </Button>
                         </div>
                     )}

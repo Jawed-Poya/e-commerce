@@ -33,6 +33,7 @@ import {
 import { GlobalSearch } from "../../features/catalog/global-search";
 import { useLookups } from "../../features/catalog/use-catalog";
 import { useCompany } from "../../features/company/company-context";
+import { LiveNotificationBanner } from "../../features/notifications/live-notification-banner";
 import { NotificationCenter } from "../../features/notifications/notification-center";
 import {
     PwaInstallBanner,
@@ -261,6 +262,7 @@ export function StoreLayout() {
 
     return (
         <div className="min-h-screen bg-background pb-20 text-foreground md:pb-0">
+            <LiveNotificationBanner />
             <header className="sticky top-0 z-40 bg-background/[0.95] shadow-[0_1px_0_rgba(15,23,42,.07)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/88 dark:shadow-[0_1px_0_rgba(255,255,255,.055)]">
                 <div className="hidden bg-[var(--brand-surface-strong)] text-white sm:block">
                     <div className="mx-auto flex h-8 w-full max-w-[1380px] items-center justify-between gap-4 px-4 text-[11px] sm:px-6 lg:px-8">

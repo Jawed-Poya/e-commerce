@@ -26,17 +26,28 @@ import {
 
 const lastCheckKey = "easycart-notifications-last-check";
 const seenKey = "easycart-notifications-seen";
+const activityKey = "easycart-notifications-activity";
 const hubUrl = apiUrl("/hubs/store-notifications");
+const reconnectDelays = [2_000, 5_000, 10_000, 30_000] as const;
 
 type RealtimeStatus = "connecting" | "live" | "reconnecting" | "polling";
+type BrowserPushStatus =
+    | "unsupported"
+    | "disabled"
+    | "registering"
+    | "ready"
+    | "error";
 
 type NotificationContextValue = {
     items: StoreNotification[];
     unreadCount: number;
     permission: NotificationPermission | "unsupported";
+    browserPushStatus: BrowserPushStatus;
     realtimeStatus: RealtimeStatus;
+    liveNotification: StoreNotification | null;
     trackProduct: (productId: number) => void;
     enableBrowserNotifications: () => Promise<boolean>;
+    dismissLiveNotification: () => void;
     markRead: (id: number) => void;
     markAllRead: () => void;
     clearAll: () => void;
@@ -48,15 +59,22 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     const cart = useCart();
     const auth = useAuth();
     const { t } = useI18n();
-    const [items, setItems] = useState<StoreNotification[]>([]);
+    const [items, setItems] = useState<StoreNotification[]>(readStoredItems);
     const [trackedIds, setTrackedIds] = useState(getTrackedProductIds);
     const [seenIds, setSeenIds] = useState<number[]>(readSeenIds);
     const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
         () => ("Notification" in window ? Notification.permission : "unsupported"),
     );
+    const [browserPushStatus, setBrowserPushStatus] = useState<BrowserPushStatus>(
+        () => webPushSupported()
+            ? Notification.permission === "granted" ? "registering" : "disabled"
+            : "unsupported",
+    );
     const [realtimeStatus, setRealtimeStatus] =
         useState<RealtimeStatus>("connecting");
-    const deliveredIds = useRef(new Set<number>());
+    const [liveNotification, setLiveNotification] =
+        useState<StoreNotification | null>(null);
+    const deliveredIds = useRef(new Set(items.map((item) => item.id)));
     const previousCartLineKeys = useRef<Set<string> | null>(null);
     const localNotificationSequence = useRef(0);
     const lastCheck = useRef(
@@ -126,9 +144,16 @@ export function NotificationProvider({ children }: PropsWithChildren) {
                     .slice(0, 30);
             });
             newItems.forEach((item) => void showBrowserNotification(item));
+            if (document.visibilityState === "visible") {
+                setLiveNotification(newItems[newItems.length - 1]);
+            }
         },
         [showBrowserNotification],
     );
+
+    useEffect(() => {
+        writeStoredItems(items);
+    }, [items]);
 
     const syncTrackedIds = useCallback(() => {
         const next = getTrackedProductIds();
@@ -180,25 +205,37 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     }, [syncTrackedIds]);
 
     const syncPushSubscription = useCallback(async () => {
-        if (
-            !("Notification" in window) ||
-            Notification.permission !== "granted" ||
-            !("serviceWorker" in navigator) ||
-            !("PushManager" in window)
-        ) {
+        if (!webPushSupported()) {
+            setBrowserPushStatus("unsupported");
+            return false;
+        }
+        if (Notification.permission !== "granted") {
+            setBrowserPushStatus("disabled");
             return false;
         }
 
+        setBrowserPushStatus("registering");
         try {
-            const registration = await navigator.serviceWorker.getRegistration();
-            if (!registration) return false;
+            const registration = await getReadyServiceWorkerRegistration();
+            if (!registration) {
+                setBrowserPushStatus("error");
+                return false;
+            }
 
             const { publicKey } = await getStorePushPublicKey();
+            const applicationServerKey = urlBase64ToUint8Array(publicKey);
             let subscription = await registration.pushManager.getSubscription();
+            if (
+                subscription &&
+                !sameBytes(subscription.options.applicationServerKey, applicationServerKey)
+            ) {
+                await subscription.unsubscribe();
+                subscription = null;
+            }
             if (!subscription) {
                 subscription = await registration.pushManager.subscribe({
                     userVisibleOnly: true,
-                    applicationServerKey: urlBase64ToUint8Array(publicKey),
+                    applicationServerKey,
                 });
             }
 
@@ -210,7 +247,10 @@ export function NotificationProvider({ children }: PropsWithChildren) {
                 subscription.getKey("auth"),
             );
 
-            if (!p256dh || !authKey) return false;
+            if (!p256dh || !authKey) {
+                setBrowserPushStatus("error");
+                return false;
+            }
 
             await saveStorePushSubscription({
                 endpoint: subscription.endpoint,
@@ -218,8 +258,10 @@ export function NotificationProvider({ children }: PropsWithChildren) {
                 auth: authKey,
                 productIds: trackedIds,
             });
+            setBrowserPushStatus("ready");
             return true;
         } catch (error) {
+            setBrowserPushStatus("error");
             console.warn("Storefront Web Push subscription could not be synchronized.", error);
             return false;
         }
@@ -252,6 +294,9 @@ export function NotificationProvider({ children }: PropsWithChildren) {
 
         let disposed = false;
         let connection: import("@microsoft/signalr").HubConnection | null = null;
+        let retryTimer: number | null = null;
+        let retryAttempt = 0;
+        let reconnectNow: (() => void) | null = null;
         setRealtimeStatus("connecting");
 
         void import("@microsoft/signalr").then(({ HubConnectionBuilder, HubConnectionState, LogLevel }) => {
@@ -273,31 +318,86 @@ export function NotificationProvider({ children }: PropsWithChildren) {
             connection.onreconnecting(() => setRealtimeStatus("reconnecting"));
             connection.onreconnected(async () => {
                 if (connection?.state === HubConnectionState.Connected) {
-                    await connection.invoke("Subscribe", trackedIds);
-                    setRealtimeStatus("live");
-                    await poll();
+                    try {
+                        await connection.invoke("Subscribe", trackedIds);
+                        retryAttempt = 0;
+                        setRealtimeStatus("live");
+                        await poll();
+                    } catch {
+                        setRealtimeStatus("polling");
+                        await connection.stop();
+                    }
                 }
             });
-            connection.onclose(() => {
-                if (!disposed) setRealtimeStatus("polling");
-            });
+            const connect = async () => {
+                if (
+                    disposed ||
+                    !connection ||
+                    connection.state !== HubConnectionState.Disconnected
+                ) return;
 
-            void connection.start()
-                .then(async () => {
-                    if (disposed || !connection) return;
+                setRealtimeStatus(retryAttempt === 0 ? "connecting" : "reconnecting");
+                try {
+                    await connection.start();
+                    if (disposed) {
+                        await connection.stop();
+                        return;
+                    }
                     await connection.invoke("Subscribe", trackedIds);
+                    retryAttempt = 0;
                     setRealtimeStatus("live");
                     await poll();
-                })
-                .catch(() => {
-                    if (!disposed) setRealtimeStatus("polling");
-                });
+                } catch {
+                    if (!disposed) {
+                        try {
+                            await connection.stop();
+                        } finally {
+                            scheduleRetry();
+                        }
+                    }
+                }
+            };
+
+            function scheduleRetry() {
+                if (disposed || retryTimer !== null) return;
+                setRealtimeStatus("polling");
+                const delay = reconnectDelays[
+                    Math.min(retryAttempt, reconnectDelays.length - 1)
+                ];
+                retryAttempt += 1;
+                retryTimer = window.setTimeout(() => {
+                    retryTimer = null;
+                    void connect();
+                }, delay);
+            }
+
+            reconnectNow = () => {
+                if (disposed || connection?.state !== HubConnectionState.Disconnected)
+                    return;
+                if (retryTimer !== null) window.clearTimeout(retryTimer);
+                retryTimer = null;
+                retryAttempt = 0;
+                void connect();
+            };
+
+            window.addEventListener("online", reconnectNow);
+            document.addEventListener("visibilitychange", reconnectNow);
+            void connect();
+
+            connection.onclose(() => {
+                if (!disposed) scheduleRetry();
+            });
         }).catch(() => {
             if (!disposed) setRealtimeStatus("polling");
         });
 
         return () => {
             disposed = true;
+            if (retryTimer !== null) window.clearTimeout(retryTimer);
+            if (reconnectNow) {
+                window.removeEventListener("online", reconnectNow);
+                document.removeEventListener("visibilitychange", reconnectNow);
+            }
             void connection?.stop();
         };
         // trackedKey and customer identity intentionally rebuild subscriptions.
@@ -342,11 +442,18 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     ]);
 
     const enableBrowserNotifications = useCallback(async () => {
-        if (!("Notification" in window)) return false;
-        const result = await Notification.requestPermission();
+        if (!webPushSupported()) {
+            setBrowserPushStatus("unsupported");
+            return false;
+        }
+        const result = Notification.permission === "default"
+            ? await Notification.requestPermission()
+            : Notification.permission;
         setPermission(result);
         if (result === "granted") {
             await Promise.all([poll(), syncPushSubscription()]);
+        } else {
+            setBrowserPushStatus("disabled");
         }
         return result === "granted";
     }, [poll, syncPushSubscription]);
@@ -371,7 +478,12 @@ export function NotificationProvider({ children }: PropsWithChildren) {
         localStorage.setItem(seenKey, JSON.stringify(nextSeenIds));
         setSeenIds(nextSeenIds);
         setItems([]);
+        setLiveNotification(null);
     }, [items, seenIds]);
+    const dismissLiveNotification = useCallback(
+        () => setLiveNotification(null),
+        [],
+    );
 
     const unreadCount = items.filter((item) => !seenIds.includes(item.id)).length;
     const value = useMemo<NotificationContextValue>(
@@ -379,9 +491,12 @@ export function NotificationProvider({ children }: PropsWithChildren) {
             items,
             unreadCount,
             permission,
+            browserPushStatus,
             realtimeStatus,
+            liveNotification,
             trackProduct,
             enableBrowserNotifications,
+            dismissLiveNotification,
             markRead,
             markAllRead,
             clearAll,
@@ -389,7 +504,10 @@ export function NotificationProvider({ children }: PropsWithChildren) {
         [
             enableBrowserNotifications,
             clearAll,
+            browserPushStatus,
+            dismissLiveNotification,
             items,
+            liveNotification,
             markRead,
             markAllRead,
             permission,
@@ -424,6 +542,37 @@ function readSeenIds(): number[] {
     }
 }
 
+function readStoredItems(): StoreNotification[] {
+    try {
+        const value = JSON.parse(localStorage.getItem(activityKey) ?? "[]") as unknown;
+        if (!Array.isArray(value)) return [];
+        return value.filter(isStoreNotification).slice(0, 30);
+    } catch {
+        return [];
+    }
+}
+
+function writeStoredItems(items: StoreNotification[]) {
+    try {
+        localStorage.setItem(activityKey, JSON.stringify(items.slice(0, 30)));
+    } catch {
+        // The live in-memory inbox remains available when storage is blocked/full.
+    }
+}
+
+function isStoreNotification(value: unknown): value is StoreNotification {
+    if (!value || typeof value !== "object") return false;
+    const item = value as Partial<StoreNotification>;
+    return typeof item.id === "number" &&
+        typeof item.title === "string" &&
+        typeof item.message === "string" &&
+        (item.kind === "Price" || item.kind === "Stock" || item.kind === "Cart") &&
+        typeof item.productId === "number" &&
+        typeof item.productName === "string" &&
+        typeof item.link === "string" &&
+        typeof item.createdAt === "string";
+}
+
 function sameNumberArray(left: number[], right: number[]) {
     return left.length === right.length &&
         left.every((value, index) => value === right[index]);
@@ -434,6 +583,33 @@ function urlBase64ToUint8Array(value: string) {
     const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
     const raw = window.atob(base64);
     return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+}
+
+function webPushSupported() {
+    return window.isSecureContext &&
+        "Notification" in window &&
+        "serviceWorker" in navigator &&
+        "PushManager" in window;
+}
+
+async function getReadyServiceWorkerRegistration() {
+    const existing = await navigator.serviceWorker.getRegistration();
+    if (existing?.active) return existing;
+
+    return Promise.race<ServiceWorkerRegistration | null>([
+        navigator.serviceWorker.ready,
+        new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 5_000)),
+    ]);
+}
+
+function sameBytes(
+    current: ArrayBuffer | null,
+    expected: Uint8Array<ArrayBuffer>,
+) {
+    if (!current) return false;
+    const left = new Uint8Array(current);
+    return left.length === expected.length &&
+        left.every((value, index) => value === expected[index]);
 }
 
 function base64FromBuffer(buffer: ArrayBuffer | null) {
