@@ -1,0 +1,41 @@
+# Repository metadata and local tooling
+.git/
+.vs/
+.agents/
+.codex/
+AGENTS.md
+
+# This EAS project builds only the mobile application.
+backend/
+frontend/admin/
+frontend/web/
+scripts/
+
+# Mobile dependencies and generated output
+frontend/mobile/node_modules/
+frontend/mobile/.expo/
+frontend/mobile/.claude/
+frontend/mobile/android/
+frontend/mobile/ios/
+frontend/mobile/dist/
+frontend/mobile/web-build/
+frontend/mobile/releases/
+frontend/mobile/*.tsbuildinfo
+
+# Local configuration, logs, and signing material
+frontend/mobile/.env
+frontend/mobile/.env.*
+!frontend/mobile/.env.example
+frontend/mobile/npm-debug.*
+frontend/mobile/yarn-debug.*
+frontend/mobile/yarn-error.*
+frontend/mobile/*.jks
+frontend/mobile/*.keystore
+frontend/mobile/*.p8
+frontend/mobile/*.p12
+frontend/mobile/*.key
+frontend/mobile/*.mobileprovision
+frontend/mobile/*.pem
+frontend/mobile/.DS_Store
+frontend/mobile/*.orig.*
+frontend/mobile/.metro-health-check*

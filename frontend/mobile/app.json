@@ -11,7 +11,15 @@
     "ios": {
       "icon": "./assets/images/easycart-icon.png",
       "bundleIdentifier": "com.easycart.store",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "ExpoLocalization_supportsRTL": true,
+        "CFBundleLocalizations": [
+          "en",
+          "ps",
+          "fa-AF"
+        ]
+      }
     },
     "android": {
       "versionCode": 1,
@@ -68,8 +76,16 @@
         "expo-localization",
         {
           "supportedLocales": {
-            "ios": ["en", "ps", "fa-AF"],
-            "android": ["en", "ps", "fa-AF"]
+            "ios": [
+              "en",
+              "ps",
+              "fa-AF"
+            ],
+            "android": [
+              "en",
+              "ps",
+              "fa"
+            ]
           },
           "supportsRTL": true,
           "allowDynamicLocaleChangesAndroid": true
@@ -79,6 +95,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "db8a3850-1cb1-4fc3-abc3-91be03e6f523"
+      }
+    },
+    "owner": "jawed-poya"
   }
 }

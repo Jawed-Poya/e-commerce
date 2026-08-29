@@ -1,0 +1,32 @@
+# Dependencies and local tool caches
+node_modules/
+.expo/
+.claude/
+*.tsbuildinfo
+
+# Generated web/native build output
+dist/
+web-build/
+android/
+ios/
+releases/
+
+# Local environment and signing material
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# Development logs and operating-system files
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+*.orig.*
+.metro-health-check*
