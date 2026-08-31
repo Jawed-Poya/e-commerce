@@ -75,24 +75,36 @@ export function cartQuantityStep(product: QuantityLimitedProduct) {
 }
 
 export function minimumCartQuantity(product: QuantityLimitedProduct) {
-  return cartQuantityStep(product);
+  const step = cartQuantityStep(product);
+  const configured = Number(product.minimumValue);
+  const requestedMinimum = Number.isFinite(configured) && configured > 0
+    ? configured
+    : step;
+  return roundCartQuantity(
+    Math.max(step, Math.ceil((requestedMinimum - Number.EPSILON) / step) * step),
+  );
 }
 
 export function maximumCartQuantity(product: QuantityLimitedProduct) {
   const stock = Math.max(0, Number(product.stock) || 0);
   const step = cartQuantityStep(product);
-  if (stock < step) return 0;
-  return roundCartQuantity(Math.floor((stock + Number.EPSILON) / step) * step);
+  const configured = product.maximumValue == null
+    ? stock
+    : Math.max(0, Number(product.maximumValue) || 0);
+  const limit = Math.min(stock, configured);
+  if (limit < step) return 0;
+  return roundCartQuantity(Math.floor((limit + Number.EPSILON) / step) * step);
 }
 
 export function cartQuickQuantities(product: CartProduct) {
   const step = cartQuantityStep(product);
+  const minimum = minimumCartQuantity(product);
   const maximum = maximumCartQuantity(product);
   return [...new Set((product.quickOrderQuantities ?? [])
     .map(Number)
     .filter((quantity) =>
       Number.isFinite(quantity) &&
-      quantity > 0 &&
+      quantity >= minimum - Number.EPSILON &&
       quantity <= maximum + Number.EPSILON &&
       Math.abs(quantity / step - Math.round(quantity / step)) < 1e-9,
     )
@@ -437,6 +449,8 @@ function toSyncedItems(items: CartItem[]): SyncedCartItem[] {
       unitName: item.unitName ?? null,
       quantityStep: item.quantityStep ?? 1,
       quickOrderQuantities: item.quickOrderQuantities ?? [],
+      minimumValue: item.minimumValue ?? null,
+      maximumValue: item.maximumValue ?? null,
       quantity: item.quantity,
     }));
 }
@@ -453,6 +467,8 @@ function fromSyncedCart(cart: SyncedCart): CartItem[] {
     conversionFactor: 1,
     quantityStep: item.quantityStep,
     quickOrderQuantities: item.quickOrderQuantities,
+    minimumValue: item.minimumValue,
+    maximumValue: item.maximumValue,
     quantity: item.quantity,
   })).filter((item) => item.quantity > 0);
 }

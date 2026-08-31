@@ -10,6 +10,8 @@ public sealed record CustomerCartItemContract(
     string? UnitName,
     decimal QuantityStep,
     IReadOnlyList<decimal> QuickOrderQuantities,
+    decimal? MinimumValue,
+    decimal? MaximumValue,
     decimal Quantity);
 
 public sealed record CustomerCartResponse(

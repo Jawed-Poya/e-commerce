@@ -10,6 +10,8 @@ export type SyncedCartItem = {
     unitName: string | null;
     quantityStep: number;
     quickOrderQuantities: number[];
+    minimumValue: number | null;
+    maximumValue: number | null;
     quantity: number;
 };
 

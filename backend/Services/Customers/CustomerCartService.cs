@@ -124,8 +124,17 @@ public sealed class CustomerCartService(
 
             var step = Round(item.QuantityStep);
             var quantity = Round(item.Quantity);
+            decimal? minimumValue = item.MinimumValue.HasValue ? Round(item.MinimumValue.Value) : null;
+            decimal? maximumValue = item.MaximumValue.HasValue ? Round(item.MaximumValue.Value) : null;
+            if (minimumValue < 0 || maximumValue < 0 ||
+                (minimumValue.HasValue && maximumValue.HasValue && minimumValue > maximumValue))
+                throw new ArgumentException("Cart quantity limits are invalid.");
             if (Math.Abs(quantity / step - decimal.Round(quantity / step, 0)) > 0.000001m)
                 throw new ArgumentException("Every cart quantity must follow its configured quantity step.");
+            if (minimumValue.HasValue && quantity < minimumValue.Value)
+                throw new ArgumentException("A cart quantity is below its configured minimum.");
+            if (maximumValue.HasValue && quantity > maximumValue.Value)
+                throw new ArgumentException("A cart quantity exceeds its configured maximum.");
 
             var quick = (item.QuickOrderQuantities ?? [])
                 .Where(value => value > 0)
@@ -143,6 +152,8 @@ public sealed class CustomerCartService(
                 Stock = Round(item.Stock),
                 QuantityStep = step,
                 QuickOrderQuantities = quick,
+                MinimumValue = minimumValue,
+                MaximumValue = maximumValue,
                 Quantity = quantity
             };
             normalized[(clean.ProductId, clean.UnitId)] = clean;

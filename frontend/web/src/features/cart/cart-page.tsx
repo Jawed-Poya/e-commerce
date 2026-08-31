@@ -71,6 +71,8 @@ export function CartPage() {
             stock: Math.max(0, product.stock / factor),
             quantityStep: product.orderQuantityStep > 0 ? product.orderQuantityStep : 1,
             quickOrderQuantities,
+            minimumValue: product.minimumValue,
+            maximumValue: product.maximumValue,
         };
     };
     const availabilityIssue = (item: CartItem) => {
@@ -79,6 +81,7 @@ export function CartPage() {
         const minimum = minimumCartQuantity(live);
         const maximum = maximumCartQuantity(live);
         if (maximum < minimum) return "unavailable" as const;
+        if (item.quantity < minimum - Number.EPSILON) return "minimum" as const;
         if (item.quantity > maximum + Number.EPSILON) return "quantity" as const;
         return null;
     };
@@ -214,7 +217,11 @@ export function CartPage() {
                                                 <span>
                                                     {availabilityIssue(item) === "unavailable"
                                                         ? t("cart.itemUnavailable")
-                                                        : t("cart.quantityUnavailable", {
+                                                        : availabilityIssue(item) === "minimum"
+                                                          ? t("product.minimumQuantity", {
+                                                                count: formatNumber(minimumCartQuantity(currentCartItem(item))),
+                                                            })
+                                                          : t("cart.quantityUnavailable", {
                                                               count: maximumCartQuantity(currentCartItem(item)),
                                                           })}
                                                 </span>

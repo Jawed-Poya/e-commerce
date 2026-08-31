@@ -136,6 +136,7 @@ public sealed class OrderService(
                 var product = productById[requested.ProductId];
                 var selectedUnit = ResolveSelectedUnit(product, requested.UnitId);
                 ValidateOrderQuantityStep(product.Name, selectedUnit.UnitName, requested.Quantity, product.OrderQuantityStep);
+                ValidateOrderQuantityLimits(product, selectedUnit.UnitName, requested.Quantity);
                 var baseQuantity = decimal.Round(requested.Quantity * selectedUnit.ConversionFactor, 3);
                 if (baseQuantity <= 0)
                     throw new InvalidOperationException("Product quantities must be greater than zero.");
@@ -1036,6 +1037,24 @@ public sealed class OrderService(
         {
             throw new InvalidOperationException(
                 $"'{productName}' must be ordered in increments of {normalizedStep:N3} {unitName}. Adjust the cart quantity and try again.");
+        }
+    }
+
+    private static void ValidateOrderQuantityLimits(
+        Product product,
+        string unitName,
+        decimal quantity)
+    {
+        if (product.MinimumValue.HasValue && quantity < product.MinimumValue.Value)
+        {
+            throw new InvalidOperationException(
+                $"'{product.Name}' requires a minimum order of {product.MinimumValue.Value:N3} {unitName}.");
+        }
+
+        if (product.MaximumValue.HasValue && quantity > product.MaximumValue.Value)
+        {
+            throw new InvalidOperationException(
+                $"'{product.Name}' allows a maximum order of {product.MaximumValue.Value:N3} {unitName}.");
         }
     }
 

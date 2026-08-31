@@ -18,7 +18,12 @@ import { productPath } from "../../shared/lib/product-path";
 import { cn } from "../../shared/lib/utils";
 import type { Product } from "../../shared/types/product";
 import { CartQuantityControl } from "../cart/cart-quantity-control";
-import { cartLineKey, useCart } from "../cart/cart-context";
+import {
+    cartLineKey,
+    maximumCartQuantity,
+    minimumCartQuantity,
+    useCart,
+} from "../cart/cart-context";
 import { useCompany } from "../company/company-context";
 import { useProductPins } from "./product-pins-context";
 
@@ -45,18 +50,26 @@ export function ProductCard({
     const hasPrice = product.price != null;
     const quantityStep =
         product.orderQuantityStep > 0 ? product.orderQuantityStep : 1;
+    const quantityLimits = {
+        stock: product.stock,
+        quantityStep,
+        minimumValue: product.minimumValue,
+        maximumValue: product.maximumValue,
+    };
+    const minimumQuantity = minimumCartQuantity(quantityLimits);
+    const maximumQuantity = maximumCartQuantity(quantityLimits);
     const configuredQuickQuantities = product.quickOrderQuantities?.length
         ? product.quickOrderQuantities
         : company?.settings.defaultQuickOrderQuantities ?? [];
     const quickOrderQuantities = configuredQuickQuantities.filter(
         (quantity) =>
-            quantity > 0 &&
-            quantity <= product.stock + Number.EPSILON &&
+            quantity >= minimumQuantity - Number.EPSILON &&
+            quantity <= maximumQuantity + Number.EPSILON &&
             Math.abs(
                 quantity / quantityStep - Math.round(quantity / quantityStep),
             ) < 1e-9,
     );
-    const hasOrderableStock = product.stock >= quantityStep;
+    const hasOrderableStock = maximumQuantity >= minimumQuantity;
     const canAddToCart = hasPrice && hasOrderableStock;
     const liveCartItem = cartItem
         ? {
@@ -64,6 +77,8 @@ export function ProductCard({
               stock: product.stock,
               quantityStep,
               quickOrderQuantities,
+              minimumValue: product.minimumValue,
+              maximumValue: product.maximumValue,
           }
         : null;
     const hasDiscount =

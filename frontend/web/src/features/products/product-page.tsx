@@ -189,8 +189,18 @@ export function ProductPage() {
   const quickOrderQuantities = p.quickOrderQuantities?.length
     ? p.quickOrderQuantities
     : company?.settings.defaultQuickOrderQuantities ?? [];
-  const minimumQuantity = minimumCartQuantity({ stock, quantityStep });
-  const maximumQuantity = maximumCartQuantity({ stock, quantityStep });
+  const minimumQuantity = minimumCartQuantity({
+    stock,
+    quantityStep,
+    minimumValue: p.minimumValue,
+    maximumValue: p.maximumValue,
+  });
+  const maximumQuantity = maximumCartQuantity({
+    stock,
+    quantityStep,
+    minimumValue: p.minimumValue,
+    maximumValue: p.maximumValue,
+  });
   const hasOrderableStock = maximumQuantity >= minimumQuantity;
   const canAddToCart = hasPrice && hasOrderableStock;
   const liveCartItem = cartItem
@@ -200,6 +210,8 @@ export function ProductPage() {
         price: price ?? cartItem.price,
         quantityStep,
         quickOrderQuantities,
+        minimumValue: p.minimumValue,
+        maximumValue: p.maximumValue,
         unitId: selectedUnit?.unitId ?? p.unitId,
         unitName: selectedUnit?.unitName ?? p.unitName,
         conversionFactor: factor,
@@ -227,8 +239,8 @@ export function ProductPage() {
       quantityStep,
       quickOrderQuantities,
       slug: p.slug,
-      minimumValue: null,
-      maximumValue: null,
+      minimumValue: p.minimumValue,
+      maximumValue: p.maximumValue,
     });
 
   return (
