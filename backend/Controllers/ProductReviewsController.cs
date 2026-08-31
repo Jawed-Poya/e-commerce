@@ -42,7 +42,7 @@ public sealed class ProductReviewsController(IProductReviewService reviews) : Co
         }
         catch (UnauthorizedAccessException exception)
         {
-            return Unauthorized(ApiResponse<object>.Fail(exception.Message));
+            return Conflict(ApiResponse<object>.Fail(exception.Message));
         }
         catch (KeyNotFoundException exception)
         {
@@ -63,7 +63,7 @@ public sealed class ProductReviewsController(IProductReviewService reviews) : Co
         }
         catch (UnauthorizedAccessException exception)
         {
-            return Unauthorized(ApiResponse<object>.Fail(exception.Message));
+            return Conflict(ApiResponse<object>.Fail(exception.Message));
         }
         catch (KeyNotFoundException exception)
         {

@@ -15,6 +15,7 @@ export function ProductReviews({ productId }: { productId: number }) {
     const auth = useAuth();
     const queryClient = useQueryClient();
     const [rating, setRating] = useState(5);
+    const [hoverRating, setHoverRating] = useState<number | null>(null);
     const [comment, setComment] = useState("");
     const [message, setMessage] = useState<string | null>(null);
 
@@ -100,10 +101,30 @@ export function ProductReviews({ productId }: { productId: number }) {
                             <div className="mt-5 space-y-4">
                                 <div>
                                     <label className="text-sm font-bold">{t("reviews.rating")}</label>
-                                    <div className="mt-2 flex gap-1" role="radiogroup" aria-label={t("reviews.rating")}>
+                                    <div
+                                        className="mt-2 flex gap-1"
+                                        role="radiogroup"
+                                        aria-label={t("reviews.rating")}
+                                        onMouseLeave={() => setHoverRating(null)}
+                                    >
                                         {[1, 2, 3, 4, 5].map((value) => (
-                                            <button key={value} type="button" role="radio" aria-checked={rating === value} onClick={() => setRating(value)} className="rounded-lg p-1.5 transition hover:bg-amber-500/10 focus-visible:ring-2 focus-visible:ring-ring">
-                                                <Star className={cn("size-7 text-amber-400", value <= rating && "fill-amber-400")} />
+                                            <button
+                                                key={value}
+                                                type="button"
+                                                role="radio"
+                                                aria-checked={rating === value}
+                                                onClick={() => setRating(value)}
+                                                onMouseEnter={() => setHoverRating(value)}
+                                                onFocus={() => setHoverRating(value)}
+                                                onBlur={() => setHoverRating(null)}
+                                                className="rounded-lg p-1.5 transition-all duration-150 hover:-translate-y-0.5 hover:scale-110 hover:bg-amber-500/10 focus-visible:ring-2 focus-visible:ring-ring"
+                                            >
+                                                <Star
+                                                    className={cn(
+                                                        "size-7 text-amber-400 transition-all duration-150",
+                                                        value <= (hoverRating ?? rating) && "scale-105 fill-amber-400 drop-shadow-sm",
+                                                    )}
+                                                />
                                             </button>
                                         ))}
                                     </div>
