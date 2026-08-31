@@ -4,6 +4,7 @@ import {
     ArchiveRestore,
     DatabaseBackup,
     DatabaseZap,
+    Download,
     HardDriveUpload,
     LoaderCircle,
     RefreshCw,
@@ -56,6 +57,7 @@ export default function DatabaseMaintenancePage() {
     const [branchId, setBranchId] = useState<number | null>(null);
     const [action, setAction] = useState<ConfirmationAction | null>(null);
     const [confirmation, setConfirmation] = useState("");
+    const [downloadingBackup, setDownloadingBackup] = useState<string | null>(null);
 
     const backups = backupsQuery.data ?? [];
     const selectedBackup = backupFileName ?? backups[0]?.fileName ?? null;
@@ -101,6 +103,17 @@ export default function DatabaseMaintenancePage() {
             await backupsQuery.refetch();
         }
     };
+    const downloadBackup = async (fileName: string) => {
+        setDownloadingBackup(fileName);
+        try {
+            await maintenanceService.downloadBackup(fileName);
+            toast.success(tr("Backup download started."));
+        } catch (error) {
+            toast.error(tr(message(error)));
+        } finally {
+            setDownloadingBackup(null);
+        }
+    };
     const confirmationMeta = useMemo(() => action ? actionCopy(action.kind, tr) : null, [action, tr]);
 
     if (statusQuery.isLoading) return <div className="grid min-h-[55vh] place-items-center"><LoaderCircle className="size-7 animate-spin text-primary" /></div>;
@@ -144,10 +157,24 @@ export default function DatabaseMaintenancePage() {
                         ) : backupsQuery.isLoading ? (
                             <div className="grid min-h-32 place-items-center"><LoaderCircle className="animate-spin" /></div>
                         ) : backups.length ? backups.map((backup) => (
-                            <button key={`${backup.fileName}-${backup.finishedAt}`} type="button" onClick={() => setBackupFileName(backup.fileName)} className={`flex w-full flex-col gap-2 border p-3 text-start transition-colors sm:flex-row sm:items-center sm:justify-between ${selectedBackup === backup.fileName ? "border-primary bg-primary/5" : "hover:bg-muted/40"}`}>
-                                <span className="min-w-0"><b className="block truncate text-xs">{backup.fileName}</b><span className="mt-1 block text-[10px] text-muted-foreground">{new Date(backup.finishedAt ?? backup.startedAt).toLocaleString(locale)} · {formatBytes(backup.sizeBytes)}</span></span>
+                            <div key={`${backup.fileName}-${backup.finishedAt}`} className={`flex w-full items-center gap-2 border p-2 transition-colors ${selectedBackup === backup.fileName ? "border-primary bg-primary/5" : "hover:bg-muted/40"}`}>
+                                <button type="button" onClick={() => setBackupFileName(backup.fileName)} className="min-w-0 flex-1 p-1 text-start">
+                                    <b className="block truncate text-xs">{backup.fileName}</b>
+                                    <span className="mt-1 block text-[10px] text-muted-foreground">{new Date(backup.finishedAt ?? backup.startedAt).toLocaleString(locale)} · {formatBytes(backup.sizeBytes)}</span>
+                                </button>
                                 <Badge variant={selectedBackup === backup.fileName ? "default" : "outline"}>{backup.backupType}</Badge>
-                            </button>
+                                <Button
+                                    type="button"
+                                    size="icon-sm"
+                                    variant="outline"
+                                    disabled={downloadingBackup !== null}
+                                    aria-label={tr("Download backup")}
+                                    title={tr("Download backup")}
+                                    onClick={() => void downloadBackup(backup.fileName)}
+                                >
+                                    {downloadingBackup === backup.fileName ? <LoaderCircle className="animate-spin" /> : <Download />}
+                                </Button>
+                            </div>
                         )) : <div className="border border-dashed p-5 text-center text-xs text-muted-foreground">{tr("No backups have been created from this database yet.")}</div>}
                     </CardContent>
                 </Card>

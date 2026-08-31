@@ -34,6 +34,30 @@ public sealed class DatabaseMaintenanceController(
         Ok(ApiResponse<IReadOnlyCollection<DatabaseBackupInfo>>.Ok(
             await maintenance.GetBackupsAsync(cancellationToken)));
 
+    [HttpGet("backups/{fileName}/download")]
+    [Authorize(Policy = AppPermissions.DatabaseBackupReadPolicy)]
+    public async Task<IActionResult> DownloadBackup(
+        string fileName,
+        CancellationToken cancellationToken)
+    {
+        var backup = (await maintenance.GetBackupsAsync(cancellationToken))
+            .FirstOrDefault(item => string.Equals(
+                item.FileName,
+                fileName?.Trim(),
+                StringComparison.OrdinalIgnoreCase));
+        if (backup is null)
+            return NotFound(ApiResponse<object>.Fail("The selected database backup was not found."));
+        if (!System.IO.File.Exists(backup.PhysicalPath))
+            return Conflict(ApiResponse<object>.Fail(
+                "The backup is registered in SQL Server, but the API server cannot read the backup file. Grant the API service read access to the SQL Server backup directory."));
+
+        return PhysicalFile(
+            backup.PhysicalPath,
+            "application/octet-stream",
+            backup.FileName,
+            enableRangeProcessing: true);
+    }
+
     [HttpPost("backups")]
     [Authorize(Policy = AppPermissions.DatabaseBackup)]
     public async Task<ActionResult<ApiResponse<DatabaseBackupInfo>>> CreateBackup(

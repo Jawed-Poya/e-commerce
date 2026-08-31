@@ -13,6 +13,10 @@ export const maintenanceService = {
         (await apiClient.get<DatabaseBackup[]>("/admin/maintenance/backups")).data,
     createBackup: async () =>
         (await apiClient.post<DatabaseBackup>("/admin/maintenance/backups")).data,
+    downloadBackup: (fileName: string) =>
+        apiClient.download(
+            `/admin/maintenance/backups/${encodeURIComponent(fileName)}/download`,
+        ),
     restore: async (backupFileName: string, confirmation: string) =>
         (await apiClient.post<{ restored: boolean; backupFileName: string }>(
             "/admin/maintenance/restore",
