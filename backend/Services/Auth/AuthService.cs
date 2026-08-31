@@ -22,6 +22,7 @@ public sealed class AuthService(
     UserManager<User> userManager,
     ApplicationDbContext context,
     ICurrentCustomerAccessor currentCustomer,
+    IDefaultCustomerTypeResolver defaultCustomerType,
     ICompanyPermissionService companyPermissions,
     IOptions<JwtOptions> jwtOptions,
     IOptions<GoogleAuthOptions> googleOptions) : IAuthService
@@ -94,10 +95,13 @@ public sealed class AuthService(
         {
             EnsureSucceeded(await userManager.CreateAsync(user, request.Password), "Could not create customer account.");
             EnsureSucceeded(await userManager.AddToRoleAsync(user, AppRoles.Customer), "Could not assign the customer role.");
-
-            // Customer data and order history are linked only after a verified
-            // checkout. Registration alone must never claim a historical customer
-            // record just because its submitted email or phone happens to match.
+            await CreateCustomerProfileAsync(
+                user,
+                firstName,
+                lastName,
+                phone,
+                email,
+                cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
         catch
@@ -107,6 +111,47 @@ public sealed class AuthService(
         }
 
         return await CreateResponseAsync(user, [AppRoles.Customer], cancellationToken);
+    }
+
+    private async Task CreateCustomerProfileAsync(
+        User user,
+        string firstName,
+        string? lastName,
+        string phone,
+        string? email,
+        CancellationToken cancellationToken)
+    {
+        var contactExists = await context.Customers.AnyAsync(
+            customer =>
+                customer.Phone == phone ||
+                (email != null && customer.Email == email),
+            cancellationToken);
+        if (contactExists)
+        {
+            throw new InvalidOperationException(
+                "A customer record already uses this email or phone. Ask an administrator to link the existing customer before registering.");
+        }
+
+        var customerType = await defaultCustomerType.GetAsync(cancellationToken);
+        var customer = new CustomerEntity
+        {
+            BranchId = customerType.BranchId,
+            FirstName = firstName,
+            LastName = lastName,
+            Phone = phone,
+            Email = email,
+            CustomerTypeId = customerType.Id
+        };
+        context.Customers.Add(customer);
+        await context.SaveChangesAsync(cancellationToken);
+
+        EnsureSucceeded(
+            await userManager.AddClaimsAsync(user,
+            [
+                new Claim(AuthClaims.CustomerId, customer.Id.ToString()),
+                new Claim(AuthClaims.CustomerTypeId, customerType.Id.ToString())
+            ]),
+            "Could not link the storefront account to its customer record.");
     }
 
     public async Task<AuthResponse> SignInWithGoogleAsync(
@@ -252,7 +297,7 @@ public sealed class AuthService(
         EnsureSucceeded(await userManager.UpdateAsync(user), "Could not update the profile.");
 
         // Keep the linked commerce customer in sync with the storefront account.
-        // A registration-only account may not have a Customer link until checkout.
+        // Legacy and Google-only accounts may not have a Customer link until checkout.
         var customerClaim = await context.UserClaims
             .AsNoTracking()
             .FirstOrDefaultAsync(

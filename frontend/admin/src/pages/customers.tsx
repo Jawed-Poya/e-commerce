@@ -310,6 +310,7 @@ export default function CustomersPage() {
                                     <TableHead>{t("customers.phone")}</TableHead>
                                     <TableHead>{t("customers.type")}</TableHead>
                                     <TableHead>{t("customers.sales")}</TableHead>
+                                    <TableHead>{t("customers.orders")}</TableHead>
                                     <TableHead>{t("customers.outstandingDebt")}</TableHead>
                                     <TableHead>{t("customers.accountCredit")}</TableHead>
                                     <TableHead>{t("customers.lastOrder")}</TableHead>
@@ -320,7 +321,7 @@ export default function CustomersPage() {
                                 {query.isLoading ? (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={9}
+                                            colSpan={10}
                                             className="h-24 text-center text-muted-foreground"
                                         >
                                             {t("customers.loading")}
@@ -341,7 +342,7 @@ export default function CustomersPage() {
                                 {!query.isLoading && data?.items.length === 0 ? (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={9}
+                                            colSpan={10}
                                             className="h-24 text-center text-muted-foreground"
                                         >
                                             {t("customers.empty")}
@@ -584,6 +585,10 @@ function CustomerCardList({
                             value={formatMoney(customer.totalSpent)}
                         />
                         <CustomerMetric
+                            label={t("customers.orders")}
+                            value={customer.orderCount.toLocaleString(locale)}
+                        />
+                        <CustomerMetric
                             label={t("customers.outstandingDebt")}
                             value={formatMoney(customer.outstandingDebt)}
                             danger={customer.outstandingDebt > 0}
@@ -696,6 +701,11 @@ function CustomerTableRow({
             </TableCell>
             <TableCell>{customer.customerTypeName ?? t("customers.default")}</TableCell>
             <TableCell>{formatMoney(customer.totalSpent)}</TableCell>
+            <TableCell>
+                <Badge variant={customer.orderCount > 0 ? "default" : "outline"}>
+                    {customer.orderCount.toLocaleString(locale)}
+                </Badge>
+            </TableCell>
             <TableCell>
                 <span
                     className={
