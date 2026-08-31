@@ -21,6 +21,16 @@ import { ListPagination } from "@/components/list-pagination";
 import { ServerSearchCombobox } from "@/components/server-search-combobox";
 import { SimpleCombobox } from "@/components/simple-combobox";
 import { Badge } from "@/components/ui/badge";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -137,6 +147,10 @@ export default function PurchasesPage() {
     const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
     const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
     const [detailsPurchase, setDetailsPurchase] = useState<Purchase | null>(null);
+    const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
+    const [deletingPurchase, setDeletingPurchase] = useState<Purchase | null>(null);
+    const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
+    const [editForm, setEditForm] = useState({ purchaseDate: today(), referenceNumber: "", notes: "" });
     const [saving, setSaving] = useState(false);
     const [exportingPdf, setExportingPdf] = useState(false);
     const [lineLimitOverrideEnabled, setLineLimitOverrideEnabled] = useState(false);
@@ -367,6 +381,81 @@ export default function PurchasesPage() {
         }
     };
 
+    const openPurchaseEditor = async (purchase: Purchase) => {
+        setSaving(true);
+        try {
+            const details = (await operationsService.purchase(purchase.id)).data;
+            let currentSupplier: Supplier | null = null;
+            if (details.supplierId) {
+                const matches = await operationsService.suppliers(details.supplierName ?? "", 20);
+                currentSupplier = matches.find((item) => item.id === details.supplierId) ?? {
+                    id: details.supplierId,
+                    name: details.supplierName ?? "Supplier",
+                    contactPerson: null,
+                    phone: null,
+                    email: null,
+                    address: null,
+                    taxNumber: null,
+                    isActive: true,
+                    outstandingBalance: 0,
+                };
+            }
+            setEditSupplier(currentSupplier);
+            setEditForm({
+                purchaseDate: details.purchaseDate,
+                referenceNumber: details.referenceNumber ?? "",
+                notes: details.notes ?? "",
+            });
+            setEditingPurchase(purchase);
+        } catch (error) {
+            toast.error(message(error));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const savePurchaseEdit = async () => {
+        if (!editingPurchase) return;
+        setSaving(true);
+        try {
+            await operationsService.updatePurchase(editingPurchase.id, {
+                supplierId: editSupplier?.id ?? null,
+                purchaseDate: editForm.purchaseDate,
+                referenceNumber: nullable(editForm.referenceNumber),
+                notes: nullable(editForm.notes),
+            });
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: operationKeys.purchaseRoot }),
+                queryClient.invalidateQueries({ queryKey: operationKeys.summary }),
+            ]);
+            setEditingPurchase(null);
+            toast.success("Purchase details updated.");
+        } catch (error) {
+            toast.error(message(error));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const deletePurchase = async () => {
+        if (!deletingPurchase) return;
+        setSaving(true);
+        try {
+            await operationsService.deletePurchase(deletingPurchase.id);
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: operationKeys.purchaseRoot }),
+                queryClient.invalidateQueries({ queryKey: operationKeys.summary }),
+                queryClient.invalidateQueries({ queryKey: ["inventory"] }),
+            ]);
+            setDeletingPurchase(null);
+            toast.success("Purchase deleted and inventory reversed.");
+        } catch (error) {
+            toast.error(message(error));
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <PageHeader
@@ -482,6 +571,16 @@ export default function PurchasesPage() {
                                                             <CreditCard className="me-2 size-4" />
                                                             Payments
                                                         </Button>
+                                                    ) : null}
+                                                    {canManage ? (
+                                                        <>
+                                                            <Button size="icon-sm" variant="ghost" title="Edit purchase details" onClick={() => void openPurchaseEditor(purchase)}>
+                                                                <Pencil className="size-4" />
+                                                            </Button>
+                                                            <Button size="icon-sm" variant="ghost" className="text-destructive hover:text-destructive" title="Delete purchase" onClick={() => setDeletingPurchase(purchase)}>
+                                                                <Trash2 className="size-4" />
+                                                            </Button>
+                                                        </>
                                                     ) : null}
                                                 </div>
                                             </TableCell>
@@ -876,6 +975,40 @@ export default function PurchasesPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <Dialog open={Boolean(editingPurchase)} onOpenChange={(open) => !open && !saving && setEditingPurchase(null)}>
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Edit {editingPurchase?.purchaseNumber}</DialogTitle>
+                        <DialogDescription>Correct the supplier and document details. Inventory quantities, totals, and payment history remain unchanged.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2 sm:col-span-2">
+                            <Label>Supplier</Label>
+                            <ServerSearchCombobox<Supplier>
+                                value={editSupplier}
+                                onValueChange={setEditSupplier}
+                                queryKey={["operations", "purchase-edit-supplier-search"]}
+                                search={(value) => operationsService.suppliers(value, 20)}
+                                getLabel={(item) => item.name}
+                                getDescription={(item) => item.phone ?? item.email ?? "Supplier"}
+                                placeholder="Search supplier…"
+                            />
+                        </div>
+                        <Field label="Purchase date"><Input type="date" value={editForm.purchaseDate} onChange={(event) => setEditForm((current) => ({ ...current, purchaseDate: event.target.value }))} /></Field>
+                        <Field label="Supplier bill / reference"><Input value={editForm.referenceNumber} onChange={(event) => setEditForm((current) => ({ ...current, referenceNumber: event.target.value }))} /></Field>
+                        <div className="space-y-2 sm:col-span-2"><Label>Notes</Label><Textarea value={editForm.notes} onChange={(event) => setEditForm((current) => ({ ...current, notes: event.target.value }))} /></div>
+                    </div>
+                    <DialogFooter><Button variant="outline" disabled={saving} onClick={() => setEditingPurchase(null)}>Cancel</Button><Button disabled={saving || !editForm.purchaseDate} onClick={() => void savePurchaseEdit()}>{saving ? <LoaderCircle className="animate-spin" /> : <Save />}Save changes</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <AlertDialog open={Boolean(deletingPurchase)} onOpenChange={(open) => !open && !saving && setDeletingPurchase(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader><AlertDialogTitle>Delete {deletingPurchase?.purchaseNumber}?</AlertDialogTitle><AlertDialogDescription>The system will reverse its inventory and accounting entries. Deletion is blocked when any received lot has already been sold or reserved.</AlertDialogDescription></AlertDialogHeader>
+                    <AlertDialogFooter><AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={saving} onClick={() => void deletePurchase()}>{saving ? <LoaderCircle className="animate-spin" /> : <Trash2 />}Delete purchase</AlertDialogAction></AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             <Sheet open={supplierBulkOpen} onOpenChange={setSupplierBulkOpen}>
                 <SheetContent side="right" className="!w-screen !max-w-none border-0">

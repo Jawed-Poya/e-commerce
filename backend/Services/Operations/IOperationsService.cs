@@ -20,11 +20,15 @@ public interface IOperationsService
     Task<PagedResult<PurchaseListItem>> GetPurchasesAsync(string? search, int page, int pageSize, CancellationToken ct);
     Task<PurchaseDetailsResponse> GetPurchaseAsync(long id, CancellationToken ct);
     Task<PurchaseListItem> CreatePurchaseAsync(CreatePurchaseRequest request, string? userId, bool canOverrideLineLimits, CancellationToken ct);
+    Task<PurchaseListItem> UpdatePurchaseAsync(long id, UpdatePurchaseRequest request, string? userId, CancellationToken ct);
+    Task DeletePurchaseAsync(long id, string? userId, CancellationToken ct);
     Task<IReadOnlyList<DocumentPaymentResponse>> GetPurchasePaymentsAsync(long purchaseId, CancellationToken ct);
     Task<PurchaseListItem> AddPurchasePaymentAsync(long purchaseId, RecordDocumentPaymentRequest request, string? userId, CancellationToken ct);
     Task<PagedResult<InventorySaleListItem>> GetSalesAsync(string? search, int page, int pageSize, CancellationToken ct);
     Task<IReadOnlyList<InventorySaleLotMovementResponse>> GetSaleLotsAsync(long saleId, CancellationToken ct);
     Task<InventorySaleListItem> CreateSaleAsync(CreateInventorySaleRequest request, string? userId, bool canOverrideLineLimits, CancellationToken ct);
+    Task<InventorySaleListItem> UpdateSaleAsync(long id, UpdateInventorySaleRequest request, string? userId, CancellationToken ct);
+    Task DeleteSaleAsync(long id, string? userId, CancellationToken ct);
     Task<IReadOnlyList<DocumentPaymentResponse>> GetSalePaymentsAsync(long saleId, CancellationToken ct);
     Task<InventorySaleListItem> AddSalePaymentAsync(long saleId, RecordDocumentPaymentRequest request, string? userId, CancellationToken ct);
     Task<IReadOnlyList<StaffResponse>> GetStaffAsync(CancellationToken ct);

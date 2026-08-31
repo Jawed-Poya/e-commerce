@@ -113,6 +113,22 @@ public sealed class AdminOperationsController(IOperationsService service, IFinan
     [HttpPost("purchases")]
     public Task<IActionResult> CreatePurchase(CreatePurchaseRequest request, CancellationToken ct) => Handle(async () => ApiResponse<PurchaseListItem>.Ok(await service.CreatePurchaseAsync(request, UserId(), request.OverrideLineLimit && HasAnyPermission(AppPermissions.OperationLineLimitsOverride), ct), "Purchase received and stock updated."));
 
+    [Authorize(Policy = AppPermissions.PurchasesManage)]
+    [HttpPut("purchases/{id:long}")]
+    public Task<IActionResult> UpdatePurchase(long id, UpdatePurchaseRequest request, CancellationToken ct) =>
+        Handle(async () => ApiResponse<PurchaseListItem>.Ok(
+            await service.UpdatePurchaseAsync(id, request, UserId(), ct),
+            "Purchase details updated."));
+
+    [Authorize(Policy = AppPermissions.PurchasesManage)]
+    [HttpDelete("purchases/{id:long}")]
+    public Task<IActionResult> DeletePurchase(long id, CancellationToken ct) =>
+        Handle(async () =>
+        {
+            await service.DeletePurchaseAsync(id, UserId(), ct);
+            return ApiResponse<object>.Ok(new { id }, "Purchase deleted and stock reversed.");
+        });
+
     [Authorize(Policy = AppPermissions.PurchasesView)]
     [HttpGet("purchases/{id:long}/payments")]
     public async Task<IActionResult> PurchasePayments(long id, CancellationToken ct) => Ok(ApiResponse<IReadOnlyList<DocumentPaymentResponse>>.Ok(await service.GetPurchasePaymentsAsync(id, ct)));
@@ -135,6 +151,22 @@ public sealed class AdminOperationsController(IOperationsService service, IFinan
     [Authorize(Policy = AppPermissions.ManualSalesManage)]
     [HttpPost("sales")]
     public Task<IActionResult> CreateSale(CreateInventorySaleRequest request, CancellationToken ct) => Handle(async () => ApiResponse<InventorySaleListItem>.Ok(await service.CreateSaleAsync(request, UserId(), request.OverrideLineLimit && HasAnyPermission(AppPermissions.OperationLineLimitsOverride), ct), "Sale recorded and stock updated."));
+
+    [Authorize(Policy = AppPermissions.ManualSalesManage)]
+    [HttpPut("sales/{id:long}")]
+    public Task<IActionResult> UpdateSale(long id, UpdateInventorySaleRequest request, CancellationToken ct) =>
+        Handle(async () => ApiResponse<InventorySaleListItem>.Ok(
+            await service.UpdateSaleAsync(id, request, UserId(), ct),
+            "Sale details updated."));
+
+    [Authorize(Policy = AppPermissions.ManualSalesManage)]
+    [HttpDelete("sales/{id:long}")]
+    public Task<IActionResult> DeleteSale(long id, CancellationToken ct) =>
+        Handle(async () =>
+        {
+            await service.DeleteSaleAsync(id, UserId(), ct);
+            return ApiResponse<object>.Ok(new { id }, "Sale deleted and stock reversed.");
+        });
 
     [Authorize(Policy = AppPermissions.ManualSalesView)]
     [HttpGet("sales/{id:long}/payments")]

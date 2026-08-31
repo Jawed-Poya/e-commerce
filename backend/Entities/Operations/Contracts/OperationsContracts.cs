@@ -97,6 +97,13 @@ public sealed class PurchaseItemRequest
     public string? LotNumber { get; set; }
     public DateOnly? ExpireDate { get; set; }
 }
+public sealed class UpdatePurchaseRequest
+{
+    public long? SupplierId { get; set; }
+    public DateOnly PurchaseDate { get; set; }
+    public string? ReferenceNumber { get; set; }
+    public string? Notes { get; set; }
+}
 public sealed record PurchaseListItem(long Id, string PurchaseNumber, string? ReferenceNumber, DateOnly PurchaseDate, string? SupplierName, int ItemCount, decimal Total, decimal PaidAmount, decimal RemainingAmount, DocumentPaymentStatus PaymentStatus, PurchaseStatus Status, DateTime CreatedAt);
 public sealed record PurchaseItemDetailsResponse(
     long Id,
@@ -166,7 +173,15 @@ public sealed class InventorySaleItemRequest
     public decimal BonusQuantity { get; set; }
     public decimal DiscountPercent { get; set; }
 }
-public sealed record InventorySaleListItem(long Id, string SaleNumber, string? ReferenceNumber, DateOnly SaleDate, string CustomerName, string? CustomerPhone, string? WhatsAppUrl, int ItemCount, decimal Total, decimal PaidAmount, decimal RemainingAmount, DocumentPaymentStatus PaymentStatus, decimal CostOfGoods, decimal GrossProfit, decimal ProfitMargin, DateTime CreatedAt);
+public sealed class UpdateInventorySaleRequest
+{
+    public DateOnly SaleDate { get; set; }
+    public string? CustomerName { get; set; }
+    public string? CustomerPhone { get; set; }
+    public string? ReferenceNumber { get; set; }
+    public string? Notes { get; set; }
+}
+public sealed record InventorySaleListItem(long Id, string SaleNumber, string? ReferenceNumber, DateOnly SaleDate, long? CustomerId, string CustomerName, string? CustomerPhone, string? Notes, string? WhatsAppUrl, int ItemCount, decimal Total, decimal PaidAmount, decimal RemainingAmount, DocumentPaymentStatus PaymentStatus, decimal CostOfGoods, decimal GrossProfit, decimal ProfitMargin, DateTime CreatedAt);
 public sealed record InventorySaleLotMovementResponse(
     long Id,
     long ProductId,

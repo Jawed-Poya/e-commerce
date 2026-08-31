@@ -142,6 +142,8 @@ export const operationsService = {
   ),
   purchase: (id: number) => apiClient.get<PurchaseDetails>(`${base}/purchases/${id}`),
   createPurchase: (body: Record<string, unknown>) => postQueueable<Purchase>(`${base}/purchases`, body, "Purchase"),
+  updatePurchase: (id: number, body: { supplierId: number | null; purchaseDate: string; referenceNumber: string | null; notes: string | null }) => apiClient.put<Purchase>(`${base}/purchases/${id}`, body),
+  deletePurchase: (id: number) => apiClient.delete<object>(`${base}/purchases/${id}`),
   purchasePayments: (id: number) => apiClient.get<DocumentPayment[]>(`${base}/purchases/${id}/payments`),
   addPurchasePayment: (id: number, body: RecordDocumentPayment) => apiClient.post<Purchase>(`${base}/purchases/${id}/payments`, body),
   sales: (search = "", page = 1, pageSize = 20) => cachedDocumentPage(
@@ -153,6 +155,8 @@ export const operationsService = {
     (item, clean) => [item.saleNumber, item.referenceNumber, item.customerName].some((value) => normalize(value ?? "").includes(clean)),
   ),
   createSale: (body: Record<string, unknown>) => postQueueable<ManualSale>(`${base}/sales`, body, "Manual sale"),
+  updateSale: (id: number, body: { saleDate: string; customerName: string | null; customerPhone: string | null; referenceNumber: string | null; notes: string | null }) => apiClient.put<ManualSale>(`${base}/sales/${id}`, body),
+  deleteSale: (id: number) => apiClient.delete<object>(`${base}/sales/${id}`),
   saleLots: (id: number) => apiClient.get<ManualSaleLotMovement[]>(`${base}/sales/${id}/lots`),
   salePayments: (id: number) => apiClient.get<DocumentPayment[]>(`${base}/sales/${id}/payments`),
   addSalePayment: (id: number, body: RecordDocumentPayment) => apiClient.post<ManualSale>(`${base}/sales/${id}/payments`, body),

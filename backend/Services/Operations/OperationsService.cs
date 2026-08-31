@@ -697,6 +697,135 @@ public sealed class OperationsService(
         return MapPurchase(purchase, supplierName);
     }
 
+    public async Task<PurchaseListItem> UpdatePurchaseAsync(
+        long id,
+        UpdatePurchaseRequest request,
+        string? userId,
+        CancellationToken ct)
+    {
+        if (request.PurchaseDate == default)
+            throw new ArgumentException("Purchase date is required.");
+
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+        var purchase = await context.Purchases
+            .Include(item => item.Supplier)
+            .Include(item => item.Items)
+            .Include(item => item.Payments)
+            .Where(item => item.Id == id &&
+                (!branchContext.BranchId.HasValue || item.BranchId == branchContext.BranchId.Value))
+            .SingleOrDefaultAsync(ct)
+            ?? throw new KeyNotFoundException("Purchase not found.");
+
+        string? supplierName = null;
+        if (request.SupplierId.HasValue)
+        {
+            supplierName = await context.Suppliers
+                .Where(item => item.Id == request.SupplierId.Value && item.IsActive &&
+                    (!branchContext.BranchId.HasValue || item.BranchId == branchContext.BranchId.Value))
+                .Select(item => item.Name)
+                .SingleOrDefaultAsync(ct);
+            if (supplierName is null)
+                throw new ArgumentException("Selected supplier does not exist or is inactive.");
+        }
+
+        purchase.SupplierId = request.SupplierId;
+        purchase.PurchaseDate = request.PurchaseDate;
+        purchase.ReferenceNumber = Clean(request.ReferenceNumber);
+        purchase.Notes = Clean(request.Notes);
+
+        var paymentIds = purchase.Payments.Select(item => item.Id).ToArray();
+        var vouchers = await context.JournalVouchers
+            .Where(item =>
+                (item.SourceType == "Purchase" && item.SourceId == purchase.Id) ||
+                (item.SourceType == "PurchasePayment" && item.SourceId.HasValue && paymentIds.Contains(item.SourceId.Value)))
+            .ToListAsync(ct);
+        foreach (var voucher in vouchers)
+        {
+            voucher.CounterpartyId = request.SupplierId;
+            voucher.CounterpartyName = supplierName;
+            if (voucher.SourceType == "Purchase")
+            {
+                voucher.VoucherDate = request.PurchaseDate;
+                voucher.ReferenceNumber = purchase.ReferenceNumber;
+            }
+            voucher.PostedByUserId ??= userId;
+        }
+
+        await context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return MapPurchase(purchase, supplierName);
+    }
+
+    public async Task DeletePurchaseAsync(long id, string? userId, CancellationToken ct)
+    {
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+        var purchase = await context.Purchases
+            .Include(item => item.Payments)
+            .Where(item => item.Id == id &&
+                (!branchContext.BranchId.HasValue || item.BranchId == branchContext.BranchId.Value))
+            .SingleOrDefaultAsync(ct)
+            ?? throw new KeyNotFoundException("Purchase not found.");
+
+        var movements = await context.InventoryTransactions
+            .Include(item => item.Lots)
+                .ThenInclude(item => item.InventoryLot)
+            .Where(item =>
+                item.ReferenceType == "Purchase" &&
+                item.ReferenceId == purchase.Id &&
+                item.Type == InventoryTransactionType.Purchase)
+            .OrderBy(item => item.Id)
+            .ToListAsync(ct);
+
+        foreach (var movement in movements)
+        {
+            if (movement.Quantity <= 0) continue;
+            var allocations = new List<InventoryLotAllocation>();
+            foreach (var detail in movement.Lots.Where(item => item.QuantityDelta > 0))
+            {
+                var lot = detail.InventoryLot
+                    ?? throw new InvalidOperationException(
+                        "This purchase cannot be deleted because its inventory lot is no longer available.");
+                if (lot.Quantity - lot.ReservedQuantity < detail.QuantityDelta)
+                {
+                    throw new InvalidOperationException(
+                        "This purchase cannot be deleted because some of its received stock has already been sold or reserved.");
+                }
+                lot.Quantity -= detail.QuantityDelta;
+                allocations.Add(new InventoryLotAllocation(lot, detail.QuantityDelta));
+            }
+
+            await ApplyStockMovement(
+                movement.ProductId,
+                -movement.Quantity,
+                InventoryTransactionType.StockAdjustment,
+                "PurchaseDeletion",
+                purchase.Id,
+                purchase.PurchaseNumber,
+                userId,
+                null,
+                allocations,
+                false,
+                ct);
+        }
+
+        await ReverseOperationalVouchersAsync(
+            "Purchase",
+            purchase.Id,
+            "PurchasePayment",
+            purchase.Payments.Select(item => item.Id).ToArray(),
+            $"Purchase {purchase.PurchaseNumber} deleted",
+            userId,
+            ct);
+        purchase.IsDeleted = true;
+        purchase.DeletedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync(ct);
+
+        foreach (var productId in movements.Select(item => item.ProductId).Distinct())
+            await RefreshInventoryExpiryAsync(productId, ct);
+        await context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+    }
+
     public async Task<IReadOnlyList<DocumentPaymentResponse>> GetPurchasePaymentsAsync(long purchaseId, CancellationToken ct) =>
         await context.PurchasePayments.AsNoTracking().Where(x => x.PurchaseId == purchaseId && (!branchContext.BranchId.HasValue || x.Purchase.BranchId == branchContext.BranchId.Value)).OrderByDescending(x => x.PaymentDate).ThenByDescending(x => x.Id).Select(MapPurchasePayment()).ToListAsync(ct);
 
@@ -750,7 +879,7 @@ public sealed class OperationsService(
             .Take(pageSize)
             .Select(x => new
             {
-                x.Id, x.SaleNumber, x.ReferenceNumber, x.SaleDate,
+                x.Id, x.SaleNumber, x.ReferenceNumber, x.SaleDate, x.CustomerId, x.Notes,
                 CustomerName = x.Customer != null ? (x.Customer.FirstName + " " + (x.Customer.LastName ?? "")).Trim() : (x.CustomerName ?? "Walk-in customer"),
                 CustomerPhone = x.Customer != null ? x.Customer.Phone : x.CustomerPhone,
                 ItemCount = x.Items.Count, x.Total, x.PaidAmount,
@@ -766,7 +895,7 @@ public sealed class OperationsService(
             var grossProfit = x.NetSales - x.CostOfGoods;
             var margin = x.NetSales > 0 ? decimal.Round(grossProfit / x.NetSales * 100m, 2) : 0;
             return new InventorySaleListItem(
-                x.Id, x.SaleNumber, x.ReferenceNumber, x.SaleDate, x.CustomerName, x.CustomerPhone,
+                x.Id, x.SaleNumber, x.ReferenceNumber, x.SaleDate, x.CustomerId, x.CustomerName, x.CustomerPhone, x.Notes,
                 WhatsAppLinkBuilder.BuildSale(x.CustomerPhone, x.CustomerName, x.SaleNumber, x.Total, x.PaidAmount, x.RemainingAmount, x.CurrencyCode, _whatsAppOptions),
                 x.ItemCount, x.Total, x.PaidAmount, x.RemainingAmount, x.PaymentStatus, x.CostOfGoods, grossProfit, margin, x.CreatedAt);
         }).ToList();
@@ -1035,6 +1164,139 @@ public sealed class OperationsService(
         await context.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return MapSale(sale, registeredCustomerName ?? request.CustomerName ?? "Walk-in customer");
+    }
+
+    public async Task<InventorySaleListItem> UpdateSaleAsync(
+        long id,
+        UpdateInventorySaleRequest request,
+        string? userId,
+        CancellationToken ct)
+    {
+        if (request.SaleDate == default)
+            throw new ArgumentException("Sale date is required.");
+
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+        var sale = await context.InventorySales
+            .Include(item => item.Customer)
+            .Include(item => item.Items)
+            .Include(item => item.Payments)
+            .Where(item => item.Id == id &&
+                (!branchContext.BranchId.HasValue || item.BranchId == branchContext.BranchId.Value))
+            .SingleOrDefaultAsync(ct)
+            ?? throw new KeyNotFoundException("Sale not found.");
+
+        if (sale.CustomerId is null)
+        {
+            sale.CustomerName = Clean(request.CustomerName) ?? "Walk-in customer";
+            sale.CustomerPhone = Clean(request.CustomerPhone);
+        }
+        sale.SaleDate = request.SaleDate;
+        sale.ReferenceNumber = Clean(request.ReferenceNumber);
+        sale.Notes = Clean(request.Notes);
+
+        var customerName = sale.Customer is null
+            ? sale.CustomerName ?? "Walk-in customer"
+            : (sale.Customer.FirstName + " " + (sale.Customer.LastName ?? "")).Trim();
+        var paymentIds = sale.Payments.Select(item => item.Id).ToArray();
+        var vouchers = await context.JournalVouchers
+            .Where(item =>
+                (item.SourceType == "ManualSale" && item.SourceId == sale.Id) ||
+                (item.SourceType == "SalePayment" && item.SourceId.HasValue && paymentIds.Contains(item.SourceId.Value)))
+            .ToListAsync(ct);
+        foreach (var voucher in vouchers)
+        {
+            voucher.CounterpartyId = sale.CustomerId;
+            voucher.CounterpartyName = customerName;
+            if (voucher.SourceType == "ManualSale")
+            {
+                voucher.VoucherDate = request.SaleDate;
+                voucher.ReferenceNumber = sale.ReferenceNumber;
+            }
+            voucher.PostedByUserId ??= userId;
+        }
+
+        await context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return MapSale(sale, customerName);
+    }
+
+    public async Task DeleteSaleAsync(long id, string? userId, CancellationToken ct)
+    {
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+        var sale = await context.InventorySales
+            .Include(item => item.Customer)
+            .Include(item => item.Payments)
+            .Where(item => item.Id == id &&
+                (!branchContext.BranchId.HasValue || item.BranchId == branchContext.BranchId.Value))
+            .SingleOrDefaultAsync(ct)
+            ?? throw new KeyNotFoundException("Sale not found.");
+
+        if (sale.Customer is not null)
+        {
+            var restoredCredit = sale.Customer.AccountCredit +
+                sale.CustomerCreditApplied -
+                sale.CustomerCreditCreated;
+            if (restoredCredit < -0.005m)
+            {
+                throw new InvalidOperationException(
+                    "This sale cannot be deleted because customer credit created by it has already been used.");
+            }
+            sale.Customer.AccountCredit = Math.Max(0, restoredCredit);
+        }
+
+        var movements = await context.InventoryTransactions
+            .Include(item => item.Lots)
+                .ThenInclude(item => item.InventoryLot)
+            .Where(item =>
+                item.ReferenceType == "ManualSale" &&
+                item.ReferenceId == sale.Id &&
+                item.Type == InventoryTransactionType.Sale)
+            .OrderBy(item => item.Id)
+            .ToListAsync(ct);
+        foreach (var movement in movements)
+        {
+            if (movement.Quantity >= 0) continue;
+            var allocations = new List<InventoryLotAllocation>();
+            foreach (var detail in movement.Lots.Where(item => item.QuantityDelta < 0))
+            {
+                var lot = detail.InventoryLot
+                    ?? throw new InvalidOperationException(
+                        "This sale cannot be deleted because its inventory lot is no longer available.");
+                var quantity = Math.Abs(detail.QuantityDelta);
+                lot.Quantity += quantity;
+                allocations.Add(new InventoryLotAllocation(lot, quantity));
+            }
+
+            await ApplyStockMovement(
+                movement.ProductId,
+                Math.Abs(movement.Quantity),
+                InventoryTransactionType.StockAdjustment,
+                "SaleDeletion",
+                sale.Id,
+                sale.SaleNumber,
+                userId,
+                null,
+                allocations,
+                false,
+                ct);
+        }
+
+        await ReverseOperationalVouchersAsync(
+            "ManualSale",
+            sale.Id,
+            "SalePayment",
+            sale.Payments.Select(item => item.Id).ToArray(),
+            $"Manual sale {sale.SaleNumber} deleted",
+            userId,
+            ct);
+        sale.IsDeleted = true;
+        sale.DeletedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync(ct);
+
+        foreach (var productId in movements.Select(item => item.ProductId).Distinct())
+            await RefreshInventoryExpiryAsync(productId, ct);
+        await context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
     }
 
     public async Task<IReadOnlyList<DocumentPaymentResponse>> GetSalePaymentsAsync(long saleId, CancellationToken ct) =>
@@ -1875,6 +2137,63 @@ public sealed class OperationsService(
         context.InventoryTransactions.Add(inventoryTransaction);
     }
 
+    private async Task ReverseOperationalVouchersAsync(
+        string documentSourceType,
+        long documentSourceId,
+        string paymentSourceType,
+        long[] paymentSourceIds,
+        string reason,
+        string? userId,
+        CancellationToken ct)
+    {
+        var vouchers = await context.JournalVouchers
+            .Include(item => item.Lines)
+            .Where(item =>
+                item.Status == JournalVoucherStatus.Posted &&
+                ((item.SourceType == documentSourceType && item.SourceId == documentSourceId) ||
+                 (item.SourceType == paymentSourceType && item.SourceId.HasValue && paymentSourceIds.Contains(item.SourceId.Value))))
+            .OrderBy(item => item.Id)
+            .ToListAsync(ct);
+        var now = DateTime.UtcNow;
+        foreach (var voucher in vouchers)
+        {
+            voucher.Status = JournalVoucherStatus.Reversed;
+            voucher.ReversedAt = now;
+            voucher.ReversedByUserId = userId;
+            voucher.ReversalReason = reason;
+            context.JournalVouchers.Add(new JournalVoucher
+            {
+                VoucherNumber = ReversalVoucherNumber(),
+                VoucherDate = DateOnly.FromDateTime(now),
+                CurrencyCode = voucher.CurrencyCode,
+                VoucherType = JournalVoucherType.Reversal,
+                Status = JournalVoucherStatus.Posted,
+                IsSystemGenerated = true,
+                ReferenceNumber = voucher.VoucherNumber,
+                Memo = $"Reversal of {voucher.VoucherNumber}: {reason}",
+                TotalDebit = voucher.TotalCredit,
+                TotalCredit = voucher.TotalDebit,
+                CreatedByUserId = userId,
+                PostedByUserId = userId,
+                PostedAt = now,
+                ReversalOfVoucherId = voucher.Id,
+                BranchId = voucher.BranchId,
+                Lines = voucher.Lines.Select(line => new JournalVoucherLine
+                {
+                    AccountCode = line.AccountCode,
+                    AccountName = line.AccountName,
+                    Description = $"Reversal: {line.Description ?? voucher.Memo}",
+                    Debit = line.Credit,
+                    Credit = line.Debit,
+                    BranchId = voucher.BranchId
+                }).ToList()
+            });
+        }
+    }
+
+    private static string ReversalVoucherNumber() =>
+        $"RV-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}"[..34];
+
     private async Task EnsurePurchasableProductsAsync(IEnumerable<long> ids, CancellationToken ct)
     {
         var distinct = ids.Distinct().ToArray();
@@ -2046,8 +2365,10 @@ public sealed class OperationsService(
             x.SaleNumber,
             x.ReferenceNumber,
             x.SaleDate,
+            x.CustomerId,
             cleanName,
             customerPhone,
+            x.Notes,
             WhatsAppLinkBuilder.BuildSale(
                 customerPhone,
                 cleanName,

@@ -5,7 +5,9 @@ import {
     CreditCard,
     Layers3,
     LoaderCircle,
+    Pencil,
     Save,
+    Trash2,
     TrendingDown,
     TrendingUp,
     TriangleAlert,
@@ -17,6 +19,16 @@ import { PageHeader } from "@/components/page-header";
 import { ServerSearchCombobox } from "@/components/server-search-combobox";
 import { SimpleCombobox } from "@/components/simple-combobox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -31,6 +43,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import {
     Table,
     TableBody,
@@ -110,6 +123,15 @@ export default function ManualSalesPage() {
     const [lineLimitOverrideEnabled, setLineLimitOverrideEnabled] = useState(false);
     const [selectedSale, setSelectedSale] = useState<ManualSale | null>(null);
     const [lotSale, setLotSale] = useState<ManualSale | null>(null);
+    const [editingSale, setEditingSale] = useState<ManualSale | null>(null);
+    const [deletingSale, setDeletingSale] = useState<ManualSale | null>(null);
+    const [editForm, setEditForm] = useState({
+        saleDate: today(),
+        customerName: "",
+        customerPhone: "",
+        referenceNumber: "",
+        notes: "",
+    });
     const { data: saleLots, isLoading: saleLotsLoading } = useOperationQuery(
         operationKeys.saleLots(lotSale?.id ?? 0),
         () => operationsService.saleLots(lotSale!.id),
@@ -330,6 +352,61 @@ export default function ManualSalesPage() {
         }
     };
 
+    const openSaleEditor = (sale: ManualSale) => {
+        setEditForm({
+            saleDate: sale.saleDate,
+            customerName: sale.customerName,
+            customerPhone: sale.customerPhone ?? "",
+            referenceNumber: sale.referenceNumber ?? "",
+            notes: sale.notes ?? "",
+        });
+        setEditingSale(sale);
+    };
+
+    const saveSaleEdit = async () => {
+        if (!editingSale) return;
+        setSaving(true);
+        try {
+            await operationsService.updateSale(editingSale.id, {
+                saleDate: editForm.saleDate,
+                customerName: editingSale.customerId ? null : nullable(editForm.customerName),
+                customerPhone: editingSale.customerId ? null : nullable(editForm.customerPhone),
+                referenceNumber: nullable(editForm.referenceNumber),
+                notes: nullable(editForm.notes),
+            });
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: operationKeys.saleRoot }),
+                queryClient.invalidateQueries({ queryKey: operationKeys.summary }),
+            ]);
+            setEditingSale(null);
+            toast.success("Sale details updated.");
+        } catch (error) {
+            toast.error(message(error));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const deleteSale = async () => {
+        if (!deletingSale) return;
+        setSaving(true);
+        try {
+            await operationsService.deleteSale(deletingSale.id);
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: operationKeys.saleRoot }),
+                queryClient.invalidateQueries({ queryKey: operationKeys.summary }),
+                queryClient.invalidateQueries({ queryKey: ["inventory"] }),
+                queryClient.invalidateQueries({ queryKey: ["customers"] }),
+            ]);
+            setDeletingSale(null);
+            toast.success("Sale deleted and stock restored.");
+        } catch (error) {
+            toast.error(message(error));
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <PageHeader
@@ -433,6 +510,28 @@ export default function ManualSalesPage() {
                                                     Payments
                                                 </Button>
                                                 <ReceiptActions source="manual-sales" id={sale.id} compact />
+                                                {canManage ? (
+                                                    <>
+                                                        <Button
+                                                            size="icon-sm"
+                                                            variant="outline"
+                                                            title="Edit sale"
+                                                            aria-label={`Edit ${sale.saleNumber}`}
+                                                            onClick={() => openSaleEditor(sale)}
+                                                        >
+                                                            <Pencil className="size-4" />
+                                                        </Button>
+                                                        <Button
+                                                            size="icon-sm"
+                                                            variant="outline"
+                                                            title="Delete sale"
+                                                            aria-label={`Delete ${sale.saleNumber}`}
+                                                            onClick={() => setDeletingSale(sale)}
+                                                        >
+                                                            <Trash2 className="size-4 text-destructive" />
+                                                        </Button>
+                                                    </>
+                                                ) : null}
                                             </div>
                                         </TableCell>
                                     </TableRow>
@@ -692,6 +791,96 @@ export default function ManualSalesPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <Dialog
+                open={Boolean(editingSale)}
+                onOpenChange={(next) => !next && !saving && setEditingSale(null)}
+            >
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Edit {editingSale?.saleNumber}</DialogTitle>
+                        <DialogDescription>
+                            Correct the customer and document details. Product lines, totals,
+                            inventory movements, and payments remain unchanged.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Sale date">
+                            <Input
+                                type="date"
+                                value={editForm.saleDate}
+                                onChange={(event) => setEditForm((current) => ({ ...current, saleDate: event.target.value }))}
+                            />
+                        </Field>
+                        <Field label="Sale receipt / external reference">
+                            <Input
+                                value={editForm.referenceNumber}
+                                onChange={(event) => setEditForm((current) => ({ ...current, referenceNumber: event.target.value }))}
+                            />
+                        </Field>
+                        <Field label="Customer name">
+                            <Input
+                                disabled={Boolean(editingSale?.customerId)}
+                                value={editForm.customerName}
+                                onChange={(event) => setEditForm((current) => ({ ...current, customerName: event.target.value }))}
+                            />
+                        </Field>
+                        <Field label="Customer phone">
+                            <Input
+                                disabled={Boolean(editingSale?.customerId)}
+                                value={editForm.customerPhone}
+                                onChange={(event) => setEditForm((current) => ({ ...current, customerPhone: event.target.value }))}
+                            />
+                        </Field>
+                        {editingSale?.customerId ? (
+                            <p className="text-xs text-muted-foreground sm:col-span-2">
+                                This sale is linked to a registered customer. Update their name or phone from the Customers page.
+                            </p>
+                        ) : null}
+                        <div className="space-y-2 sm:col-span-2">
+                            <Label>Notes</Label>
+                            <Textarea
+                                value={editForm.notes}
+                                onChange={(event) => setEditForm((current) => ({ ...current, notes: event.target.value }))}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" disabled={saving} onClick={() => setEditingSale(null)}>
+                            Cancel
+                        </Button>
+                        <Button disabled={saving || !editForm.saleDate} onClick={() => void saveSaleEdit()}>
+                            {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
+                            Save changes
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <AlertDialog
+                open={Boolean(deletingSale)}
+                onOpenChange={(next) => !next && !saving && setDeletingSale(null)}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete {deletingSale?.saleNumber}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            The system will restore its stock and reverse its accounting and customer-credit entries. Deletion is blocked if credit created by this sale has already been used.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            variant="destructive"
+                            disabled={saving}
+                            onClick={() => void deleteSale()}
+                        >
+                            {saving ? <LoaderCircle className="animate-spin" /> : <Trash2 />}
+                            Delete sale
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             <Dialog open={Boolean(lotSale)} onOpenChange={(next) => !next && setLotSale(null)}>
                 <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
