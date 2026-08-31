@@ -33,7 +33,7 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 
 function readLanguage(): Language {
     const value = localStorage.getItem(languageKey);
-    return value === "dr" || value === "ps" || value === "en" ? value : "en";
+    return value === "dr" || value === "ps" || value === "en" ? value : "dr";
 }
 
 export function I18nProvider({ children }: PropsWithChildren) {
