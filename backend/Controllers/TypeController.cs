@@ -1,4 +1,5 @@
 using API.Entities.Types;
+using ECommerce.Entities;
 using ECommerce.Dtos;
 using ECommerce.Services.GeneralTypes;
 using ECommerce.Services.Products;
@@ -42,7 +43,10 @@ public class GeneralTypesController : ControllerBase
     [HttpGet("{id:long}")]
     public async Task<IActionResult> Get(long id)
     {
-        return Ok(await _service.GetByIdAsync(id));
+        var result = await _service.GetByIdAsync(id);
+        return result is null
+            ? NotFound(ApiResponse<object>.Fail("Type not found."))
+            : Ok(ApiResponse<GeneralType>.Ok(result));
     }
 
     [Authorize(Policy = AppPermissions.GeneralTypesManage)]
@@ -51,7 +55,15 @@ public class GeneralTypesController : ControllerBase
     public async Task<IActionResult> CreateJson(
         [FromBody] GeneralType model)
     {
-        return Ok(await _service.CreateAsync(model));
+        try
+        {
+            var id = await _service.CreateAsync(model);
+            return Ok(ApiResponse<long>.Ok(id, "Type created successfully."));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(ApiResponse<object>.Fail(exception.Message));
+        }
     }
 
     [Authorize(Policy = AppPermissions.GeneralTypesManage)]
@@ -79,7 +91,8 @@ public class GeneralTypesController : ControllerBase
                 storedImage?.PublicUrl ?? request.ImageUrl
             );
 
-            return Ok(await _service.CreateAsync(model));
+            var id = await _service.CreateAsync(model);
+            return Ok(ApiResponse<long>.Ok(id, "Type created successfully."));
         }
         catch (InvalidOperationException exception)
         {
@@ -124,7 +137,9 @@ public class GeneralTypesController : ControllerBase
             await DeleteOwnedImageSafelyAsync(current.ImageUrl);
         }
 
-        return NoContent();
+        return Ok(ApiResponse<GeneralType>.Ok(
+            updated!,
+            "Type updated successfully."));
     }
 
     [Authorize(Policy = AppPermissions.GeneralTypesManage)]
@@ -172,7 +187,9 @@ public class GeneralTypesController : ControllerBase
                 await DeleteOwnedImageSafelyAsync(current.ImageUrl);
             }
 
-            return NoContent();
+            return Ok(ApiResponse<GeneralType>.Ok(
+                updated!,
+                "Type updated successfully."));
         }
         catch (InvalidOperationException exception)
         {
@@ -200,7 +217,7 @@ public class GeneralTypesController : ControllerBase
         await _service.DeleteAsync(id);
         await DeleteOwnedImageSafelyAsync(current?.ImageUrl);
 
-        return NoContent();
+        return Ok(ApiResponse<object>.Ok(new { id }, "Type deleted successfully."));
     }
 
     private static GeneralType ToModel(
