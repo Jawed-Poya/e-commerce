@@ -68,6 +68,7 @@ public static class DependencyInjection
         services.AddSingleton<StoreMobilePushSubscriptionStore>();
         services.AddSingleton<StorePushDeliveryQueue>();
         services.AddHostedService<StorePushDeliveryHostedService>();
+        services.AddHostedService<ScheduledPriceNotificationHostedService>();
         services.AddScoped<IAdminNotificationService, AdminNotificationService>();
         services.AddScoped<IInventoryExpiryAlertService, InventoryExpiryAlertService>();
         services.AddHostedService<InventoryExpiryAlertHostedService>();

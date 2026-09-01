@@ -17,7 +17,10 @@ public sealed class StoreNotificationService(
     ILogger<StoreNotificationService> logger) : IStoreNotificationService
 {
     private const string StockEntityType = "StoreProductStock";
-    private const string PriceEntityTypePrefix = "StoreProductPrice:";
+    internal const string PriceEntityTypePrefix = "StoreProductPrice:";
+
+    internal static string PriceEntityType(long customerTypeId) =>
+        PriceEntityTypePrefix + customerTypeId;
 
     public async Task<PendingStoreNotification?> CreatePriceChangedAsync(
         long productId,
@@ -55,7 +58,7 @@ public sealed class StoreNotificationService(
             Title = $"Price updated: {data.Name}",
             Message = message,
             Type = NotificationType.Product,
-            EntityType = PriceEntityTypePrefix + customerTypeId,
+            EntityType = PriceEntityType(customerTypeId),
             EntityId = productId,
             UserId = null
         };
@@ -168,8 +171,8 @@ public sealed class StoreNotificationService(
         var allowedEntityTypes = new[]
         {
             StockEntityType,
-            PriceEntityTypePrefix + defaultTypeId,
-            currentTypeId.HasValue ? PriceEntityTypePrefix + currentTypeId.Value : null
+            PriceEntityType(defaultTypeId),
+            currentTypeId.HasValue ? PriceEntityType(currentTypeId.Value) : null
         }.OfType<string>().Distinct(StringComparer.Ordinal).ToArray();
 
         var threshold = after?.ToUniversalTime() ?? serverTime.AddDays(-2);
