@@ -17,6 +17,9 @@ export const registerCustomer = (request: RegisterRequest) =>
 export const signInWithGoogle = (credential: string) =>
     apiPost<AuthResponse>("/auth/customer/google", { credential });
 
+export const refreshCustomerSession = () =>
+    apiPost<AuthResponse>("/auth/customer/refresh-session", {});
+
 export const getCurrentCustomer = () => apiGet<AuthUser>("/auth/me");
 
 export const sendVerificationCode = (channel: VerificationChannel) =>

@@ -267,6 +267,22 @@ public sealed class AuthController(
             : Ok(ApiResponse<AuthUserResponse>.Ok(user));
     }
 
+    [Authorize(Roles = AppRoles.Customer)]
+    [HttpPost("customer/refresh-session")]
+    public async Task<ActionResult<ApiResponse<AuthResponse>>> RefreshCustomerSession()
+    {
+        try
+        {
+            using var operation = ServerOperation.CreateReadScope();
+            var response = await auth.RefreshCustomerSessionAsync(operation.Token);
+            return Ok(ApiResponse<AuthResponse>.Ok(response, "Customer session refreshed."));
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return Unauthorized(ApiResponse<object>.Fail(exception.Message));
+        }
+    }
+
     [Authorize]
     [HttpGet("profile")]
     public async Task<ActionResult<ApiResponse<UserProfileResponse>>> Profile()

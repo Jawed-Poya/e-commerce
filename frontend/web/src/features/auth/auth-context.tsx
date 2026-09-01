@@ -11,7 +11,7 @@ import {
 
 import { clearStorefrontPwaPrivateCaches } from "../../app/register-service-worker";
 import { ApiError, customerTokenKey } from "../../shared/api/api-client";
-import { getCurrentCustomer, loginCustomer, registerCustomer, signInWithGoogle } from "./auth-api";
+import { getCurrentCustomer, loginCustomer, refreshCustomerSession, registerCustomer, signInWithGoogle } from "./auth-api";
 import type {
     AuthResponse,
     AuthUser,
@@ -30,6 +30,7 @@ type AuthContextValue = {
     googleSignIn: (credential: string) => Promise<void>;
     logout: () => void;
     refresh: () => Promise<void>;
+    renewSession: () => Promise<boolean>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -117,6 +118,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
             googleSignIn: async (credential) => save(await signInWithGoogle(credential)),
             logout,
             refresh,
+            renewSession: async () => {
+                try {
+                    await save(await refreshCustomerSession());
+                    return true;
+                } catch {
+                    // The completed order must still be shown even if session
+                    // renewal is temporarily unavailable. Server-side customer
+                    // resolution also supports the persisted account link.
+                    return false;
+                }
+            },
         }),
         [loading, logout, refresh, save, user],
     );

@@ -22,7 +22,7 @@ public sealed class ProductReviewService(
         if (!await context.Products.AsNoTracking().AnyAsync(product => product.Id == productId && product.IsActive, cancellationToken))
             return null;
 
-        var customerId = currentCustomer.CustomerId;
+        var customerId = await currentCustomer.ResolveCustomerIdAsync(cancellationToken);
         var rows = await context.ProductReviews
             .AsNoTracking()
             .Where(review => review.ProductId == productId && (review.IsApproved || (customerId.HasValue && review.CustomerId == customerId.Value)))
@@ -64,7 +64,7 @@ public sealed class ProductReviewService(
         CancellationToken cancellationToken = default)
     {
         Validate(request);
-        var customerId = currentCustomer.CustomerId
+        var customerId = await currentCustomer.ResolveCustomerIdAsync(cancellationToken)
             ?? throw new UnauthorizedAccessException("A customer account is required to review a product.");
         var product = await context.Products
             .AsNoTracking()
@@ -127,7 +127,7 @@ public sealed class ProductReviewService(
 
     public async Task DeleteMineAsync(long productId, CancellationToken cancellationToken = default)
     {
-        var customerId = currentCustomer.CustomerId
+        var customerId = await currentCustomer.ResolveCustomerIdAsync(cancellationToken)
             ?? throw new UnauthorizedAccessException("A customer account is required.");
         var review = await context.ProductReviews
             .FirstOrDefaultAsync(item => item.ProductId == productId && item.CustomerId == customerId, cancellationToken)

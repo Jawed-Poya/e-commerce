@@ -50,7 +50,8 @@ public sealed class StorePushService(
         await mobileSubscriptions.UpsertAsync(
             new StoreMobilePushSubscriptionRecord(
                 request.Token.Trim(), request.DeviceId.Trim(), NormalizePlatform(request.Platform),
-                NormalizeLocale(request.Locale), currentCustomer.CustomerId,
+                NormalizeLocale(request.Locale),
+                await currentCustomer.ResolveCustomerIdAsync(cancellationToken),
                 await ResolveCustomerTypeIdAsync(cancellationToken),
                 NormalizeProductIds(request.ProductIds), DateTime.UtcNow),
             cancellationToken);

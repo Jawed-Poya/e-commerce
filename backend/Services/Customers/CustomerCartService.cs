@@ -19,7 +19,7 @@ public sealed class CustomerCartService(
 
     public async Task<CustomerCartResponse> GetAsync(CancellationToken cancellationToken = default)
     {
-        var customerId = RequireCustomerId();
+        var customerId = await RequireCustomerIdAsync(cancellationToken);
         var cart = await context.CustomerCarts
             .AsNoTracking()
             .SingleOrDefaultAsync(item => item.CustomerId == customerId, cancellationToken);
@@ -39,7 +39,7 @@ public sealed class CustomerCartService(
         if (request.Items.Count > MaximumLines)
             throw new ArgumentException($"A cart can contain at most {MaximumLines} products.");
 
-        var customerId = RequireCustomerId();
+        var customerId = await RequireCustomerIdAsync(cancellationToken);
         var incoming = Normalize(request.Items);
         var cart = await context.CustomerCarts
             .SingleOrDefaultAsync(item => item.CustomerId == customerId, cancellationToken);
@@ -106,7 +106,8 @@ public sealed class CustomerCartService(
         return ToResponse(cart);
     }
 
-    private long RequireCustomerId() => currentCustomer.CustomerId
+    private async Task<long> RequireCustomerIdAsync(CancellationToken cancellationToken) =>
+        await currentCustomer.ResolveCustomerIdAsync(cancellationToken)
         ?? throw new UnauthorizedAccessException("A customer account is required.");
 
     private static List<CustomerCartItemContract> Normalize(

@@ -255,6 +255,20 @@ public sealed class AuthService(
         return await BuildUserAsync(user, roles, cancellationToken);
     }
 
+    public async Task<AuthResponse> RefreshCustomerSessionAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var user = await FindCurrentUserAsync()
+            ?? throw new UnauthorizedAccessException("Authentication is required.");
+        if (!user.IsActive)
+            throw new UnauthorizedAccessException("Your account is inactive.");
+
+        var roles = (await userManager.GetRolesAsync(user)).ToArray();
+        if (!roles.Contains(AppRoles.Customer, StringComparer.OrdinalIgnoreCase))
+            throw new UnauthorizedAccessException("A customer account is required.");
+        return await CreateResponseAsync(user, roles, cancellationToken);
+    }
+
     public async Task<UserProfileResponse?> GetProfileAsync(CancellationToken cancellationToken = default)
     {
         var user = await FindCurrentUserAsync();

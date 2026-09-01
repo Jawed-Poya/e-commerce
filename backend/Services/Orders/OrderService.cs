@@ -774,15 +774,7 @@ public sealed class OrderService(
 
 
     private async Task<long?> ResolveCurrentCustomerIdAsync(CancellationToken cancellationToken)
-    {
-        if (currentCustomer.CustomerId.HasValue)
-            return currentCustomer.CustomerId.Value;
-        if (!currentCustomer.IsAuthenticated || string.IsNullOrWhiteSpace(currentCustomer.UserId))
-            return null;
-
-        var user = await userManager.FindByIdAsync(currentCustomer.UserId);
-        return user is null ? null : await GetLinkedCustomerIdAsync(user);
-    }
+        => await currentCustomer.ResolveCustomerIdAsync(cancellationToken);
 
     private async Task<long?> GetLinkedCustomerIdAsync(User user)
     {
@@ -817,7 +809,8 @@ public sealed class OrderService(
     {
         var phone = NormalizePhone(request.Phone);
         var email = NormalizeEmail(request.Email);
-        var linkedCustomerId = currentCustomer.CustomerId ?? await GetLinkedCustomerIdAsync(user);
+        var linkedCustomerId = await currentCustomer.ResolveCustomerIdAsync(cancellationToken)
+            ?? await GetLinkedCustomerIdAsync(user);
         Customer? customer;
         if (linkedCustomerId.HasValue)
         {

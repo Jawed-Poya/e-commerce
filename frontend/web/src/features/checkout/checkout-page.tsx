@@ -195,7 +195,7 @@ export function CheckoutPage() {
 
         try {
             const confirmation = await createOrder(request);
-            await auth.refresh();
+            await auth.renewSession();
             saveConfirmation(confirmation, form.phone);
             saveRecentOrder(confirmation, form.phone);
             cart.clear();
