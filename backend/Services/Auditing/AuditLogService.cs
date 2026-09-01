@@ -35,13 +35,13 @@ public sealed class AuditLogService(
             Description = action == ActivityAction.Login
                 ? $"{userName} signed in to {area}."
                 : $"{userName} created a customer account.",
-            HttpMethod = httpContext.Request.Method.ToUpperInvariant(),
-            Path = httpContext.Request.Path,
+            HttpMethod = Clean(httpContext.Request.Method.ToUpperInvariant(), 12),
+            Path = Clean(httpContext.Request.Path + httpContext.Request.QueryString, 1000),
             StatusCode = httpContext.Response.StatusCode is >= 200 and < 400
                 ? httpContext.Response.StatusCode
                 : StatusCodes.Status200OK,
-            RequestId = httpContext.TraceIdentifier,
-            IpAddress = httpContext.Connection.RemoteIpAddress?.ToString(),
+            RequestId = Clean(httpContext.TraceIdentifier, 100),
+            IpAddress = Clean(httpContext.Connection.RemoteIpAddress?.ToString(), 64),
             UserAgent = Clean(userAgent, 1000),
             DeviceType = device.DeviceType,
             Browser = device.Browser,

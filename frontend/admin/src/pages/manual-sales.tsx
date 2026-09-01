@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
     CircleDollarSign,
@@ -14,6 +14,12 @@ import {
     TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+    focusDocumentLine,
+    focusFirstInvalidSummary,
+    focusOperationApiError,
+    focusValidationField,
+} from "@/lib/focus-validation-error";
 
 import { ListPagination } from "@/components/list-pagination";
 import { PageHeader } from "@/components/page-header";
@@ -122,6 +128,8 @@ export default function ManualSalesPage() {
         operationsService.policy,
     );
     const [open, setOpen] = useState(false);
+    const saleDialogRef = useRef<HTMLDivElement>(null);
+    const editSaleDialogRef = useRef<HTMLDivElement>(null);
     const [saving, setSaving] = useState(false);
     const [lineLimitOverrideEnabled, setLineLimitOverrideEnabled] = useState(false);
     const [selectedSale, setSelectedSale] = useState<ManualSale | null>(null);
@@ -286,12 +294,16 @@ export default function ManualSalesPage() {
 
     const submit = async () => {
         if (!canManage) return;
+        if (focusFirstInvalidSummary(saleDialogRef.current)) {
+            return toast.error(tr("Correct the highlighted field before saving."));
+        }
         const documentItems = getSubmittableDocumentLines(items);
         const configuredLineLimit = operationPolicy?.maximumManualSaleLines ?? 50;
         const effectiveLineLimit = operationPolicy?.canOverrideLineLimits && lineLimitOverrideEnabled
             ? 500
             : configuredLineLimit;
         if (documentItems.length > effectiveLineLimit) {
+            focusDocumentLine(saleDialogRef.current);
             return toast.error(
                 operationPolicy?.canOverrideLineLimits && lineLimitOverrideEnabled
                     ? tr("A document cannot contain more than 500 product lines.")
@@ -299,15 +311,21 @@ export default function ManualSalesPage() {
             );
         }
         if (!documentItems.length) {
+            focusDocumentLine(saleDialogRef.current, 0);
             return toast.error(tr("Add at least one product."));
         }
-        if (documentItems.some((item) => !isDocumentLineComplete(item))) {
+        const incompleteItem = documentItems.find((item) => !isDocumentLineComplete(item));
+        if (incompleteItem) {
+            focusDocumentLine(saleDialogRef.current, items.indexOf(incompleteItem));
             return toast.error(tr("Complete every sale line."));
         }
         if (
             new Set(documentItems.map((item) => item.productId)).size !==
             documentItems.length
         ) {
+            const duplicateIndex = documentItems.findIndex((item, index) =>
+                documentItems.findIndex((candidate) => candidate.productId === item.productId) !== index);
+            focusDocumentLine(saleDialogRef.current, items.indexOf(documentItems[duplicateIndex]));
             return toast.error(tr("Each product may appear only once."));
         }
         for (const item of documentItems) {
@@ -315,12 +333,14 @@ export default function ManualSalesPage() {
             if (!product) continue;
             const baseQuantity = item.quantity * Math.max(item.conversionFactor, 0.000001);
             if (!operationPolicy?.allowNegativeStockSales && baseQuantity > product.availableQuantity) {
+                focusDocumentLine(saleDialogRef.current, items.indexOf(item));
                 return toast.error(
                     `${product.name}: ${tr("Available quantity")} ${product.availableQuantity} ${product.baseUnitName ?? tr("base units")}.`,
                 );
             }
         }
         if (form.paidAmount < 0 || (!selectedCustomer && form.paidAmount > total)) {
+            focusValidationField(saleDialogRef.current, "salePaidAmount");
             return toast.error(
                 tr("A walk-in payment must be between zero and the sale total. Registered-customer overpayments are saved as account credit."),
             );
@@ -382,6 +402,7 @@ export default function ManualSalesPage() {
                 setLotSale(response.data);
             }
         } catch (error) {
+            focusOperationApiError(saleDialogRef.current, error);
             toast.error(message(error));
         } finally {
             setSaving(false);
@@ -444,14 +465,22 @@ export default function ManualSalesPage() {
 
     const saveSaleEdit = async () => {
         if (!editingSale) return;
+        if (focusFirstInvalidSummary(editSaleDialogRef.current)) {
+            return toast.error(tr("Correct the highlighted field before saving."));
+        }
         const documentItems = getSubmittableDocumentLines(editItems);
         if (!documentItems.length || documentItems.some((item) => !isDocumentLineComplete(item))) {
+            const incompleteIndex = editItems.findIndex((item) =>
+                documentItems.includes(item) && !isDocumentLineComplete(item));
+            focusDocumentLine(editSaleDialogRef.current, incompleteIndex >= 0 ? incompleteIndex : 0);
             return toast.error("Complete at least one sale product line.");
         }
         if (new Set(documentItems.map((item) => item.productId)).size !== documentItems.length) {
+            focusDocumentLine(editSaleDialogRef.current);
             return toast.error("Each product may appear only once.");
         }
         if (!editingSale.customerId && editTotal < editForm.paidAmount) {
+            focusValidationField(editSaleDialogRef.current, "editSaleTotals");
             return toast.error(`A walk-in sale total cannot be lower than its recorded payments (${formatMoney(editForm.paidAmount)}).`);
         }
         setSaving(true);
@@ -487,6 +516,7 @@ export default function ManualSalesPage() {
             setEditingSale(null);
             toast.success("Sale corrected; stock, customer balance, and accounting were reposted.");
         } catch (error) {
+            focusOperationApiError(editSaleDialogRef.current, error);
             toast.error(message(error));
         } finally {
             setSaving(false);
@@ -741,7 +771,7 @@ export default function ManualSalesPage() {
             </Card>
 
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-6xl">
+                <DialogContent ref={saleDialogRef} className="max-h-[94vh] overflow-y-auto sm:max-w-6xl">
                     <DialogHeader>
                         <DialogTitle>Record manual sale</DialogTitle>
                         <DialogDescription>
@@ -795,6 +825,7 @@ export default function ManualSalesPage() {
                         </div>
                         <Field label="Sale date">
                             <Input
+                                data-validation-field="saleDate"
                                 type="date"
                                 value={form.saleDate}
                                 onChange={(event) =>
@@ -912,15 +943,17 @@ export default function ManualSalesPage() {
                         <AmountInputRow
                             label="Discount"
                             value={form.discount}
+                            inputId="saleDiscount"
                             onChange={(discount) =>
                                 setForm((current) => ({ ...current, discount }))
                             }
                         />
-                        <AmountInputRow label={`General discount 1 %${form.discountPercent === 0 && (operationPolicy?.generalSalesDiscountPercent ?? 0) > 0 ? ` (default ${operationPolicy?.generalSalesDiscountPercent}%)` : ""}`} value={form.discountPercent} max={100} onChange={(discountPercent) => setForm((current) => ({ ...current, discountPercent }))} />
-                        <AmountInputRow label="General discount 2 %" value={form.secondaryDiscountPercent} max={100} onChange={(secondaryDiscountPercent) => setForm((current) => ({ ...current, secondaryDiscountPercent }))} />
+                        <AmountInputRow inputId="saleDiscountPercent" label={`General discount 1 %${form.discountPercent === 0 && (operationPolicy?.generalSalesDiscountPercent ?? 0) > 0 ? ` (default ${operationPolicy?.generalSalesDiscountPercent}%)` : ""}`} value={form.discountPercent} max={100} onChange={(discountPercent) => setForm((current) => ({ ...current, discountPercent }))} />
+                        <AmountInputRow inputId="saleSecondaryDiscountPercent" label="General discount 2 %" value={form.secondaryDiscountPercent} max={100} onChange={(secondaryDiscountPercent) => setForm((current) => ({ ...current, secondaryDiscountPercent }))} />
                         <AmountInputRow
                             label="Tax"
                             value={form.tax}
+                            inputId="saleTax"
                             onChange={(tax) =>
                                 setForm((current) => ({ ...current, tax }))
                             }
@@ -944,6 +977,8 @@ export default function ManualSalesPage() {
                         <AmountInputRow
                             label="Opening payment"
                             value={form.paidAmount}
+                            inputId="salePaidAmount"
+                            invalid={form.paidAmount < 0 || (!selectedCustomer && form.paidAmount > total)}
                             onChange={(paidAmount) =>
                                 setForm((current) => ({ ...current, paidAmount }))
                             }
@@ -977,7 +1012,7 @@ export default function ManualSalesPage() {
                 open={Boolean(editingSale)}
                 onOpenChange={(next) => !next && !saving && setEditingSale(null)}
             >
-                <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-6xl">
+                <DialogContent ref={editSaleDialogRef} className="max-h-[94vh] overflow-y-auto sm:max-w-6xl">
                     <DialogHeader>
                         <DialogTitle>Edit {editingSale?.saleNumber}</DialogTitle>
                         <DialogDescription>
@@ -987,6 +1022,7 @@ export default function ManualSalesPage() {
                     <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <Field label="Sale date">
                             <Input
+                                data-validation-field="editSaleDate"
                                 type="date"
                                 value={editForm.saleDate}
                                 onChange={(event) => setEditForm((current) => ({ ...current, saleDate: event.target.value }))}
@@ -1030,6 +1066,7 @@ export default function ManualSalesPage() {
                         allowNegativeStock={operationPolicy?.allowNegativeStockSales ?? false}
                     />
                     <Separator />
+                    <div data-validation-field="editSaleTotals">
                     <DocumentSettlementLayout
                         notes={editForm.notes}
                         onNotesChange={(notes) => setEditForm((current) => ({ ...current, notes }))}
@@ -1037,10 +1074,10 @@ export default function ManualSalesPage() {
                         summaryDescription="Existing payments remain attached and customer credit is recalculated safely."
                     >
                         <MoneySummaryRow label="Product lines" value={editLinesNet} />
-                        <AmountInputRow label="Discount" value={editForm.discount} onChange={(discount) => setEditForm((current) => ({ ...current, discount }))} />
-                        <AmountInputRow label="General discount 1 %" value={editForm.discountPercent} max={100} onChange={(discountPercent) => setEditForm((current) => ({ ...current, discountPercent }))} />
-                        <AmountInputRow label="General discount 2 %" value={editForm.secondaryDiscountPercent} max={100} onChange={(secondaryDiscountPercent) => setEditForm((current) => ({ ...current, secondaryDiscountPercent }))} />
-                        <AmountInputRow label="Tax" value={editForm.tax} onChange={(tax) => setEditForm((current) => ({ ...current, tax }))} />
+                        <AmountInputRow inputId="editSaleDiscount" label="Discount" value={editForm.discount} onChange={(discount) => setEditForm((current) => ({ ...current, discount }))} />
+                        <AmountInputRow inputId="editSaleDiscountPercent" label="General discount 1 %" value={editForm.discountPercent} max={100} onChange={(discountPercent) => setEditForm((current) => ({ ...current, discountPercent }))} />
+                        <AmountInputRow inputId="editSaleSecondaryDiscountPercent" label="General discount 2 %" value={editForm.secondaryDiscountPercent} max={100} onChange={(secondaryDiscountPercent) => setEditForm((current) => ({ ...current, secondaryDiscountPercent }))} />
+                        <AmountInputRow inputId="editSaleTax" label="Tax" value={editForm.tax} onChange={(tax) => setEditForm((current) => ({ ...current, tax }))} />
                         {editingSale?.customerId ? (
                             <label className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3 text-sm">
                                 <Checkbox checked={editForm.useCustomerCredit} onCheckedChange={(checked) => setEditForm((current) => ({ ...current, useCustomerCredit: checked === true }))} />
@@ -1055,6 +1092,7 @@ export default function ManualSalesPage() {
                         <MoneySummaryRow label="Payments preserved" value={editForm.paidAmount} muted />
                         <MoneySummaryRow label="Balance before credit recalculation" value={Math.max(0, editTotal - editForm.paidAmount)} muted />
                     </DocumentSettlementLayout>
+                    </div>
                     <DialogFooter>
                         <Button variant="outline" disabled={saving} onClick={() => setEditingSale(null)}>
                             Cancel

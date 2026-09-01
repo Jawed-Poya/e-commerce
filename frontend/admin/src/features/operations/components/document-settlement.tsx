@@ -54,18 +54,27 @@ export function AmountInputRow({
     value,
     onChange,
     max,
+    inputId,
+    invalid = false,
 }: {
     label: string;
     value: number;
     onChange: (value: number) => void;
     max?: number;
+    inputId?: string;
+    invalid?: boolean;
 }) {
     return (
-        <div className="grid grid-cols-[1fr_140px] items-center gap-4">
-            <Label className="text-sm font-normal text-muted-foreground">
+        <div
+            className="grid grid-cols-[1fr_140px] items-center gap-4"
+            data-validation-field={inputId}
+        >
+            <Label htmlFor={inputId} className="text-sm font-normal text-muted-foreground">
                 {label}
             </Label>
             <Input
+                id={inputId}
+                aria-invalid={invalid || value < 0 || (max != null && value > max)}
                 className="text-end tabular-nums"
                 type="number"
                 min={0}

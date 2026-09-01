@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -88,6 +88,12 @@ import {
 import { operationsService } from "@/features/operations/operations-service";
 import { companyService } from "@/features/company/company-service";
 import { useI18n } from "@/i18n/i18n-provider";
+import {
+    focusDocumentLine,
+    focusFirstInvalidSummary,
+    focusOperationApiError,
+    focusValidationField,
+} from "@/lib/focus-validation-error";
 import type {
     DocumentItem,
     Purchase,
@@ -139,6 +145,8 @@ export default function PurchasesPage() {
         searchParams.get("tab") === "suppliers" ? "suppliers" : "purchases",
     );
     const [purchaseOpen, setPurchaseOpen] = useState(false);
+    const purchaseDialogRef = useRef<HTMLDivElement>(null);
+    const editPurchaseDialogRef = useRef<HTMLDivElement>(null);
     const [supplierOpen, setSupplierOpen] = useState(false);
     const [supplierBulkOpen, setSupplierBulkOpen] = useState(false);
     const [supplierRows, setSupplierRows] = useState([emptySupplier(), emptySupplier(), emptySupplier()]);
@@ -272,12 +280,16 @@ export default function PurchasesPage() {
 
     const submit = async () => {
         if (!canManage) return;
+        if (focusFirstInvalidSummary(purchaseDialogRef.current)) {
+            return toast.error(tr("Correct the highlighted field before saving."));
+        }
         const documentItems = getSubmittableDocumentLines(items);
         const configuredLineLimit = operationPolicy?.maximumPurchaseLines ?? 50;
         const effectiveLineLimit = operationPolicy?.canOverrideLineLimits && lineLimitOverrideEnabled
             ? 500
             : configuredLineLimit;
         if (documentItems.length > effectiveLineLimit) {
+            focusDocumentLine(purchaseDialogRef.current);
             return toast.error(
                 operationPolicy?.canOverrideLineLimits && lineLimitOverrideEnabled
                     ? tr("A document cannot contain more than 500 product lines.")
@@ -285,9 +297,12 @@ export default function PurchasesPage() {
             );
         }
         if (!documentItems.length) {
+            focusDocumentLine(purchaseDialogRef.current, 0);
             return toast.error(tr("Add at least one product."));
         }
-        if (documentItems.some((item) => !isDocumentLineComplete(item))) {
+        const incompleteItem = documentItems.find((item) => !isDocumentLineComplete(item));
+        if (incompleteItem) {
+            focusDocumentLine(purchaseDialogRef.current, items.indexOf(incompleteItem));
             return toast.error(tr("Complete every purchase line."));
         }
         const currentDate = today();
@@ -295,6 +310,7 @@ export default function PurchasesPage() {
             (item) => item.expireDate && item.expireDate < currentDate,
         );
         if (expiredItem) {
+            focusDocumentLine(purchaseDialogRef.current, items.indexOf(expiredItem));
             return toast.error(
                 tr("Expired stock cannot be received. Return it to the supplier or record it through quarantine documentation."),
             );
@@ -307,11 +323,13 @@ export default function PurchasesPage() {
             ].join("|"),
         );
         if (new Set(lotKeys).size !== lotKeys.length) {
+            focusDocumentLine(purchaseDialogRef.current);
             return toast.error(
                 tr("The same product, lot number, and expiry date may appear only once."),
             );
         }
         if (form.paidAmount < 0 || form.paidAmount > total) {
+            focusValidationField(purchaseDialogRef.current, "purchasePaidAmount");
             return toast.error(
                 tr("Opening payment must be between zero and the purchase total."),
             );
@@ -350,6 +368,7 @@ export default function PurchasesPage() {
             setPurchaseOpen(false);
             resetPurchase();
         } catch (error) {
+            focusOperationApiError(purchaseDialogRef.current, error);
             toast.error(message(error));
         } finally {
             setSaving(false);
@@ -468,8 +487,14 @@ export default function PurchasesPage() {
 
     const savePurchaseEdit = async () => {
         if (!editingPurchase) return;
+        if (focusFirstInvalidSummary(editPurchaseDialogRef.current)) {
+            return toast.error(tr("Correct the highlighted field before saving."));
+        }
         const documentItems = getSubmittableDocumentLines(editItems);
         if (!documentItems.length || documentItems.some((item) => !isDocumentLineComplete(item))) {
+            const incompleteIndex = editItems.findIndex((item) =>
+                documentItems.includes(item) && !isDocumentLineComplete(item));
+            focusDocumentLine(editPurchaseDialogRef.current, incompleteIndex >= 0 ? incompleteIndex : 0);
             return toast.error("Complete at least one purchase product line.");
         }
         const lotKeys = documentItems.map((item) => [
@@ -478,9 +503,13 @@ export default function PurchasesPage() {
             item.expireDate ?? "",
         ].join("|"));
         if (new Set(lotKeys).size !== lotKeys.length) {
+            focusDocumentLine(editPurchaseDialogRef.current);
             return toast.error("The same product, lot number, and expiry date may appear only once.");
         }
         if (editTotal < editForm.paidAmount) {
+            if (!focusValidationField(editPurchaseDialogRef.current, "editPurchaseTotals")) {
+                focusDocumentLine(editPurchaseDialogRef.current);
+            }
             return toast.error(`The corrected total cannot be below the recorded payments (${formatMoney(editForm.paidAmount)}).`);
         }
         setSaving(true);
@@ -515,6 +544,7 @@ export default function PurchasesPage() {
             setEditingPurchase(null);
             toast.success("Purchase corrected; inventory and accounting were reposted.");
         } catch (error) {
+            focusOperationApiError(editPurchaseDialogRef.current, error);
             toast.error(message(error));
         } finally {
             setSaving(false);
@@ -776,7 +806,7 @@ export default function PurchasesPage() {
             )}
 
             <Dialog open={purchaseOpen} onOpenChange={setPurchaseOpen}>
-                <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-6xl">
+                <DialogContent ref={purchaseDialogRef} className="max-h-[94vh] overflow-y-auto sm:max-w-6xl">
                     <DialogHeader>
                         <DialogTitle>Receive purchase</DialogTitle>
                         <DialogDescription>
@@ -806,6 +836,7 @@ export default function PurchasesPage() {
                         </Field>
                         <Field label="Purchase date">
                             <Input
+                                data-validation-field="purchaseDate"
                                 type="date"
                                 value={form.purchaseDate}
                                 onChange={(event) =>
@@ -854,15 +885,17 @@ export default function PurchasesPage() {
                         <AmountInputRow
                             label="Discount"
                             value={form.discount}
+                            inputId="purchaseDiscount"
                             onChange={(discount) =>
                                 setForm((current) => ({ ...current, discount }))
                             }
                         />
-                        <AmountInputRow label="General discount 1 %" value={form.discountPercent} max={100} onChange={(discountPercent) => setForm((current) => ({ ...current, discountPercent }))} />
-                        <AmountInputRow label="General discount 2 %" value={form.secondaryDiscountPercent} max={100} onChange={(secondaryDiscountPercent) => setForm((current) => ({ ...current, secondaryDiscountPercent }))} />
+                        <AmountInputRow inputId="purchaseDiscountPercent" label="General discount 1 %" value={form.discountPercent} max={100} onChange={(discountPercent) => setForm((current) => ({ ...current, discountPercent }))} />
+                        <AmountInputRow inputId="purchaseSecondaryDiscountPercent" label="General discount 2 %" value={form.secondaryDiscountPercent} max={100} onChange={(secondaryDiscountPercent) => setForm((current) => ({ ...current, secondaryDiscountPercent }))} />
                         <AmountInputRow
                             label="Tax"
                             value={form.tax}
+                            inputId="purchaseTax"
                             onChange={(tax) =>
                                 setForm((current) => ({ ...current, tax }))
                             }
@@ -870,6 +903,7 @@ export default function PurchasesPage() {
                         <AmountInputRow
                             label="Other cost"
                             value={form.otherCost}
+                            inputId="purchaseOtherCost"
                             onChange={(otherCost) =>
                                 setForm((current) => ({ ...current, otherCost }))
                             }
@@ -890,6 +924,8 @@ export default function PurchasesPage() {
                         <AmountInputRow
                             label="Opening payment"
                             value={form.paidAmount}
+                            inputId="purchasePaidAmount"
+                            invalid={form.paidAmount < 0 || form.paidAmount > total}
                             onChange={(paidAmount) =>
                                 setForm((current) => ({ ...current, paidAmount }))
                             }
@@ -1061,7 +1097,7 @@ export default function PurchasesPage() {
             </Dialog>
 
             <Dialog open={Boolean(editingPurchase)} onOpenChange={(open) => !open && !saving && setEditingPurchase(null)}>
-                <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-6xl">
+                <DialogContent ref={editPurchaseDialogRef} className="max-h-[94vh] overflow-y-auto sm:max-w-6xl">
                     <DialogHeader>
                         <DialogTitle>Edit {editingPurchase?.purchaseNumber}</DialogTitle>
                         <DialogDescription>
@@ -1081,7 +1117,7 @@ export default function PurchasesPage() {
                                 placeholder="Search supplier…"
                             />
                         </div>
-                        <Field label="Purchase date"><Input type="date" value={editForm.purchaseDate} onChange={(event) => setEditForm((current) => ({ ...current, purchaseDate: event.target.value }))} /></Field>
+                        <Field label="Purchase date"><Input data-validation-field="editPurchaseDate" type="date" value={editForm.purchaseDate} onChange={(event) => setEditForm((current) => ({ ...current, purchaseDate: event.target.value }))} /></Field>
                         <Field label="Supplier bill / reference"><Input value={editForm.referenceNumber} onChange={(event) => setEditForm((current) => ({ ...current, referenceNumber: event.target.value }))} /></Field>
                     </div>
                     <Separator />
@@ -1095,6 +1131,7 @@ export default function PurchasesPage() {
                         onOverrideLineLimitChange={setEditLineLimitOverrideEnabled}
                     />
                     <Separator />
+                    <div data-validation-field="editPurchaseTotals">
                     <DocumentSettlementLayout
                         notes={editForm.notes}
                         onNotesChange={(notes) => setEditForm((current) => ({ ...current, notes }))}
@@ -1102,16 +1139,17 @@ export default function PurchasesPage() {
                         summaryDescription="Payments are preserved. The corrected total cannot be less than the amount already paid."
                     >
                         <MoneySummaryRow label="Product lines" value={editLinesNet} />
-                        <AmountInputRow label="Discount" value={editForm.discount} onChange={(discount) => setEditForm((current) => ({ ...current, discount }))} />
-                        <AmountInputRow label="General discount 1 %" value={editForm.discountPercent} max={100} onChange={(discountPercent) => setEditForm((current) => ({ ...current, discountPercent }))} />
-                        <AmountInputRow label="General discount 2 %" value={editForm.secondaryDiscountPercent} max={100} onChange={(secondaryDiscountPercent) => setEditForm((current) => ({ ...current, secondaryDiscountPercent }))} />
-                        <AmountInputRow label="Tax" value={editForm.tax} onChange={(tax) => setEditForm((current) => ({ ...current, tax }))} />
-                        <AmountInputRow label="Other cost" value={editForm.otherCost} onChange={(otherCost) => setEditForm((current) => ({ ...current, otherCost }))} />
+                        <AmountInputRow inputId="editPurchaseDiscount" label="Discount" value={editForm.discount} onChange={(discount) => setEditForm((current) => ({ ...current, discount }))} />
+                        <AmountInputRow inputId="editPurchaseDiscountPercent" label="General discount 1 %" value={editForm.discountPercent} max={100} onChange={(discountPercent) => setEditForm((current) => ({ ...current, discountPercent }))} />
+                        <AmountInputRow inputId="editPurchaseSecondaryDiscountPercent" label="General discount 2 %" value={editForm.secondaryDiscountPercent} max={100} onChange={(secondaryDiscountPercent) => setEditForm((current) => ({ ...current, secondaryDiscountPercent }))} />
+                        <AmountInputRow inputId="editPurchaseTax" label="Tax" value={editForm.tax} onChange={(tax) => setEditForm((current) => ({ ...current, tax }))} />
+                        <AmountInputRow inputId="editPurchaseOtherCost" label="Other cost" value={editForm.otherCost} onChange={(otherCost) => setEditForm((current) => ({ ...current, otherCost }))} />
                         <Separator />
                         <MoneySummaryRow label="Corrected total" value={editTotal} emphasis />
                         <MoneySummaryRow label="Payments preserved" value={editForm.paidAmount} muted />
                         <MoneySummaryRow label="Corrected supplier balance" value={Math.max(0, editTotal - editForm.paidAmount)} muted />
                     </DocumentSettlementLayout>
+                    </div>
                     <DialogFooter>
                         <Button variant="outline" disabled={saving} onClick={() => setEditingPurchase(null)}>Cancel</Button>
                         <Button disabled={saving || !editForm.purchaseDate} onClick={() => void savePurchaseEdit()}>{saving ? <LoaderCircle className="animate-spin" /> : <Save />}Apply correction</Button>

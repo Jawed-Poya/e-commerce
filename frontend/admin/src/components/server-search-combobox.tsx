@@ -29,6 +29,7 @@ interface ServerSearchComboboxProps<T extends Identifiable> {
     disabled?: boolean;
     allowClear?: boolean;
     className?: string;
+    ariaInvalid?: boolean;
 }
 
 export function ServerSearchCombobox<T extends Identifiable>({
@@ -43,6 +44,7 @@ export function ServerSearchCombobox<T extends Identifiable>({
     disabled = false,
     allowClear = true,
     className,
+    ariaInvalid = false,
 }: ServerSearchComboboxProps<T>) {
     const { t } = useI18n();
     const [inputValue, setInputValue] = useState(value ? getLabel(value) : "");
@@ -88,6 +90,7 @@ export function ServerSearchCombobox<T extends Identifiable>({
         >
             <ComboboxInput
                 className={cn("w-full", className)}
+                aria-invalid={ariaInvalid}
                 placeholder={placeholder}
                 showClear={allowClear && Boolean(value)}
             />

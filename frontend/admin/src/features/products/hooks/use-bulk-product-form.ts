@@ -99,6 +99,23 @@ function getErrorMessage(error: unknown) {
     return "Failed to create products.";
 }
 
+function getServerValidationTarget(error: unknown) {
+    const errors = (error as {
+        response?: { data?: { errors?: Record<string, unknown> } };
+    })?.response?.data?.errors;
+    const key = errors ? Object.keys(errors)[0] : undefined;
+    const match = key?.match(/^Products\[(\d+)](?:\.(.+))?$/i);
+    if (!match) return null;
+
+    const index = Number(match[1]);
+    const field = match[2]
+        ?.replace(/\[(\d+)]/g, ".$1")
+        .split(".")
+        .map((part) => part ? part[0].toLowerCase() + part.slice(1) : part)
+        .join(".");
+    return { index, field };
+}
+
 function scrollToProduct(index: number, field?: string) {
     requestAnimationFrame(() => {
         const card = document.querySelector<HTMLElement>(`[data-product-index="${index}"]`);
@@ -263,8 +280,10 @@ export function useBulkProductForm() {
                 await createPromise;
                 resetProducts();
                 navigate("/products");
-            } catch {
+            } catch (error) {
                 // The toast already displays the API error.
+                const target = getServerValidationTarget(error);
+                scrollToProduct(target?.index ?? 0, target?.field);
             }
         },
         [createMutation, navigate, resetProducts, t],

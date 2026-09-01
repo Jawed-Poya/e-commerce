@@ -343,20 +343,22 @@ public class ApplicationDbContext
                 BranchId = entry.Entity.BranchId,
                 UserId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
                     ?? httpContext.User.FindFirstValue("sub"),
-                UserName = httpContext.User.FindFirstValue(ClaimTypes.Name)
-                    ?? httpContext.User.Identity?.Name,
+                UserName = LimitAuditValue(
+                    httpContext.User.FindFirstValue(ClaimTypes.Name)
+                        ?? httpContext.User.Identity?.Name,
+                    256),
                 CustomerId = long.TryParse(httpContext.User.FindFirstValue(AuthClaims.CustomerId), out var customerId)
                     ? customerId
                     : null,
                 Action = action,
-                EntityName = entityName,
-                Description = $"{action} {entityName}.",
+                EntityName = LimitAuditValue(entityName, 160) ?? "Entity",
+                Description = LimitAuditValue($"{action} {entityName}.", 1000)!,
                 Changes = changes.Count == 0 ? null : JsonSerializer.Serialize(changes),
                 HttpMethod = httpContext.Request.Method,
-                Path = httpContext.Request.Path + httpContext.Request.QueryString,
+                Path = LimitAuditValue(httpContext.Request.Path + httpContext.Request.QueryString, 1000),
                 StatusCode = StatusCodes.Status200OK,
-                RequestId = httpContext.TraceIdentifier,
-                IpAddress = httpContext.Connection.RemoteIpAddress?.ToString(),
+                RequestId = LimitAuditValue(httpContext.TraceIdentifier, 100),
+                IpAddress = LimitAuditValue(httpContext.Connection.RemoteIpAddress?.ToString(), 64),
                 UserAgent = LimitAuditValue(userAgent, 1000),
                 DeviceType = device.DeviceType,
                 Browser = device.Browser,

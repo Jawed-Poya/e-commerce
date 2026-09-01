@@ -53,21 +53,25 @@ public sealed class ActivityAuditMiddleware(
                 BranchId = branchContext.BranchId,
                 UserId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
                     ?? httpContext.User.FindFirstValue("sub"),
-                UserName = httpContext.User.FindFirstValue(ClaimTypes.Name)
-                    ?? httpContext.User.Identity?.Name,
+                UserName = Limit(
+                    httpContext.User.FindFirstValue(ClaimTypes.Name)
+                        ?? httpContext.User.Identity?.Name,
+                    256),
                 CustomerId = TryGetCustomerId(httpContext.User),
                 Action = ToAction(method, httpContext.Request.Path, httpContext.Request.QueryString),
-                EntityName = controller,
+                EntityName = Limit(controller, 160) ?? "Api",
                 EntityId = entityId,
-                Description = actionName is null
-                    ? $"{method} {httpContext.Request.Path} returned {statusCode}."
-                    : $"{controller}.{actionName} returned {statusCode}.",
+                Description = Limit(
+                    actionName is null
+                        ? $"{method} {httpContext.Request.Path} returned {statusCode}."
+                        : $"{controller}.{actionName} returned {statusCode}.",
+                    1000)!,
                 HttpMethod = method,
-                Path = httpContext.Request.Path + httpContext.Request.QueryString,
+                Path = Limit(httpContext.Request.Path + httpContext.Request.QueryString, 1000),
                 StatusCode = statusCode,
                 DurationMs = timer.ElapsedMilliseconds,
-                RequestId = httpContext.TraceIdentifier,
-                IpAddress = httpContext.Connection.RemoteIpAddress?.ToString(),
+                RequestId = Limit(httpContext.TraceIdentifier, 100),
+                IpAddress = Limit(httpContext.Connection.RemoteIpAddress?.ToString(), 64),
                 UserAgent = Limit(userAgent, 1000),
                 DeviceType = device.DeviceType,
                 Browser = device.Browser,

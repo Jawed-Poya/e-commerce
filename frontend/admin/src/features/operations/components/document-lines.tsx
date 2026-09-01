@@ -413,6 +413,7 @@ export function DocumentLines({
                         <Card
                             key={index}
                             data-document-line={index}
+                            data-document-line-state={lineState}
                             className={cn(
                                 "scroll-mt-24 overflow-hidden border-border/80 bg-card shadow-none transition-colors dark:border-white/10",
                                 lineState === "empty" &&
@@ -525,9 +526,10 @@ export function DocumentLines({
                                     </span>
                                 </div>
 
-                                <div className="space-y-2">
+                                <div className="space-y-2" data-document-field="product">
                                     <Label>{tr("Product")}</Label>
                                     <ServerSearchCombobox<OperationProduct>
+                                        ariaInvalid={lineState === "incomplete" && !item.product}
                                         value={item.product ?? null}
                                         onValueChange={(product) =>
                                             selectProduct(
@@ -640,6 +642,7 @@ export function DocumentLines({
                                         label={`${tr("Quantity")} · ${unit?.unitName ?? tr("Unit")}`}
                                     >
                                         <Input
+                                            data-document-field="quantity"
                                             type="number"
                                             min={bounds.minimum}
                                             max={
@@ -667,21 +670,25 @@ export function DocumentLines({
 
                                     <LineField label={tr("Bonus quantity")}>
                                         <Input
+                                            data-document-field="bonusQuantity"
                                             type="number"
                                             min={0}
                                             step="0.001"
                                             value={item.bonusQuantity}
+                                            aria-invalid={item.bonusQuantity < 0}
                                             onChange={(event) => update(index, { bonusQuantity: Number(event.target.value) })}
                                         />
                                     </LineField>
 
                                     <LineField label={tr("Discount %")}>
                                         <Input
+                                            data-document-field="discountPercent"
                                             type="number"
                                             min={0}
                                             max={100}
                                             step="0.01"
                                             value={item.discountPercent}
+                                            aria-invalid={item.discountPercent < 0 || item.discountPercent > 100}
                                             onChange={(event) => update(index, { discountPercent: Number(event.target.value) })}
                                         />
                                     </LineField>
@@ -690,10 +697,12 @@ export function DocumentLines({
                                         label={`${mode === "purchase" ? tr("Unit cost") : tr("Unit price")} · ${unit?.unitName ?? tr("Unit")}`}
                                     >
                                         <Input
+                                            data-document-field="amount"
                                             type="number"
                                             min={0}
                                             step="0.01"
                                             value={item.amount}
+                                            aria-invalid={!Number.isFinite(item.amount) || item.amount < 0}
                                             onChange={(event) =>
                                                 update(index, {
                                                     amount: Number(

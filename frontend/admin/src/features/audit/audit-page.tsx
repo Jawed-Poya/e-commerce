@@ -50,11 +50,15 @@ export default function AuditPage() {
         queryKey: ["audit", "activities", deferredSearch, action, page],
         queryFn: async () => (await auditService.activities(deferredSearch, action, page, PageSize)).data,
         enabled: view === "activities",
+        refetchInterval: view === "activities" ? 5_000 : false,
+        refetchOnWindowFocus: true,
     });
     const visits = useQuery({
         queryKey: ["audit", "visits", deferredSearch, page],
         queryFn: async () => (await auditService.visits(deferredSearch, page, PageSize)).data,
         enabled: view === "visits",
+        refetchInterval: view === "visits" ? 5_000 : false,
+        refetchOnWindowFocus: true,
     });
     const analytics = useQuery({
         queryKey: ["audit", "visit-analytics"],

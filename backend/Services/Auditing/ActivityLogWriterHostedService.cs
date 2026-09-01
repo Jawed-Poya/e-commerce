@@ -1,5 +1,6 @@
 using ECommerce.Data;
 using ECommerce.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace ECommerce.Services.Auditing;
 
@@ -53,6 +54,7 @@ public sealed class ActivityLogWriterHostedService(
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                await NormalizeForPersistenceAsync(context, batch);
                 context.ActivityLogs.AddRange(batch);
 
                 // Bound a single SQL attempt even if the provider or network is
@@ -86,4 +88,60 @@ public sealed class ActivityLogWriterHostedService(
             }
         }
     }
+
+    private static async Task NormalizeForPersistenceAsync(
+        ApplicationDbContext context,
+        IReadOnlyCollection<ActivityLog> batch)
+    {
+        var userIds = batch
+            .Select(item => item.UserId)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var validUserIds = userIds.Length == 0
+            ? []
+            : await context.Users.AsNoTracking()
+                .Where(user => userIds.Contains(user.Id))
+                .Select(user => user.Id)
+                .ToArrayAsync();
+        var validUsers = validUserIds.ToHashSet(StringComparer.Ordinal);
+
+        var customerIds = batch
+            .Where(item => item.CustomerId.HasValue)
+            .Select(item => item.CustomerId!.Value)
+            .Distinct()
+            .ToArray();
+        var validCustomerIds = customerIds.Length == 0
+            ? []
+            : await context.Customers.IgnoreQueryFilters().AsNoTracking()
+                .Where(customer => customerIds.Contains(customer.Id))
+                .Select(customer => customer.Id)
+                .ToArrayAsync();
+        var validCustomers = validCustomerIds.ToHashSet();
+
+        foreach (var item in batch)
+        {
+            if (item.UserId is not null && !validUsers.Contains(item.UserId))
+                item.UserId = null;
+            if (item.CustomerId.HasValue && !validCustomers.Contains(item.CustomerId.Value))
+                item.CustomerId = null;
+
+            item.EntityName = Limit(item.EntityName, 160) ?? "Api";
+            item.Description = Limit(item.Description, 1000) ?? "Audited request.";
+            item.UserName = Limit(item.UserName, 256);
+            item.HttpMethod = Limit(item.HttpMethod, 12);
+            item.Path = Limit(item.Path, 1000);
+            item.RequestId = Limit(item.RequestId, 100);
+            item.IpAddress = Limit(item.IpAddress, 64);
+            item.UserAgent = Limit(item.UserAgent, 1000);
+            item.DeviceType = Limit(item.DeviceType, 40);
+            item.Browser = Limit(item.Browser, 100);
+            item.OperatingSystem = Limit(item.OperatingSystem, 100);
+        }
+    }
+
+    private static string? Limit(string? value, int maximum) =>
+        string.IsNullOrWhiteSpace(value)
+            ? null
+            : value.Length <= maximum ? value : value[..maximum];
 }
