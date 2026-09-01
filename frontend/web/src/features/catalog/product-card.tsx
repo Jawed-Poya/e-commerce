@@ -177,7 +177,7 @@ export function ProductCard({
                     </button>
                     <button
                         type="button"
-                        onClick={() => pins.togglePinned(product)}
+                        onClick={() => pins.togglePinned(product.id)}
                         className={cn(
                             "grid size-8 place-items-center rounded-full border border-border/80 bg-card/95 text-foreground shadow-none backdrop-blur",
                             pinned && "bg-primary text-primary-foreground",
@@ -301,7 +301,7 @@ export function ProductCard({
                             type="button"
                             variant="outline"
                             size="icon"
-                            onClick={() => pins.togglePinned(product)}
+                            onClick={() => pins.togglePinned(product.id)}
                             className={cn(
                                 "hidden size-11 shrink-0 rounded-xl shadow-none sm:inline-flex",
                                 pinned &&

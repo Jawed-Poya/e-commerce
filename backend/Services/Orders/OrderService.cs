@@ -83,6 +83,14 @@ public sealed class OrderService(
     {
         ValidateCheckoutRequest(request);
         var checkoutUser = await EnsureVerifiedCheckoutUserAsync(request.Customer, cancellationToken);
+        // Persist and link the customer in its own transaction before any order
+        // is built. A valid new storefront account therefore appears in the
+        // customer list even when inventory or payment validation later rejects
+        // the order.
+        var customer = await PrepareCheckoutCustomerAsync(
+            checkoutUser,
+            request.Customer,
+            cancellationToken);
         var currency = await GetCompanyCurrencyAsync(cancellationToken);
 
         var groupedItems = request.Items
@@ -100,10 +108,6 @@ public sealed class OrderService(
 
         try
         {
-            var customer = await UpsertCheckoutCustomerAsync(checkoutUser, request.Customer, cancellationToken);
-            await context.SaveChangesAsync(cancellationToken);
-            await EnsureCustomerLinkAsync(checkoutUser, customer.Id);
-
             await UpsertDefaultAddressAsync(customer.Id, request.ShippingAddress, cancellationToken);
 
             var products = await context.Products
@@ -786,20 +790,59 @@ public sealed class OrderService(
             : null;
     }
 
-    private async Task EnsureCustomerLinkAsync(User user, long customerId)
+    private async Task EnsureCustomerLinkAsync(
+        User user,
+        long customerId,
+        long customerTypeId)
     {
         var claims = await userManager.GetClaimsAsync(user);
-        var existing = claims.FirstOrDefault(claim => claim.Type == AuthClaims.CustomerId);
-        if (existing?.Value == customerId.ToString()) return;
+        await EnsureClaimAsync(
+            user,
+            claims.FirstOrDefault(claim => claim.Type == AuthClaims.CustomerId),
+            new Claim(AuthClaims.CustomerId, customerId.ToString()));
+        await EnsureClaimAsync(
+            user,
+            claims.FirstOrDefault(claim => claim.Type == AuthClaims.CustomerTypeId),
+            new Claim(AuthClaims.CustomerTypeId, customerTypeId.ToString()));
+    }
+
+    private async Task EnsureClaimAsync(User user, Claim? existing, Claim required)
+    {
+        if (existing?.Value == required.Value) return;
         if (existing is not null)
         {
             var remove = await userManager.RemoveClaimAsync(user, existing);
             if (!remove.Succeeded)
                 throw new InvalidOperationException("Could not update the customer account link.");
         }
-        var add = await userManager.AddClaimAsync(user, new Claim(AuthClaims.CustomerId, customerId.ToString()));
+        var add = await userManager.AddClaimAsync(user, required);
         if (!add.Succeeded)
             throw new InvalidOperationException("Could not link the order to your customer account.");
+    }
+
+    private async Task<Customer> PrepareCheckoutCustomerAsync(
+        User user,
+        CheckoutCustomerRequest request,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var customer = await UpsertCheckoutCustomerAsync(user, request, cancellationToken);
+            await context.SaveChangesAsync(cancellationToken);
+            await EnsureCustomerLinkAsync(
+                user,
+                customer.Id,
+                customer.CustomerTypeId
+                    ?? throw new InvalidOperationException("The customer type is not configured."));
+            await transaction.CommitAsync(cancellationToken);
+            return customer;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            throw;
+        }
     }
 
     private async Task<Customer> UpsertCheckoutCustomerAsync(
@@ -858,6 +901,8 @@ public sealed class OrderService(
             customer.Email = email ?? customer.Email;
             customer.UpdatedAt = DateTime.UtcNow;
         }
+
+        customer.CustomerTypeId ??= await defaultCustomerType.GetIdAsync(cancellationToken);
 
         return customer;
     }

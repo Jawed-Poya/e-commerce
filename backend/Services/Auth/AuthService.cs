@@ -233,6 +233,8 @@ public sealed class AuthService(
             if (!await userManager.IsInRoleAsync(user, AppRoles.Customer))
                 EnsureSucceeded(await userManager.AddToRoleAsync(user, AppRoles.Customer), "Could not assign the customer role.");
 
+            await LinkExistingCustomerByEmailAsync(user, email, cancellationToken);
+
             user.LastLoginAt = DateTime.UtcNow;
             EnsureSucceeded(await userManager.UpdateAsync(user), "Could not update login information.");
             roles = (await userManager.GetRolesAsync(user)).ToArray();
@@ -245,6 +247,36 @@ public sealed class AuthService(
         }
 
         return await CreateResponseAsync(user, roles, cancellationToken);
+    }
+
+    private async Task LinkExistingCustomerByEmailAsync(
+        User user,
+        string email,
+        CancellationToken cancellationToken)
+    {
+        var claims = await userManager.GetClaimsAsync(user);
+        if (claims.Any(claim => claim.Type == AuthClaims.CustomerId)) return;
+
+        var matches = await context.Customers
+            .Where(customer => customer.Email == email)
+            .Take(2)
+            .Select(customer => new { customer.Id, customer.CustomerTypeId })
+            .ToListAsync(cancellationToken);
+        if (matches.Count != 1) return;
+
+        var customerClaims = new List<Claim>
+        {
+            new(AuthClaims.CustomerId, matches[0].Id.ToString())
+        };
+        var customerTypeId = matches[0].CustomerTypeId;
+        if (customerTypeId is long resolvedCustomerTypeId)
+            customerClaims.Add(new Claim(
+                AuthClaims.CustomerTypeId,
+                resolvedCustomerTypeId.ToString()));
+
+        EnsureSucceeded(
+            await userManager.AddClaimsAsync(user, customerClaims),
+            "Could not link the Google account to its existing customer record.");
     }
 
     public async Task<AuthUserResponse?> GetCurrentAsync(CancellationToken cancellationToken = default)

@@ -3,6 +3,7 @@ import { useTheme } from "next-themes";
 import { useEffect, useRef, useState } from "react";
 
 import { apiGet } from "../../shared/api/api-client";
+import { useI18n } from "../../i18n/i18n-provider";
 
 const scriptId = "google-identity-services";
 const scriptUrl = "https://accounts.google.com/gsi/client";
@@ -18,13 +19,23 @@ export function GoogleSignInButton({
 }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const { resolvedTheme } = useTheme();
+    const { t } = useI18n();
     const [clientId, setClientId] = useState("");
     const [configurationLoaded, setConfigurationLoaded] = useState(false);
-    const [scriptFailed, setScriptFailed] = useState(false);
+    const [failure, setFailure] = useState<"configuration" | "script" | "origin" | null>(null);
     const [buttonRendered, setButtonRendered] = useState(false);
+    const isLocalHost = /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(window.location.hostname);
+    const isSecureForGoogle = window.location.protocol === "https:" || isLocalHost;
 
     useEffect(() => {
         let active = true;
+
+        if (!isSecureForGoogle) {
+            setConfigurationLoaded(true);
+            return () => {
+                active = false;
+            };
+        }
 
         // Keep the backend as the single source of truth for Google OAuth.
         // The same client ID that renders the Google button is therefore also
@@ -41,7 +52,10 @@ export function GoogleSignInButton({
                 );
             })
             .catch(() => {
-                if (active) setClientId("");
+                if (active) {
+                    setClientId("");
+                    setFailure("configuration");
+                }
             })
             .finally(() => {
                 if (active) setConfigurationLoaded(true);
@@ -50,7 +64,7 @@ export function GoogleSignInButton({
         return () => {
             active = false;
         };
-    }, []);
+    }, [isSecureForGoogle]);
 
     useEffect(() => {
         if (!clientId) return;
@@ -59,6 +73,8 @@ export function GoogleSignInButton({
         let resizeFrame = 0;
         let resizeObserver: ResizeObserver | undefined;
         let lastRenderedWidth = -1;
+        let renderCheck = 0;
+        let loadTimeout = 0;
 
         const render = (force = false) => {
             if (disposed || !containerRef.current || !window.google) return;
@@ -81,23 +97,38 @@ export function GoogleSignInButton({
 
             lastRenderedWidth = width;
             containerRef.current.replaceChildren();
-            window.google.accounts.id.initialize({
-                client_id: clientId,
-                callback: (response) => onCredential(response.credential),
-                auto_select: false,
-                cancel_on_tap_outside: true,
-            });
-            window.google.accounts.id.renderButton(containerRef.current, {
-                type: "standard",
-                theme: resolvedTheme === "dark" ? "filled_black" : "outline",
-                size: "large",
-                text: "continue_with",
-                shape: "pill",
-                width,
-                logo_alignment: "left",
-            });
-            setButtonRendered(true);
-            setScriptFailed(false);
+            try {
+                window.google.accounts.id.initialize({
+                    client_id: clientId,
+                    callback: (response) => onCredential(response.credential),
+                    auto_select: false,
+                    cancel_on_tap_outside: true,
+                });
+                window.google.accounts.id.renderButton(containerRef.current, {
+                    type: "standard",
+                    theme: resolvedTheme === "dark" ? "filled_black" : "outline",
+                    size: "large",
+                    text: "continue_with",
+                    shape: "pill",
+                    width,
+                    logo_alignment: "left",
+                });
+            } catch {
+                setButtonRendered(false);
+                setFailure("origin");
+                return;
+            }
+            window.clearTimeout(renderCheck);
+            renderCheck = window.setTimeout(() => {
+                if (disposed) return;
+                if (containerRef.current?.childElementCount) {
+                    setButtonRendered(true);
+                    setFailure(null);
+                } else {
+                    setButtonRendered(false);
+                    setFailure("origin");
+                }
+            }, 500);
         };
 
         const observeSize = () => {
@@ -113,13 +144,15 @@ export function GoogleSignInButton({
         };
 
         const handleLoad = () => {
+            window.clearTimeout(loadTimeout);
             render(true);
             observeSize();
         };
 
         const handleError = () => {
             if (disposed) return;
-            setScriptFailed(true);
+            window.clearTimeout(loadTimeout);
+            setFailure("script");
             setButtonRendered(false);
         };
 
@@ -135,6 +168,7 @@ export function GoogleSignInButton({
         } else if (existing) {
             existing.addEventListener("load", handleLoad, { once: true });
             existing.addEventListener("error", handleError, { once: true });
+            loadTimeout = window.setTimeout(handleError, 10_000);
         } else {
             scriptElement = document.createElement("script");
             scriptElement.id = scriptId;
@@ -144,42 +178,47 @@ export function GoogleSignInButton({
             scriptElement.addEventListener("load", handleLoad, { once: true });
             scriptElement.addEventListener("error", handleError, { once: true });
             document.head.appendChild(scriptElement);
+            loadTimeout = window.setTimeout(handleError, 10_000);
         }
 
         return () => {
             disposed = true;
             cancelAnimationFrame(resizeFrame);
+            window.clearTimeout(renderCheck);
+            window.clearTimeout(loadTimeout);
             resizeObserver?.disconnect();
             scriptElement?.removeEventListener("load", handleLoad);
             scriptElement?.removeEventListener("error", handleError);
         };
     }, [clientId, onCredential, resolvedTheme]);
 
+    if (!isSecureForGoogle) {
+        return <GoogleUnavailable message={t("google.insecureContext")} />;
+    }
+
     if (!clientId) {
         return (
-            <div className="mx-auto w-full max-w-[400px]">
+            <div className="mx-auto w-full max-w-[400px] space-y-2">
                 <GoogleButtonShell
                     loading={!configurationLoaded}
                     disabled
                     title={
                         configurationLoaded
-                            ? "Google sign-in is not configured on the server"
-                            : "Loading Google sign-in"
+                            ? t(failure === "configuration" ? "google.configurationUnavailable" : "google.notConfigured")
+                            : t("google.loading")
                     }
                 />
+                {configurationLoaded ? (
+                    <p role="alert" className="text-center text-xs leading-5 text-destructive">
+                        {t(failure === "configuration" ? "google.configurationUnavailable" : "google.notConfigured")}
+                    </p>
+                ) : null}
             </div>
         );
     }
 
-    if (scriptFailed) {
-        return (
-            <div className="mx-auto w-full max-w-[400px]">
-                <GoogleButtonShell
-                    disabled
-                    title="Google sign-in could not be loaded"
-                />
-            </div>
-        );
+    if (failure) {
+        return <GoogleUnavailable message={t(failure === "origin" ? "google.originUnavailable" : "google.scriptUnavailable")} />;
     }
 
     return (
@@ -203,6 +242,17 @@ export function GoogleSignInButton({
                 ref={containerRef}
                 className="relative z-10 min-h-11 w-full [&>div]:!mx-auto [&>div]:!w-full [&_iframe]:!w-full"
             />
+        </div>
+    );
+}
+
+function GoogleUnavailable({ message }: { message: string }) {
+    return (
+        <div className="mx-auto w-full max-w-[400px] space-y-2">
+            <GoogleButtonShell disabled title={message} />
+            <p role="alert" className="text-center text-xs leading-5 text-destructive">
+                {message}
+            </p>
         </div>
     );
 }

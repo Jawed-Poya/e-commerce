@@ -4,6 +4,7 @@ import {
     ArrowUp,
     BadgeCheck,
     Check,
+    Download,
     Heart,
     House,
     LayoutGrid,
@@ -16,6 +17,7 @@ import {
     Share2,
     ShieldCheck,
     ShoppingBag,
+    Smartphone,
     Store,
     Truck,
     UserRound,
@@ -36,9 +38,13 @@ import { useCompany } from "../../features/company/company-context";
 import { LiveNotificationBanner } from "../../features/notifications/live-notification-banner";
 import { NotificationCenter } from "../../features/notifications/notification-center";
 import {
-    PwaInstallBanner,
+    MobileAppDownloadBanner,
     PwaInstallButton,
 } from "../../features/pwa/pwa-install-button";
+import {
+    mobileAppDownloadUrl,
+    mobileAppLinkIsExternal,
+} from "../../features/pwa/mobile-app-download";
 import { LanguageSwitcher } from "../../i18n/language-switcher";
 import { useI18n } from "../../i18n/i18n-provider";
 import { imageUrl } from "../api/api-client";
@@ -491,6 +497,26 @@ export function StoreLayout() {
                                     ))}
                             </div>
                         ) : null}
+
+                        <a
+                            href={mobileAppDownloadUrl}
+                            target={mobileAppLinkIsExternal ? "_blank" : undefined}
+                            rel={mobileAppLinkIsExternal ? "noreferrer" : undefined}
+                            className="mt-5 inline-flex items-center gap-3 rounded-xl border border-primary/15 bg-primary/[0.055] px-3.5 py-3 text-start transition hover:border-primary/30 hover:bg-primary/[0.09]"
+                        >
+                            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
+                                <Smartphone className="size-4.5" />
+                            </span>
+                            <span className="min-w-0">
+                                <span className="block text-xs font-black text-foreground">
+                                    {t("mobileApp.downloadTitle")}
+                                </span>
+                                <span className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-primary">
+                                    <Download className="size-3" />
+                                    {t("mobileApp.download")}
+                                </span>
+                            </span>
+                        </a>
                     </div>
 
                     <FooterColumn title={t("nav.shop")}>
@@ -591,7 +617,7 @@ export function StoreLayout() {
                 </a>
             ) : null}
 
-            {location.pathname === "/" ? <PwaInstallBanner /> : null}
+            {location.pathname === "/" ? <MobileAppDownloadBanner /> : null}
 
             <nav
                 className="fixed inset-x-0 bottom-0 z-40 bg-background/[0.96] shadow-[0_-14px_36px_-30px_rgba(15,23,42,.55)] ring-1 ring-black/[0.06] backdrop-blur-xl md:hidden dark:ring-white/[0.06]"

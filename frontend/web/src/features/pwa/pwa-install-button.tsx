@@ -4,6 +4,10 @@ import { useState } from "react";
 
 import { useI18n } from "../../i18n/i18n-provider";
 import { Button } from "../../shared/components/ui/button";
+import {
+    mobileAppDownloadUrl,
+    mobileAppLinkIsExternal,
+} from "./mobile-app-download";
 import { usePwaInstall } from "./pwa-install-context";
 
 export function PwaInstallButton({ compact = false }: { compact?: boolean }) {
@@ -90,17 +94,16 @@ export function PwaInstallButton({ compact = false }: { compact?: boolean }) {
     );
 }
 
-export function PwaInstallBanner() {
+export function MobileAppDownloadBanner() {
     const { t } = useI18n();
-    const { canInstall, installed, install } = usePwaInstall();
     const [dismissed, setDismissed] = useState(
-        () => sessionStorage.getItem("pwa-install-banner-dismissed") === "true",
+        () => sessionStorage.getItem("mobile-app-banner-dismissed") === "true",
     );
 
-    if (installed || !canInstall || dismissed) return null;
+    if (dismissed) return null;
 
     const dismiss = () => {
-        sessionStorage.setItem("pwa-install-banner-dismissed", "true");
+        sessionStorage.setItem("mobile-app-banner-dismissed", "true");
         setDismissed(true);
     };
 
@@ -113,19 +116,24 @@ export function PwaInstallBanner() {
                 <Smartphone className="size-5" />
             </span>
             <div className="min-w-0 flex-1">
-                <p className="text-sm font-black">{t("pwa.installTitle")}</p>
+                <p className="text-sm font-black">{t("mobileApp.downloadTitle")}</p>
                 <p className="truncate text-xs text-muted-foreground">
-                    {t("pwa.installDescription")}
+                    {t("mobileApp.downloadDescription")}
                 </p>
             </div>
             <Button
-                type="button"
+                asChild
                 size="sm"
                 className="rounded-xl"
-                onClick={() => void install()}
             >
-                <Download className="size-4" />
-                {t("pwa.install")}
+                <a
+                    href={mobileAppDownloadUrl}
+                    target={mobileAppLinkIsExternal ? "_blank" : undefined}
+                    rel={mobileAppLinkIsExternal ? "noreferrer" : undefined}
+                >
+                    <Download className="size-4" />
+                    {t("mobileApp.download")}
+                </a>
             </Button>
             <Button
                 type="button"

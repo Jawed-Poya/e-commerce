@@ -20,7 +20,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { flattenCategoryTree } from "./category-tree";
 import { ProductCard } from "./product-card";
 import { useProductPins } from "./product-pins-context";
-import { useInfiniteProducts, useLookups } from "./use-catalog";
+import { useInfiniteProducts, useLookups, useProducts } from "./use-catalog";
 
 import { imageUrl } from "../../shared/api/api-client";
 import { Button } from "../../shared/components/ui/button";
@@ -96,12 +96,20 @@ export function CatalogPage() {
         () => query.data?.pages.flatMap((result) => result.items) ?? [],
         [query.data?.pages],
     );
+    const pinnedQuery = useProducts(
+        {
+            ids: pins.pinnedIds,
+            isActive: true,
+            pageSize: Math.max(1, pins.pinnedIds.length),
+        },
+        pins.pinnedIds.length > 0,
+    );
     const matchingPinnedProducts = useMemo(
         () =>
-            pins.pinnedProducts.filter((product) =>
+            (pinnedQuery.data?.items ?? []).filter((product) =>
                 matchesCatalogFilters(product, params),
             ),
-        [params, pins.pinnedProducts],
+        [params, pinnedQuery.data?.items],
     );
     const displayedProducts = useMemo(() => {
         const products = new Map<number, (typeof loadedProducts)[number]>();
