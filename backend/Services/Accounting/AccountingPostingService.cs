@@ -32,6 +32,8 @@ public sealed class AccountingPostingService(
         public const string SalesTaxName = "Sales Tax Payable";
         public const string Sales = "4000";
         public const string SalesName = "Sales Revenue";
+        public const string SalesReturns = "4010";
+        public const string SalesReturnsName = "Sales Returns and Allowances";
         public const string Shipping = "4200";
         public const string ShippingName = "Shipping Revenue";
         public const string CostOfGoods = "5000";
@@ -99,7 +101,7 @@ public sealed class AccountingPostingService(
         AddPositive(lines, Debit(Accounts.Receivable, Accounts.ReceivableName, sale.Total, $"Sale {sale.SaleNumber}"));
         AddPositive(lines, Credit(Accounts.Sales, Accounts.SalesName, sale.Total - sale.Tax, $"Net sales on {sale.SaleNumber}"));
         AddPositive(lines, Credit(Accounts.SalesTax, Accounts.SalesTaxName, sale.Tax, $"Sales tax on {sale.SaleNumber}"));
-        var cost = sale.Items.Sum(item => item.Quantity * item.UnitCost);
+        var cost = sale.Items.Where(item => !item.IsDeleted).Sum(item => item.Quantity * item.UnitCost);
         AddPositive(lines, Debit(Accounts.CostOfGoods, Accounts.CostOfGoodsName, cost, $"Cost recognized for {sale.SaleNumber}"));
         AddPositive(lines, Credit(Accounts.Inventory, Accounts.InventoryName, cost, $"Inventory issued for {sale.SaleNumber}"));
 
@@ -156,6 +158,73 @@ public sealed class AccountingPostingService(
             payment.CreatedByUserId ?? sale.CreatedByUserId,
             postedByUserId,
             sale.BranchId,
+            lines,
+            ct);
+    }
+
+    public Task<bool> PostSalesReturnAsync(
+        InventorySaleReturn salesReturn,
+        string customerName,
+        string? postedByUserId,
+        CancellationToken ct)
+    {
+        var lines = new List<JournalVoucherLine>();
+        AddPositive(lines, Debit(
+            Accounts.SalesReturns,
+            Accounts.SalesReturnsName,
+            salesReturn.Total - salesReturn.TaxAmount,
+            $"Return {salesReturn.ReturnNumber} for {salesReturn.InventorySale.SaleNumber}"));
+        AddPositive(lines, Debit(
+            Accounts.SalesTax,
+            Accounts.SalesTaxName,
+            salesReturn.TaxAmount,
+            $"Sales tax reversed on {salesReturn.ReturnNumber}"));
+        AddPositive(lines, Credit(
+            Accounts.Receivable,
+            Accounts.ReceivableName,
+            salesReturn.DebtReduction,
+            $"Receivable reduced by {salesReturn.ReturnNumber}"));
+        AddPositive(lines, Credit(
+            Accounts.CustomerDeposits,
+            Accounts.CustomerDepositsName,
+            salesReturn.CreditAmount,
+            $"Customer credit from {salesReturn.ReturnNumber}"));
+        var refundAccount = PaymentAccount(salesReturn.RefundMethod);
+        AddPositive(lines, Credit(
+            refundAccount.Code,
+            refundAccount.Name,
+            salesReturn.RefundAmount,
+            $"Refund paid for {salesReturn.ReturnNumber}"));
+
+        var restoredCost = salesReturn.Items
+            .Where(item => item.Restock)
+            .Sum(item => item.Quantity * item.UnitCost);
+        AddPositive(lines, Debit(
+            Accounts.Inventory,
+            Accounts.InventoryName,
+            restoredCost,
+            $"Returned inventory on {salesReturn.ReturnNumber}"));
+        AddPositive(lines, Credit(
+            Accounts.CostOfGoods,
+            Accounts.CostOfGoodsName,
+            restoredCost,
+            $"Cost reversed on {salesReturn.ReturnNumber}"));
+
+        return AddOperationalVoucherAsync(
+            JournalVoucherType.SalesReturn,
+            "SalesReturn",
+            salesReturn.Id,
+            salesReturn.ReturnNumber,
+            salesReturn.ReturnDate,
+            salesReturn.CurrencyCode,
+            $"Customer return {salesReturn.ReturnNumber} against {salesReturn.InventorySale.SaleNumber}",
+            salesReturn.InventorySale.ReferenceNumber,
+            "Customer",
+            salesReturn.CustomerId,
+            customerName,
+            salesReturn.CreatedByUserId,
+            postedByUserId,
+            salesReturn.BranchId,
             lines,
             ct);
     }
@@ -324,12 +393,27 @@ public sealed class AccountingPostingService(
                 ? sale.CustomerName ?? "Walk-in customer"
                 : (sale.Customer.FirstName + " " + (sale.Customer.LastName ?? string.Empty)).Trim();
             if (await PostManualSaleAsync(sale, customerName, postedByUserId, ct)) created++;
-            var remaining = sale.Total;
+            var remaining = Math.Max(0, sale.Total - sale.ReturnedAmount);
             foreach (var payment in sale.Payments.OrderBy(item => item.PaymentDate).ThenBy(item => item.Id))
             {
                 if (await PostSalePaymentAsync(sale, payment, remaining, customerName, postedByUserId, ct)) created++;
                 remaining = Math.Max(0, remaining - payment.Amount);
             }
+        }
+
+        var salesReturns = await context.InventorySaleReturns
+            .AsNoTracking()
+            .Include(item => item.Customer)
+            .Include(item => item.InventorySale)
+            .Include(item => item.Items)
+            .Where(item => !branchContext.BranchId.HasValue || item.BranchId == branchContext.BranchId.Value)
+            .ToListAsync(ct);
+        foreach (var salesReturn in salesReturns)
+        {
+            var customerName = salesReturn.Customer is null
+                ? salesReturn.InventorySale.CustomerName ?? "Walk-in customer"
+                : (salesReturn.Customer.FirstName + " " + (salesReturn.Customer.LastName ?? string.Empty)).Trim();
+            if (await PostSalesReturnAsync(salesReturn, customerName, postedByUserId, ct)) created++;
         }
 
         var expenses = await context.Expenses
@@ -451,8 +535,8 @@ public sealed class AccountingPostingService(
         IReadOnlyCollection<JournalVoucherLine> lines,
         CancellationToken ct)
     {
-        if (context.JournalVouchers.Local.Any(item => item.SourceType == sourceType && item.SourceId == sourceId) ||
-            await context.JournalVouchers.AsNoTracking().AnyAsync(item => item.SourceType == sourceType && item.SourceId == sourceId, ct))
+        if (context.JournalVouchers.Local.Any(item => item.Status == JournalVoucherStatus.Posted && item.SourceType == sourceType && item.SourceId == sourceId) ||
+            await context.JournalVouchers.AsNoTracking().AnyAsync(item => item.Status == JournalVoucherStatus.Posted && item.SourceType == sourceType && item.SourceId == sourceId, ct))
             return false;
 
         var effectiveLines = lines.Where(line => line.Debit > 0 || line.Credit > 0).ToList();
@@ -522,6 +606,7 @@ public sealed class AccountingPostingService(
         JournalVoucherType.PurchasePayment => "PPV",
         JournalVoucherType.ManualSale => "SV",
         JournalVoucherType.SaleReceipt => "RCV",
+        JournalVoucherType.SalesReturn => "SRV",
         JournalVoucherType.OnlineSale => "OSV",
         JournalVoucherType.OnlineReceipt => "ORV",
         JournalVoucherType.Expense => "EV",

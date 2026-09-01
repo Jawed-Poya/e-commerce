@@ -875,7 +875,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
                 .Select(item => new
                 {
                     item.Id, item.SaleNumber, item.SaleDate, item.CreatedAt, item.CustomerId, item.CurrencyCode, item.Subtotal, item.Discount, item.Tax,
-                    item.Total, item.PaidAmount, item.PaymentStatus, item.PaymentMethod, item.Notes,
+                    item.Total, item.ReturnedAmount, item.PaidAmount, item.PaymentStatus, item.PaymentMethod, item.Notes,
                     Branch = context.Branches.Where(branch => branch.Id == item.BranchId).Select(branch => branch.Name).FirstOrDefault(),
                     CustomerName = item.Customer != null
                         ? (item.Customer.FirstName + " " + (item.Customer.LastName ?? "")).Trim()
@@ -892,8 +892,8 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
             return new ReceiptResponse("manual-sales", sale.Id, sale.SaleNumber, sale.SaleDate.ToDateTime(TimeOnly.MinValue),
                 company.Name, company.LegalName, company.Phone, company.Email, company.Address, company.LogoUrl,
                 sale.Branch, sale.CustomerName, sale.CustomerPhone, sale.CustomerAddress, sale.CurrencyCode,
-                sale.Subtotal, sale.Discount, sale.Tax, 0, sale.Total, sale.PaidAmount,
-                Math.Max(0, sale.Total - sale.PaidAmount), previousBalance, sale.PaymentStatus.ToString(), sale.PaymentMethod,
+                sale.Subtotal, sale.Discount, sale.Tax, 0, sale.Total - sale.ReturnedAmount, sale.PaidAmount,
+                Math.Max(0, sale.Total - sale.ReturnedAmount - sale.PaidAmount), previousBalance, sale.PaymentStatus.ToString(), sale.PaymentMethod,
                 sale.Notes, sale.Items);
         }
 
@@ -927,10 +927,21 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
                     .Sum(payment => (decimal?)payment.Amount) ?? (item.PaymentStatus == PaymentStatus.Paid ? item.Total : 0)
             })
             .ToListAsync(cancellationToken);
-        var manual = await context.InventorySales.AsNoTracking()
+        var manualRows = await context.InventorySales.AsNoTracking()
             .Where(item => item.CustomerId == customerId && item.CurrencyCode == currency &&
                 item.CreatedAt < before && (source != "manual-sales" || item.Id != currentId))
-            .SumAsync(item => (decimal?)(item.Total > item.PaidAmount ? item.Total - item.PaidAmount : 0), cancellationToken) ?? 0;
+            .Select(item => new
+            {
+                item.Total,
+                Returned = item.Returns
+                    .Where(salesReturn => salesReturn.CreatedAt < before)
+                    .Sum(salesReturn => (decimal?)salesReturn.Total) ?? 0,
+                Paid = item.Payments
+                    .Where(payment => payment.CreatedAt < before)
+                    .Sum(payment => (decimal?)payment.Amount) ?? 0
+            })
+            .ToListAsync(cancellationToken);
+        var manual = manualRows.Sum(item => Math.Max(0, item.Total - item.Returned - item.Paid));
         return orders.Sum(item => Math.Max(0, item.Total - item.Paid)) + manual;
     }
 

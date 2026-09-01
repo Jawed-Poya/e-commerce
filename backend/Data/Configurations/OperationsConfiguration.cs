@@ -81,12 +81,53 @@ public sealed class InventorySaleConfiguration : IEntityTypeConfiguration<Invent
         b.Property(x => x.PaidAmount).HasPrecision(18, 2);
         b.Property(x => x.CustomerCreditApplied).HasPrecision(18, 2);
         b.Property(x => x.CustomerCreditCreated).HasPrecision(18, 2);
+        b.Property(x => x.ReturnedAmount).HasPrecision(18, 2);
         b.HasIndex(x => x.SaleNumber).IsUnique();
         b.HasIndex(x => x.ClientRequestId).IsUnique().HasFilter("[ClientRequestId] IS NOT NULL");
         b.HasIndex(x => x.ReferenceNumber);
         b.HasIndex(x => x.SaleDate);
         b.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
         b.HasMany(x => x.Payments).WithOne(x => x.InventorySale).HasForeignKey(x => x.InventorySaleId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class InventorySaleReturnConfiguration : IEntityTypeConfiguration<InventorySaleReturn>
+{
+    public void Configure(EntityTypeBuilder<InventorySaleReturn> b)
+    {
+        b.Property(x => x.ReturnNumber).HasMaxLength(50).IsRequired();
+        b.Property(x => x.Total).HasPrecision(18, 2);
+        b.Property(x => x.TaxAmount).HasPrecision(18, 2);
+        b.Property(x => x.DebtReduction).HasPrecision(18, 2);
+        b.Property(x => x.RefundAmount).HasPrecision(18, 2);
+        b.Property(x => x.CreditAmount).HasPrecision(18, 2);
+        b.Property(x => x.RefundMethod).HasMaxLength(50).IsRequired();
+        b.Property(x => x.CurrencyCode).HasMaxLength(10).IsRequired();
+        b.Property(x => x.Reason).HasMaxLength(500).IsRequired();
+        b.Property(x => x.Notes).HasMaxLength(2000);
+        b.HasIndex(x => x.ReturnNumber).IsUnique();
+        b.HasIndex(x => new { x.InventorySaleId, x.ReturnDate });
+        b.HasOne(x => x.InventorySale).WithMany(x => x.Returns).HasForeignKey(x => x.InventorySaleId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+        b.HasMany(x => x.Items).WithOne(x => x.InventorySaleReturn).HasForeignKey(x => x.InventorySaleReturnId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class InventorySaleReturnItemConfiguration : IEntityTypeConfiguration<InventorySaleReturnItem>
+{
+    public void Configure(EntityTypeBuilder<InventorySaleReturnItem> b)
+    {
+        b.Property(x => x.Quantity).HasPrecision(18, 3);
+        b.Property(x => x.EnteredQuantity).HasPrecision(18, 3);
+        b.Property(x => x.SelectedUnitName).HasMaxLength(100);
+        b.Property(x => x.UnitConversionFactor).HasPrecision(18, 6);
+        b.Property(x => x.UnitPrice).HasPrecision(18, 4);
+        b.Property(x => x.UnitCost).HasPrecision(18, 4);
+        b.Property(x => x.LineTotal).HasPrecision(18, 2);
+        b.ToTable(table => table.HasCheckConstraint("CK_InventorySaleReturnItem_Quantity", "[Quantity] > 0 AND [EnteredQuantity] > 0 AND [UnitConversionFactor] > 0"));
+        b.HasIndex(x => x.InventorySaleItemId);
+        b.HasOne(x => x.InventorySaleItem).WithMany().HasForeignKey(x => x.InventorySaleItemId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -188,7 +229,7 @@ public sealed class JournalVoucherConfiguration : IEntityTypeConfiguration<Journ
         b.HasIndex(x => x.VoucherDate);
         b.HasIndex(x => new { x.SourceType, x.SourceId })
             .IsUnique()
-            .HasFilter("[SourceType] IS NOT NULL AND [SourceId] IS NOT NULL AND [IsDeleted] = 0");
+            .HasFilter("[SourceType] IS NOT NULL AND [SourceId] IS NOT NULL AND [IsDeleted] = 0 AND [Status] = 1");
         b.HasIndex(x => x.ReversalOfVoucherId)
             .IsUnique()
             .HasFilter("[ReversalOfVoucherId] IS NOT NULL AND [IsDeleted] = 0");

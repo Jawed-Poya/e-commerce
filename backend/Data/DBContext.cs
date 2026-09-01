@@ -145,6 +145,8 @@ public class ApplicationDbContext
     public DbSet<InventorySale> InventorySales => Set<InventorySale>();
     public DbSet<InventorySaleItem> InventorySaleItems => Set<InventorySaleItem>();
     public DbSet<InventorySalePayment> InventorySalePayments => Set<InventorySalePayment>();
+    public DbSet<InventorySaleReturn> InventorySaleReturns => Set<InventorySaleReturn>();
+    public DbSet<InventorySaleReturnItem> InventorySaleReturnItems => Set<InventorySaleReturnItem>();
     public DbSet<Staff> StaffMembers => Set<Staff>();
     public DbSet<StaffSalaryPayment> StaffSalaryPayments => Set<StaffSalaryPayment>();
     public DbSet<StaffSalaryInstallment> StaffSalaryInstallments => Set<StaffSalaryInstallment>();
@@ -226,6 +228,8 @@ public class ApplicationDbContext
         builder.Entity<InventorySale>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<InventorySaleItem>().HasQueryFilter(x => !x.IsDeleted && !x.InventorySale.IsDeleted);
         builder.Entity<InventorySalePayment>().HasQueryFilter(x => !x.IsDeleted && !x.InventorySale.IsDeleted);
+        builder.Entity<InventorySaleReturn>().HasQueryFilter(x => !x.IsDeleted && !x.InventorySale.IsDeleted);
+        builder.Entity<InventorySaleReturnItem>().HasQueryFilter(x => !x.IsDeleted && !x.InventorySaleReturn.IsDeleted && !x.InventorySaleReturn.InventorySale.IsDeleted);
         builder.Entity<Staff>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<StaffSalaryPayment>().HasQueryFilter(x => !x.IsDeleted && !x.Staff.IsDeleted);
         builder.Entity<StaffSalaryInstallment>().HasQueryFilter(x => !x.IsDeleted && !x.StaffSalaryPayment.IsDeleted && !x.StaffSalaryPayment.Staff.IsDeleted);

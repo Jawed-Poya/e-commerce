@@ -150,7 +150,19 @@ export default function PurchasesPage() {
     const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
     const [deletingPurchase, setDeletingPurchase] = useState<Purchase | null>(null);
     const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
-    const [editForm, setEditForm] = useState({ purchaseDate: today(), referenceNumber: "", notes: "" });
+    const [editItems, setEditItems] = useState<DocumentItem[]>([newDocumentItem()]);
+    const [editLineLimitOverrideEnabled, setEditLineLimitOverrideEnabled] = useState(false);
+    const [editForm, setEditForm] = useState({
+        purchaseDate: today(),
+        discount: 0,
+        discountPercent: 0,
+        secondaryDiscountPercent: 0,
+        tax: 0,
+        otherCost: 0,
+        paidAmount: 0,
+        referenceNumber: "",
+        notes: "",
+    });
     const [saving, setSaving] = useState(false);
     const [exportingPdf, setExportingPdf] = useState(false);
     const [lineLimitOverrideEnabled, setLineLimitOverrideEnabled] = useState(false);
@@ -207,6 +219,19 @@ export default function PurchasesPage() {
         discountedSubtotal - form.discount + form.tax + form.otherCost,
     ));
     const remaining = roundCurrency(Math.max(0, total - form.paidAmount));
+    const editLinesNet = useMemo(
+        () => editItems.reduce((sum, item) => sum + stackedLineTotal(item), 0),
+        [editItems],
+    );
+    const editDiscountedSubtotal = calculateStackedDiscountNet(
+        editLinesNet,
+        editForm.discountPercent,
+        editForm.secondaryDiscountPercent,
+    );
+    const editTotal = roundCurrency(Math.max(
+        0,
+        editDiscountedSubtotal - editForm.discount + editForm.tax + editForm.otherCost,
+    ));
 
     const resetPurchase = () => {
         setItems([newDocumentItem()]);
@@ -403,9 +428,36 @@ export default function PurchasesPage() {
             setEditSupplier(currentSupplier);
             setEditForm({
                 purchaseDate: details.purchaseDate,
+                discount: details.discount,
+                discountPercent: details.discountPercent,
+                secondaryDiscountPercent: details.secondaryDiscountPercent,
+                tax: details.tax,
+                otherCost: details.otherCost,
+                paidAmount: details.paidAmount,
                 referenceNumber: details.referenceNumber ?? "",
                 notes: details.notes ?? "",
             });
+            const products = await Promise.all(details.items.map(async (line) => {
+                const matches = await operationsService.products(line.barcode ?? line.productName, 50, true);
+                return matches.find((product) => product.id === line.productId) ?? null;
+            }));
+            if (products.some((product) => !product)) {
+                throw new Error("One or more purchase products are inactive or unavailable and cannot be corrected.");
+            }
+            setEditItems(details.items.map((line, index) => ({
+                productId: line.productId,
+                unitId: line.selectedUnitId,
+                unitName: line.selectedUnitName,
+                conversionFactor: line.unitConversionFactor,
+                quantity: line.enteredQuantity,
+                amount: line.enteredUnitCost,
+                bonusQuantity: line.bonusQuantity,
+                discountPercent: line.discountPercent,
+                lotNumber: line.lotNumber ?? "",
+                expireDate: line.expireDate,
+                product: products[index],
+            })));
+            setEditLineLimitOverrideEnabled(false);
             setEditingPurchase(purchase);
         } catch (error) {
             toast.error(message(error));
@@ -416,20 +468,52 @@ export default function PurchasesPage() {
 
     const savePurchaseEdit = async () => {
         if (!editingPurchase) return;
+        const documentItems = getSubmittableDocumentLines(editItems);
+        if (!documentItems.length || documentItems.some((item) => !isDocumentLineComplete(item))) {
+            return toast.error("Complete at least one purchase product line.");
+        }
+        const lotKeys = documentItems.map((item) => [
+            item.productId,
+            (item.lotNumber ?? "").trim().toLocaleUpperCase(),
+            item.expireDate ?? "",
+        ].join("|"));
+        if (new Set(lotKeys).size !== lotKeys.length) {
+            return toast.error("The same product, lot number, and expiry date may appear only once.");
+        }
+        if (editTotal < editForm.paidAmount) {
+            return toast.error(`The corrected total cannot be below the recorded payments (${formatMoney(editForm.paidAmount)}).`);
+        }
         setSaving(true);
         try {
             await operationsService.updatePurchase(editingPurchase.id, {
+                overrideLineLimit: editLineLimitOverrideEnabled,
                 supplierId: editSupplier?.id ?? null,
                 purchaseDate: editForm.purchaseDate,
+                discount: editForm.discount,
+                discountPercent: editForm.discountPercent,
+                secondaryDiscountPercent: editForm.secondaryDiscountPercent,
+                tax: editForm.tax,
+                otherCost: editForm.otherCost,
                 referenceNumber: nullable(editForm.referenceNumber),
                 notes: nullable(editForm.notes),
+                items: documentItems.map((item) => ({
+                    productId: item.productId,
+                    unitId: item.unitId,
+                    quantity: item.quantity,
+                    unitCost: item.amount,
+                    bonusQuantity: item.bonusQuantity,
+                    discountPercent: item.discountPercent,
+                    lotNumber: nullable(item.lotNumber ?? ""),
+                    expireDate: item.expireDate || null,
+                })),
             });
             await Promise.all([
                 queryClient.invalidateQueries({ queryKey: operationKeys.purchaseRoot }),
                 queryClient.invalidateQueries({ queryKey: operationKeys.summary }),
+                queryClient.invalidateQueries({ queryKey: ["inventory"] }),
             ]);
             setEditingPurchase(null);
-            toast.success("Purchase details updated.");
+            toast.success("Purchase corrected; inventory and accounting were reposted.");
         } catch (error) {
             toast.error(message(error));
         } finally {
@@ -977,13 +1061,15 @@ export default function PurchasesPage() {
             </Dialog>
 
             <Dialog open={Boolean(editingPurchase)} onOpenChange={(open) => !open && !saving && setEditingPurchase(null)}>
-                <DialogContent className="sm:max-w-2xl">
+                <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-6xl">
                     <DialogHeader>
                         <DialogTitle>Edit {editingPurchase?.purchaseNumber}</DialogTitle>
-                        <DialogDescription>Correct the supplier and document details. Inventory quantities, totals, and payment history remain unchanged.</DialogDescription>
+                        <DialogDescription>
+                            Correct products, quantities, costs, lots, or totals. The system safely reverses the old inventory and accounting entries, then posts the corrected purchase. Recorded payments remain unchanged.
+                        </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2 sm:col-span-2">
+                    <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="min-w-0 space-y-2 sm:col-span-2">
                             <Label>Supplier</Label>
                             <ServerSearchCombobox<Supplier>
                                 value={editSupplier}
@@ -997,9 +1083,39 @@ export default function PurchasesPage() {
                         </div>
                         <Field label="Purchase date"><Input type="date" value={editForm.purchaseDate} onChange={(event) => setEditForm((current) => ({ ...current, purchaseDate: event.target.value }))} /></Field>
                         <Field label="Supplier bill / reference"><Input value={editForm.referenceNumber} onChange={(event) => setEditForm((current) => ({ ...current, referenceNumber: event.target.value }))} /></Field>
-                        <div className="space-y-2 sm:col-span-2"><Label>Notes</Label><Textarea value={editForm.notes} onChange={(event) => setEditForm((current) => ({ ...current, notes: event.target.value }))} /></div>
                     </div>
-                    <DialogFooter><Button variant="outline" disabled={saving} onClick={() => setEditingPurchase(null)}>Cancel</Button><Button disabled={saving || !editForm.purchaseDate} onClick={() => void savePurchaseEdit()}>{saving ? <LoaderCircle className="animate-spin" /> : <Save />}Save changes</Button></DialogFooter>
+                    <Separator />
+                    <DocumentLines
+                        items={editItems}
+                        setItems={setEditItems}
+                        mode="purchase"
+                        maximumLines={operationPolicy?.maximumPurchaseLines ?? 50}
+                        canOverrideLineLimit={operationPolicy?.canOverrideLineLimits ?? false}
+                        overrideLineLimit={editLineLimitOverrideEnabled}
+                        onOverrideLineLimitChange={setEditLineLimitOverrideEnabled}
+                    />
+                    <Separator />
+                    <DocumentSettlementLayout
+                        notes={editForm.notes}
+                        onNotesChange={(notes) => setEditForm((current) => ({ ...current, notes }))}
+                        summaryTitle="Corrected purchase totals"
+                        summaryDescription="Payments are preserved. The corrected total cannot be less than the amount already paid."
+                    >
+                        <MoneySummaryRow label="Product lines" value={editLinesNet} />
+                        <AmountInputRow label="Discount" value={editForm.discount} onChange={(discount) => setEditForm((current) => ({ ...current, discount }))} />
+                        <AmountInputRow label="General discount 1 %" value={editForm.discountPercent} max={100} onChange={(discountPercent) => setEditForm((current) => ({ ...current, discountPercent }))} />
+                        <AmountInputRow label="General discount 2 %" value={editForm.secondaryDiscountPercent} max={100} onChange={(secondaryDiscountPercent) => setEditForm((current) => ({ ...current, secondaryDiscountPercent }))} />
+                        <AmountInputRow label="Tax" value={editForm.tax} onChange={(tax) => setEditForm((current) => ({ ...current, tax }))} />
+                        <AmountInputRow label="Other cost" value={editForm.otherCost} onChange={(otherCost) => setEditForm((current) => ({ ...current, otherCost }))} />
+                        <Separator />
+                        <MoneySummaryRow label="Corrected total" value={editTotal} emphasis />
+                        <MoneySummaryRow label="Payments preserved" value={editForm.paidAmount} muted />
+                        <MoneySummaryRow label="Corrected supplier balance" value={Math.max(0, editTotal - editForm.paidAmount)} muted />
+                    </DocumentSettlementLayout>
+                    <DialogFooter>
+                        <Button variant="outline" disabled={saving} onClick={() => setEditingPurchase(null)}>Cancel</Button>
+                        <Button disabled={saving || !editForm.purchaseDate} onClick={() => void savePurchaseEdit()}>{saving ? <LoaderCircle className="animate-spin" /> : <Save />}Apply correction</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 

@@ -72,6 +72,9 @@ public sealed class FinancialReportService(
         var salesQuery = context.InventorySales.AsNoTracking()
             .Where(item => item.SaleDate >= startOnly && item.SaleDate <= endOnly &&
                 item.CurrencyCode == selectedCurrency);
+        var salesReturnsQuery = context.InventorySaleReturns.AsNoTracking()
+            .Where(item => item.ReturnDate >= startOnly && item.ReturnDate <= endOnly &&
+                item.CurrencyCode == selectedCurrency);
         var purchasesQuery = context.Purchases.AsNoTracking()
             .Where(item => item.PurchaseDate >= startOnly && item.PurchaseDate <= endOnly &&
                 item.Status != PurchaseStatus.Cancelled && item.CurrencyCode == selectedCurrency);
@@ -87,6 +90,7 @@ public sealed class FinancialReportService(
             ordersQuery = ordersQuery.Where(item => item.BranchId == request.BranchId.Value);
             recognizedOrdersQuery = recognizedOrdersQuery.Where(item => item.BranchId == request.BranchId.Value);
             salesQuery = salesQuery.Where(item => item.BranchId == request.BranchId.Value);
+            salesReturnsQuery = salesReturnsQuery.Where(item => item.BranchId == request.BranchId.Value);
             purchasesQuery = purchasesQuery.Where(item => item.BranchId == request.BranchId.Value);
             expensesQuery = expensesQuery.Where(item => item.BranchId == request.BranchId.Value);
             payrollQuery = payrollQuery.Where(item => item.BranchId == request.BranchId.Value);
@@ -96,8 +100,13 @@ public sealed class FinancialReportService(
         // liability owed to the tax authority, not business income.
         var onlineRevenue = await recognizedOrdersQuery
             .SumAsync(item => (decimal?)(item.Total - item.TaxTotal), cancellationToken) ?? 0;
-        var manualRevenue = await salesQuery
+        var manualGrossRevenue = await salesQuery
             .SumAsync(item => (decimal?)(item.Total - item.Tax), cancellationToken) ?? 0;
+        var manualReturnedRevenue = await salesReturnsQuery
+            .SumAsync(item => (decimal?)(item.Total - item.TaxAmount), cancellationToken) ?? 0;
+        // Keep returns in the period in which they are posted. A period that only
+        // contains returns can legitimately have negative manual revenue/COGS.
+        var manualRevenue = manualGrossRevenue - manualReturnedRevenue;
         var purchaseTotal = await purchasesQuery.SumAsync(item => (decimal?)item.Total, cancellationToken) ?? 0;
         var expenseTotal = await expensesQuery.SumAsync(item => (decimal?)item.Amount, cancellationToken) ?? 0;
         var payrollObligation = await payrollQuery.SumAsync(item => (decimal?)item.NetAmount, cancellationToken) ?? 0;
@@ -113,11 +122,18 @@ public sealed class FinancialReportService(
         var onlineCost = await context.OrderItems.AsNoTracking()
             .Where(item => recognizedOrderIds.Contains(item.OrderId))
             .SumAsync(item => (decimal?)(item.Quantity * item.UnitCost), cancellationToken) ?? 0;
-        var manualCost = await context.InventorySaleItems.AsNoTracking()
+        var manualGrossCost = await context.InventorySaleItems.AsNoTracking()
             .Where(item => item.InventorySale.SaleDate >= startOnly && item.InventorySale.SaleDate <= endOnly &&
                 item.InventorySale.CurrencyCode == selectedCurrency &&
                 (!request.BranchId.HasValue || item.InventorySale.BranchId == request.BranchId.Value))
             .SumAsync(item => (decimal?)(item.Quantity * item.UnitCost), cancellationToken) ?? 0;
+        var manualReturnedCost = await context.InventorySaleReturnItems.AsNoTracking()
+            .Where(item => item.Restock && item.InventorySaleReturn.ReturnDate >= startOnly &&
+                item.InventorySaleReturn.ReturnDate <= endOnly &&
+                item.InventorySaleReturn.CurrencyCode == selectedCurrency &&
+                (!request.BranchId.HasValue || item.InventorySaleReturn.BranchId == request.BranchId.Value))
+            .SumAsync(item => (decimal?)(item.Quantity * item.UnitCost), cancellationToken) ?? 0;
+        var manualCost = manualGrossCost - manualReturnedCost;
         var costOfGoodsSold = onlineCost + manualCost;
 
         var onlineCashQuery = context.Payments.AsNoTracking().Where(item =>
@@ -134,6 +150,7 @@ public sealed class FinancialReportService(
         var payrollCashQuery = context.StaffSalaryInstallments.AsNoTracking().Where(item =>
             item.PaymentDate >= startOnly && item.PaymentDate <= endOnly &&
             item.StaffSalaryPayment.CurrencyCode == selectedCurrency);
+        var salesReturnRefundQuery = salesReturnsQuery.Where(item => item.RefundAmount > 0);
 
         if (request.BranchId.HasValue)
         {
@@ -147,8 +164,9 @@ public sealed class FinancialReportService(
         var manualCash = await manualCashQuery.SumAsync(item => (decimal?)item.Amount, cancellationToken) ?? 0;
         var purchaseCash = await purchaseCashQuery.SumAsync(item => (decimal?)item.Amount, cancellationToken) ?? 0;
         var payrollCash = await payrollCashQuery.SumAsync(item => (decimal?)item.Amount, cancellationToken) ?? 0;
+        var salesReturnRefunds = await salesReturnRefundQuery.SumAsync(item => (decimal?)item.RefundAmount, cancellationToken) ?? 0;
         var cashReceived = onlineCash + manualCash;
-        var cashPaid = purchaseCash + payrollCash + expenseTotal;
+        var cashPaid = purchaseCash + payrollCash + expenseTotal + salesReturnRefunds;
 
         var outstandingReceivables = await GetOutstandingReceivablesAsync(
             end,
@@ -160,7 +178,9 @@ public sealed class FinancialReportService(
             .Where(item => item.PurchaseDate <= endOnly && item.Status != PurchaseStatus.Cancelled &&
                 item.CurrencyCode == selectedCurrency &&
                 (!request.BranchId.HasValue || item.BranchId == request.BranchId.Value))
-            .SumAsync(item => (decimal?)(item.Total > item.PaidAmount ? item.Total - item.PaidAmount : 0), cancellationToken) ?? 0;
+            .SumAsync(item => (decimal?)(item.Total > item.PaidAmount
+                ? item.Total - item.PaidAmount
+                : 0), cancellationToken) ?? 0;
         var outstandingPayroll = await context.StaffSalaryPayments.AsNoTracking()
             .Where(item => item.PaidDate <= endOnly && item.CurrencyCode == selectedCurrency &&
                 (!request.BranchId.HasValue || item.BranchId == request.BranchId.Value))
@@ -191,6 +211,7 @@ public sealed class FinancialReportService(
         var lines = await BuildLinesAsync(
             ordersQuery,
             salesQuery,
+            salesReturnsQuery,
             purchasesQuery,
             expensesQuery,
             payrollQuery,
@@ -238,6 +259,7 @@ public sealed class FinancialReportService(
             purchaseCashQuery,
             payrollCashQuery,
             expensesQuery,
+            salesReturnRefundQuery,
             cancellationToken);
         var profitTrend = await BuildProfitTrendAsync(
             startOnly,
@@ -253,7 +275,11 @@ public sealed class FinancialReportService(
             request.BranchId,
             selectedCurrency,
             cancellationToken);
-        var topCustomers = await GetTopCustomersAsync(recognizedOrdersQuery, salesQuery, cancellationToken);
+        var topCustomers = await GetTopCustomersAsync(
+            recognizedOrdersQuery,
+            salesQuery,
+            salesReturnsQuery,
+            cancellationToken);
         var topSuppliers = await GetTopSuppliersAsync(purchasesQuery, cancellationToken);
 
         var totalRevenue = onlineRevenue + manualRevenue;
@@ -807,16 +833,28 @@ public sealed class FinancialReportService(
         var online = onlineRows.Sum(item => Math.Max(
             0,
             item.Total - (item.Paid > 0 ? item.Paid : item.PaymentStatus == PaymentStatus.Paid ? item.Total : 0)));
-        var manual = await context.InventorySales.AsNoTracking()
+        var manualRows = await context.InventorySales.AsNoTracking()
             .Where(item => item.SaleDate <= endOnly && item.CurrencyCode == currency &&
                 (!branchId.HasValue || item.BranchId == branchId.Value))
-            .SumAsync(item => (decimal?)(item.Total > item.PaidAmount ? item.Total - item.PaidAmount : 0), cancellationToken) ?? 0;
+            .Select(item => new
+            {
+                item.Total,
+                Returned = item.Returns
+                    .Where(salesReturn => salesReturn.ReturnDate <= endOnly)
+                    .Sum(salesReturn => (decimal?)salesReturn.Total) ?? 0,
+                Paid = item.Payments
+                    .Where(payment => payment.PaymentDate <= endOnly)
+                    .Sum(payment => (decimal?)payment.Amount) ?? 0
+            })
+            .ToListAsync(cancellationToken);
+        var manual = manualRows.Sum(item => Math.Max(0, item.Total - item.Returned - item.Paid));
         return online + manual;
     }
 
     private static async Task<List<FinancialReportLineResponse>> BuildLinesAsync(
         IQueryable<Order> ordersQuery,
         IQueryable<InventorySale> salesQuery,
+        IQueryable<InventorySaleReturn> salesReturnsQuery,
         IQueryable<Purchase> purchasesQuery,
         IQueryable<Expense> expensesQuery,
         IQueryable<StaffSalaryPayment> payrollQuery,
@@ -890,6 +928,33 @@ public sealed class FinancialReportService(
                 item.PaidAmount,
                 currency,
                 "in",
+                item.BranchId,
+                branches)));
+
+            var returnRows = await salesReturnsQuery.Select(item => new
+            {
+                item.Id,
+                item.ReturnNumber,
+                item.ReturnDate,
+                item.Total,
+                item.SettlementMode,
+                SaleNumber = item.InventorySale.SaleNumber,
+                CustomerName = item.Customer == null
+                    ? item.InventorySale.CustomerName ?? "Walk-in customer"
+                    : item.Customer.FirstName + " " + (item.Customer.LastName ?? ""),
+                item.BranchId
+            }).ToListAsync(cancellationToken);
+            lines.AddRange(returnRows.Select(item => Line(
+                "manual-sales",
+                item.Id,
+                item.ReturnNumber,
+                item.ReturnDate.ToDateTime(TimeOnly.MinValue),
+                $"Return for {item.SaleNumber} · {item.CustomerName.Trim()}",
+                $"Sales return / {item.SettlementMode}",
+                item.Total,
+                item.Total,
+                currency,
+                "out",
                 item.BranchId,
                 branches)));
         }
@@ -989,6 +1054,7 @@ public sealed class FinancialReportService(
         IQueryable<PurchasePayment> purchaseCashQuery,
         IQueryable<StaffSalaryInstallment> payrollCashQuery,
         IQueryable<Expense> expenseQuery,
+        IQueryable<InventorySaleReturn> salesReturnRefundQuery,
         CancellationToken cancellationToken)
     {
         var onlineRows = await onlineCashQuery
@@ -1013,6 +1079,10 @@ public sealed class FinancialReportService(
             .GroupBy(item => item.ExpenseDate)
             .Select(group => new { Date = group.Key, Amount = group.Sum(item => item.Amount) })
             .ToDictionaryAsync(item => item.Date, item => item.Amount, cancellationToken);
+        var salesReturnRefunds = await salesReturnRefundQuery
+            .GroupBy(item => item.ReturnDate)
+            .Select(group => new { Date = group.Key, Amount = group.Sum(item => item.RefundAmount) })
+            .ToDictionaryAsync(item => item.Date, item => item.Amount, cancellationToken);
 
         return Enumerable.Range(0, end.DayNumber - start.DayNumber + 1)
             .Select(offset =>
@@ -1020,7 +1090,7 @@ public sealed class FinancialReportService(
                 var date = start.AddDays(offset);
                 var revenue = online.GetValueOrDefault(date) + manual.GetValueOrDefault(date);
                 var cost = purchases.GetValueOrDefault(date) + payroll.GetValueOrDefault(date) +
-                    expenses.GetValueOrDefault(date);
+                    expenses.GetValueOrDefault(date) + salesReturnRefunds.GetValueOrDefault(date);
                 return new FinancialTrendPoint(date, revenue, cost, revenue - cost);
             })
             .ToArray();
@@ -1058,6 +1128,16 @@ public sealed class FinancialReportService(
                 Cost = item.Items.Sum(line => line.Quantity * line.UnitCost)
             })
             .ToListAsync(cancellationToken);
+        var manualReturns = await context.InventorySaleReturns.AsNoTracking()
+            .Where(item => item.CurrencyCode == currency && item.ReturnDate >= start && item.ReturnDate <= end &&
+                (!branchId.HasValue || item.BranchId == branchId.Value))
+            .Select(item => new
+            {
+                Date = item.ReturnDate,
+                Revenue = item.Total - item.TaxAmount,
+                Cost = item.Items.Where(line => line.Restock).Sum(line => line.Quantity * line.UnitCost)
+            })
+            .ToListAsync(cancellationToken);
         var expenses = await context.Expenses.AsNoTracking()
             .Where(item => item.CurrencyCode == currency && item.ExpenseDate >= start && item.ExpenseDate <= end &&
                 (!branchId.HasValue || item.BranchId == branchId.Value))
@@ -1081,6 +1161,11 @@ public sealed class FinancialReportService(
             .ToDictionary(
                 group => group.Key,
                 group => new { Revenue = group.Sum(item => item.Revenue), Cost = group.Sum(item => item.Cost) });
+        var manualReturnsByDate = manualReturns
+            .GroupBy(item => item.Date)
+            .ToDictionary(
+                group => group.Key,
+                group => new { Revenue = group.Sum(item => item.Revenue), Cost = group.Sum(item => item.Cost) });
 
         return Enumerable.Range(0, end.DayNumber - start.DayNumber + 1)
             .Select(offset =>
@@ -1088,8 +1173,11 @@ public sealed class FinancialReportService(
                 var date = start.AddDays(offset);
                 var onlinePoint = onlineByDate.GetValueOrDefault(date);
                 var manualPoint = manualByDate.GetValueOrDefault(date);
-                var revenue = (onlinePoint?.Revenue ?? 0) + (manualPoint?.Revenue ?? 0);
-                var cost = (onlinePoint?.Cost ?? 0) + (manualPoint?.Cost ?? 0) +
+                var manualReturnPoint = manualReturnsByDate.GetValueOrDefault(date);
+                var revenue = (onlinePoint?.Revenue ?? 0) + (manualPoint?.Revenue ?? 0) -
+                    (manualReturnPoint?.Revenue ?? 0);
+                var cost = (onlinePoint?.Cost ?? 0) + (manualPoint?.Cost ?? 0) -
+                    (manualReturnPoint?.Cost ?? 0) +
                     expenses.GetValueOrDefault(date) + payroll.GetValueOrDefault(date);
                 return new FinancialTrendPoint(date, revenue, cost, revenue - cost);
             })
@@ -1148,9 +1236,40 @@ public sealed class FinancialReportService(
                 0,
                 0))
             .ToList();
+        var topManualReturnRows = await context.InventorySaleReturnItems.AsNoTracking()
+            .Where(item => item.InventorySaleReturn.ReturnDate >= startOnly &&
+                item.InventorySaleReturn.ReturnDate <= endOnly &&
+                item.InventorySaleReturn.CurrencyCode == currency &&
+                (!branchId.HasValue || item.InventorySaleReturn.BranchId == branchId.Value))
+            .Select(item => new
+            {
+                item.ProductId,
+                item.Product.Name,
+                item.Quantity,
+                item.LineTotal,
+                ReturnNetRevenue = item.InventorySaleReturn.Total - item.InventorySaleReturn.TaxAmount,
+                ReturnLinesTotal = item.InventorySaleReturn.Items.Sum(line => line.LineTotal),
+                Cost = item.Restock ? item.Quantity * item.UnitCost : 0
+            })
+            .ToListAsync(cancellationToken);
+        var topManualReturns = topManualReturnRows
+            .GroupBy(item => new { item.ProductId, item.Name })
+            .Select(group => new TopProductResponse(
+                group.Key.ProductId,
+                group.Key.Name,
+                -group.Sum(item => item.Quantity),
+                -group.Sum(item => AllocateLineRevenue(
+                    item.LineTotal,
+                    item.ReturnNetRevenue,
+                    item.ReturnLinesTotal)),
+                -group.Sum(item => item.Cost),
+                0,
+                0))
+            .ToList();
 
         return topOnline
             .Concat(topManual)
+            .Concat(topManualReturns)
             .GroupBy(item => new { item.ProductId, item.ProductName })
             .Select(group =>
             {
@@ -1174,6 +1293,7 @@ public sealed class FinancialReportService(
     private static async Task<IReadOnlyCollection<BusinessPartyMetricResponse>> GetTopCustomersAsync(
         IQueryable<Order> orders,
         IQueryable<InventorySale> sales,
+        IQueryable<InventorySaleReturn> salesReturns,
         CancellationToken cancellationToken)
     {
         var onlineRows = await orders.Where(item => item.Status == OrderStatus.Delivered)
@@ -1203,15 +1323,37 @@ public sealed class FinancialReportService(
                         ? item.Paid
                         : item.PaymentStatus == PaymentStatus.Paid ? item.Total : 0)))))
             .ToList();
-        var manual = await sales
-            .GroupBy(item => new { item.CustomerId, Name = item.CustomerName ?? "Walk-in customer" })
-            .Select(group => new BusinessPartyMetricResponse(
-                group.Key.CustomerId,
-                group.Key.Name,
-                group.Count(),
-                group.Sum(item => item.Total - item.Tax),
-                group.Sum(item => item.Total > item.PaidAmount ? item.Total - item.PaidAmount : 0)))
+        var manualSales = await sales
+            .Select(item => new BusinessPartyMetricResponse(
+                item.CustomerId,
+                item.Customer == null
+                    ? item.CustomerName ?? "Walk-in customer"
+                    : item.Customer.FirstName + " " + (item.Customer.LastName ?? ""),
+                1,
+                item.Total - item.Tax,
+                item.Total - item.ReturnedAmount > item.PaidAmount
+                    ? item.Total - item.ReturnedAmount - item.PaidAmount
+                    : 0))
             .ToListAsync(cancellationToken);
+        var manualReturns = await salesReturns
+            .Select(item => new BusinessPartyMetricResponse(
+                item.CustomerId,
+                item.Customer == null
+                    ? item.InventorySale.CustomerName ?? "Walk-in customer"
+                    : item.Customer.FirstName + " " + (item.Customer.LastName ?? ""),
+                0,
+                -(item.Total - item.TaxAmount),
+                0))
+            .ToListAsync(cancellationToken);
+        var manual = manualSales.Concat(manualReturns)
+            .GroupBy(item => new { item.Id, Name = item.Name.Trim() })
+            .Select(group => new BusinessPartyMetricResponse(
+                group.Key.Id,
+                group.Key.Name,
+                group.Sum(item => item.TransactionCount),
+                group.Sum(item => item.Amount),
+                group.Sum(item => item.Balance)))
+            .ToList();
 
         return online.Concat(manual)
             .GroupBy(item => new { item.Id, Name = item.Name.Trim() })
@@ -1286,7 +1428,11 @@ public sealed class FinancialReportService(
             .Where(item => item.ExpenseDate <= asOf && item.CurrencyCode == currency &&
                 (!branchId.HasValue || item.BranchId == branchId.Value))
             .SumAsync(item => (decimal?)item.Amount, cancellationToken) ?? 0;
-        return purchases + payroll + expenses;
+        var salesReturnRefunds = await context.InventorySaleReturns.AsNoTracking()
+            .Where(item => item.ReturnDate <= asOf && item.CurrencyCode == currency && item.RefundAmount > 0 &&
+                (!branchId.HasValue || item.BranchId == branchId.Value))
+            .SumAsync(item => (decimal?)item.RefundAmount, cancellationToken) ?? 0;
+        return purchases + payroll + expenses + salesReturnRefunds;
     }
 
     private async Task<decimal> GetInventoryValueAsync(

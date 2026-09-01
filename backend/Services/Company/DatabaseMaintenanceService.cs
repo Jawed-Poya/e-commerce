@@ -247,6 +247,8 @@ ALTER DATABASE {QuoteIdentifier(databaseName)} SET MULTI_USER;
         await DeleteAsync("purchases", context.PurchaseItems);
         await DeleteAsync("purchases", context.Purchases);
 
+        await DeleteAsync("manual sales", context.InventorySaleReturnItems);
+        await DeleteAsync("manual sales", context.InventorySaleReturns);
         await DeleteAsync("manual sales", context.InventorySalePayments);
         await DeleteAsync("manual sales", context.InventorySaleItems);
         await DeleteAsync("manual sales", context.InventorySales);

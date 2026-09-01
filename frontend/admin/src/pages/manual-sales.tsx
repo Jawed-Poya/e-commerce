@@ -6,6 +6,7 @@ import {
     Layers3,
     LoaderCircle,
     Pencil,
+    RotateCcw,
     Save,
     Trash2,
     TrendingDown,
@@ -89,8 +90,10 @@ import { operationsService } from "@/features/operations/operations-service";
 import type {
     DocumentItem,
     ManualSale,
+    ManualSaleDetails,
     ManualSaleLotMovement,
     OperationCustomer,
+    SalesReturn,
 } from "@/features/operations/operations-types";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -125,11 +128,31 @@ export default function ManualSalesPage() {
     const [lotSale, setLotSale] = useState<ManualSale | null>(null);
     const [editingSale, setEditingSale] = useState<ManualSale | null>(null);
     const [deletingSale, setDeletingSale] = useState<ManualSale | null>(null);
+    const [editItems, setEditItems] = useState<DocumentItem[]>([newDocumentItem()]);
+    const [editLineLimitOverrideEnabled, setEditLineLimitOverrideEnabled] = useState(false);
     const [editForm, setEditForm] = useState({
         saleDate: today(),
         customerName: "",
         customerPhone: "",
+        discount: 0,
+        discountPercent: 0,
+        secondaryDiscountPercent: 0,
+        tax: 0,
+        paidAmount: 0,
+        useCustomerCredit: true,
+        debtDueDate: "",
         referenceNumber: "",
+        notes: "",
+    });
+    const [returnSale, setReturnSale] = useState<ManualSale | null>(null);
+    const [returnDetails, setReturnDetails] = useState<ManualSaleDetails | null>(null);
+    const [returnHistory, setReturnHistory] = useState<SalesReturn[]>([]);
+    const [returnLines, setReturnLines] = useState<Record<number, { quantity: number; restock: boolean }>>({});
+    const [returnForm, setReturnForm] = useState({
+        returnDate: today(),
+        settlementMode: "CustomerCredit" as "Refund" | "CustomerCredit",
+        refundMethod: "Cash",
+        reason: "",
         notes: "",
     });
     const { data: saleLots, isLoading: saleLotsLoading } = useOperationQuery(
@@ -175,6 +198,19 @@ export default function ManualSalesPage() {
         ? Math.min(selectedCustomer.accountCredit, Math.max(0, total - form.paidAmount))
         : 0;
     const remaining = roundCurrency(Math.max(0, total - form.paidAmount - creditApplied));
+    const editLinesNet = useMemo(
+        () => editItems.reduce((sum, item) => sum + stackedLineTotal(item), 0),
+        [editItems],
+    );
+    const editEffectiveDiscountPercent = editForm.discountPercent > 0
+        ? editForm.discountPercent
+        : operationPolicy?.generalSalesDiscountPercent ?? 0;
+    const editDiscountedSubtotal = calculateStackedDiscountNet(
+        editLinesNet,
+        editEffectiveDiscountPercent,
+        editForm.secondaryDiscountPercent,
+    );
+    const editTotal = roundCurrency(Math.max(0, editDiscountedSubtotal - editForm.discount + editForm.tax));
     const profitPreview = useMemo(() => {
         const saleItems = getSubmittableDocumentLines(items);
         if (!saleItems.length || saleItems.some((item) => !isDocumentLineComplete(item))) {
@@ -352,34 +388,167 @@ export default function ManualSalesPage() {
         }
     };
 
-    const openSaleEditor = (sale: ManualSale) => {
-        setEditForm({
-            saleDate: sale.saleDate,
-            customerName: sale.customerName,
-            customerPhone: sale.customerPhone ?? "",
-            referenceNumber: sale.referenceNumber ?? "",
-            notes: sale.notes ?? "",
-        });
-        setEditingSale(sale);
+    const openSaleEditor = async (sale: ManualSale) => {
+        setSaving(true);
+        try {
+            const details = (await operationsService.sale(sale.id)).data;
+            const products = await Promise.all(details.items.map(async (line) => {
+                const matches = await operationsService.products(line.barcode ?? line.productName, 50, true);
+                const product = matches.find((item) => item.id === line.productId);
+                if (!product) return null;
+                return {
+                    ...product,
+                    availableQuantity: product.availableQuantity + line.quantity,
+                    units: product.units.map((unit) => ({
+                        ...unit,
+                        availableQuantity: unit.availableQuantity + line.quantity / Math.max(unit.conversionFactor, 0.000001),
+                    })),
+                };
+            }));
+            if (products.some((product) => !product)) {
+                throw new Error("One or more sale products are inactive or unavailable and cannot be corrected.");
+            }
+            setEditForm({
+                saleDate: details.saleDate,
+                customerName: details.customerName,
+                customerPhone: details.customerPhone ?? "",
+                discount: details.discount,
+                discountPercent: details.discountPercent,
+                secondaryDiscountPercent: details.secondaryDiscountPercent,
+                tax: details.tax,
+                paidAmount: details.paidAmount,
+                useCustomerCredit: details.customerCreditApplied > 0,
+                debtDueDate: details.debtDueDate ?? "",
+                referenceNumber: details.referenceNumber ?? "",
+                notes: details.notes ?? "",
+            });
+            setEditItems(details.items.map((line, index) => ({
+                productId: line.productId,
+                unitId: line.selectedUnitId,
+                unitName: line.selectedUnitName,
+                conversionFactor: line.unitConversionFactor,
+                quantity: line.enteredQuantity,
+                amount: line.enteredUnitPrice,
+                bonusQuantity: line.bonusQuantity,
+                discountPercent: line.discountPercent,
+                product: products[index],
+            })));
+            setEditLineLimitOverrideEnabled(false);
+            setEditingSale(sale);
+        } catch (error) {
+            toast.error(message(error));
+        } finally {
+            setSaving(false);
+        }
     };
 
     const saveSaleEdit = async () => {
         if (!editingSale) return;
+        const documentItems = getSubmittableDocumentLines(editItems);
+        if (!documentItems.length || documentItems.some((item) => !isDocumentLineComplete(item))) {
+            return toast.error("Complete at least one sale product line.");
+        }
+        if (new Set(documentItems.map((item) => item.productId)).size !== documentItems.length) {
+            return toast.error("Each product may appear only once.");
+        }
+        if (!editingSale.customerId && editTotal < editForm.paidAmount) {
+            return toast.error(`A walk-in sale total cannot be lower than its recorded payments (${formatMoney(editForm.paidAmount)}).`);
+        }
         setSaving(true);
         try {
             await operationsService.updateSale(editingSale.id, {
+                overrideLineLimit: editLineLimitOverrideEnabled,
                 saleDate: editForm.saleDate,
                 customerName: editingSale.customerId ? null : nullable(editForm.customerName),
                 customerPhone: editingSale.customerId ? null : nullable(editForm.customerPhone),
+                discount: editForm.discount,
+                discountPercent: editForm.discountPercent,
+                secondaryDiscountPercent: editForm.secondaryDiscountPercent,
+                tax: editForm.tax,
+                useCustomerCredit: editForm.useCustomerCredit,
+                debtDueDate: editForm.debtDueDate || null,
                 referenceNumber: nullable(editForm.referenceNumber),
                 notes: nullable(editForm.notes),
+                items: documentItems.map((item) => ({
+                    productId: item.productId,
+                    unitId: item.unitId,
+                    quantity: item.quantity,
+                    unitPrice: item.amount,
+                    bonusQuantity: item.bonusQuantity,
+                    discountPercent: item.discountPercent,
+                })),
             });
             await Promise.all([
                 queryClient.invalidateQueries({ queryKey: operationKeys.saleRoot }),
                 queryClient.invalidateQueries({ queryKey: operationKeys.summary }),
+                queryClient.invalidateQueries({ queryKey: ["inventory"] }),
+                queryClient.invalidateQueries({ queryKey: ["customers"] }),
             ]);
             setEditingSale(null);
-            toast.success("Sale details updated.");
+            toast.success("Sale corrected; stock, customer balance, and accounting were reposted.");
+        } catch (error) {
+            toast.error(message(error));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const openSaleReturn = async (sale: ManualSale) => {
+        setSaving(true);
+        try {
+            const [detailsResponse, historyResponse] = await Promise.all([
+                operationsService.sale(sale.id),
+                operationsService.saleReturns(sale.id),
+            ]);
+            const history = historyResponse.data;
+            setReturnDetails(detailsResponse.data);
+            setReturnHistory(history);
+            setReturnLines(Object.fromEntries(detailsResponse.data.items.map((item) => [
+                item.id,
+                { quantity: 0, restock: true },
+            ])));
+            setReturnForm({
+                returnDate: today(),
+                settlementMode: sale.customerId ? "CustomerCredit" : "Refund",
+                refundMethod: "Cash",
+                reason: "",
+                notes: "",
+            });
+            setReturnSale(sale);
+        } catch (error) {
+            toast.error(message(error));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const submitSaleReturn = async () => {
+        if (!returnSale || !returnDetails) return;
+        const itemsToReturn = returnDetails.items.flatMap((item) => {
+            const selected = returnLines[item.id];
+            return selected?.quantity > 0
+                ? [{ saleItemId: item.id, quantity: selected.quantity, restock: selected.restock }]
+                : [];
+        });
+        if (!itemsToReturn.length) return toast.error("Enter a return quantity for at least one product.");
+        if (!returnForm.reason.trim()) return toast.error("Return reason is required.");
+        setSaving(true);
+        try {
+            const result = await operationsService.createSaleReturn(returnSale.id, {
+                ...returnForm,
+                reason: returnForm.reason.trim(),
+                notes: nullable(returnForm.notes),
+                items: itemsToReturn,
+            });
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: operationKeys.saleRoot }),
+                queryClient.invalidateQueries({ queryKey: operationKeys.summary }),
+                queryClient.invalidateQueries({ queryKey: ["inventory"] }),
+                queryClient.invalidateQueries({ queryKey: ["customers"] }),
+            ]);
+            setReturnSale(null);
+            setReturnDetails(null);
+            toast.success(`Return ${result.data.returnNumber} posted for ${formatMoney(result.data.total)}.`);
         } catch (error) {
             toast.error(message(error));
         } finally {
@@ -472,7 +641,10 @@ export default function ManualSalesPage() {
                                         </TableCell>
                                         <TableCell>{sale.itemCount}</TableCell>
                                         <TableCell className="text-end">
-                                            {formatMoney(sale.total)}
+                                            <p>{formatMoney(Math.max(0, sale.total - sale.returnedAmount))}</p>
+                                            {sale.returnedAmount > 0 ? (
+                                                <p className="text-xs text-amber-600">Returned {formatMoney(sale.returnedAmount)}</p>
+                                            ) : null}
                                         </TableCell>
                                         <TableCell className="text-end">
                                             {formatMoney(sale.paidAmount)}
@@ -515,9 +687,18 @@ export default function ManualSalesPage() {
                                                         <Button
                                                             size="icon-sm"
                                                             variant="outline"
+                                                            title="Customer return"
+                                                            aria-label={`Return items from ${sale.saleNumber}`}
+                                                            onClick={() => void openSaleReturn(sale)}
+                                                        >
+                                                            <RotateCcw className="size-4" />
+                                                        </Button>
+                                                        <Button
+                                                            size="icon-sm"
+                                                            variant="outline"
                                                             title="Edit sale"
                                                             aria-label={`Edit ${sale.saleNumber}`}
-                                                            onClick={() => openSaleEditor(sale)}
+                                                            onClick={() => void openSaleEditor(sale)}
                                                         >
                                                             <Pencil className="size-4" />
                                                         </Button>
@@ -796,15 +977,14 @@ export default function ManualSalesPage() {
                 open={Boolean(editingSale)}
                 onOpenChange={(next) => !next && !saving && setEditingSale(null)}
             >
-                <DialogContent className="sm:max-w-2xl">
+                <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-6xl">
                     <DialogHeader>
                         <DialogTitle>Edit {editingSale?.saleNumber}</DialogTitle>
                         <DialogDescription>
-                            Correct the customer and document details. Product lines, totals,
-                            inventory movements, and payments remain unchanged.
+                            Correct products, quantities, prices, or totals. The old stock and accounting entries are reversed and the corrected sale is reposted. Payment history is preserved. A sale with returns cannot be rewritten.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <Field label="Sale date">
                             <Input
                                 type="date"
@@ -837,22 +1017,159 @@ export default function ManualSalesPage() {
                                 This sale is linked to a registered customer. Update their name or phone from the Customers page.
                             </p>
                         ) : null}
-                        <div className="space-y-2 sm:col-span-2">
-                            <Label>Notes</Label>
-                            <Textarea
-                                value={editForm.notes}
-                                onChange={(event) => setEditForm((current) => ({ ...current, notes: event.target.value }))}
-                            />
-                        </div>
                     </div>
+                    <Separator />
+                    <DocumentLines
+                        items={editItems}
+                        setItems={setEditItems}
+                        mode="sale"
+                        maximumLines={operationPolicy?.maximumManualSaleLines ?? 50}
+                        canOverrideLineLimit={operationPolicy?.canOverrideLineLimits ?? false}
+                        overrideLineLimit={editLineLimitOverrideEnabled}
+                        onOverrideLineLimitChange={setEditLineLimitOverrideEnabled}
+                        allowNegativeStock={operationPolicy?.allowNegativeStockSales ?? false}
+                    />
+                    <Separator />
+                    <DocumentSettlementLayout
+                        notes={editForm.notes}
+                        onNotesChange={(notes) => setEditForm((current) => ({ ...current, notes }))}
+                        summaryTitle="Corrected sale totals"
+                        summaryDescription="Existing payments remain attached and customer credit is recalculated safely."
+                    >
+                        <MoneySummaryRow label="Product lines" value={editLinesNet} />
+                        <AmountInputRow label="Discount" value={editForm.discount} onChange={(discount) => setEditForm((current) => ({ ...current, discount }))} />
+                        <AmountInputRow label="General discount 1 %" value={editForm.discountPercent} max={100} onChange={(discountPercent) => setEditForm((current) => ({ ...current, discountPercent }))} />
+                        <AmountInputRow label="General discount 2 %" value={editForm.secondaryDiscountPercent} max={100} onChange={(secondaryDiscountPercent) => setEditForm((current) => ({ ...current, secondaryDiscountPercent }))} />
+                        <AmountInputRow label="Tax" value={editForm.tax} onChange={(tax) => setEditForm((current) => ({ ...current, tax }))} />
+                        {editingSale?.customerId ? (
+                            <label className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3 text-sm">
+                                <Checkbox checked={editForm.useCustomerCredit} onCheckedChange={(checked) => setEditForm((current) => ({ ...current, useCustomerCredit: checked === true }))} />
+                                <span><strong className="block">Use available customer credit</strong><span className="text-xs text-muted-foreground">Credit and any resulting debt are recalculated when the correction is posted.</span></span>
+                            </label>
+                        ) : null}
+                        {editingSale?.customerId && editTotal > editForm.paidAmount ? (
+                            <Field label="Debt due date"><Input type="date" value={editForm.debtDueDate} onChange={(event) => setEditForm((current) => ({ ...current, debtDueDate: event.target.value }))} /></Field>
+                        ) : null}
+                        <Separator />
+                        <MoneySummaryRow label="Corrected total" value={editTotal} emphasis />
+                        <MoneySummaryRow label="Payments preserved" value={editForm.paidAmount} muted />
+                        <MoneySummaryRow label="Balance before credit recalculation" value={Math.max(0, editTotal - editForm.paidAmount)} muted />
+                    </DocumentSettlementLayout>
                     <DialogFooter>
                         <Button variant="outline" disabled={saving} onClick={() => setEditingSale(null)}>
                             Cancel
                         </Button>
                         <Button disabled={saving || !editForm.saleDate} onClick={() => void saveSaleEdit()}>
                             {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
-                            Save changes
+                            Apply correction
                         </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={Boolean(returnSale)}
+                onOpenChange={(next) => !next && !saving && setReturnSale(null)}
+            >
+                <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-5xl">
+                    <DialogHeader>
+                        <DialogTitle>Customer return · {returnSale?.saleNumber}</DialogTitle>
+                        <DialogDescription>
+                            Create a formal return document. Outstanding debt is reduced first; any remaining value is refunded or saved as registered-customer credit. Restocked products are returned to their original inventory lots when possible.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {returnDetails ? (
+                        <>
+                            <div className="overflow-x-auto rounded-xl border">
+                                <Table className="min-w-[760px]">
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Product</TableHead>
+                                            <TableHead className="text-end">Sold</TableHead>
+                                            <TableHead className="text-end">Already returned</TableHead>
+                                            <TableHead className="w-40 text-end">Return now</TableHead>
+                                            <TableHead className="text-center">Restock</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {returnDetails.items.map((item) => {
+                                            const alreadyReturned = returnHistory.flatMap((entry) => entry.items)
+                                                .filter((line) => line.saleItemId === item.id)
+                                                .reduce((sum, line) => sum + line.quantity, 0);
+                                            const returnable = Math.max(0, item.enteredQuantity - alreadyReturned);
+                                            return (
+                                                <TableRow key={item.id}>
+                                                    <TableCell><p className="font-medium">{item.productName}</p><p className="text-xs text-muted-foreground">{item.selectedUnitName ?? "unit"} · {formatMoney(item.enteredUnitPrice)}</p></TableCell>
+                                                    <TableCell className="text-end tabular-nums">{item.enteredQuantity.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-end tabular-nums">{alreadyReturned.toLocaleString()}</TableCell>
+                                                    <TableCell>
+                                                        <Input
+                                                            className="text-end"
+                                                            type="number"
+                                                            min={0}
+                                                            max={returnable}
+                                                            step="0.001"
+                                                            disabled={returnable <= 0}
+                                                            value={returnLines[item.id]?.quantity ?? 0}
+                                                            onChange={(event) => {
+                                                                const quantity = Math.max(0, Math.min(returnable, Number(event.target.value)));
+                                                                setReturnLines((current) => ({ ...current, [item.id]: { quantity, restock: current[item.id]?.restock ?? true } }));
+                                                            }}
+                                                        />
+                                                        <p className="mt-1 text-end text-xs text-muted-foreground">Max {returnable.toLocaleString()}</p>
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        <Checkbox
+                                                            checked={returnLines[item.id]?.restock ?? true}
+                                                            disabled={returnable <= 0}
+                                                            onCheckedChange={(checked) => setReturnLines((current) => ({ ...current, [item.id]: { quantity: current[item.id]?.quantity ?? 0, restock: checked === true } }))}
+                                                        />
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <Field label="Return date"><Input type="date" value={returnForm.returnDate} onChange={(event) => setReturnForm((current) => ({ ...current, returnDate: event.target.value }))} /></Field>
+                                <Field label="Settlement">
+                                    <SimpleCombobox
+                                        value={returnForm.settlementMode}
+                                        onValueChange={(settlementMode) => setReturnForm((current) => ({ ...current, settlementMode: (settlementMode ?? "Refund") as "Refund" | "CustomerCredit" }))}
+                                        options={[
+                                            { value: "Refund", label: "Refund customer" },
+                                            ...(returnSale?.customerId ? [{ value: "CustomerCredit", label: "Save as account credit" }] : []),
+                                        ]}
+                                        placeholder="Select settlement"
+                                    />
+                                </Field>
+                                {returnForm.settlementMode === "Refund" ? (
+                                    <Field label="Refund method">
+                                        <SimpleCombobox value={returnForm.refundMethod} onValueChange={(refundMethod) => setReturnForm((current) => ({ ...current, refundMethod: refundMethod ?? "Cash" }))} options={["Cash", "Bank transfer", "Card", "Mobile money", "Other"].map((value) => ({ value, label: value }))} placeholder="Select refund method" />
+                                    </Field>
+                                ) : null}
+                                <Field label="Return reason"><Input value={returnForm.reason} onChange={(event) => setReturnForm((current) => ({ ...current, reason: event.target.value }))} placeholder="Damaged, wrong product, customer request…" /></Field>
+                                <div className="space-y-2 sm:col-span-2"><Label>Notes</Label><Textarea value={returnForm.notes} onChange={(event) => setReturnForm((current) => ({ ...current, notes: event.target.value }))} /></div>
+                            </div>
+                            {returnHistory.length ? (
+                                <div className="rounded-xl border bg-muted/20 p-4">
+                                    <p className="font-medium">Previous returns</p>
+                                    <div className="mt-2 space-y-2 text-sm">
+                                        {returnHistory.map((entry) => (
+                                            <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2">
+                                                <span>{entry.returnNumber} · {date(entry.returnDate)} · {entry.reason}</span>
+                                                <span className="font-medium">{formatMoney(entry.total)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : null}
+                        </>
+                    ) : <div className="flex justify-center p-10"><LoaderCircle className="animate-spin" /></div>}
+                    <DialogFooter>
+                        <Button variant="outline" disabled={saving} onClick={() => setReturnSale(null)}>Cancel</Button>
+                        <Button disabled={saving || !returnDetails} onClick={() => void submitSaleReturn()}>{saving ? <LoaderCircle className="animate-spin" /> : <RotateCcw />}Post return</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -926,7 +1243,7 @@ export default function ManualSalesPage() {
                     title="Sale payments"
                     description="Record customer installments and preserve previous receipts"
                     documentNumber={selectedSale.saleNumber}
-                    total={selectedSale.total}
+                    total={Math.max(0, selectedSale.total - selectedSale.returnedAmount)}
                     paidAmount={selectedSale.paidAmount}
                     remainingAmount={selectedSale.remainingAmount}
                     paymentStatus={selectedSale.paymentStatus}

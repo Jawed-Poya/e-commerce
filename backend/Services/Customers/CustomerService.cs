@@ -64,14 +64,14 @@ public sealed class CustomerService(
                     .Sum(order => (decimal?)order.Total) ?? 0,
                 ManualSales = context.InventorySales
                     .Where(sale => sale.CustomerId == customer.Id)
-                    .Sum(sale => (decimal?)sale.Total) ?? 0,
+                    .Sum(sale => (decimal?)(sale.Total - sale.ReturnedAmount)) ?? 0,
                 OutstandingDebt = context.InventorySales
-                    .Where(sale => sale.CustomerId == customer.Id && sale.Total > sale.PaidAmount)
-                    .Sum(sale => (decimal?)(sale.Total - sale.PaidAmount)) ?? 0,
+                    .Where(sale => sale.CustomerId == customer.Id && sale.Total - sale.ReturnedAmount > sale.PaidAmount)
+                    .Sum(sale => (decimal?)(sale.Total - sale.ReturnedAmount - sale.PaidAmount)) ?? 0,
                 customer.AccountCredit,
                 CreditLimit = customer.CreditLimit ?? companyDebtLimit,
                 HasOverdueDebt = context.InventorySales.Any(sale =>
-                    sale.CustomerId == customer.Id && sale.Total > sale.PaidAmount &&
+                    sale.CustomerId == customer.Id && sale.Total - sale.ReturnedAmount > sale.PaidAmount &&
                     sale.DebtDueDate.HasValue && sale.DebtDueDate.Value < today),
                 LastOrderAt = customer.Orders
                     .OrderByDescending(order => order.CreatedAt)
@@ -130,11 +130,11 @@ public sealed class CustomerService(
             .Select(item => new { item.MaximumCustomerDebt, item.DefaultDebtDueDays })
             .SingleOrDefaultAsync(cancellationToken);
         var outstandingDebt = await context.InventorySales.AsNoTracking()
-            .Where(sale => sale.CustomerId == id && sale.Total > sale.PaidAmount)
-            .SumAsync(sale => (decimal?)(sale.Total - sale.PaidAmount), cancellationToken) ?? 0;
+            .Where(sale => sale.CustomerId == id && sale.Total - sale.ReturnedAmount > sale.PaidAmount)
+            .SumAsync(sale => (decimal?)(sale.Total - sale.ReturnedAmount - sale.PaidAmount), cancellationToken) ?? 0;
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var hasOverdueDebt = await context.InventorySales.AsNoTracking().AnyAsync(sale =>
-            sale.CustomerId == id && sale.Total > sale.PaidAmount &&
+            sale.CustomerId == id && sale.Total - sale.ReturnedAmount > sale.PaidAmount &&
             sale.DebtDueDate.HasValue && sale.DebtDueDate.Value < today,
             cancellationToken);
         return MapDetails(

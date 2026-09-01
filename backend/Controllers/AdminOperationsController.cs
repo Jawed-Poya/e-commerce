@@ -117,7 +117,7 @@ public sealed class AdminOperationsController(IOperationsService service, IFinan
     [HttpPut("purchases/{id:long}")]
     public Task<IActionResult> UpdatePurchase(long id, UpdatePurchaseRequest request, CancellationToken ct) =>
         Handle(async () => ApiResponse<PurchaseListItem>.Ok(
-            await service.UpdatePurchaseAsync(id, request, UserId(), ct),
+            await service.UpdatePurchaseAsync(id, request, UserId(), request.OverrideLineLimit && HasAnyPermission(AppPermissions.OperationLineLimitsOverride), ct),
             "Purchase details updated."));
 
     [Authorize(Policy = AppPermissions.PurchasesManage)]
@@ -143,6 +143,11 @@ public sealed class AdminOperationsController(IOperationsService service, IFinan
         Ok(ApiResponse<PagedResult<InventorySaleListItem>>.Ok(await service.GetSalesAsync(search, page, pageSize, ct)));
 
     [Authorize(Policy = AppPermissions.ManualSalesView)]
+    [HttpGet("sales/{id:long}")]
+    public async Task<IActionResult> GetSale(long id, CancellationToken ct) =>
+        Ok(ApiResponse<InventorySaleDetailsResponse>.Ok(await service.GetSaleAsync(id, ct)));
+
+    [Authorize(Policy = AppPermissions.ManualSalesView)]
     [HttpGet("sales/{id:long}/lots")]
     public async Task<IActionResult> SaleLots(long id, CancellationToken ct) =>
         Ok(ApiResponse<IReadOnlyList<InventorySaleLotMovementResponse>>.Ok(
@@ -156,7 +161,7 @@ public sealed class AdminOperationsController(IOperationsService service, IFinan
     [HttpPut("sales/{id:long}")]
     public Task<IActionResult> UpdateSale(long id, UpdateInventorySaleRequest request, CancellationToken ct) =>
         Handle(async () => ApiResponse<InventorySaleListItem>.Ok(
-            await service.UpdateSaleAsync(id, request, UserId(), ct),
+            await service.UpdateSaleAsync(id, request, UserId(), request.OverrideLineLimit && HasAnyPermission(AppPermissions.OperationLineLimitsOverride), ct),
             "Sale details updated."));
 
     [Authorize(Policy = AppPermissions.ManualSalesManage)]
@@ -167,6 +172,19 @@ public sealed class AdminOperationsController(IOperationsService service, IFinan
             await service.DeleteSaleAsync(id, UserId(), ct);
             return ApiResponse<object>.Ok(new { id }, "Sale deleted and stock reversed.");
         });
+
+    [Authorize(Policy = AppPermissions.ManualSalesView)]
+    [HttpGet("sales/{id:long}/returns")]
+    public async Task<IActionResult> SaleReturns(long id, CancellationToken ct) =>
+        Ok(ApiResponse<IReadOnlyList<InventorySaleReturnResponse>>.Ok(
+            await service.GetSaleReturnsAsync(id, ct)));
+
+    [Authorize(Policy = AppPermissions.ManualSalesManage)]
+    [HttpPost("sales/{id:long}/returns")]
+    public Task<IActionResult> CreateSaleReturn(long id, CreateInventorySaleReturnRequest request, CancellationToken ct) =>
+        Handle(async () => ApiResponse<InventorySaleReturnResponse>.Ok(
+            await service.CreateSaleReturnAsync(id, request, UserId(), ct),
+            "Customer return recorded and stock/balances updated."));
 
     [Authorize(Policy = AppPermissions.ManualSalesView)]
     [HttpGet("sales/{id:long}/payments")]

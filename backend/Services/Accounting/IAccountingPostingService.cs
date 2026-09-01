@@ -9,6 +9,7 @@ public interface IAccountingPostingService
     Task<bool> PostPurchasePaymentAsync(Purchase purchase, PurchasePayment payment, string? supplierName, string? postedByUserId, CancellationToken ct);
     Task<bool> PostManualSaleAsync(InventorySale sale, string customerName, string? postedByUserId, CancellationToken ct);
     Task<bool> PostSalePaymentAsync(InventorySale sale, InventorySalePayment payment, decimal receivableBeforePayment, string customerName, string? postedByUserId, CancellationToken ct);
+    Task<bool> PostSalesReturnAsync(InventorySaleReturn salesReturn, string customerName, string? postedByUserId, CancellationToken ct);
     Task<bool> PostExpenseAsync(Expense expense, string categoryName, string? postedByUserId, CancellationToken ct);
     Task<bool> PostPayrollAccrualAsync(StaffSalaryPayment salary, string staffName, string? postedByUserId, CancellationToken ct);
     Task<bool> PostPayrollPaymentAsync(StaffSalaryPayment salary, StaffSalaryInstallment payment, string staffName, string? postedByUserId, CancellationToken ct);

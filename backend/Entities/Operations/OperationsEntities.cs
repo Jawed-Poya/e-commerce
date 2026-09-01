@@ -19,12 +19,14 @@ public enum JournalVoucherType
     SaleReceipt = 21,
     OnlineSale = 22,
     OnlineReceipt = 23,
+    SalesReturn = 24,
     Expense = 30,
     PayrollAccrual = 40,
     PayrollPayment = 41,
     Reversal = 90
 }
 public enum JournalVoucherStatus { Posted = 1, Reversed = 2 }
+public enum SalesReturnSettlementMode { Refund = 1, CustomerCredit = 2 }
 
 public sealed class Supplier : BaseEntity
 {
@@ -121,9 +123,11 @@ public sealed class InventorySale : BaseEntity
     public DateOnly? DebtDueDate { get; set; }
     public decimal CustomerCreditApplied { get; set; }
     public decimal CustomerCreditCreated { get; set; }
+    public decimal ReturnedAmount { get; set; }
     public string? CreatedByUserId { get; set; }
     public ICollection<InventorySaleItem> Items { get; set; } = [];
     public ICollection<InventorySalePayment> Payments { get; set; } = [];
+    public ICollection<InventorySaleReturn> Returns { get; set; } = [];
 }
 
 public sealed class InventorySaleItem : BaseEntity
@@ -158,6 +162,47 @@ public sealed class InventorySalePayment : BaseEntity
     public string? ReferenceNumber { get; set; }
     public string? Notes { get; set; }
     public string? CreatedByUserId { get; set; }
+}
+
+public sealed class InventorySaleReturn : BaseEntity
+{
+    public string ReturnNumber { get; set; } = null!;
+    public long InventorySaleId { get; set; }
+    public InventorySale InventorySale { get; set; } = null!;
+    public long? CustomerId { get; set; }
+    public Customer? Customer { get; set; }
+    public DateOnly ReturnDate { get; set; }
+    public SalesReturnSettlementMode SettlementMode { get; set; }
+    public decimal Total { get; set; }
+    public decimal TaxAmount { get; set; }
+    public decimal DebtReduction { get; set; }
+    public decimal RefundAmount { get; set; }
+    public decimal CreditAmount { get; set; }
+    public string RefundMethod { get; set; } = "Cash";
+    public string CurrencyCode { get; set; } = "USD";
+    public string Reason { get; set; } = null!;
+    public string? Notes { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public ICollection<InventorySaleReturnItem> Items { get; set; } = [];
+}
+
+public sealed class InventorySaleReturnItem : BaseEntity
+{
+    public long InventorySaleReturnId { get; set; }
+    public InventorySaleReturn InventorySaleReturn { get; set; } = null!;
+    public long InventorySaleItemId { get; set; }
+    public InventorySaleItem InventorySaleItem { get; set; } = null!;
+    public long ProductId { get; set; }
+    public Product Product { get; set; } = null!;
+    public decimal Quantity { get; set; }
+    public decimal EnteredQuantity { get; set; }
+    public long? SelectedUnitId { get; set; }
+    public string? SelectedUnitName { get; set; }
+    public decimal UnitConversionFactor { get; set; } = 1;
+    public decimal UnitPrice { get; set; }
+    public decimal UnitCost { get; set; }
+    public decimal LineTotal { get; set; }
+    public bool Restock { get; set; } = true;
 }
 
 public sealed class Staff : BaseEntity

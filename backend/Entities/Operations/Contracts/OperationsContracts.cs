@@ -99,10 +99,17 @@ public sealed class PurchaseItemRequest
 }
 public sealed class UpdatePurchaseRequest
 {
+    public bool OverrideLineLimit { get; set; }
     public long? SupplierId { get; set; }
     public DateOnly PurchaseDate { get; set; }
+    public decimal Discount { get; set; }
+    public decimal DiscountPercent { get; set; }
+    public decimal SecondaryDiscountPercent { get; set; }
+    public decimal Tax { get; set; }
+    public decimal OtherCost { get; set; }
     public string? ReferenceNumber { get; set; }
     public string? Notes { get; set; }
+    public List<PurchaseItemRequest> Items { get; set; } = [];
 }
 public sealed record PurchaseListItem(long Id, string PurchaseNumber, string? ReferenceNumber, DateOnly PurchaseDate, string? SupplierName, int ItemCount, decimal Total, decimal PaidAmount, decimal RemainingAmount, DocumentPaymentStatus PaymentStatus, PurchaseStatus Status, DateTime CreatedAt);
 public sealed record PurchaseItemDetailsResponse(
@@ -119,6 +126,8 @@ public sealed record PurchaseItemDetailsResponse(
     decimal UnitConversionFactor,
     decimal EnteredUnitCost,
     decimal LineTotal,
+    decimal BonusQuantity,
+    decimal DiscountPercent,
     string? LotNumber,
     DateOnly? ExpireDate);
 
@@ -133,6 +142,8 @@ public sealed record PurchaseDetailsResponse(
     DocumentPaymentStatus PaymentStatus,
     decimal Subtotal,
     decimal Discount,
+    decimal DiscountPercent,
+    decimal SecondaryDiscountPercent,
     decimal Tax,
     decimal OtherCost,
     decimal Total,
@@ -175,13 +186,63 @@ public sealed class InventorySaleItemRequest
 }
 public sealed class UpdateInventorySaleRequest
 {
+    public bool OverrideLineLimit { get; set; }
     public DateOnly SaleDate { get; set; }
     public string? CustomerName { get; set; }
     public string? CustomerPhone { get; set; }
+    public decimal Discount { get; set; }
+    public decimal DiscountPercent { get; set; }
+    public decimal SecondaryDiscountPercent { get; set; }
+    public decimal Tax { get; set; }
+    public bool UseCustomerCredit { get; set; } = true;
+    public DateOnly? DebtDueDate { get; set; }
     public string? ReferenceNumber { get; set; }
     public string? Notes { get; set; }
+    public List<InventorySaleItemRequest> Items { get; set; } = [];
 }
-public sealed record InventorySaleListItem(long Id, string SaleNumber, string? ReferenceNumber, DateOnly SaleDate, long? CustomerId, string CustomerName, string? CustomerPhone, string? Notes, string? WhatsAppUrl, int ItemCount, decimal Total, decimal PaidAmount, decimal RemainingAmount, DocumentPaymentStatus PaymentStatus, decimal CostOfGoods, decimal GrossProfit, decimal ProfitMargin, DateTime CreatedAt);
+public sealed record InventorySaleListItem(long Id, string SaleNumber, string? ReferenceNumber, DateOnly SaleDate, long? CustomerId, string CustomerName, string? CustomerPhone, string? Notes, string? WhatsAppUrl, int ItemCount, decimal Total, decimal ReturnedAmount, decimal PaidAmount, decimal RemainingAmount, DocumentPaymentStatus PaymentStatus, decimal CostOfGoods, decimal GrossProfit, decimal ProfitMargin, DateTime CreatedAt);
+public sealed record InventorySaleItemDetailsResponse(
+    long Id,
+    long ProductId,
+    string ProductName,
+    string? Strength,
+    string? Barcode,
+    decimal Quantity,
+    decimal UnitPrice,
+    decimal UnitCost,
+    decimal EnteredQuantity,
+    long? SelectedUnitId,
+    string? SelectedUnitName,
+    decimal UnitConversionFactor,
+    decimal EnteredUnitPrice,
+    decimal LineTotal,
+    decimal BonusQuantity,
+    decimal DiscountPercent);
+public sealed record InventorySaleDetailsResponse(
+    long Id,
+    string SaleNumber,
+    string? ReferenceNumber,
+    DateOnly SaleDate,
+    long? CustomerId,
+    string CustomerName,
+    string? CustomerPhone,
+    DocumentPaymentStatus PaymentStatus,
+    decimal Subtotal,
+    decimal Discount,
+    decimal DiscountPercent,
+    decimal SecondaryDiscountPercent,
+    decimal Tax,
+    decimal Total,
+    decimal ReturnedAmount,
+    decimal PaidAmount,
+    decimal RemainingAmount,
+    string CurrencyCode,
+    string? Notes,
+    DateOnly? DebtDueDate,
+    decimal CustomerCreditApplied,
+    decimal CustomerCreditCreated,
+    DateTime CreatedAt,
+    IReadOnlyList<InventorySaleItemDetailsResponse> Items);
 public sealed record InventorySaleLotMovementResponse(
     long Id,
     long ProductId,
@@ -193,6 +254,49 @@ public sealed record InventorySaleLotMovementResponse(
     DateOnly? ExpiresAt,
     decimal Quantity,
     DateTime CreatedAt);
+
+public sealed class CreateInventorySaleReturnRequest
+{
+    public DateOnly ReturnDate { get; set; }
+    public SalesReturnSettlementMode SettlementMode { get; set; } = SalesReturnSettlementMode.CustomerCredit;
+    public string RefundMethod { get; set; } = "Cash";
+    public string Reason { get; set; } = null!;
+    public string? Notes { get; set; }
+    public List<InventorySaleReturnItemRequest> Items { get; set; } = [];
+}
+public sealed class InventorySaleReturnItemRequest
+{
+    public long SaleItemId { get; set; }
+    public decimal Quantity { get; set; }
+    public bool Restock { get; set; } = true;
+}
+public sealed record InventorySaleReturnItemResponse(
+    long Id,
+    long SaleItemId,
+    long ProductId,
+    string ProductName,
+    decimal Quantity,
+    string? UnitName,
+    decimal LineTotal,
+    bool Restocked);
+public sealed record InventorySaleReturnResponse(
+    long Id,
+    string ReturnNumber,
+    long SaleId,
+    string SaleNumber,
+    DateOnly ReturnDate,
+    SalesReturnSettlementMode SettlementMode,
+    decimal Total,
+    decimal TaxAmount,
+    decimal DebtReduction,
+    decimal RefundAmount,
+    decimal CreditAmount,
+    string RefundMethod,
+    string CurrencyCode,
+    string Reason,
+    string? Notes,
+    DateTime CreatedAt,
+    IReadOnlyList<InventorySaleReturnItemResponse> Items);
 
 public sealed class RecordDocumentPaymentRequest
 {
