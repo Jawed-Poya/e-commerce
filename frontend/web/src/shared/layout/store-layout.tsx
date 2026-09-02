@@ -500,6 +500,7 @@ export function StoreLayout() {
 
                         <a
                             href={mobileAppDownloadUrl}
+                            download={mobileAppLinkIsExternal ? undefined : "easycart-mobile.apk"}
                             target={mobileAppLinkIsExternal ? "_blank" : undefined}
                             rel={mobileAppLinkIsExternal ? "noreferrer" : undefined}
                             className="mt-5 inline-flex items-center gap-3 rounded-xl border border-primary/15 bg-primary/[0.055] px-3.5 py-3 text-start transition hover:border-primary/30 hover:bg-primary/[0.09]"

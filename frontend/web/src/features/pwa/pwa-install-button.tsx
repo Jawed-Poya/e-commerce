@@ -128,6 +128,7 @@ export function MobileAppDownloadBanner() {
             >
                 <a
                     href={mobileAppDownloadUrl}
+                    download={mobileAppLinkIsExternal ? undefined : "easycart-mobile.apk"}
                     target={mobileAppLinkIsExternal ? "_blank" : undefined}
                     rel={mobileAppLinkIsExternal ? "noreferrer" : undefined}
                 >
