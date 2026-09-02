@@ -268,8 +268,6 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     }, [trackedIds]);
 
     const poll = useCallback(async () => {
-        if (!trackedIds.length) return;
-
         try {
             const response = await getStoreNotifications(
                 lastCheck.current,
@@ -287,11 +285,6 @@ export function NotificationProvider({ children }: PropsWithChildren) {
 
     const trackedKey = trackedIds.join(",");
     useEffect(() => {
-        if (!trackedIds.length) {
-            setRealtimeStatus("polling");
-            return;
-        }
-
         let disposed = false;
         let connection: import("@microsoft/signalr").HubConnection | null = null;
         let retryTimer: number | null = null;

@@ -112,7 +112,7 @@ export const ps: Messages = {
     "notifications.pushError": "خبرتیاوو ته اجازه شته، خو د شالید لېږد ونښلېد.",
     "notifications.retry": "بیا هڅه",
     "notifications.emptyTitle": "لا خبرتیا نشته",
-    "notifications.emptyDescription": "ستاسو د ټوکرۍ او خوښو محصولات د نرخ او موجودۍ بدلونونو لپاره په اتومات ډول څارل کېږي.",
+    "notifications.emptyDescription": "د نرخ بدلونونه په اتومات ډول درته لېږل کېږي. هغه محصولات چې تاسو یې څارئ د موجودۍ د بدلون لپاره هم څارل کېږي.",
     "notifications.cartAddedTitle": "ټوکرۍ ته اضافه شو",
     "notifications.cartAddedMessage": "{product} ستاسو ټوکرۍ ته اضافه شو.",
     "product.notFound": "محصول ونه موندل شو",

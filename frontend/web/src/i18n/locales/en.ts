@@ -106,7 +106,7 @@ export const en: Messages = {
     "notifications.pushError": "Browser alerts are allowed, but background delivery could not connect.",
     "notifications.retry": "Retry",
     "notifications.emptyTitle": "No alerts yet",
-    "notifications.emptyDescription": "Products in your cart or wishlist are watched automatically for price and stock changes.",
+    "notifications.emptyDescription": "Price changes are delivered automatically. Products you watch are also monitored for stock changes.",
     "notifications.markRead": "Mark all read",
     "notifications.clear": "Clear",
     "notifications.clearConfirm": "Clear all?",

@@ -43,6 +43,7 @@ public sealed class StorePushSubscriptionStore(
 
     public async Task<IReadOnlyCollection<StorePushSubscriptionRecord>> FindAsync(
         long productId,
+        bool includeAllProducts,
         CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken);
@@ -52,7 +53,7 @@ public sealed class StorePushSubscriptionStore(
             var subscriptions = await ReadUnsafeAsync(cancellationToken);
             var active = subscriptions
                 .Where(item => now - item.UpdatedAt <= MaximumIdleAge)
-                .Where(item => item.ProductIds.Contains(productId))
+                .Where(item => includeAllProducts || item.ProductIds.Contains(productId))
                 .ToArray();
 
             if (active.Length != subscriptions.Count &&

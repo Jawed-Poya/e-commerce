@@ -65,7 +65,13 @@ public sealed class StorePushService(
         long? customerTypeId,
         CancellationToken cancellationToken = default)
     {
-        var webTargetsTask = webSubscriptions.FindAsync(notification.ProductId, cancellationToken);
+        // Browser subscribers receive price changes for their applicable customer
+        // tier even when they have not opened or pinned the product. Stock alerts
+        // remain product-specific. Mobile behavior is intentionally unchanged.
+        var webTargetsTask = webSubscriptions.FindAsync(
+            notification.ProductId,
+            includeAllProducts: customerTypeId.HasValue,
+            cancellationToken);
         var mobileTargetsTask = mobileSubscriptions.FindProductAsync(notification.ProductId, cancellationToken);
         await Task.WhenAll(webTargetsTask, mobileTargetsTask);
 

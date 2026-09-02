@@ -1,4 +1,5 @@
 using ECommerce.Data;
+using ECommerce.Entities.Common;
 using ECommerce.Entities.Notifications;
 using ECommerce.Entities.Notifications.Contracts;
 using ECommerce.Services.Customers;
@@ -67,7 +68,7 @@ public sealed class StoreNotificationService(
         return new PendingStoreNotification(
             entity,
             data.Name,
-            StoreNotificationGroups.Price(productId, customerTypeId));
+            StoreNotificationGroups.PriceAudience(customerTypeId));
     }
 
     public async Task<PendingStoreNotification?> CreateStockIncreasedAsync(
@@ -116,10 +117,14 @@ public sealed class StoreNotificationService(
             var item = Map(
                 pending.Entity,
                 pending.ProductName);
+            var realtimeGroups = new[] { pending.Group };
             try
             {
+                realtimeGroups = await ResolveRealtimeGroupsAsync(
+                    pending,
+                    cancellationToken);
                 await hub.Clients
-                    .Group(pending.Group)
+                    .Groups(realtimeGroups)
                     .SendAsync("storeNotification", item, cancellationToken);
             }
             catch (Exception exception)
@@ -128,9 +133,9 @@ public sealed class StoreNotificationService(
                 // so a temporary realtime failure must not fail the business operation.
                 logger.LogWarning(
                     exception,
-                    "Could not publish store notification {NotificationId} to {Group}.",
+                    "Could not publish store notification {NotificationId} to {Groups}.",
                     pending.Entity.Id,
-                    pending.Group);
+                    string.Join(", ", realtimeGroups));
             }
 
             try
@@ -156,24 +161,21 @@ public sealed class StoreNotificationService(
     {
         var serverTime = DateTime.UtcNow;
         var ids = productIds.Where(id => id > 0).Distinct().Take(100).ToArray();
-        if (ids.Length == 0)
-            return new StoreNotificationsResponse(serverTime, []);
 
-        // Notification polling is best-effort and bounded. Do not cancel its short
-        // database reads when React replaces a product subscription or SignalR
-        // reconnects; those routine client transitions previously surfaced as
-        // TaskCanceledException while opening a product details page.
+        // Price changes are storefront-wide for the customer's applicable price
+        // tiers. Product IDs still scope stock alerts to items the customer chose
+        // to watch, but an empty watch list must not disable price notifications.
+        // Reads remain non-cancelled because React routinely replaces product
+        // subscriptions while SignalR is reconnecting.
         var readToken = CancellationToken.None;
         var defaultTypeId = await defaultCustomerType.GetIdAsync(readToken);
         var currentTypeId = await TransientSqlRetry.ExecuteAsync(
             token => currentCustomer.GetCustomerTypeIdAsync(token),
             readToken);
-        var allowedEntityTypes = new[]
-        {
-            StockEntityType,
-            PriceEntityType(defaultTypeId),
-            currentTypeId.HasValue ? PriceEntityType(currentTypeId.Value) : null
-        }.OfType<string>().Distinct(StringComparer.Ordinal).ToArray();
+        var resolvedTypeId = currentTypeId ?? defaultTypeId;
+        var usesCustomPriceTier = resolvedTypeId != defaultTypeId;
+        var defaultPriceEntityType = PriceEntityType(defaultTypeId);
+        var currentPriceEntityType = PriceEntityType(resolvedTypeId);
 
         var threshold = after?.ToUniversalTime() ?? serverTime.AddDays(-2);
         if (threshold < serverTime.AddDays(-30)) threshold = serverTime.AddDays(-30);
@@ -185,10 +187,15 @@ public sealed class StoreNotificationService(
                     !notification.IsDeleted &&
                     notification.UserId == null &&
                     notification.EntityId.HasValue &&
-                    ids.Contains(notification.EntityId.Value) &&
                     notification.CreatedAt > threshold &&
-                    notification.EntityType != null &&
-                    allowedEntityTypes.Contains(notification.EntityType))
+                    (notification.EntityType == currentPriceEntityType ||
+                     (usesCustomPriceTier &&
+                      notification.EntityType == defaultPriceEntityType &&
+                      !context.ProductPrices.Any(price =>
+                          price.ProductId == notification.EntityId.Value &&
+                          price.CustomerTypeId == resolvedTypeId)) ||
+                     (notification.EntityType == StockEntityType &&
+                      ids.Contains(notification.EntityId.Value))))
                 .OrderBy(notification => notification.CreatedAt)
                 .Take(50)
                 .Select(notification => new
@@ -224,6 +231,36 @@ public sealed class StoreNotificationService(
                 productNames.GetValueOrDefault(row.ProductId, "Product"),
                 $"/products/{row.ProductId}",
                 row.CreatedAt)).ToList());
+    }
+
+    private async Task<string[]> ResolveRealtimeGroupsAsync(
+        PendingStoreNotification pending,
+        CancellationToken cancellationToken)
+    {
+        var customerTypeId = ResolvePushCustomerTypeId(pending.Entity.EntityType);
+        if (!customerTypeId.HasValue || !pending.Entity.EntityId.HasValue)
+            return [pending.Group];
+
+        var defaultTypeId = await defaultCustomerType.GetIdAsync(cancellationToken);
+        if (customerTypeId.Value != defaultTypeId)
+            return [pending.Group];
+
+        var productId = pending.Entity.EntityId.Value;
+        var affectedCustomerTypeIds = await context.Types
+            .AsNoTracking()
+            .Where(type =>
+                type.Group == GeneralTypeEnum.CustomerType &&
+                (type.Id == defaultTypeId ||
+                 !context.ProductPrices.Any(price =>
+                     price.ProductId == productId &&
+                     price.CustomerTypeId == type.Id)))
+            .Select(type => type.Id)
+            .ToArrayAsync(cancellationToken);
+
+        return affectedCustomerTypeIds
+            .Select(StoreNotificationGroups.PriceAudience)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
     }
 
     private static long? ResolvePushCustomerTypeId(string? entityType)

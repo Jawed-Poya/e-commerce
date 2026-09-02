@@ -112,7 +112,7 @@ export const dr: Messages = {
     "notifications.pushError": "اجازهٔ اعلان داده شده، اما تحویل پس‌زمینه وصل نشد.",
     "notifications.retry": "تلاش دوباره",
     "notifications.emptyTitle": "هنوز اعلانی نیست",
-    "notifications.emptyDescription": "محصولات سبد خرید و علاقه‌مندی‌های شما به‌صورت خودکار برای تغییر قیمت و موجودی دنبال می‌شوند.",
+    "notifications.emptyDescription": "تغییرات قیمت به‌صورت خودکار اطلاع داده می‌شوند. محصولات دنبال‌شده شما برای تغییر موجودی نیز بررسی می‌شوند.",
     "notifications.cartAddedTitle": "به سبد خرید افزوده شد",
     "notifications.cartAddedMessage": "{product} به سبد خرید شما افزوده شد.",
     "product.notFound": "محصول یافت نشد",

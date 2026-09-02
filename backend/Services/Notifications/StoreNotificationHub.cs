@@ -58,12 +58,8 @@ public sealed class StoreNotificationHub(
         if (Context.ConnectionAborted.IsCancellationRequested) return;
 
         var groups = ids
-            .SelectMany(productId => new[]
-            {
-                StoreNotificationGroups.Stock(productId),
-                StoreNotificationGroups.Price(productId, defaultTypeId),
-                StoreNotificationGroups.Price(productId, currentTypeId)
-            })
+            .Select(StoreNotificationGroups.Stock)
+            .Append(StoreNotificationGroups.PriceAudience(currentTypeId))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
