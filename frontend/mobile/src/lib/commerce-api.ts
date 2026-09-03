@@ -42,8 +42,6 @@ export const commerceApi = {
     email: string | null;
     password: string;
   }) => api.post<AuthResponse>('/auth/customer/register', request),
-  googleConfiguration: () => api.get<{ enabled: boolean; clientId: string | null }>('/auth/customer/google/config'),
-  googleSignIn: (credential: string) => api.post<AuthResponse>('/auth/customer/google', { credential }),
   forgotPassword: (email: string) => api.post<Record<string, never>>('/auth/customer/forgot-password', { email }),
   resetPassword: (email: string, token: string, newPassword: string) =>
     api.post<Record<string, never>>('/auth/customer/reset-password', { email, token, newPassword }),

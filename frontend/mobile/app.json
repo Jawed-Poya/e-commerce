@@ -4,12 +4,12 @@
     "slug": "easycart-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/easycart-icon.png",
+    "icon": "./assets/images/easycart-app-icon.png",
     "scheme": "easycart",
     "userInterfaceStyle": "automatic",
     "description": "Shop products, place orders, and track deliveries from EasyCart.",
     "ios": {
-      "icon": "./assets/images/easycart-icon.png",
+      "icon": "./assets/images/easycart-app-icon.png",
       "bundleIdentifier": "com.easycart.store",
       "supportsTablet": false,
       "infoPlist": {
@@ -25,9 +25,9 @@
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0B1F3A",
-        "foregroundImage": "./assets/images/easycart-icon.png"
+        "foregroundImage": "./assets/images/easycart-launch-mark.png"
       },
-      "predictiveBackGestureEnabled": true,
+      "predictiveBackGestureEnabled": false,
       "package": "com.easycart.store",
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -37,13 +37,14 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/easycart-icon-small.png"
+      "favicon": "./assets/images/easycart-launch-mark.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-notifications",
         {
+          "icon": "./assets/images/easycart-notification-icon.png",
           "color": "#0F766E",
           "defaultChannel": "store-updates"
         }
@@ -52,8 +53,8 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#0B1F3A",
-          "image": "./assets/images/easycart-icon-small.png",
-          "imageWidth": 76
+          "image": "./assets/images/easycart-launch-mark.png",
+          "imageWidth": 168
         }
       ],
       [
@@ -71,7 +72,6 @@
           }
         }
       ],
-      "expo-web-browser",
       [
         "expo-localization",
         {

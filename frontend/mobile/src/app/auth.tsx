@@ -1,13 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandMark, Field, PrimaryButton } from '@/components/ui';
 import { Text } from '@/components/app-text';
-import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import { radii, spacing, type AppPalette } from '@/constants/theme';
 import { ApiError } from '@/lib/api';
 import { commerceApi } from '@/lib/commerce-api';
@@ -100,20 +99,6 @@ export default function AuthScreen() {
     }
   };
 
-  const handleGoogleCredential = useCallback(async (credential: string) => {
-    setBusy(true);
-    setError('');
-    setMessage('');
-    try {
-      await auth.googleSignIn(credential);
-      router.replace(params.returnTo === 'checkout' ? '/checkout' : '/account');
-    } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : 'Google sign-in could not be completed.');
-    } finally {
-      setBusy(false);
-    }
-  }, [auth, params.returnTo, router]);
-
   return (
     <SafeAreaView edges={['bottom']} style={styles.safeArea}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -168,12 +153,6 @@ export default function AuthScreen() {
               <PrimaryButton title={busy ? 'Please wait…' : mode === 'login' ? 'Sign in securely' : mode === 'register' ? 'Create my account' : 'Send reset link'} icon={mode === 'login' ? 'log-in' : mode === 'register' ? 'person-add' : 'mail'} onPress={() => void submit()} loading={busy} />
               {mode === 'forgot' && message ? <PrimaryButton title="Enter a reset token" icon="key-outline" variant="outline" onPress={() => router.push({ pathname: '/reset-password', params: { email: form.email.trim() } })} /> : null}
 
-              {mode !== 'forgot' ? (
-                <>
-                  <View style={styles.divider}><View style={styles.dividerLine} /><Text style={styles.dividerText}>OR</Text><View style={styles.dividerLine} /></View>
-                  <GoogleSignInButton busy={busy} onCredential={(credential) => void handleGoogleCredential(credential)} onError={setError} />
-                </>
-              ) : null}
               <Text style={styles.privacy}>Your session token is stored securely on this device. We never store your password.</Text>
             </View>
           </View>
@@ -223,8 +202,5 @@ const createStyles = (palette: AppPalette, isRtl: boolean) => StyleSheet.create(
   errorText: { flex: 1, color: palette.danger, fontSize: 11, lineHeight: 16, fontWeight: '600' },
   message: { padding: 11, borderRadius: radii.md, backgroundColor: palette.successSoft, flexDirection: isRtl ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 },
   messageText: { flex: 1, color: palette.success, fontSize: 10, lineHeight: 16, fontWeight: '700' },
-  divider: { flexDirection: isRtl ? 'row-reverse' : 'row', alignItems: 'center', gap: 10 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: palette.border },
-  dividerText: { color: palette.muted, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
   privacy: { color: palette.muted, fontSize: 9, lineHeight: 15, textAlign: 'center' },
 });

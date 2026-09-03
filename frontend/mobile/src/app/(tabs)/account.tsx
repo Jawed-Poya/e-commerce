@@ -52,7 +52,6 @@ export default function AccountScreen() {
             <PrimaryButton title="Create free account" icon="person-add" variant="outline" onPress={() => router.push({ pathname: '/auth', params: { mode: 'register' } })} />
           </View>
           <LanguageSection />
-          <ServerSettingsButton />
         </ScrollView>
       </SafeAreaView>
     );
@@ -139,7 +138,6 @@ export default function AccountScreen() {
         </View>
 
         <LanguageSection />
-        <ServerSettingsButton />
 
         <View style={styles.actions}>
           <PrimaryButton title="View my orders" icon="receipt" onPress={() => router.push('/orders')} />
@@ -211,24 +209,6 @@ function LanguageSection() {
   );
 }
 
-function ServerSettingsButton() {
-  const router = useRouter();
-  const { colors: palette, styles, isRtl } = useThemedStyles(createStyles);
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => router.push('/server-settings')}
-      style={({ pressed }) => [styles.serverButton, pressed && styles.languagePressed]}>
-      <View style={styles.sectionIcon}><Ionicons name="server-outline" size={21} color={palette.primary} /></View>
-      <View style={styles.flex}>
-        <Text style={styles.sectionTitle}>Store connection</Text>
-        <Text style={styles.sectionText}>View or change the backend server used by this app.</Text>
-      </View>
-      <Ionicons name={isRtl ? 'chevron-back' : 'chevron-forward'} size={18} color={palette.muted} />
-    </Pressable>
-  );
-}
-
 const createStyles = (palette: AppPalette, isRtl: boolean) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
   flex: { flex: 1 },
@@ -272,5 +252,4 @@ const createStyles = (palette: AppPalette, isRtl: boolean) => StyleSheet.create(
   languageLabel: { color: palette.muted, fontSize: 8, fontWeight: '700', textAlign: 'center' },
   languageLabelActive: { color: palette.primaryForeground },
   languagePressed: { opacity: 0.75, transform: [{ scale: 0.98 }] },
-  serverButton: { marginTop: 14, minHeight: 70, padding: spacing.lg, flexDirection: isRtl ? 'row-reverse' : 'row', alignItems: 'center', gap: 11, borderRadius: radii.lg, backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border },
 });

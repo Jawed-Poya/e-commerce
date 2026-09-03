@@ -3,8 +3,8 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef } from 'react';
-import { BackHandler, Platform, ToastAndroid, View } from 'react-native';
+import { useEffect } from 'react';
+import { BackHandler, Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { LiveNotificationBanner } from '@/components/live-notification-banner';
@@ -122,38 +122,25 @@ function RootNavigator() {
 }
 
 const exitRootRoutes = new Set(['/', '/shop', '/welcome']);
-const doubleBackWindowMs = 2_000;
 
 function AndroidBackButtonHandler() {
   const pathname = usePathname();
   const router = useRouter();
-  const { t } = useI18n();
-  const lastRootBackPressRef = useRef(0);
 
   useEffect(() => {
     if (Platform.OS !== 'android') return;
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (exitRootRoutes.has(pathname)) {
-        const now = Date.now();
-        if (now - lastRootBackPressRef.current <= doubleBackWindowMs) {
-          BackHandler.exitApp();
-          return true;
-        }
-
-        lastRootBackPressRef.current = now;
-        ToastAndroid.show(t('Press back again to exit'), ToastAndroid.SHORT);
         return true;
       }
 
       if (router.canGoBack()) {
-        lastRootBackPressRef.current = 0;
         router.back();
         return true;
       }
 
       if (!exitRootRoutes.has(pathname)) {
-        lastRootBackPressRef.current = 0;
         router.replace('/shop');
         return true;
       }
@@ -162,7 +149,7 @@ function AndroidBackButtonHandler() {
     });
 
     return () => subscription.remove();
-  }, [pathname, router, t]);
+  }, [pathname, router]);
 
   return null;
 }

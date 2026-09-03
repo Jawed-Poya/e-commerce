@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
@@ -8,6 +8,8 @@ import { radii, type AppPalette } from '@/constants/theme';
 import { Text } from '@/components/app-text';
 import { useCompany } from '@/providers/company-provider';
 import { useThemedStyles } from '@/providers/theme-provider';
+
+const launchLogo = require('../../assets/images/easycart-launch-mark.png');
 
 export function AppLoadingScreen({ label = 'Preparing your shopping experience' }: { label?: string }) {
   const { company } = useCompany();
@@ -34,8 +36,10 @@ export function AppLoadingScreen({ label = 'Preparing your shopping experience' 
     <LinearGradient colors={[palette.darkSurface, palette.primaryDark, palette.primary]} style={styles.background}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
-          <Animated.View style={[styles.logoHalo, { opacity: fade, transform: [{ scale: pulse }] }]}>
-            <View style={styles.logo}><Ionicons name="bag-handle" size={39} color={palette.white} /></View>
+          <Animated.View style={[styles.logoStage, { transform: [{ scale: pulse }] }]}>
+            <Animated.View style={[styles.logoGlow, { opacity: fade }]} />
+            <View style={styles.logoRing} />
+            <Image source={launchLogo} contentFit="contain" style={styles.logoImage} />
           </Animated.View>
           <Text numberOfLines={1} adjustsFontSizeToFit style={styles.company}>{company?.name ?? 'EasyCart'}<Text style={styles.dot}>.</Text></Text>
           <Text style={styles.tagline}>SHOP • ORDER • TRACK</Text>
@@ -54,9 +58,11 @@ const createStyles = (palette: AppPalette) => StyleSheet.create({
   background: { flex: 1 },
   safeArea: { flex: 1, paddingHorizontal: 28 },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  logoHalo: { width: 104, height: 104, borderRadius: 38, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,.18)' },
-  logo: { width: 76, height: 76, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,.13)' },
-  company: { maxWidth: '90%', marginTop: 24, color: palette.white, fontSize: 34, fontWeight: '900', letterSpacing: -1.3 },
+  logoStage: { width: 194, height: 194, alignItems: 'center', justifyContent: 'center' },
+  logoGlow: { position: 'absolute', width: 172, height: 172, borderRadius: 86, backgroundColor: 'rgba(255,255,255,.16)' },
+  logoRing: { position: 'absolute', width: 190, height: 190, borderRadius: 95, borderWidth: 1, borderColor: 'rgba(255,255,255,.16)' },
+  logoImage: { width: 170, height: 170 },
+  company: { maxWidth: '90%', marginTop: 14, color: palette.white, fontSize: 34, fontWeight: '900', letterSpacing: -1.3 },
   dot: { color: palette.amber },
   tagline: { marginTop: 8, color: 'rgba(255,255,255,.62)', fontSize: 9, fontWeight: '900', letterSpacing: 2.4 },
   footer: { alignItems: 'center', paddingBottom: 34 },

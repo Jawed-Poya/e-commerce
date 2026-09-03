@@ -61,6 +61,7 @@ type NotificationContextValue = {
   nativePermission: NativeNotificationPermission;
   nativePermissionCanAskAgain: boolean;
   remotePushStatus: RemotePushStatus;
+  remotePushError: string | null;
   liveNotification: AppNotification | null;
   isRead: (id: string) => boolean;
   markRead: (id: string) => void;
@@ -203,6 +204,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
   const [remotePushStatus, setRemotePushStatus] = useState<RemotePushStatus>(
     Platform.OS === 'web' ? 'unsupported' : 'unconfigured',
   );
+  const [remotePushError, setRemotePushError] = useState<string | null>(null);
   const [liveStoreItem, setLiveStoreItem] = useState<StoreNotification | null>(null);
   const lastStoreCheck = useRef(new Date().toISOString());
   const storePollActive = useRef(false);
@@ -374,32 +376,50 @@ export function NotificationProvider({ children }: PropsWithChildren) {
   }, [storeStateReady, trackedProductIds]);
 
   const trackedKey = trackedProductIds.join(',');
-  const registerRemotePush = useCallback(async (): Promise<RemotePushStatus> => {
+  const registerRemotePush = useCallback(async (): Promise<{ status: RemotePushStatus; error: string | null }> => {
     const projectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID?.trim()
       || Constants.expoConfig?.extra?.eas?.projectId
       || Constants.easConfig?.projectId;
-    if (!projectId || Constants.appOwnership === 'expo') return 'unconfigured';
+    if (!projectId) {
+      return {
+        status: 'unconfigured',
+        error: t('This build is missing its EasyCart push project configuration.'),
+      };
+    }
+    if (Constants.appOwnership === 'expo') {
+      return {
+        status: 'unconfigured',
+        error: t('Background push alerts require the installed EasyCart app, not Expo Go.'),
+      };
+    }
 
     try {
       const [token, deviceId] = await Promise.all([
         Notifications.getExpoPushTokenAsync({ projectId }).then((result) => result.data),
         getOrCreatePushDeviceId(),
       ]);
-      await commerceApi.saveMobilePushSubscription({
+      if (!token.trim()) throw new Error('The push service returned an empty device token.');
+      const subscription = await commerceApi.saveMobilePushSubscription({
         token,
         deviceId,
         platform: Platform.OS,
         locale,
         productIds: trackedProductIds,
       });
-      return 'ready';
-    } catch {
-      return 'error';
+      if (!subscription.subscribed) throw new Error('The store did not accept this device subscription.');
+      return { status: 'ready', error: null };
+    } catch (error) {
+      return { status: 'error', error: remotePushErrorMessage(error, t) };
     }
-  }, [locale, trackedProductIds]);
+  }, [locale, t, trackedProductIds]);
 
   useEffect(() => {
-    if (Platform.OS === 'web' || nativePermission !== 'granted' || !storeStateReady) return;
+    if (Platform.OS === 'web') return;
+    if (nativePermission !== 'granted' || !storeStateReady) {
+      setRemotePushStatus('unconfigured');
+      setRemotePushError(null);
+      return;
+    }
     let active = true;
     let syncing = false;
     let retryAttempt = 0;
@@ -409,12 +429,14 @@ export function NotificationProvider({ children }: PropsWithChildren) {
       if (!active || syncing) return;
       syncing = true;
       setRemotePushStatus('registering');
-      const status = await registerRemotePush();
+      setRemotePushError(null);
+      const result = await registerRemotePush();
       syncing = false;
       if (!active) return;
-      setRemotePushStatus(status);
-      if (status === 'ready') retryAttempt = 0;
-      if (status === 'error') scheduleRetry();
+      setRemotePushStatus(result.status);
+      setRemotePushError(result.error);
+      if (result.status === 'ready') retryAttempt = 0;
+      if (result.status === 'error') scheduleRetry();
     };
 
     const scheduleRetry = () => {
@@ -687,6 +709,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     nativePermission,
     nativePermissionCanAskAgain,
     remotePushStatus,
+    remotePushError,
     liveNotification: liveStoreItem ? notificationFromStore(liveStoreItem, t, locale) : null,
     isRead,
     markRead,
@@ -696,7 +719,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     trackProducts,
     requestNativePermission,
     refresh,
-  }), [auth.loading, auth.user, isRead, liveStoreItem, locale, markAllRead, markRead, nativePermission, nativePermissionCanAskAgain, notifications, orders.error, orders.isError, orders.isLoading, orders.isRefetching, readStateReady, realtimeStatus, refresh, remotePushStatus, requestNativePermission, storeError, storeRefreshing, storeStateReady, t, trackProduct, trackProducts, unreadCount]);
+  }), [auth.loading, auth.user, isRead, liveStoreItem, locale, markAllRead, markRead, nativePermission, nativePermissionCanAskAgain, notifications, orders.error, orders.isError, orders.isLoading, orders.isRefetching, readStateReady, realtimeStatus, refresh, remotePushError, remotePushStatus, requestNativePermission, storeError, storeRefreshing, storeStateReady, t, trackProduct, trackProducts, unreadCount]);
 
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 }
@@ -713,6 +736,17 @@ function hasNotificationPermission(permission: Notifications.NotificationPermiss
   return permission.ios?.status === Notifications.IosAuthorizationStatus.AUTHORIZED
     || permission.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
     || permission.ios?.status === Notifications.IosAuthorizationStatus.EPHEMERAL;
+}
+
+function remotePushErrorMessage(error: unknown, t: Translate) {
+  const detail = error instanceof Error ? error.message : String(error ?? '');
+  if (/firebase|fcm|google-services|default firebaseapp/i.test(detail)) {
+    return t('This EasyCart build is missing its Android Firebase notification configuration.');
+  }
+  if (/network|fetch|timeout|timed out|offline/i.test(detail)) {
+    return t('The push service could not be reached. EasyCart will retry automatically.');
+  }
+  return t('Background push registration failed. EasyCart will retry automatically.');
 }
 
 function isStorePushNotification(notification: Notifications.Notification) {

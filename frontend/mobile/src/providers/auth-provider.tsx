@@ -27,7 +27,6 @@ type AuthContextValue = {
   isAuthenticated: boolean;
   login: (identifier: string, password: string) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
-  googleSignIn: (credential: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -87,7 +86,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
     isAuthenticated: Boolean(user),
     login: async (identifier, password) => saveAuth(await commerceApi.login(identifier, password)),
     register: async (input) => saveAuth(await commerceApi.register(input)),
-    googleSignIn: async (credential) => saveAuth(await commerceApi.googleSignIn(credential)),
     logout,
     refresh,
   }), [loading, logout, refresh, saveAuth, user]);

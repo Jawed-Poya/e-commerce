@@ -95,7 +95,7 @@ export default function NotificationsScreen() {
               {t(inbox.nativePermission === 'granted' && inbox.remotePushStatus === 'ready'
                 ? 'New order, price, and stock updates can appear even when EasyCart is closed.'
                 : inbox.nativePermission === 'granted'
-                  ? 'Notification permission is allowed, but this build is not connected to the production push service yet.'
+                  ? inbox.remotePushError ?? 'Notification permission is allowed, but this build is not connected to the production push service yet.'
                 : 'Allow EasyCart to show important updates in your Android notification panel.')}
             </Text>
           </View>

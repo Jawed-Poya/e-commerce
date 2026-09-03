@@ -122,12 +122,6 @@ function Logo({ inverse = false }: { inverse?: boolean }) {
     const { company } = useCompany();
     const { t } = useI18n();
     const name = company?.name ?? "Default Company";
-    const initials = name
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((part) => part[0])
-        .join("")
-        .toUpperCase();
 
     return (
         <Link
@@ -143,7 +137,11 @@ function Logo({ inverse = false }: { inverse?: boolean }) {
                         className="size-full bg-white object-contain p-1 dark:bg-slate-950"
                     />
                 ) : (
-                    initials
+                    <img
+                        src="/easycart-logo.png"
+                        alt=""
+                        className="size-full object-contain"
+                    />
                 )}
             </span>
             <span className="min-w-0">

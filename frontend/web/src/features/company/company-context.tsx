@@ -93,7 +93,7 @@ export function CompanyProvider({ children }: PropsWithChildren) {
         );
         const favicon = imageUrl(company.faviconUrl) ?? company.faviconUrl;
         const logo = imageUrl(company.logoUrl) ?? company.logoUrl;
-        const appIcon = favicon || logo;
+        const appIcon = favicon || logo || "/easycart-logo.png";
         if (appIcon) {
             let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
             if (!link) {

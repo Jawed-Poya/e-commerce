@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { Tabs } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/app-header';
 import { Text } from '@/components/app-text';
@@ -125,6 +126,7 @@ export default function TabsLayout() {
   const { itemCount } = useCart();
   const { isRtl, t } = useI18n();
   const { colors, dark } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const labels: Record<TabKey, string> = {
     shop: t('Shop'),
     cart: t('Cart'),
@@ -160,7 +162,7 @@ export default function TabsLayout() {
           flexDirection: isRtl ? 'row-reverse' : 'row',
           height: tabBarHeight,
           marginHorizontal: 12,
-          marginBottom: 9,
+          marginBottom: Math.max(insets.bottom, 9),
           paddingTop: 7,
           paddingBottom: 6,
           backgroundColor: 'transparent',

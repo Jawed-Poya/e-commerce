@@ -10,7 +10,6 @@ import {
     MapPin,
     Phone,
     ShieldCheck,
-    ShoppingBag,
     Sparkles,
     UserRound,
 } from "lucide-react";
@@ -108,7 +107,7 @@ export function AuthPage() {
 
     if (auth.isAuthenticated) return <Navigate to="/account" replace />;
 
-    const logo = imageUrl(company?.logoUrl);
+    const logo = imageUrl(company?.logoUrl) ?? "/easycart-logo.png";
     const companyName = company?.name ?? "";
 
     return (
@@ -130,15 +129,11 @@ export function AuthPage() {
                                 className="flex min-w-0 items-center gap-2.5 rounded-xl bg-white/[0.08] p-2 pe-3.5 text-white backdrop-blur transition hover:bg-white/[0.13]"
                             >
                                 <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-white text-primary shadow-lg">
-                                    {logo ? (
-                                        <img
-                                            src={logo}
-                                            alt=""
-                                            className="size-full object-contain p-1.5"
-                                        />
-                                    ) : (
-                                        <ShoppingBag className="size-5" />
-                                    )}
+                                    <img
+                                        src={logo}
+                                        alt=""
+                                        className="size-full object-contain p-1.5"
+                                    />
                                 </span>
                                 <span className="truncate text-sm font-black">
                                     {companyName}
@@ -156,15 +151,11 @@ export function AuthPage() {
                                 <div className="absolute -start-7 top-8 size-14 rounded-2xl bg-white/[0.08] backdrop-blur" />
                                 <div className="absolute -end-8 bottom-10 size-16 rounded-full bg-brand-orange/20 backdrop-blur" />
                                 <span className="grid size-32 place-items-center overflow-hidden rounded-[30px] bg-white text-primary shadow-2xl xl:size-36">
-                                    {logo ? (
-                                        <img
-                                            src={logo}
-                                            alt={companyName}
-                                            className="size-full object-contain p-5"
-                                        />
-                                    ) : (
-                                        <ShoppingBag className="size-14" />
-                                    )}
+                                    <img
+                                        src={logo}
+                                        alt={companyName}
+                                        className="size-full object-contain p-5"
+                                    />
                                 </span>
                             </div>
 
@@ -237,15 +228,11 @@ export function AuthPage() {
                                 className="flex min-w-0 items-center gap-3"
                             >
                                 <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/75 bg-background text-primary shadow-sm dark:border-white/[0.10]">
-                                    {logo ? (
-                                        <img
-                                            src={logo}
-                                            alt=""
-                                            className="size-full object-contain p-1.5"
-                                        />
-                                    ) : (
-                                        <ShoppingBag className="size-4.5" />
-                                    )}
+                                    <img
+                                        src={logo}
+                                        alt=""
+                                        className="size-full object-contain p-1.5"
+                                    />
                                 </span>
                                 <span className="truncate text-sm font-black">
                                     {companyName}

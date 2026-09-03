@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound, LockKeyhole, ShoppingBag } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound, LockKeyhole } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 
@@ -50,7 +50,7 @@ export function ResetPasswordPage() {
         }
     };
 
-    const logo = imageUrl(company?.logoUrl);
+    const logo = imageUrl(company?.logoUrl) ?? "/easycart-logo.png";
 
     return (
         <main className="relative isolate grid min-h-[70vh] place-items-center overflow-hidden bg-[radial-gradient(circle_at_top,color-mix(in_srgb,var(--primary)_10%,transparent),transparent_42%),linear-gradient(to_bottom,var(--background),color-mix(in_srgb,var(--muted)_55%,var(--background)))] px-4 py-10 sm:px-6">
@@ -59,7 +59,7 @@ export function ResetPasswordPage() {
                 <div className="border-b bg-muted/30 p-5 sm:p-6">
                     <div className="flex items-center gap-3">
                         <span className="grid size-11 place-items-center overflow-hidden rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
-                            {logo ? <img src={logo} alt="" className="size-full bg-white object-contain p-1.5" /> : <ShoppingBag className="size-5" />}
+                            <img src={logo} alt="" className="size-full bg-white object-contain p-1.5" />
                         </span>
                         <div className="min-w-0">
                             <p className="truncate text-sm font-black">{company?.name}</p>
