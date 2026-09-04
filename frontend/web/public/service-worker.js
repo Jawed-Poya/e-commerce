@@ -10,7 +10,7 @@ const APP_SHELL = [
   "/",
   "/index.html",
   "/manifest.webmanifest",
-  "/favicon.svg",
+  "/easycart-logo.png",
   "/placeholder-product.svg",
   "/pwa-192.png",
   "/pwa-512.png",
