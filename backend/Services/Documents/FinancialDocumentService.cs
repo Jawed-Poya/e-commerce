@@ -1130,7 +1130,8 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
                         TextDirection(itemColumn.Item(), item.Name).Text(item.Name).FontSize(7.5f).SemiBold();
                         itemColumn.Item().Row(row =>
                         {
-                            row.RelativeItem(2).Text($"{item.Quantity:N2}{(string.IsNullOrWhiteSpace(item.UnitName) ? string.Empty : $" {item.UnitName}")} × {Money(item.UnitPrice, receipt.CurrencyCode)}")
+                            var quantityDetails = $"{item.Quantity:N2}{(string.IsNullOrWhiteSpace(item.UnitName) ? string.Empty : $" {item.UnitName}")} × {Money(item.UnitPrice, receipt.CurrencyCode)}";
+                            TextDirection(row.RelativeItem(2), quantityDetails).Text(quantityDetails)
                                 .FontSize(6.5f).FontColor(Slate);
                             row.RelativeItem().AlignRight().ScaleToFit()
                                 .Text(Money(item.Total, receipt.CurrencyCode)).FontSize(7.5f).SemiBold();
@@ -1204,7 +1205,10 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
             column.Spacing(2);
             column.Item().Text($"Payment status: {receipt.PaymentStatus}").SemiBold();
             if (!string.IsNullOrWhiteSpace(receipt.PaymentMethod))
-                column.Item().Text($"Method: {receipt.PaymentMethod}").FontSize(compact ? 7 : 8).FontColor(Slate);
+            {
+                var method = $"Method: {receipt.PaymentMethod}";
+                TextDirection(column.Item(), method).Text(method).FontSize(compact ? 7 : 8).FontColor(Slate);
+            }
         });
     }
 
