@@ -15,6 +15,13 @@ using Microsoft.IdentityModel.Tokens;
 var builder = WebApplication.CreateBuilder(args);
 
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+var pdfArabicFontPath = Path.Combine(
+    builder.Environment.ContentRootPath,
+    "Assets",
+    "Fonts",
+    "NotoSansArabic-Variable.ttf");
+using (var pdfArabicFont = File.OpenRead(pdfArabicFontPath))
+    QuestPDF.Drawing.FontManager.RegisterFont(pdfArabicFont);
 
 builder.Services
     .AddControllers(options =>

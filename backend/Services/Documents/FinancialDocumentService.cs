@@ -24,6 +24,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
     private const string Border = "#E2E8F0";
     private const string Green = "#047857";
     private const string Red = "#B91C1C";
+    private const string ArabicFontFamily = "Noto Sans Arabic";
 
     public async Task<string> GetCompanyNameAsync(CancellationToken cancellationToken = default) =>
         await TransientSqlRetry.ExecuteAsync(
@@ -232,7 +233,8 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
                         ("Revenue", ledger.Revenue, Navy),
                         ("Gross profit", ledger.GrossProfit, ledger.GrossProfit >= 0 ? Green : Red)
                     ], ledger.CurrencyCode));
-                    column.Item().Text(ledger.Phone is null ? ledger.CustomerName : $"{ledger.CustomerName} · {ledger.Phone}")
+                    var customerSummary = ledger.Phone is null ? ledger.CustomerName : $"{ledger.CustomerName} · {ledger.Phone}";
+                    TextDirection(column.Item(), customerSummary).Text(customerSummary)
                         .FontSize(10).FontColor(Slate);
                     column.Item().Element(container => LedgerTable(container, ledger.Entries, ledger.CurrencyCode));
                 });
@@ -259,7 +261,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
                 {
                     row.RelativeItem().Column(column =>
                     {
-                        column.Item().Text(companyName).FontSize(18).Bold().FontColor(Navy);
+                        TextDirection(column.Item(), companyName).Text(companyName).FontSize(18).Bold().FontColor(Navy);
                         column.Item().Text("Journal voucher").FontSize(11).FontColor(Slate);
                     });
                     row.AutoItem().AlignRight().Column(column =>
@@ -294,13 +296,18 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
                     {
                         details.Spacing(4);
                         details.Item().Text("Business narration").FontSize(8).SemiBold().FontColor(Slate);
-                        details.Item().Background(Light).Border(1).BorderColor(Border).Padding(10).Text(voucher.Memo).FontSize(10);
+                        TextDirection(details.Item().Background(Light).Border(1).BorderColor(Border).Padding(10), voucher.Memo)
+                            .Text(voucher.Memo).FontSize(10);
                     });
                     column.Item().Text("Double-entry posting").FontSize(14).SemiBold().FontColor(Navy);
                     column.Item().Element(container => VoucherLinesTable(container, voucher.Lines, voucher.CurrencyCode));
                     if (!string.IsNullOrWhiteSpace(voucher.ReversalReason))
                         column.Item().Background("#FEF2F2").Border(1).BorderColor("#FECACA").Padding(10)
-                            .Text($"Reversal reason: {voucher.ReversalReason}").FontColor(Red);
+                            .Element(container =>
+                            {
+                                var reason = $"Reversal reason: {voucher.ReversalReason}";
+                                TextDirection(container, reason).Text(reason).FontColor(Red);
+                            });
                     column.Item().PaddingTop(22).Row(row =>
                     {
                         SignatureLine(row.RelativeItem(), "Prepared by");
@@ -344,7 +351,8 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
                         ("Period credit", ledger.PeriodCredit, Green),
                         ("Closing balance", ledger.ClosingBalance, ledger.ClosingBalance >= 0 ? Navy : Red)
                     ], ledger.CurrencyCode));
-                    column.Item().Text($"{ledger.AccountCode} · {ledger.AccountName} · {ledger.CurrencyCode}")
+                    var accountSummary = $"{ledger.AccountCode} · {ledger.AccountName} · {ledger.CurrencyCode}";
+                    TextDirection(column.Item(), accountSummary).Text(accountSummary)
                         .FontSize(10).SemiBold().FontColor(Slate);
                     column.Item().Element(container => JournalLedgerTable(container, ledger.Entries, ledger.CurrencyCode));
                     column.Item().PaddingTop(18).Row(row =>
@@ -990,7 +998,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
 
             page.Size(PageSizes.A4);
             page.Margin(22, Unit.Millimetre);
-            page.DefaultTextStyle(text => text.FontFamily(Fonts.Arial).FontSize(9).FontColor(Navy));
+            page.DefaultTextStyle(text => text.FontFamily(Fonts.Arial, ArabicFontFamily).FontSize(9).FontColor(Navy));
             page.Content().Element(container => ComposeA4Receipt(container, receipt));
             page.Footer().AlignCenter().Text(text =>
             {
@@ -1017,7 +1025,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
         page.ContinuousSize(widthMillimetres, Unit.Millimetre);
         page.MarginHorizontal(4, Unit.Millimetre);
         page.MarginVertical(5, Unit.Millimetre);
-        page.DefaultTextStyle(text => text.FontFamily(Fonts.Arial).FontSize(8).FontColor(Navy));
+        page.DefaultTextStyle(text => text.FontFamily(Fonts.Arial, ArabicFontFamily).FontSize(8).FontColor(Navy));
     }
 
     private static void ComposeA4Receipt(IContainer container, ReceiptResponse receipt)
@@ -1057,10 +1065,10 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
         container.AlignCenter().Column(column =>
         {
             column.Spacing(2);
-            column.Item().AlignCenter().Text(receipt.CompanyName).FontSize(companyFontSize).Bold();
+            TextDirection(column.Item().AlignCenter(), receipt.CompanyName).Text(receipt.CompanyName).FontSize(companyFontSize).Bold();
             if (!string.IsNullOrWhiteSpace(receipt.LegalName) &&
                 !string.Equals(receipt.LegalName, receipt.CompanyName, StringComparison.OrdinalIgnoreCase))
-                column.Item().AlignCenter().Text(receipt.LegalName).FontSize(8).FontColor(Slate);
+                TextDirection(column.Item().AlignCenter(), receipt.LegalName).Text(receipt.LegalName).FontSize(8).FontColor(Slate);
             column.Item().AlignCenter().Text("SALES RECEIPT")
                 .FontSize(subtitleFontSize).SemiBold().LetterSpacing(0.08f).FontColor(Slate);
         });
@@ -1119,7 +1127,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
                     column.Item().BorderBottom(1).BorderColor(Border).PaddingVertical(5).PaddingHorizontal(3).Column(itemColumn =>
                     {
                         itemColumn.Spacing(2);
-                        itemColumn.Item().Text(item.Name).FontSize(7.5f).SemiBold();
+                        TextDirection(itemColumn.Item(), item.Name).Text(item.Name).FontSize(7.5f).SemiBold();
                         itemColumn.Item().Row(row =>
                         {
                             row.RelativeItem(2).Text($"{item.Quantity:N2}{(string.IsNullOrWhiteSpace(item.UnitName) ? string.Empty : $" {item.UnitName}")} × {Money(item.UnitPrice, receipt.CurrencyCode)}")
@@ -1153,7 +1161,9 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
 
             foreach (var item in receipt.Items)
             {
-                table.Cell().BorderBottom(1).BorderColor(Border).PaddingVertical(6).PaddingHorizontal(5)
+                TextDirection(
+                        table.Cell().BorderBottom(1).BorderColor(Border).PaddingVertical(6).PaddingHorizontal(5),
+                        item.Name)
                     .Text(item.Name).FontSize(8).SemiBold();
                 ReceiptBodyCell(table.Cell().AlignRight(), $"{item.Quantity:N2}{(string.IsNullOrWhiteSpace(item.UnitName) ? string.Empty : $" {item.UnitName}")}", compact: false);
                 ReceiptBodyCell(table.Cell().AlignRight(), Money(item.UnitPrice, receipt.CurrencyCode), compact: false);
@@ -1204,7 +1214,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
         {
             column.Spacing(5);
             if (!string.IsNullOrWhiteSpace(receipt.Notes))
-                column.Item().Text(text =>
+                TextDirection(column.Item(), receipt.Notes).Text(text =>
                 {
                     text.Span("Note: ").FontColor(Slate);
                     text.Span(receipt.Notes);
@@ -1212,12 +1222,12 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
             column.Item().AlignCenter().Text("Thank you for your business").SemiBold();
             var contact = JoinNonEmpty(receipt.CompanyPhone, receipt.CompanyEmail, receipt.CompanyAddress);
             if (!string.IsNullOrWhiteSpace(contact))
-                column.Item().AlignCenter().Text(contact).FontSize(compact ? 6.5f : 7).FontColor(Slate);
+                TextDirection(column.Item().AlignCenter(), contact).Text(contact).FontSize(compact ? 6.5f : 7).FontColor(Slate);
         });
     }
 
     private static void ReceiptLabelValue(ColumnDescriptor column, string label, string value) =>
-        column.Item().Text(text =>
+        TextDirection(column.Item(), value).Text(text =>
         {
             text.Span($"{label}: ").FontColor(Slate);
             text.Span(value).SemiBold();
@@ -1229,8 +1239,10 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
 
     private static void ReceiptBodyCell(IContainer container, string text, bool compact, bool semiBold = false)
     {
-        var descriptor = container.BorderBottom(1).BorderColor(Border)
-            .PaddingVertical(compact ? 4 : 6).PaddingHorizontal(compact ? 2 : 5)
+        var descriptor = TextDirection(
+                container.BorderBottom(1).BorderColor(Border)
+                    .PaddingVertical(compact ? 4 : 6).PaddingHorizontal(compact ? 2 : 5),
+                text)
             .Text(text).FontSize(compact ? 7 : 8);
         if (semiBold) descriptor.SemiBold();
     }
@@ -1268,7 +1280,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
             {
                 page.Size(PageSizes.A4.Landscape());
                 page.Margin(14, Unit.Millimetre);
-                page.DefaultTextStyle(text => text.FontFamily(Fonts.Arial).FontSize(8).FontColor(Navy));
+                page.DefaultTextStyle(text => text.FontFamily(Fonts.Arial, ArabicFontFamily).FontSize(8).FontColor(Navy));
                 page.Header().Element(container => OperationalHeader(container, model));
                 page.Content().PaddingVertical(10).Column(column =>
                 {
@@ -1298,12 +1310,12 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
             row.RelativeItem().Column(column =>
             {
                 column.Spacing(2);
-                column.Item().Text(model.Company.Name).FontSize(17).Bold().FontColor(Navy);
+                TextDirection(column.Item(), model.Company.Name).Text(model.Company.Name).FontSize(17).Bold().FontColor(Navy);
                 if (!string.IsNullOrWhiteSpace(model.Company.LegalName) &&
                     !string.Equals(model.Company.LegalName, model.Company.Name, StringComparison.OrdinalIgnoreCase))
-                    column.Item().Text(model.Company.LegalName).FontSize(8).FontColor(Slate);
-                column.Item().Text(model.Title).FontSize(11).SemiBold().FontColor(Navy);
-                column.Item().Text(model.Subtitle).FontSize(8).FontColor(Slate);
+                    TextDirection(column.Item(), model.Company.LegalName).Text(model.Company.LegalName).FontSize(8).FontColor(Slate);
+                TextDirection(column.Item(), model.Title).Text(model.Title).FontSize(11).SemiBold().FontColor(Navy);
+                TextDirection(column.Item(), model.Subtitle).Text(model.Subtitle).FontSize(8).FontColor(Slate);
             });
             row.ConstantItem(255).AlignRight().Column(column =>
             {
@@ -1315,7 +1327,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
                 column.Item().AlignRight().Text($"Generated: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC").FontSize(7).FontColor(Slate);
                 var contact = JoinNonEmpty(model.Company.Phone, model.Company.Email, model.Company.Address);
                 if (!string.IsNullOrWhiteSpace(contact))
-                    column.Item().AlignRight().Text(contact).FontSize(7).FontColor(Slate);
+                    TextDirection(column.Item().AlignRight(), contact).Text(contact).FontSize(7).FontColor(Slate);
             });
         });
     }
@@ -1378,7 +1390,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
                         .BorderBottom(1).BorderColor(Border)
                         .PaddingVertical(5).PaddingHorizontal(4);
                     if (rightAligned.Contains(columnIndex)) cell = cell.AlignRight();
-                    cell.Text(value).FontSize(7);
+                    TextDirection(cell, value).Text(value).FontSize(7);
                 }
             }
         });
@@ -1419,7 +1431,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
     {
         page.Size(PageSizes.A4);
         page.Margin(24, Unit.Millimetre);
-        page.DefaultTextStyle(text => text.FontFamily(Fonts.Arial).FontSize(9).FontColor(Navy));
+        page.DefaultTextStyle(text => text.FontFamily(Fonts.Arial, ArabicFontFamily).FontSize(9).FontColor(Navy));
     }
 
     private static void ReportHeader(IContainer container, string companyName, string title, DateTime start, DateTime end)
@@ -1428,8 +1440,8 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
         {
             row.RelativeItem().Column(column =>
             {
-                column.Item().Text(companyName).FontSize(18).Bold().FontColor(Navy);
-                column.Item().Text(title).FontSize(11).FontColor(Slate);
+                TextDirection(column.Item(), companyName).Text(companyName).FontSize(18).Bold().FontColor(Navy);
+                TextDirection(column.Item(), title).Text(title).FontSize(11).FontColor(Slate);
             });
             row.AutoItem().AlignRight().Column(column =>
             {
@@ -1563,7 +1575,7 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
         container.Padding(4).Background(Light).Border(1).BorderColor(Border).Padding(9).Column(column =>
         {
             column.Item().Text(label).FontSize(7.5f).FontColor(Slate);
-            column.Item().Text(value).FontSize(9).SemiBold().FontColor(Navy);
+            TextDirection(column.Item(), value).Text(value).FontSize(9).SemiBold().FontColor(Navy);
         });
 
     private static void SignatureLine(IContainer container, string label) =>
@@ -1576,7 +1588,21 @@ public sealed class FinancialDocumentService(ApplicationDbContext context, IBran
         container.Background(Navy).PaddingVertical(6).PaddingHorizontal(5).Text(text).FontSize(8).SemiBold().FontColor(Colors.White);
 
     private static void BodyCell(IContainer container, string text) =>
-        container.BorderBottom(1).BorderColor(Border).PaddingVertical(6).PaddingHorizontal(5).Text(text).FontSize(8);
+        TextDirection(
+                container.BorderBottom(1).BorderColor(Border).PaddingVertical(6).PaddingHorizontal(5),
+                text)
+            .Text(text).FontSize(8);
+
+    private static IContainer TextDirection(IContainer container, string? text) =>
+        UsesArabicScript(text) ? container.ContentFromRightToLeft() : container;
+
+    private static bool UsesArabicScript(string? text) =>
+        !string.IsNullOrEmpty(text) && text.Any(character =>
+            character is >= '\u0600' and <= '\u06FF'
+                or >= '\u0750' and <= '\u077F'
+                or >= '\u08A0' and <= '\u08FF'
+                or >= '\uFB50' and <= '\uFDFF'
+                or >= '\uFE70' and <= '\uFEFF');
 
     private static void TotalRow(ColumnDescriptor column, string label, decimal value, string currency, bool compact = false) =>
         column.Item().Row(row =>
